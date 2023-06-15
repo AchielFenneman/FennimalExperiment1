@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <style>
+        /* General */
+        body{
+            overflow: hidden;
+            margin: 0 auto;
+            font-family: "Myriad Pro";
+        }
+        svg{
+            user-select: none;
+            width: 100%;
+            height: 100%
+        }
+        /* INSTRUCTIONS */
+        #instruction_cursor_travel {animation: instruction_cursor_travel_move 5s linear infinite;}
+        #instruction_cursor_travel .cursor_fill{ animation: instruction_cursor_travel_color 5s linear infinite}
+        #instruction_player_icon {animation: instruction_player_icon 5s linear infinite;}
+        .instructions_arrow { animation: highlighted_arrow 3s ease-in-out infinite alternate-reverse;}
+        .instructions_arrow rect { animation: highlighted_arrow 3s ease-in-out infinite alternate-reverse;}
+        #instruction_cursor_search {animation: instructions_search_cursor_move 10s linear infinite;}
+        #instruction_cursor_search .cursor_fill{ animation: instructions_cursor_search_color  10s linear infinite}
+        #instruction_flashlight_light {animation: instructions_search_light 10s linear infinite; transform-origin: center}
+        #instructions_Fennimal_icon {animation: instructions_search_outline 10s linear infinite; transform-origin: center}
+
+        @keyframes instruction_cursor_travel_move {
+            5% {transform: translate(-2%, -2%);}
+            45% {transform: translate(-2%, -2%);}
+            55% {transform: translate(-2%, 15%);}
+            99% {transform: translate(-2%, 15%);}
+        }
+        @keyframes instruction_cursor_travel_color {
+            0% {fill: white}
+            9% {fill: white}
+            10% {fill: red}
+            42% {fill: red}
+            43% {fill:white}
+            55% {fill:white}
+            58% {fill: red}
+            94% {fill: red}
+            95% {fill:white}
+            99% {fill: white}
+        }
+        @keyframes instruction_player_icon {
+            10% {transform: translate(0%, 0%);}
+            42% {transform: translate(0%, -17%);}
+            57% {transform: translate(0%, -17%);}
+            95% {transform: translate(0%, 0%);}
+
+        }
+        @keyframes instructions_search_cursor_move {
+            5% {transform: translate(-3%, -5%);}
+            15% {transform: translate(-3%, -5%);}
+            25% {transform: translate(-5%, -10%);}
+            45% {transform: translate(0%, -15%);}
+            50% {transform: translate(0%, -15%);}
+            60% {transform: translate(-1%, -20%);}
+            70% {transform: translate(-3%, -18%);}
+            90% {transform: translate(-3%, -18%);}
+            99% {transform: translate(-3%, -18%);}
+        }
+        @keyframes instructions_cursor_search_color {
+            0% {fill: white}
+            14% {fill: white}
+            15% {fill: red}
+            94% { fill: red}
+            95% {fill:white}
+        }
+        @keyframes instructions_search_light {
+            0% {opacity: 0; display: none}
+            5% {transform: translate(0%, 0%); }
+            14% {display: inherit}
+            15% {opacity: 0}
+            16% {opacity: 1}
+            25% {transform: translate(-2%, -5%); }
+            45% {transform: translate(2.5%, -10%); }
+            50% {transform: translate(2.5%, -10%);}
+            60% {transform: translate(1%, -17%);}
+            70% {transform: translate(0%, -13%);}
+            90% {transform: translate(0%, -13%);}
+            95% {opacity: 1}
+            96% {opacity: 0; display: none}
+            99% {transform: translate(0%, -13%);}
+        }
+        @keyframes instructions_search_outline {
+            0% {opacity: 0; display: none}
+            70% {opacity: 0; display: inherit}
+            75% {opacity: 1}
+            95% {opacity: 1}
+            99% {opacity: 0; display: none}
+
+        }
+
+        .instruction_page {
+            display: none
+        }
+        .instructions_button * {
+            transition: all 200ms ease-out;
+            cursor: pointer
+        }
+        .instructions_button rect {
+            animation: highlighted_arrow 2s ease-in-out infinite alternate-reverse;
+        }
+        .instructions_button tspan{
+            fill: darkblue;
+        }
+        .instructions_button text{
+            fill: darkblue;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .instructions_button g {
+            margin: 0 auto;
+            text-align: center;
+        }
+        .instructions_button:hover rect{
+            fill: black;
+            stroke-width: 0px;
+        }
+        .instructions_button:hover tspan{
+            fill: white
+        }
+        .instructions_button:hover text{
+            fill: white
+        }
+
+        .instructions_exploration_target_box {
+            display: none;
+        }
+        .instructions_exploration_target_box * {
+            transition: all 1s ease-in-out;
+        }
+        .instructions_exploration_target_box rect {
+           fill: whitesmoke;
+        }
+        .instructions_exploration_target_box text {
+            fill: gray;
+        }
+        .instructions_exploration_target_box path {
+            opacity: 0;
+        }
+
+        /* Seach and delivery */
+        .Fennimal_Search_Target {
+            display: none
+        }
+
+        /* Map */
+        .shimmered_object {
+            animation: highlighted_arrow 2s ease-in-out infinite alternate-reverse;
+        }
+        .shimmered_outline {
+            animation: shimmered_outline 2s ease-in-out infinite alternate-reverse;
+        }
+        @keyframes highlighted_arrow {
+            from {fill:  #ffa600; stroke: #58508d; }
+            to { fill: #58508d; stroke: #ffa600; }
+        }
+        @keyframes shimmered_outline {
+            from {stroke: #58508d; }
+            to {  stroke: #ffa600; }
+        }
+
+        /* Locations and arrows within locations */
+        .location {
+            transform-origin: center;
+
+        }
+
+        .icon_path {
+            display: none
+        }
+        .location_mask {
+            cursor:pointer;
+        }
+
+        .location_arrow {
+            animation: highlighted_arrow 3s ease-in-out infinite alternate-reverse;
+            opacity: 0.9;
+            display: none;
+            cursor: pointer;
+            stroke-width: 3px;
+        }
+        #home_button {
+            cursor:pointer;
+        }
+        #home_button rect {
+            animation: highlighted_arrow 2s ease-in-out infinite alternate-reverse;
+        }
+        #home_button text tspan {
+            animation: black_and_white_text 2s ease-in-out infinite alternate-reverse;
+
+        }
+        @keyframes black_and_white_text {
+            from {fill: black}
+            to { fill:white}
+        }
+
+        .return_arrow rect {
+            animation: highlighted_arrow 3s ease-in-out infinite alternate-reverse;
+            cursor: pointer;
+        }
+        .return_arrow path {
+            animation: highlighted_arrow 3s ease-in-out infinite alternate-reverse;
+            animation-delay: 1500ms;
+            cursor: pointer;
+        }
+        #return_to_home_button {
+            display: none;
+            cursor: pointer ;
+        }
+
+        foreignObject {
+            pointer-events: none;
+        }
+
+        /* FENNIMAL ELEMENTS */
+        .outline_target{
+            opacity: 0
+        }
+        .Fennimals_layer {
+            display: none
+        }
+        .Fennimal_outline {
+            transition: all 1s ease
+        }
+        #Fennimals_Mask_Layer{
+            transition: all 1s ease
+        }
+        #mask_Fennimals {
+            opacity: 0;
+            transition: all 1s ease;
+
+        }
+        .Fennimal_droptarget {
+            display: none;
+            stroke-width: 8px;
+            stroke-dasharray: 50;
+        }
+        .feedback_heart {
+            fill: pink;
+            transition: all 3.5s
+        }
+        .objective_achieved_star {
+            fill: gold;
+            transition: all 3.5s ease-out;
+        }
+        .objective_achieved_text tspan{
+            fill: gold;
+            stroke: goldenrod;
+            transition: all 1s ease-in-out;
+        }
+        .prompt {
+            display: none
+        }
+        #prompt_feedback rect {
+            fill: aliceblue;
+            stroke: darkblue;
+            opacity: 0.9;
+        }
+        #prompt_feedback text tspan{
+            fill: black
+        }
+        .item {
+            display: none
+        }
+        .item_icon {
+            display: none;
+            cursor: pointer;
+        }
+        #item_bar {
+            display: none;
+        }
+        .Fennimal_outline {
+            display: none;
+            stroke: transparent;
+        }
+        .Fennimal_droptarget {
+            stroke-dasharray: 50;
+            animation: dashstroke_action 7s linear infinite;
+        }
+        @keyframes dashstroke_action {
+            0% {
+                stroke-dashoffset: 0;
+                stroke: blue;
+            }
+            25% {
+                stroke: red;
+            }
+            50% {
+                stroke-dashoffset: 800;
+                stroke: blue;
+            }
+            51% {
+            }
+            100% {
+            }
+        }
+
+        /* TOP-LEVEL MASK */
+        #Mask_Layer {
+            display: none
+        }
+        .moving_jeep_inbound {
+            animation: moving_jeep_inbound 1.25s ease-in ;
+        }
+        @keyframes moving_jeep_inbound {
+            100% {transform: translate(-130%, 0%);}
+        }
+        .moving_jeep_outbound {
+            animation: moving_jeep_outbound 1.25s ease-in ;
+        }
+        @keyframes moving_jeep_outbound {
+            100% {transform: translate(130%, 0%);}
+        }
+
+        /* Ingame hints box */
+        #Ingame_Hints_Layer {
+            pointer-events: none;
+            display: inherit;
+        }
+        #hint_box_rect {
+            display: none;
+        }
+        .ingame_hint_container {
+            vertical-align: center;
+            border: .075em dashed #00000033;
+            border-radius: 20px;
+
+        }
+        .ingame_hint_text {
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto;
+            font-size: larger;
+            background-color: #FFFFFF88;
+            color: #000000AA;
+            pointer-events:none
+        }
+
+        /*ITEMS */
+        #item_spinner .item_container_active {
+            animation: rotation 700ms ease-in-out infinite;
+            transform-origin: 35px 37px
+        }
+        #item_boomerang .spin_container_active {
+            transform-origin: 35px 35px;
+            animation: boomerang_rotation 3000ms linear infinite;
+        }
+        #item_boomerang .movement_container_active {
+            transform-origin: 35px 35px;
+            animation: boomerang_movement 3000ms ease-in-out infinite;
+        }
+        #item_balloon .movement_container_active {
+            transform-origin: 35px 35px;
+            animation: balloon_movement 3000ms linear infinite;
+        }
+        #item_trumpet .swing_container_active {
+            transform-origin: 75px 10px;
+            animation: trumpet_swing 3000ms linear infinite;
+        }
+        #item_shovel .movement_container_active {
+            transform-origin: 45px 45px;
+            animation: shovel_movement 2000ms linear infinite;
+        }
+        #item_car .movement_container_active{
+            transform-origin: 45px 42px;
+            animation: driving_car 3000ms linear infinite;
+        }
+        @keyframes rotation {
+            from {transform: rotate(0deg);}
+            to {transform: rotate(359deg); }
+        }
+        @keyframes boomerang_movement {
+            5% { translate: 0 -10px}
+            50% { translate: 200px -50px}
+            95% {translate: 0 0}
+        }
+        @keyframes boomerang_rotation {
+            5% { transform: rotate(0deg);}
+            50% { transform: rotate(350deg);}
+            52% { transform: rotate(360deg);}
+            95% { transform: rotate(720deg);}
+            95.1% { transform: rotate(0deg);}
+        }
+        @keyframes balloon_movement {
+            50% {translate: 0 -80px}
+            54% {translate: 0 -75px}
+            58% {translate: 0 -80px}
+            61% {translate: 0 -77px}
+            64% {translate: 0 -80px}
+            80% {translate: 0 -80px}
+            95% {translate: 0 10px}
+        }
+        @keyframes trumpet_swing {
+            10% { transform: rotate(20deg);}
+            20% { transform: rotate(0deg);}
+            28% { transform: rotate(25deg);}
+            45% { transform: rotate(0deg);}
+            55% { transform: rotate(-20deg);}
+            67% { transform: rotate(25deg);}
+            70% { transform: rotate(20deg);}
+            75% { transform: rotate(25deg);}
+            80% { transform: rotate(18deg);}
+            87% { transform: rotate(23deg);}
+        }
+        @keyframes shovel_movement {
+            10% { translate: -30px -20px; transform: rotate(20deg);}
+            30% { translate: -50px 20px; transform: rotate(30deg);}
+            40% { translate: -20px 20px; transform: rotate(-10deg);}
+            50% { translate: 20px 20px; transform: rotate(-30deg);}
+            60% { translate: 20px 20px; transform: rotate(-40deg);}
+            85% { translate: 40px -20px; transform: rotate(30deg);}
+            100% { translate: 0px 0px; transform: rotate(0deg);}
+        }
+        @keyframes driving_car {
+            10% {translate: 40px 70px}
+            25% {translate: -70px 70px}
+            30% {translate: -95px 70px}
+            45% {translate: 30px 70px}
+            50% {translate: 40px 70px}
+            55% {translate: 30px 70px}
+            65% {translate: -60px 70px}
+            70% {translate: -80px 70px}
+            75% {translate: -60px 70px}
+            85% {translate: 20px 70px}
+            95% {translate: 0px 70px}
+        }
+
+        /* TEST PHASE */
+        .day_box {
+            stroke-width: 3px;
+            transition: all 750ms ease-in-out;
+            fill: #444444;
+            stroke: #666666;
+        }
+        .day_box text {
+            fill: #666666;
+            stroke-width: 0;
+            text-anchor: middle;
+            dominant-baseline: middle;
+            transition: all 750ms linear;
+            font-size: 40px;
+            font-weight: bold;
+
+        }
+        .day_box_past {
+            fill: #144814;
+            stroke: #217821;
+        }
+        .day_box_past text { fill: #217821 }
+        .day_box_present {
+            fill: #2d4465;
+            stroke: #ffa600;
+        }
+        .day_box_present text { fill: #ffa600 }
+
+        /* GENERAL OBJECTS */
+        .ingame_button {
+            cursor: pointer;
+        }
+        .ingame_button rect {
+            animation: highlighted_arrow 3s ease-in-out infinite alternate-reverse;
+            opacity: 0.9;
+            stroke-width: 3px;
+        }
+        .ingame_button text {
+            text-anchor: middle;
+            dominant-baseline: middle;
+            font-size: 25px;
+            font-weight: bold;
+            opacity: 0.5
+        }
+
+        .instruction_title {
+            text-anchor: middle;
+            dominant-baseline: middle;
+            font-size: 30px;
+            font-weight: bold;
+            fill: black;
+        }
+        .instruction_background {
+            fill: white;
+            opacity: 0.2;
+        }
+        .basic_instructions_text {
+            font-size: 11px;
+
+        }
+        .basic_instructions_text p {
+            padding-left: 1%;
+            padding-top: 1%;
+            line-height: 1.1;
+            margin: 0;
+        }
+        .score_star {
+            fill: lightgray;
+            stroke: #BBBBBB;
+            stroke-width: 3px;
+            transition: all 1s ease-in-out;
+        }
+        .score_star_achieved {
+            fill:gold;
+            stroke: goldenrod;
+            transition: all 1s ease-in-out;
+            animation: score_star_achieved_animation 750ms ease-in-out alternate-reverse infinite;
+        }
+        @keyframes score_star_achieved_animation {
+            from {fill:  gold; stroke: goldenrod; }
+            to { fill: #fcdd95; stroke: #f2c55a }
+        }
+
+
+
+    </style>
+    <link href="https://fonts.cdnfonts.com/css/myriad-pro" rel="stylesheet">
+</head>
+<body>
+<div id="exp_div">
+    <div id="SVG_container" style="width:100%"></div>
+</div>
+
+<div id="formcontainer" style="display: none" >
+    <form action="https://api.staticforms.xyz/submit" method="post">
+        <!-- Replace with accesKey sent to your email -->
+        <input type="hidden" name="accessKey" value="2c6330f1-699e-47a9-9391-207212a0a937"> <!-- Required -->
+        <textarea name="message" id='data_form_field'></textarea> <!-- Optional -->
+        <input type="text" name="honeypot" style="display: none;"> <!-- Optional -->
+
+        <!-- If you want form to redirect to a specific url after submission -->
+        <input id="submitbutton" type="submit" value="Submit" />
+    </form>
+</div>
+
+</body>
+
+<script type="text/javascript" src = "SVG_data.js"></script>
+<script type="text/javascript" src="scannimals2.js"></script>
+</html>
