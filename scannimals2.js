@@ -6364,7 +6364,7 @@ ExperimentController = function(Stimuli, DataController){
         DataCont.experiment_completed()
         InstrCont.show_final_screen(DataCont.get_score(), DataCont.submitDataForm)
     }
-    
+
 }
 
 //Create this object to generate and store all the different Fennimals encountered for a participant number.
