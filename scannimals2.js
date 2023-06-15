@@ -208,7 +208,6 @@ function RotateElem(Elem, degrees){
     Elem.transform.baseVal.getItem(0).setMatrix( matrix );
 }
 
-
 //Get the mouse position ON THE SVG ELEMENT
 function getMousePosition(evt) {
     let CTM = SVGObjects.SVG.getScreenCTM();
@@ -6365,9 +6364,7 @@ ExperimentController = function(Stimuli, DataController){
         DataCont.experiment_completed()
         InstrCont.show_final_screen(DataCont.get_score(), DataCont.submitDataForm)
     }
-
-    experiment_complete()
-
+    
 }
 
 //Create this object to generate and store all the different Fennimals encountered for a participant number.
@@ -6887,7 +6884,7 @@ let SVGObjects = {
 let DataCont = new DataController(participant_number, Stimuli)
 
 let EC = new ExperimentController(Stimuli, DataCont)
-//EC.showStartScreen()
+EC.showStartScreen()
 //EC.show_starting_instructions()
 //EC.start_targeted_search_subphase()
 //EC.start_delivery_subphase()
