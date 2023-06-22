@@ -301,6 +301,75 @@ function SplitArrayIntoParts(arr, size_per_part){
     return(Segments)
 }
 
+//Returns an SVG group object with the requested Fennimal (all set to visible). Also includes the target.
+function createFennimal(head,body, primary_color,secondary_color,tertiary_color){
+    //Create a new group to hold the Fennimal
+    let Container = document.createElementNS("http://www.w3.org/2000/svg", 'g')
+
+    //First copy the body
+    let BodyObj = document.getElementById("body_" + body).cloneNode(true)
+    Container.appendChild(BodyObj)
+    BodyObj.style.display = "inherit"
+
+    //Then the head
+    let HeadObj = document.getElementById("head_" + head).cloneNode(true)
+    Container.appendChild(HeadObj)
+    HeadObj.style.display = "inherit"
+
+    //Then the droptarget
+    let TargetObj = document.getElementById("Fennimal_droptarget").cloneNode(true)
+    Container.appendChild(TargetObj)
+
+    //Color the elements
+    //Set primary color regions
+    let Primary_regions = Container.getElementsByClassName("Fennimal_primary_color")
+    for(let i = 0; i< Primary_regions.length; i++){
+        Primary_regions[i].style.fill = primary_color
+    }
+
+    //Set secondary colors
+    let Secondary_regions =  Container.getElementsByClassName("Fennimal_secondary_color")
+    for(let i = 0; i< Secondary_regions.length; i++){
+        Secondary_regions[i].style.fill = secondary_color
+    }
+
+    //Set tertiary colors
+    let Tertiary_regions =  Container.getElementsByClassName("Fennimal_tertiary_color")
+    for(let i = 0; i< Tertiary_regions.length; i++){
+        Tertiary_regions[i].style.fill = tertiary_color
+    }
+
+    // Returns SVG layer
+    return(Container)
+}
+
+//Returns an SVG group object with the requested Fennimal outline. Also contains the search targets
+function createFennimalOutline(head,body){
+    let Container = document.createElementNS("http://www.w3.org/2000/svg", 'g')
+
+    //Copy the body outline
+    let BodyObj = document.getElementById("outline_body_" + body).cloneNode(true)
+    BodyObj.id = "outline_body"
+    Container.appendChild(BodyObj)
+    BodyObj.style.display = "inherit"
+
+    //Then the head
+    let HeadObj = document.getElementById("outline_head_" + head).cloneNode(true)
+    Container.appendChild(HeadObj)
+    HeadObj.id = "outline_head"
+    HeadObj.style.display = "inherit"
+
+    //Then the targets for both the head and the body
+    let BodyTargets = document.getElementById("targets_body_" + body).cloneNode(true)
+    Container.appendChild(BodyTargets)
+    let HeadTargets = document.getElementById("targets_head_" + head).cloneNode(true)
+    Container.appendChild(HeadTargets)
+
+    //Return SVG layer
+    return(Container)
+
+}
+
 STIMULUSDATA = function(participant_number){
     // SETTING STIMULUS PARAMETERS //
     /////////////////////////////////
@@ -311,23 +380,23 @@ STIMULUSDATA = function(participant_number){
 
     // TODO: REMOVE FOR ACTUAL EXPERIMENT. In actual experiment, define pairs directly. This is just for pilotting purposes!
     if(Math.random() > 0.5){
-        location_pairs_in_training_set = 3
-        type_pairs_in_training_set = 0
+        location_pairs_in_training_set = 2
+        type_pairs_in_training_set = 1
     }else{
-        location_pairs_in_training_set = 0
-        type_pairs_in_training_set = 3
+        location_pairs_in_training_set = 1
+        type_pairs_in_training_set = 2
     }
 
     //If set to TRUE, then the tertiary color of a Fennimal is always set to equal the location of the Fennimal.
     //If set to FALSE, then tertiary colors are (pseudo)randomly assigned
-    let tertiary_colors_based_on_location = false
+    let tertiary_colors_based_on_location = true
 
     // This governs the logic for the color scheme sampling. There are three ways to determine the primary and secondary color schemes.
     //      unique: all Fennimals will have a unique color scheme. Sampled to be differentiated (different primary colors) between training pairs AND between training / test.
     //      both_training_same: pairs in the same training pair will have the same color scheme, each of the test trials will have a different color scheme (sampled to be differentiated)
     //      training_test_same: each training trial will have a different color scheme (sampled to be differentiated within a pair), each test trial matches its associated training trial
     //      location: colors are always set to match the color schemes of the regions in which the Fennimals reside.
-    let color_sampling_method = "location"
+    let color_sampling_method = "both_training_same"
 
     // Defines the maximum number of test trials.
     // Note that for some combinations of location and type pairs, the actual number of possible unique test trials can be substantially lower than this.
@@ -338,42 +407,10 @@ STIMULUSDATA = function(participant_number){
     //  If the number of max test trials is set to lower than this amount, test trials will be sampled across pairs to be as uniform over the remaining locations as possible.
     let max_number_of_test_trials_per_training_trial = 2
 
-    // If set to true, includes the training set Fennimals in the test phase. If set to false, then the test phase only includes new Fennimals
-    let include_training_fennimals_in_test_set = true
-
-    //Determines how the items are paired to the Fennimals. Allows for the following two inputs:
-    //      unique: all training-set Fennimals will be associated to a different item. Requires 2*(total number of pairs) items to be available. Will throw an error if there are more Fennimals that need to be generated
-    //      paired: each item occurs twice - but no two items ever co-occur more than once. Associates Fennimals in pair [i in 0 to n] with items [i, i+1]. Exception for pair n, which will take [i,0]\
-    let item_sampling_method = "unique"
-
-    //Do not touch. Determines the total number of test trials that are going to be generated with the specified parameters.
-    //  Note that each unique trial will be shown twice: for both direct and indirect versions.
-    function get_total_number_of_unique_test_trials(){
-        let number_of_available_regions = Param.region_Names.length - 1 //Removing Home as an available region for Fennimal trials.
-        let number_of_available_Fennimal_types = Param.Available_Fennimals.length
-
-        let total_number_of_pairs = location_pairs_in_training_set + type_pairs_in_training_set
-
-        let number_of_regions_consumed_during_training = location_pairs_in_training_set + 2*type_pairs_in_training_set
-        let number_of_locations_available_for_test_trials = (number_of_available_regions - number_of_regions_consumed_during_training) * 2
-
-        let number_of_types_consumed_during_training = number_of_available_Fennimal_types - (type_pairs_in_training_set + 2*location_pairs_in_training_set)
-        let number_of_types_available_for_test_trials = number_of_available_Fennimal_types - number_of_types_consumed_during_training
-
-        return( Math.min(
-            max_number_of_test_trials_per_training_trial * total_number_of_pairs * 2, //Maximum number determined above.
-            number_of_locations_available_for_test_trials * 2 * total_number_of_pairs ,//Maximum number constrained by the unconsumed locations. Test trials for the type pairs do not require any new locations, but each available location contributes 2 trials for each location pair
-            number_of_types_available_for_test_trials * 2 * total_number_of_pairs //Maximum number as constrained by the unconsumed types. Test trials for the location pairs do not require any new types, but each type can contribute at most 2 trials for each available type pair.
-        ))
-    }
-    let number_unique_test_trials = get_total_number_of_unique_test_trials()
-
-    //Now we can print some data to the console to confirm the number of test and training trials. Note that each test trial comes in two flavors (with identical Fennimals / locations): a direct and indirect version.
-    if(include_training_fennimals_in_test_set){
-        console.log("%c Generating " + (2*(location_pairs_in_training_set + type_pairs_in_training_set)) + " training trials and " + (number_unique_test_trials*2 + 2*(location_pairs_in_training_set + type_pairs_in_training_set)) + " test trials (" + number_unique_test_trials + " direct and indirect, plus "+ 2*(location_pairs_in_training_set + type_pairs_in_training_set) +  " repeated training trials)", 'background:lightblue')
-    }else{
-        console.log("%c Generating " + (2*(location_pairs_in_training_set + type_pairs_in_training_set)) + " training trials and " + (number_unique_test_trials*2) + " test trials (" + number_unique_test_trials + " direct and indirect)", 'background:lightblue')
-    }
+    // Can be set to false (both Fennimals in a training set never share any features), "body" (training pairs always have the same body) or "head" (training pairs always have the same head).
+    // NB: this only affects location pairs! (type pairs already have the same bodies and heads)
+    // NB: If set to body (or head), then for location pairs each test-phase Fennimal will have a unique body (head)
+    let parts_shared_by_training_pair = "body"
 
     // RESETTING THE RNG SEED HERE //
     ////////////////////////////////
@@ -382,10 +419,9 @@ STIMULUSDATA = function(participant_number){
 
     // CREATING ALL THE FENNIMAL OBJECTS (SANS COLORS) HERE //
     //The following two variables keep track of which regions have been assigned in the stimulus creating process.
-    let Available_Types = JSON.parse(JSON.stringify(Param.Available_Fennimals))
-
-    //Shuffling
-    shuffleArray(Available_Types)
+    let Available_Heads = shuffleArray(Param.Available_Fennimal_Heads)
+    let Available_Bodies = shuffleArray(Param.Available_Fennimal_Bodies)
+    let Available_Names = shuffleArray(Param.Available_Names)
 
     //Creating each pair as an element in an array (each element containing an array of two objects). Here we initialize the FennimalObjects.
     // Regions are draw by order of inclusion (to maximize dis-similarity for the training pairs)
@@ -399,18 +435,44 @@ STIMULUSDATA = function(participant_number){
         let sampled_region = Regions_for_training_pairs.splice(0,1)[0]
         let sampled_locations = shuffleArray(JSON.parse(JSON.stringify(Param.RegionData[sampled_region].Locations)))
 
-        //Destructively draw two types (A and B)
-        let sampled_type_A = Available_Types.splice(0,1)[0]
-        let sampled_type_B = Available_Types.splice(0,1)[0]
+        //Now we need to sample the body parts of the Fennimals. The exact sampling depends on the setting defined above
+        let head_A, head_B, body_A, body_B
+        switch(parts_shared_by_training_pair){
+            case(false):
+                // Both Fennimals have unique bodies and heads
+                head_A = Available_Heads.splice(0,1)[0]
+                head_B = Available_Heads.splice(0,1)[0]
+                body_A = Available_Bodies.splice(0,1)[0]
+                body_B = Available_Bodies.splice(0,1)[0]
+                break
+            case("head"):
+                // Both Fennimals share the same head, but with different bodies
+                head_A = Available_Heads.splice(0,1)[0]
+                head_B = head_A
+                body_A = Available_Bodies.splice(0,1)[0]
+                body_B = Available_Bodies.splice(0,1)[0]
+                break
+            case("body"):
+                // Both Fennimals share the same body, but with different heads
+                head_A = Available_Heads.splice(0,1)[0]
+                head_B = Available_Heads.splice(0,1)[0]
+                body_A = Available_Bodies.splice(0,1)[0]
+                body_B = body_A
+                break
+        }
 
         //Determine the names
-        let name_A = Param.RegionData[sampled_region].prefix + " " + sampled_type_A
-        let name_B = Param.RegionData[sampled_region].prefix + " " + sampled_type_B
+        let name_A = Available_Names.splice(0,1)[0]
+        let name_B = Available_Names.splice(0,1)[0]
+
+        //Determine a random shift in the x-position
+        let shifted_x_A = randomIntFromInterval(0,Param.max_x_shift)
+        let shifted_x_B = randomIntFromInterval(0,Param.max_x_shift)
 
         //Push to TrainingPairs
         TrainingPairs.push([
-            {name: name_A, type: sampled_type_A, region: sampled_region, location: sampled_locations[0], pairtype: "location"},
-            {name: name_B, type: sampled_type_B, region: sampled_region, location: sampled_locations[1], pairtype: "location"}, ])
+            {name: name_A, head: head_A, body: body_A, region: sampled_region, location: sampled_locations[0],shifted_x: shifted_x_A, pairtype: "location"},
+            {name: name_B, head: head_B, body: body_B, region: sampled_region, location: sampled_locations[1],shifted_x: shifted_x_B, pairtype: "location"}, ])
     }
 
     //Adding the type pairs
@@ -422,17 +484,22 @@ STIMULUSDATA = function(participant_number){
         let sampled_location_A = shuffleArray(JSON.parse(JSON.stringify(Param.RegionData[sampled_region_A].Locations)))[0]
         let sampled_location_B = shuffleArray(JSON.parse(JSON.stringify(Param.RegionData[sampled_region_B].Locations)))[0]
 
-        //Destructively sample one type
-        let sampled_type = Available_Types.splice(0,1)[0]
+        //Destructively sample one head and one body
+        let head = Available_Heads.splice(0,1)[0]
+        let body = Available_Bodies.splice(0,1)[0]
 
         //Determine the names
-        let name_A = Param.RegionData[sampled_region_A].prefix + " " + sampled_type
-        let name_B = Param.RegionData[sampled_region_B].prefix + " " + sampled_type
+        let name_A = Available_Names.splice(0,1)[0]
+        let name_B = Available_Names.splice(0,1)[0]
+
+        //Determine a random shift in the x-position
+        let shifted_x_A = randomIntFromInterval(0,Param.max_x_shift)
+        let shifted_x_B = randomIntFromInterval(0,Param.max_x_shift)
 
         // Push to TrainingPairs
         TrainingPairs.push([
-            {name: name_A, type: sampled_type, region: sampled_region_A, location: sampled_location_A, pairtype: "type"},
-            {name: name_B, type: sampled_type, region: sampled_region_B, location: sampled_location_B, pairtype: "type"}])
+            {name: name_A, head: head, body: body, region: sampled_region_A, location: sampled_location_A,shifted_x: shifted_x_A, pairtype: "type"},
+            {name: name_B, head: head, body: body, region: sampled_region_B, location: sampled_location_B,shifted_x: shifted_x_B, pairtype: "type"}])
     }
 
     //Shuffle the pairs
@@ -441,18 +508,11 @@ STIMULUSDATA = function(participant_number){
     // SETTING THE ITEMS USED
     // Algorithm used is defined above
     let Items_Used_In_Experiment
-    switch(item_sampling_method){
-        case("unique"):
-            let number_of_items_required = 2 * (type_pairs_in_training_set + location_pairs_in_training_set)
-            if(number_of_items_required > Param.Available_items.length){
-                console.error("Attempting to assign more items (" + number_of_items_required + ") than available in Parameters (" + Param.Available_items.length + ")" )
-            }else{
-                Items_Used_In_Experiment = drawRandomElementsFromArray(Param.Available_items, number_of_items_required, false )
-            }
-            break
-        case("paired"):
-            Items_Used_In_Experiment = drawRandomElementsFromArray(Param.Available_items, type_pairs_in_training_set + location_pairs_in_training_set, false )
-            break
+    let number_of_items_required = 2 * (type_pairs_in_training_set + location_pairs_in_training_set)
+    if(number_of_items_required > Param.Available_items.length){
+        console.error("Attempting to assign more items (" + number_of_items_required + ") than available in Parameters (" + Param.Available_items.length + ")" )
+    }else{
+        Items_Used_In_Experiment = drawRandomElementsFromArray(Param.Available_items, number_of_items_required, false )
     }
 
     //Given an array of used items, generates the set of items used and their color. Stores in Item_Details an object keyed on the item names, with two properties: location_on_screen (numeric) and backgroundColor
@@ -478,42 +538,25 @@ STIMULUSDATA = function(participant_number){
     let Item_Details = generate_item_details(Items_Used_In_Experiment)
 
     //Assign items to the pairs
-    switch (item_sampling_method){
-        case("unique"):
-            let Random_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
+    let Random_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
 
-            for(let i =0;i<TrainingPairs.length;i++){
-                // The first pair should have items [0,1]. The second pair should have [2,3] ... the last pair should have [2n-1,2n], with n being the number of pairs.
-                //      Hence: pair i should have items [2i, 2i+1], with i starting at 0
-                TrainingPairs[i][0].item = Random_Items[2*i]
-                TrainingPairs[i][1].item = Random_Items[2*i + 1]
-            }
-            break
-        case("paired"):
-                        for(let i =0;i<TrainingPairs.length;i++){
-                // The first pair should have items [1,2]. The second pair should have [2,3] ... the last pair should have [n,1], with n being the number of pairs.
-                //Select the correct two items. For all but the last pair this should be [i,i+1] of UsedItems. For the last pair it should be [i,0]
-
-                let item_A = Item_Details.All_Items[i]
-                let item_B
-                if(i === TrainingPairs.length-1){
-                    item_B = Item_Details.All_Items[0]
-                }else {
-                    item_B = Item_Details.All_Items[i+1]
-                }
-
-                //Assigning items
-                TrainingPairs[i][0].item = item_A
-                TrainingPairs[i][1].item = item_B
-            }
-            break
+    for(let i =0;i<TrainingPairs.length;i++){
+        // The first pair should have items [0,1]. The second pair should have [2,3] ... the last pair should have [2n-1,2n], with n being the number of pairs.
+        //      Hence: pair i should have items [2i, 2i+1], with i starting at 0
+        TrainingPairs[i][0].item = Random_Items[2*i]
+        TrainingPairs[i][1].item = Random_Items[2*i + 1]
     }
 
     // GENERATING THE TEST TRIALS
     // If possible, we would like the test trials to be as unique as possible. Therefore, we'll spread out the available locations (not regions!) and types as much as possible
-    let UseCountsOfAvailableTypes = {}
-    for(let i = 0;i<Available_Types.length;i++){
-        UseCountsOfAvailableTypes[Available_Types[i]] = 0
+    let UseCountsOfAvailableHeads = {}
+    for(let i = 0;i<Available_Heads.length;i++){
+        UseCountsOfAvailableHeads[Available_Heads[i]] = 0
+    }
+
+    let UseCountsOfAvailableBodies = {}
+    for(let i = 0;i<Available_Bodies.length;i++){
+        UseCountsOfAvailableBodies[Available_Bodies[i]] = 0
     }
 
     let UseCountsOfAvailableLocations = {}
@@ -549,9 +592,11 @@ STIMULUSDATA = function(participant_number){
     //      In addition, the number of test trials per training trial may be limited by the input given above.
     //      If there is a restriction, we want to vary the locations and types used as much as possible.
     let number_of_available_locations = Object.getOwnPropertyNames(UseCountsOfAvailableLocations).length
-    let number_of_available_types = Object.getOwnPropertyNames(UseCountsOfAvailableTypes).length
-    let number_of_test_trials_per_training_trial = Math.min(number_of_available_locations, number_of_available_types, max_number_of_test_trials_per_training_trial)
+    let number_of_available_heads = Object.getOwnPropertyNames(UseCountsOfAvailableHeads).length
+    let number_of_available_bodies = Object.getOwnPropertyNames(UseCountsOfAvailableBodies).length
+    let number_of_test_trials_per_training_trial = Math.min(number_of_available_locations, number_of_available_bodies, number_of_available_heads, max_number_of_test_trials_per_training_trial)
 
+    //Generating test trials here
     let TestTrialsPerPair = []
     for(let i = 0; i<TrainingPairs.length;i++){
         let pair_type = TrainingPairs[i][0].pairtype
@@ -566,12 +611,27 @@ STIMULUSDATA = function(participant_number){
 
                 //Creating the Fennimal object (sans color scheme!)
                 for(let location_ind = 0; location_ind < Sampled_Locations.length; location_ind++){
-                    //The test trials associated to a location pair always have one of the pair's Fennimals
+                    //The test trials associated to a location pair always have one of the pair's Fennimals location.
+                    //Note: if parts are shared between the location pairs, then a new part has to be selected here
+                    let head = TrainingTrial.head
+                    let body = TrainingTrial.body
+                    if(parts_shared_by_training_pair === "body"){
+                        //The body is the same for both training stimuli. To prevent direct overlaps, create a new body for the test phase Fennimal here
+                        body = get_n_elements_with_lowest_counts(1, UseCountsOfAvailableBodies)[0]
+                        UseCountsOfAvailableBodies[body] = UseCountsOfAvailableBodies[body] + 1
+                    }
+                    if(parts_shared_by_training_pair === "head"){
+                        head = get_n_elements_with_lowest_counts(1, UseCountsOfAvailableHeads)[0]
+                        UseCountsOfAvailableHeads[head] = UseCountsOfAvailableHeads[head] + 1
+                    }
+
                     let TestFennimal = {
-                        type: TrainingTrial.type,
+                        head: head,
+                        body: body,
                         location: Sampled_Locations[location_ind],
                         region: Param.get_region_of_location(Sampled_Locations[location_ind]),
-                        name: Param.RegionData[ Param.get_region_of_location(Sampled_Locations[location_ind]) ].prefix + " " + TrainingTrial.type,
+                        name: Available_Names.splice(0,1)[0],
+                        shifted_x: randomIntFromInterval(0,Param.max_x_shift)
                     }
 
                     //Finding direct and indirectly associated items
@@ -596,17 +656,20 @@ STIMULUSDATA = function(participant_number){
             for(let num_in_pair = 0; num_in_pair <= 1; num_in_pair++){
                 let TrainingTrial = TrainingPairs[i][num_in_pair]
 
-                //Find the n least used types
-                let Sampled_Types = get_n_elements_with_lowest_counts(number_of_test_trials_per_training_trial, UseCountsOfAvailableTypes)
+                //Find the n least used heads and bodies
+                let Sampled_Heads = get_n_elements_with_lowest_counts(number_of_test_trials_per_training_trial, UseCountsOfAvailableHeads)
+                let Sampled_Bodies = get_n_elements_with_lowest_counts(number_of_test_trials_per_training_trial, UseCountsOfAvailableBodies)
 
                 //Creating the Fennimal object (sans color scheme!)
-                for(let type_ind = 0; type_ind < Sampled_Types.length; type_ind++){
+                for(let type_ind = 0; type_ind < number_of_test_trials_per_training_trial; type_ind++){
                     //The test trials associated to a location pair always have one of the pair's Fennimals
                     let TestFennimal = {
-                        type: Sampled_Types[type_ind],
+                        head: Sampled_Heads[type_ind],
+                        body: Sampled_Bodies[type_ind],
                         location: TrainingTrial.location,
                         region: Param.get_region_of_location(TrainingTrial.location),
-                        name: Param.RegionData[ Param.get_region_of_location(TrainingTrial.location) ].prefix + " " + Sampled_Types[type_ind]
+                        name: Available_Names.splice(0,1)[0],
+                        shifted_x: randomIntFromInterval(0,Param.max_x_shift)
                     }
 
                     //Finding direct and indirectly associated items
@@ -619,7 +682,8 @@ STIMULUSDATA = function(participant_number){
                     }
 
                     //Incrementing the locations used count
-                    UseCountsOfAvailableTypes[Sampled_Types[type_ind]] = UseCountsOfAvailableTypes[Sampled_Types[type_ind]] + 1
+                    UseCountsOfAvailableHeads[Sampled_Heads[type_ind]] = UseCountsOfAvailableHeads[Sampled_Heads[type_ind]] + 1
+                    UseCountsOfAvailableBodies[Sampled_Bodies[type_ind]] = UseCountsOfAvailableBodies[Sampled_Bodies[type_ind]] + 1
 
                     //Push to the output array
                     AssociatedTestTrials[num_in_pair].push(TestFennimal)
@@ -687,8 +751,8 @@ STIMULUSDATA = function(participant_number){
 
                 //If the tertiary colors should be based on the location, then overwrite these values
                 if(tertiary_colors_based_on_location){
-                    tertiary_color_A = Param.RegionData[TrainingPairs[i][0].region].color
-                    tertiary_color_B = Param.RegionData[TrainingPairs[i][1].region].color
+                    tertiary_color_A = Param.RegionData[TrainingPairs[i][0].region].Fennimal_location_colors.tertiary
+                    tertiary_color_B = Param.RegionData[TrainingPairs[i][1].region].Fennimal_location_colors.tertiary
                 }
 
                 TrainingPairs[i][0].primary_color = primary_color_A
@@ -772,7 +836,7 @@ STIMULUSDATA = function(participant_number){
                             e !== TrainingPair_ColorsUsed[1].tertiary_color )
                         let tertiary_color = ColorScheme.getColorSchemes().TertiaryColors[drawRandomElementsFromArray(tertiary_colors_available, 1, false)[0]]
                         if(tertiary_colors_based_on_location){
-                            tertiary_color = Param.RegionData[TrainingPairs[i][num_in_pair].region].color // TestTrialsPerPair[i][num_in_pair][test_trial_index].location
+                            tertiary_color = Param.RegionData[TrainingPairs[i][num_in_pair].region].Fennimal_location_colors.tertiary // TestTrialsPerPair[i][num_in_pair][test_trial_index].location
                         }
 
                         //Setting the correct colors to the FennimalObj in the training trial
@@ -817,8 +881,8 @@ STIMULUSDATA = function(participant_number){
 
                 //If the tertiary colors should be based on the location, then overwrite these values
                 if(tertiary_colors_based_on_location){
-                    tertiary_color_A = Param.RegionData[TrainingPairs[i][0].region].color
-                    tertiary_color_B = Param.RegionData[TrainingPairs[i][1].region].color
+                    tertiary_color_A = Param.RegionData[TrainingPairs[i][0].region].Fennimal_location_colors.tertiary
+                    tertiary_color_B = Param.RegionData[TrainingPairs[i][1].region].Fennimal_location_colors.tertiary
                 }
 
                 TrainingPairs[i][0].primary_color = primary_color_A
@@ -843,8 +907,8 @@ STIMULUSDATA = function(participant_number){
             }
             break
         case("both_training_same"):
-        //Here each training pair has the same primary and second color schemes. The test trials can have any color scheme, as long as their colors do not overlap with this primary / secondary pair.
-        //So: we first determine the colors for each training pair. We sample primary and secondary colors to equally spread over the available colors. Sample destructively from ColorsAvailable.
+            //Here each training pair has the same primary and second color schemes. The test trials can have any color scheme, as long as their colors do not overlap with this primary / secondary pair.
+            //So: we first determine the colors for each training pair. We sample primary and secondary colors to equally spread over the available colors. Sample destructively from ColorsAvailable.
             //Creating colorscheme
             ColorScheme = new FENNIMALCOLORSCHEMES(location_pairs_in_training_set + type_pairs_in_training_set + number_of_test_trials_per_training_trial)
             ColorsAvailable = ColorScheme.getKeyedColorSchemeObject(true)
@@ -870,8 +934,8 @@ STIMULUSDATA = function(participant_number){
                 let tertiary_color_B = ColorScheme.getColorSchemes().TertiaryColors[secondary_color]
 
                 if(tertiary_colors_based_on_location){
-                    tertiary_color_A = Param.RegionData[TrainingPairs[i][0].region].color
-                    tertiary_color_B = Param.RegionData[TrainingPairs[i][1].region].color
+                    tertiary_color_A = Param.RegionData[TrainingPairs[i][0].region].Fennimal_location_colors.tertiary
+                    tertiary_color_B = Param.RegionData[TrainingPairs[i][1].region].Fennimal_location_colors.tertiary
                 }
 
                 //Set the correct colors to the FennimalObj
@@ -918,7 +982,7 @@ STIMULUSDATA = function(participant_number){
                         //Figure out which tertiary color to use.
                         let tertiary_color
                         if(tertiary_colors_based_on_location){
-                            tertiary_color = Param.RegionData[TrainingPairs[i][num_in_pair].region].color // TestTrialsPerPair[i][num_in_pair][test_trial_index].location
+                            tertiary_color = Param.RegionData[TestTrialsPerPair[i][num_in_pair][test_trial_index].region].Fennimal_location_colors.tertiary
                         }else{
                             tertiary_color = drawRandomElementsFromArray(collapse_Obj_to_array(ColorScheme.getColorSchemes().TertiaryColors).filter(e => e !== TrainingPairs[i][0].tertiary_color), 1, false)[0]
                         }
@@ -1168,9 +1232,42 @@ PARAMETERS = function() {
     // LOCATION PARAMETERS //
     /////////////////////////
     this.location_Names = ["Pineforest", "Iceberg", "Windmill", "Garden", "Waterfall", "Mine", "Church", "Farm","Marsh", "Cottage","Oasis", "Cactus", "Beachbar", "Port", "Bush", "Jungleforest"]
-    this.Available_Fennimals = ["Mushroom","Giraffe","Flamingo","Grasshopper","Dragon","Walrus","Robot","Frog","Beaver"]
-        //["Crab", "Snake", "Giraffe", "Mushroom", "Ant", "Beaver", "Spider","Flamingo","Grasshopper",
-       // "Frog", "Dragon", "Bunny", "Bird", "Elephant", "Tiger", "Walrus", "Turtle", "Crocodile", "Gnome", "Plant", "Robot"]
+    //["Crab", "Snake", "Giraffe", "Mushroom", "Ant", "Beaver", "Spider","Flamingo","Grasshopper",
+    // "Frog", "Dragon", "Bunny", "Bird", "Elephant", "Tiger", "Walrus", "Turtle", "Crocodile", "Gnome", "Plant", "Robot"]
+    this.Available_Fennimal_Heads = ["A", "B", "C", "D", "E", "F","G","H"]
+    this.Available_Fennimal_Bodies = ["A", "B", "C", "D", "E", "F","G","H"]
+    this.Available_Names = [
+        "Alexander",
+        "Olivia",
+        "Benjamin",
+        "Sophia",
+        "Ethan",
+        "Ava",
+        "Noah",
+        "Mia",
+        "Samuel",
+        "Isabella",
+        "Gabriel",
+        "Sarah",
+        "Lucas",
+        "Amelia",
+        "Matthew",
+        "Charlotte",
+        "Daniel",
+        "Harper",
+        "Christopher",
+        "Grace",
+        "Steve",
+        "Lily",
+        "William",
+        "Abigail",
+        "James",
+        "Emily",
+        "Joseph",
+        "Elizabeth",
+        "Michael",
+        "Victoria"
+    ]
 
     this.LocationTransitionData = {
         //This object holds all the location transitions.
@@ -1222,9 +1319,9 @@ PARAMETERS = function() {
             location_name: "Pineforest",
             sky: "sky_North_2x",
             AdjacentRegions: [{
-                    arrow_id: "arrow_return_to_previous_region_right",
-                    target_region: "intersection_North",
-                }]
+                arrow_id: "arrow_return_to_previous_region_right",
+                target_region: "intersection_North",
+            }]
 
         },
         location_Iceberg : {
@@ -1234,9 +1331,9 @@ PARAMETERS = function() {
             region: "North",
             sky: "sky_North_3x",
             AdjacentRegions: [{
-                    arrow_id: "arrow_return_to_previous_region_left",
-                    target_region: "intersection_North",
-                }]
+                arrow_id: "arrow_return_to_previous_region_left",
+                target_region: "intersection_North",
+            }]
         },
 
         start_Flowerfields: {
@@ -1279,9 +1376,9 @@ PARAMETERS = function() {
             region: "Flowerfields",
             sky: "sky_Flowerfields_2x",
             AdjacentRegions: [{
-                    arrow_id: "arrow_return_to_previous_region_right",
-                    target_region: "intersection_Flowerfields",
-                }]
+                arrow_id: "arrow_return_to_previous_region_right",
+                target_region: "intersection_Flowerfields",
+            }]
         },
         location_Garden : {
             zoomable: false,
@@ -1290,9 +1387,9 @@ PARAMETERS = function() {
             region: "Flowerfields",
             sky: "sky_Flowerfields_3x",
             AdjacentRegions: [{
-                    arrow_id: "arrow_return_to_previous_region_left",
-                    target_region: "intersection_Flowerfields",
-                }]
+                arrow_id: "arrow_return_to_previous_region_left",
+                target_region: "intersection_Flowerfields",
+            }]
 
         },
 
@@ -1334,9 +1431,9 @@ PARAMETERS = function() {
             location_name: "Waterfall",
             region: "Mountains",
             AdjacentRegions: [{
-                    arrow_id: "arrow_return_to_previous_region_right",
-                    target_region: "intersection_Mountains",
-                }]
+                arrow_id: "arrow_return_to_previous_region_right",
+                target_region: "intersection_Mountains",
+            }]
 
         },
         location_Mine : {
@@ -1345,9 +1442,9 @@ PARAMETERS = function() {
             location_name: "Mine",
             region: "Mountains",
             AdjacentRegions:  [{
-                    arrow_id: "arrow_return_to_previous_region_left",
-                    target_region: "intersection_Mountains",
-                }]
+                arrow_id: "arrow_return_to_previous_region_left",
+                target_region: "intersection_Mountains",
+            }]
         },
 
         start_Village: {
@@ -1389,9 +1486,9 @@ PARAMETERS = function() {
             region: "Village",
             sky: "sky_Village_2x",
             AdjacentRegions:  [{
-                    arrow_id: "arrow_return_to_previous_region_right",
-                    target_region: "intersection_Village",
-                }]
+                arrow_id: "arrow_return_to_previous_region_right",
+                target_region: "intersection_Village",
+            }]
 
         },
         location_Farm : {
@@ -1401,9 +1498,9 @@ PARAMETERS = function() {
             region: "Village",
             sky: "sky_Village_3x",
             AdjacentRegions:  [{
-                    arrow_id: "arrow_return_to_previous_region_left",
-                    target_region: "intersection_Village",
-                }]
+                arrow_id: "arrow_return_to_previous_region_left",
+                target_region: "intersection_Village",
+            }]
         },
 
         start_Swamp: {
@@ -1444,9 +1541,9 @@ PARAMETERS = function() {
             region: "Swamp",
             sky: "sky_Swamp_2x",
             AdjacentRegions:  [{
-                    arrow_id: "arrow_return_to_previous_region_right",
-                    target_region: "intersection_Swamp",
-                }]
+                arrow_id: "arrow_return_to_previous_region_right",
+                target_region: "intersection_Swamp",
+            }]
 
         },
         location_Cottage : {
@@ -1456,9 +1553,9 @@ PARAMETERS = function() {
             region: "Swamp",
             sky: "sky_Swamp_3x",
             AdjacentRegions: [{
-                    arrow_id: "arrow_return_to_previous_region_left",
-                    target_region: "intersection_Swamp",
-                }]
+                arrow_id: "arrow_return_to_previous_region_left",
+                target_region: "intersection_Swamp",
+            }]
         },
 
         start_Desert: {
@@ -1500,9 +1597,9 @@ PARAMETERS = function() {
             region: "Desert",
             sky: "sky_Desert_2x",
             AdjacentRegions:  [{
-                    arrow_id: "arrow_return_to_previous_region_right",
-                    target_region: "intersection_Desert",
-                }]
+                arrow_id: "arrow_return_to_previous_region_right",
+                target_region: "intersection_Desert",
+            }]
         },
         location_Cactus : {
             zoomable: false,
@@ -1511,9 +1608,9 @@ PARAMETERS = function() {
             region: "Desert",
             sky: "sky_Desert_3x",
             AdjacentRegions:  [{
-                    arrow_id: "arrow_return_to_previous_region_left",
-                    target_region: "intersection_Desert",
-                }]
+                arrow_id: "arrow_return_to_previous_region_left",
+                target_region: "intersection_Desert",
+            }]
         },
 
         start_Beach: {
@@ -1555,9 +1652,9 @@ PARAMETERS = function() {
             region: "Beach",
             sky: "sky_Beach_2x",
             AdjacentRegions:  [{
-                    arrow_id: "arrow_return_to_previous_region_right",
-                    target_region: "intersection_Beach",
-                }]
+                arrow_id: "arrow_return_to_previous_region_right",
+                target_region: "intersection_Beach",
+            }]
         },
         location_Port : {
             zoomable: false,
@@ -1566,9 +1663,9 @@ PARAMETERS = function() {
             region: "Beach",
             sky: "sky_Beach_3x",
             AdjacentRegions:  [{
-                    arrow_id: "arrow_return_to_previous_region_left",
-                    target_region: "intersection_Beach",
-                }]
+                arrow_id: "arrow_return_to_previous_region_left",
+                target_region: "intersection_Beach",
+            }]
         },
 
         start_Jungle: {
@@ -1610,9 +1707,9 @@ PARAMETERS = function() {
             region: "Jungle",
             sky: "sky_Jungle_3x",
             AdjacentRegions:  [{
-                    arrow_id: "arrow_return_to_previous_region_right",
-                    target_region: "intersection_Jungle",
-                }]
+                arrow_id: "arrow_return_to_previous_region_right",
+                target_region: "intersection_Jungle",
+            }]
         },
         location_Jungleforest : {
             zoomable: false,
@@ -1621,9 +1718,9 @@ PARAMETERS = function() {
             region: "Jungle",
             sky: "sky_Jungle_2x",
             AdjacentRegions: [{
-                    arrow_id: "arrow_return_to_previous_region_left",
-                    target_region: "intersection_Jungle",
-                }]
+                arrow_id: "arrow_return_to_previous_region_left",
+                target_region: "intersection_Jungle",
+            }]
         },
 
         //In addition, there are a number of general parameters.
@@ -1645,7 +1742,7 @@ PARAMETERS = function() {
             color: "#0020ac",
             darker_color: "#001987",
             prefix: "Arctic",
-            hint: "This Fennimal can be found in cold places...",
+            hint: "can be found in cold places...",
             Fennimal_location_colors:{
                 primary: "#526785",
                 secondary: "#b0c9d4",
@@ -1658,7 +1755,7 @@ PARAMETERS = function() {
             color: "#278b1e",
             darker_color: "#175412",
             prefix: "Jungle",
-            hint: "This Fennimal lives in tropical forests...",
+            hint: "lives in tropical forests...",
             Fennimal_location_colors:{
                 primary: "#6c8a55",
                 secondary: "#beedc6",
@@ -1671,7 +1768,7 @@ PARAMETERS = function() {
             color: "#c7c602", //#fffe03
             darker_color: "#757500",
             prefix: "Desert",
-            hint: "This Fennimal likes the extreme heat...",
+            hint: "likes the extreme heat...",
             Fennimal_location_colors:{
                 primary: "#8c8c15",
                 secondary: "#d1caa9",
@@ -1684,7 +1781,7 @@ PARAMETERS = function() {
             color: "#502d16",
             darker_color: "#26150a",
             prefix: "Mountain",
-            hint: "This Fennimal can be found in high places...",
+            hint: "can be found in high places...",
             Fennimal_location_colors:{
                 primary: "#ded3d6",
                 secondary: "#dedcdc",
@@ -1697,11 +1794,11 @@ PARAMETERS = function() {
             color: "#ffe6d5",
             darker_color: "#615c58",
             prefix: "Beach",
-            hint: "This Fennimal lives near the shore...",
+            hint: "lives near the shore...",
             Fennimal_location_colors:{
                 primary: "#665244",
                 secondary: "#f7cdbc",
-                tertiary: "#8a7e76",
+                tertiary: "#f2e7df",
             }
         },
         Flowerfields: {
@@ -1710,7 +1807,7 @@ PARAMETERS = function() {
             color: "#f472e6",
             darker_color: "#783771",
             prefix: "Flowerland",
-            hint: "This Fennimal likes to live near flowers...",
+            hint: "likes to live near flowers...",
             Fennimal_location_colors:{
                 primary:  "#4d2f49",
                 secondary: "#d5bfd9",
@@ -1723,7 +1820,7 @@ PARAMETERS = function() {
             color: "#f20000",
             darker_color: "#7d0101",
             prefix: "Domestic",
-            hint: "This Fennimal likes to live near people...",
+            hint: "likes to live near people...",
             Fennimal_location_colors:{
                 primary: "#734b53",
                 secondary: "#ccb1b8",
@@ -1736,7 +1833,7 @@ PARAMETERS = function() {
             color: "#00fdcc",
             darker_color: "#025e4c",
             prefix: "Wetland",
-            hint: "This Fennimal lives in the wetlands...",
+            hint: "lives in the wetlands...",
             Fennimal_location_colors:{
                 primary: "#5b7875",
                 secondary: "#c2f0df",
@@ -1772,23 +1869,26 @@ PARAMETERS = function() {
 
     //Contains all the location-based hints
     this.HintsBasedOnLocation = {
-        Pineforest: "This Fennimal lives in cold forests...",
-        Iceberg: "This Fennimal can be found on or near ice-shelves...",
-        Windmill: "This Fennimal  can often be found in large fields of flowers...",
-        Garden: "This Fennimal enjoys being near fountains...",
-        Waterfall: "This Fennimal likes to swim in fast-flowing streams...",
-        Mine: "This Fennimal builds a home in or near dark caves...",
-        Church: "This Fennimal often hangs out near tall, free-standing buildings...",
-        Farm: "This Fennimal can typically be found near large open fields of wheat...",
-        Marsh: "This Fennimal can often be found near water-lilies and murky ponds...",
-        Cottage: "This Fennimal can often be found near abandoned houses...",
-        Oasis: "This Fennimal lives near water in very hot regions...",
-        Cactus: "This Fennimal is not afraid of thorny plants...",
-        Beachbar: "This Fennimal likes to sunbathe on the beach...",
-        Port: "This Fennimal likes to hang around near ships...",
-        Bush: "This Fennimal likes colorful plants and forest clearings...",
-        Jungleforest: "This Fennimal lives in dense forests..."
+        Pineforest: "lives in cold forests...",
+        Iceberg: "can be found on or near ice-shelves...",
+        Windmill: "can often be found in large fields of flowers...",
+        Garden: "enjoys being near fountains...",
+        Waterfall: "likes to swim in fast-flowing streams...",
+        Mine: "builds a home in or near dark caves...",
+        Church: "often hangs out near tall, free-standing buildings...",
+        Farm: "can typically be found near large open fields of wheat...",
+        Marsh: "can often be found near water-lilies and murky ponds...",
+        Cottage: "can often be found near abandoned houses...",
+        Oasis: "lives near water in very hot regions...",
+        Cactus: "is not afraid of thorny plants...",
+        Beachbar: "likes to sunbathe on the beach...",
+        Port: "likes to hang around near ships...",
+        Bush: "likes colorful plants and forest clearings...",
+        Jungleforest: "lives in dense forests..."
     }
+
+    //Determines how much right the Fennimals are allowed to move on screen
+    this.max_x_shift = 150
 
     // COLOR SETTINGS //
     ////////////////////
@@ -1904,10 +2004,10 @@ PARAMETERS = function() {
     }
 
     //Radius for the flashlight cone
-    this.flashlight_radius = 40
+    this.flashlight_radius = 60
 
     //The distance to which the flashlight must approach the outline targets before a hit is registered
-    this.flashlight_target_sensitivity = 40
+    this.flashlight_target_sensitivity = 50
 
     //Minimum distance to the target before a dropped item is registered as given
     this.minimum_drop_target_distance = 35
@@ -1924,17 +2024,6 @@ PARAMETERS = function() {
         quiz_splashscreen_disappear: 2000,
         quiz_feedback_time: 1000,
     }
-
-   /* this.ItemBackgroundColors = {
-        1: ["#bc5090"],
-        2: ["#003f5c","#ffa600"],
-        3: ["#003f5c","#bc5090","#ffa600"],
-        4: ["#003f5c","#7a5195","#ef5675","#ffa600"],
-        5: ["#003f5c","#58508d","#bc5090","#ff6361","#ffa600"],
-        6: ["#003f5c","#444e86","#955196","#dd5182","#ff6e54","#ffa600"],
-    }
-
-    */
 
     //Denotes the relative x-positions in which (multiple) items should be displayed on the item bar. Keyed by the number of items
     this.ItemRelativeXPositions = {
@@ -2027,11 +2116,11 @@ FENNIMALCOLORSCHEMES = function(number_of_base_pairs){
     //Saturation and lightness can either be specified as a specific value (which will then be used), or as a range of [min,max].
     // If a range is specified, then a random int in this range is specified is drawn for each color (one sample per color).
     //Defining which transformations in HSL space are used for the primary, secondary and tertiary colors.
-    let primary_color_saturation = [90,100]
-    let primary_color_lightness = [40,45]
+    let primary_color_saturation = [70,80]
+    let primary_color_lightness = [35,40]
 
     let secondary_color_saturation = [35,45]
-    let secondary_color_lightness = [65,70]
+    let secondary_color_lightness = [70,80]
 
     let tertiary_color_saturation = [50,60]
     let tertiary_color_lightness = [25,35]
@@ -2446,7 +2535,7 @@ LocationController = function(ExpCont){
 
             //Make sure all the correct locations are highlighted
             toggleLocationMarker(true, Param.region_Names)
-           //toggleLocationMarker(true, "Home")
+            //toggleLocationMarker(true, "Home")
         }
 
         //Call to show a passive state of the map (just the figure, but no button interactions and no highlights)
@@ -2487,7 +2576,7 @@ LocationController = function(ExpCont){
         //Show the map layer, hide the regions, fennimals and instructions layers
         SVGReferences.Layers.Map.style.display = "inherit"
         SVGReferences.Layers.Regions.style.display = "none"
-        SVGReferences.Layers.Fennimals.style.display = "none"
+        //SVGReferences.Layers.Fennimals.style.display = "none"
         SVGReferences.Layers.Instructions.style.display = "none"
 
         //Make sure the map elements and the masks are set to visible (but masks should have 0 opacity)
@@ -2605,7 +2694,7 @@ LocationController = function(ExpCont){
 
             //If we're leaving a location with possible Fennimals, then inform the experiment controller
             if(Param.LocationTransitionData[currentLocation].may_contain_Fennimals){
-               leaving_location_with_possible_Fennimal()
+                leaving_location_with_possible_Fennimal()
             }
 
             if(target_location === "map"){
@@ -2624,44 +2713,44 @@ LocationController = function(ExpCont){
     }
 
     //Shows and creates a zoom arrow. Supply with either "forward" or "backward" as direction
-  /*  function create_zoom_arrow(direction){
-        //Find a reference to the correct arrow
-        let ArrowObj
-        if(direction === "forward"){
-            ArrowObj = document.getElementById("arrow_zoom_forward")
-        }else{
-            ArrowObj = document.getElementById("arrow_zoom_back")
-        }
+    /*  function create_zoom_arrow(direction){
+          //Find a reference to the correct arrow
+          let ArrowObj
+          if(direction === "forward"){
+              ArrowObj = document.getElementById("arrow_zoom_forward")
+          }else{
+              ArrowObj = document.getElementById("arrow_zoom_back")
+          }
 
-        //After a brief delay to match with the zoom animation
-        setTimeout(function(){
-            //Show the Arrow on screen
-            ArrowObj.style.display = "inherit"
+          //After a brief delay to match with the zoom animation
+          setTimeout(function(){
+              //Show the Arrow on screen
+              ArrowObj.style.display = "inherit"
 
-            //Find out what index the currentZoomPoint is in, and which are the following points
-            let currentZoomIndex = Param.LocationTransitionData.Zoom_Points.indexOf(currentZoomPoint)
+              //Find out what index the currentZoomPoint is in, and which are the following points
+              let currentZoomIndex = Param.LocationTransitionData.Zoom_Points.indexOf(currentZoomPoint)
 
-            //Set the correct event listener
-            if(direction === "forward"){
-                ArrowObj.addEventListener("click", function(){
-                    //move_within_location(currentZoomDepth + Param.LocationData.zoom_speed)
-                    if(currentZoomIndex < (Param.LocationTransitionData.Zoom_Points.length - 1)){
-                        move_within_location(Param.LocationTransitionData.Zoom_Points[currentZoomIndex +1] )
-                    }
-                })
-            }else{
-                ArrowObj.addEventListener("click", function(){
-                    if(currentZoomIndex > 0){
-                        move_within_location(Param.LocationTransitionData.Zoom_Points[currentZoomIndex -1] )
-                    }
+              //Set the correct event listener
+              if(direction === "forward"){
+                  ArrowObj.addEventListener("click", function(){
+                      //move_within_location(currentZoomDepth + Param.LocationData.zoom_speed)
+                      if(currentZoomIndex < (Param.LocationTransitionData.Zoom_Points.length - 1)){
+                          move_within_location(Param.LocationTransitionData.Zoom_Points[currentZoomIndex +1] )
+                      }
+                  })
+              }else{
+                  ArrowObj.addEventListener("click", function(){
+                      if(currentZoomIndex > 0){
+                          move_within_location(Param.LocationTransitionData.Zoom_Points[currentZoomIndex -1] )
+                      }
 
-                })
-            }
-        },Param.LocationTransitionData.zoom_arrow_reappear_speed)
+                  })
+              }
+          },Param.LocationTransitionData.zoom_arrow_reappear_speed)
 
-    }
+      }
 
-   */
+     */
     //Hides all sky sublayers
     function hide_sky_sublayers(){
         let All_Skies = document.getElementsByClassName("location_sky")
@@ -2680,7 +2769,7 @@ LocationController = function(ExpCont){
         }
     }
 
-        //Go to a specified location. Call with a string denoting the name of the location, and a zoom depth.
+    //Go to a specified location. Call with a string denoting the name of the location, and a zoom depth.
     function go_to_location(name, arriving_from_terminal_location){
         //Hide the map and instructions
         SVGReferences.Layers.Map.style.display = "none"
@@ -2749,7 +2838,7 @@ LocationController = function(ExpCont){
 
         //On the first location, show a hint on how to use the arrows
         if(IngameHintsGiven.location_arrow_first_click === false){
-            show_ingame_hint((508-268)/2,5,268,90,"You can travel within a region of Fenneland by clicking on the highlighted buttons. <br> The map icon at the bottom of the screen returns you to the main map.")
+            show_ingame_hint((508-298)/2,5,298,90,"You can travel within a region of Fenneland by clicking on the highlighted buttons. <br> The map icon at the bottom of the screen returns you to the main map.")
             IngameHintsGiven.location_arrow_first_click = true
         }
 
@@ -2861,7 +2950,6 @@ LocationController = function(ExpCont){
     this.jump_to_static_location = function(location){
         SVGReferences.Layers.Map.style.display = "inherit"
         SVGReferences.Layers.Regions.style.display = "none"
-        SVGReferences.Layers.Fennimals.style.display = "none"
         SVGReferences.Layers.Instructions.style.display = "none"
 
         //Hide all locations
@@ -2907,27 +2995,16 @@ LocationController = function(ExpCont){
 //Handles the flashlight elements. Presents the outline for a given FennimalObject (call with false if no Fennimal is present at this location).
 //
 Flashlight_Controller = function(FennimalObj,LocCont, ExpCont){
-    SVGObjects.Layers.Stage.style.display = "inherit"
-    //We need three sets of references: the Outline Object (outline of the Fennimal), the Flashlight and its sub-parts, plus a set of targets that need to be hit
+    let that = this
+
+    //We need the references to the SVG elements of the flashlight
     let FlashlightIcon = document.getElementById("flashlight")
     let FlashlightIcon_symbol = document.getElementById("flashlight_light")
     let FlashlightIcon_box = document.getElementById("flashlight_background")
 
-    let OutlineContainerLayer = document.getElementById("Fennimal_outlines_layer")
     let Flashlight_Mask_Black = document.getElementById("spotlight_background_mask_black")
     let Flashlight_Mask_Yellow = document.getElementById("spotlight_background_mask")
     let FlashlightPrompt = document.getElementById("prompt_flashlight")
-
-    let that = this
-
-    //Check if there should a Fennimal here. If yes, then find the associated object.
-    let OutlineLayer,OutlineObject
-    if(FennimalObj !== false){
-        OutlineLayer = document.getElementById("layer_outline_" + FennimalObj.type)
-        OutlineObject = document.getElementById(FennimalObj.type + "_outline")
-        OutlineObject.style.opacity = 1
-        OutlineObject.style.display = "inherit"
-    }
 
     //Stores the state of the flashlight. True is on, False is off. Toggle with the correct function.
     let flashlight_state_on = false
@@ -3054,9 +3131,6 @@ Flashlight_Controller = function(FennimalObj,LocCont, ExpCont){
         //Make sure that the item bar is displayed
         document.getElementById("item_bar").style.display = "inherit"
 
-        //Make sure that the Fennimals layer is displayed
-        SVGObjects.Layers.Fennimals.style.display = "inherit"
-
         //Show the Flashlight icon on the item bar
         FlashlightIcon.style.display = "inherit"
     }
@@ -3068,21 +3142,6 @@ Flashlight_Controller = function(FennimalObj,LocCont, ExpCont){
 
         //Hide the Flashlight icon on the item bar
         FlashlightIcon.style.display = "none"
-    }
-
-    //Call to display the Fennimal outline
-    function showFennimalOutline(){
-        //Show the layer containing the Fennimal outlines (each is stored as a separate sub-layer)
-        SVGObjects.Layers.Outline.style.display = "inherit"
-
-        //Show the outline layer
-        OutlineLayer.style.display = "inherit"
-
-    }
-    //Call to hide the Fennimal outline
-    function hideFennimalOutline(){
-        SVGObjects.Layers.Outline.style.display = "none"
-        OutlineLayer.style.display = "none"
     }
 
     //New state should be a bool. True for on, false for off.
@@ -3107,11 +3166,11 @@ Flashlight_Controller = function(FennimalObj,LocCont, ExpCont){
         //Hide or show the outline
         if(new_state){
             if(FennimalObj !== false){
-                showFennimalOutline(FennimalObj.type)
+                Container.style.display = "inherit"
             }
         }else{
             if(FennimalObj !== false){
-                showFennimalOutline(FennimalObj.type)
+                Container.style.display = "none"
             }
         }
 
@@ -3131,8 +3190,6 @@ Flashlight_Controller = function(FennimalObj,LocCont, ExpCont){
             SpotlightGradient_FennimalOutline.setAttribute("cy", 9999)
             SpotlightGradient_Background.setAttribute("cx", 9999)
             SpotlightGradient_Background.setAttribute("cy", 9999)
-
-
         }
     }
 
@@ -3140,9 +3197,9 @@ Flashlight_Controller = function(FennimalObj,LocCont, ExpCont){
     // TARGETS //
     /////////////
     //Returns an array of targets associated to the Fennimal. Each target has
-    function createTargets(){
+    function createTargets(List_of_Elem){
         //Get all target circles from the SVG
-        let TargetCircles = OutlineLayer.getElementsByClassName("outline_target")
+        let TargetCircles = List_of_Elem
         let arr = []
 
         for(let i=0;i<TargetCircles.length;i++){
@@ -3217,32 +3274,33 @@ Flashlight_Controller = function(FennimalObj,LocCont, ExpCont){
         if(try_first_use_hint_timeout !== "undefined"){clearTimeout(try_first_use_hint_timeout)}
 
         //For a short period, show the entire outline
-        OutlineObject.style.display = "none"
-        OutlineObject.style.fill = "black"
-        OutlineObject.style.opacity = 0
-        OutlineContainerLayer.style.display = "inherit"
-        OutlineLayer.style.display = "inherit"
+        Container.style.display = "none"
+        Container.style.opacity = 0
+        Container.style.transition = "all 500ms ease-out"
 
         setTimeout(function(){
-            OutlineObject.style.display = "inherit"
+            Container.style.display = "inherit"
+            HeadObject.style.stroke = "black"
+            HeadObject.style.fill = "black"
+            BodyObject.style.stroke = "black"
+            BodyObject.style.fill = "black"
+
         }, 5)
 
         //Fade the outline in
         setTimeout(function(){
-            OutlineObject.style.opacity = 1
+            Container.style.opacity = 1
         },100)
 
         //After a brief delay, fade the outline out and continue with the remaining portion of the trial
         setTimeout(function(){
-            OutlineObject.style.opacity = 0
-
+            Container.style.opacity = 0
             //Wait for the animation to finish before hiding the outline
             setTimeout(function(){
-                hideFennimalOutline()
-                OutlineContainerLayer.style.display = "none"
                 that.leaving_area();
                 ExpCont.FennimalFound(FennimalObj)
-
+                Container.style.transition = ""
+                Container.style.opacity = 1
             },600)
 
         }, 750)
@@ -3251,46 +3309,63 @@ Flashlight_Controller = function(FennimalObj,LocCont, ExpCont){
 
     }
 
-    /////////////////////
-    // ON CONSTRUCTION //
-    /////////////////////
-    //Creating and setting elements
-    OutlineContainerLayer.style.display = "inherit"
-    showFlashLightIcon()
-    toggleFlashlight(false)
-
-    Flashlight_Mask_Yellow.style.fill = "url(#spotlight_gradient_background)"
-    FlashlightPrompt.style.display = "inherit"
-
-    let Targets
-    if(FennimalObj !== false){
-        OutlineObject.style.fill = "url(#spotlight_gradient)"
-
-        //Finding the targets
-        Targets = createTargets()
-    }
-
     //Call when leaving the area (before deleting this controller
     this.leaving_area = function(){
         //Hide the prompt
         FlashlightPrompt.style.display = "none"
 
-        //Hiding the Fennimal outline
-        if(FennimalObj !== false){
-            OutlineObject.style.display = "none"
-        }
-
         //Hiding the item bar and the flashlight icon
         toggleFlashlight(false)
         hideFlashLightIcon()
         hide_Fennimal_background_mask()
-        OutlineContainerLayer.style.display = "none"
+
+        //Clear the Container
+        document.getElementById("Fennimal_Container").innerHTML = ""
 
         if(try_first_use_hint_timeout !== "undefined"){
             clearTimeout(try_first_use_hint_timeout)
         }
         clear_ingame_hint()
     }
+
+    /////////////////////
+    // ON CONSTRUCTION //
+    /////////////////////
+    let Targets, Container, HeadObject, BodyObject
+
+    document.getElementById("Fennimal_Container").innerHTML = ""
+
+    //Check if there is a Fennimal in this location
+    if(FennimalObj !== false){
+        Container = document.getElementById("Fennimal_Container")
+        //Creating the outline object and attaching it to the Container
+        let OutlineObject = createFennimalOutline(FennimalObj.head,FennimalObj.body)
+        Container.appendChild(OutlineObject)
+
+        //Storing references to the head and body part of the outline
+        HeadObject = document.getElementById("outline_head")
+        BodyObject = document.getElementById("outline_body")
+
+        //Setting the correct fills
+        HeadObject.style.fill = "url(#spotlight_gradient)"
+        HeadObject.style.stroke = "url(#spotlight_gradient)"
+        BodyObject.style.fill = "url(#spotlight_gradient)"
+        BodyObject.style.stroke = "url(#spotlight_gradient)"
+
+        //Finding the targets
+        let TargetsList = OutlineObject.getElementsByClassName("outline_target")
+        Targets = createTargets(TargetsList)
+    }
+
+    //Showing the layers on screen
+    SVGObjects.Layers.Stage.style.display = "inherit"
+
+    //Creating and setting elements
+    showFlashLightIcon()
+    toggleFlashlight(false)
+
+    Flashlight_Mask_Yellow.style.fill = "url(#spotlight_gradient_background)"
+    FlashlightPrompt.style.display = "inherit"
 
     // DISPLAYING INGAME HINTS
     //When the first flashlight controller is generated, show subjects a hint on how to use the flashlight.
@@ -3304,7 +3379,7 @@ Flashlight_Controller = function(FennimalObj,LocCont, ExpCont){
     }
 
     if(!IngameHintsGiven.flashlight_first_use){
-        try_first_use_hint_timeout =  setTimeout(function(){try_first_use_hint()},4500)
+        try_first_use_hint_timeout =  setTimeout(function(){try_first_use_hint()},6500)
     }
 
 }
@@ -3316,39 +3391,9 @@ TrainingPhaseFennimalController = function(FennimalObj, ItemDetails, ItemAvailab
     //ItemAvailability: should contain an object with one key for each element in ItemDetails.All_Items. Each key should be set to either invisible (item not displayed on the bar), "available" (present and availalbe) or "unavailable" (present, but grayed out).
     //The FennimalController gets created AFTER the subject has uncovered the Fennimal outline.
 
-    let FennimalSVGObj = document.getElementById("Fennimal_"+FennimalObj.type)
-
     //Subcontroller for the item interactions stored here
     let ItemCont = false
     let FeedbackCont = false
-
-    //Sets the correct color-scheme to the Fennimal
-    function setFennimalColors(){
-        //Set primary color regions
-        let Primary_regions = FennimalSVGObj.getElementsByClassName("Fennimal_primary_color")
-        for(let i = 0; i< Primary_regions.length; i++){
-            Primary_regions[i].style.fill = FennimalObj.primary_color
-        }
-
-        //Set secondary colors
-        let Secondary_regions =  FennimalSVGObj.getElementsByClassName("Fennimal_secondary_color")
-        for(let i = 0; i< Secondary_regions.length; i++){
-            Secondary_regions[i].style.fill = FennimalObj.secondary_color
-        }
-
-        //Set tertiary colors
-        let Tertiary_regions =  FennimalSVGObj.getElementsByClassName("Fennimal_tertiary_color")
-        for(let i = 0; i< Tertiary_regions.length; i++){
-            Tertiary_regions[i].style.fill = FennimalObj.tertiary_color
-        }
-    }
-
-    function showFennimal(){
-        FennimalSVGObj.style.display = "inherit"
-    }
-    function hideFennimal(){
-        FennimalSVGObj.style.display = "none"
-    }
 
     function show_Fennimal_background_mask(){
         SVGObjects.Splashscreen_Fennimal.Mask.style.display = "inherit"
@@ -3359,7 +3404,7 @@ TrainingPhaseFennimalController = function(FennimalObj, ItemDetails, ItemAvailab
 
     // Call when the interaction is aborted (probably by the subject leaving the area), before deletion of this controller
     this.interactionAborted = function(){
-        hideFennimal()
+        document.getElementById("Fennimal_Container").innerHTML = ""
         hide_Fennimal_background_mask()
         if(ItemCont !== false){
             ItemCont.interactionAborted()
@@ -3378,18 +3423,24 @@ TrainingPhaseFennimalController = function(FennimalObj, ItemDetails, ItemAvailab
     }
 
     // ON CONSTRUCTION
-    setFennimalColors()
     show_Fennimal_background_mask()
-    showFennimal()
+
+    //Remove any existing Fennimals on the screen
+    document.getElementById("Fennimal_Container").innerHTML = ""
+
+    //Creating the Fennimal SVG group and a container to hold it in
+    let Fennimal = createFennimal(FennimalObj.head, FennimalObj.body, FennimalObj.primary_color,FennimalObj.secondary_color, FennimalObj.tertiary_color)
+    let Container = document.getElementById("Fennimal_Container")
+    Container.appendChild(Fennimal)
+    Container.style.display = "inherit"
+    SVGObjects.Layers.Stage.style.display = "inherit"
 
     //Set and show the prompt text
     document.getElementById("item_bar").style.display = "none"
     SVGObjects.Layers.Item_Bar.style.display = "inherit"
-    if(FennimalObj.region === "North"){
-        SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "You have found an "+ FennimalObj.name
-    }else{
-        SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "You have found a "+ FennimalObj.name
-    }
+
+    SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "This Fennimal is called "+ FennimalObj.name
+
     SVGObjects.Prompts.Feedback.Prompt.style.opacity = 1
     SVGObjects.Prompts.Feedback.Prompt.style.display = "inherit"
 
@@ -3404,7 +3455,15 @@ TrainingPhaseFennimalController = function(FennimalObj, ItemDetails, ItemAvailab
 //Displays all items as available. Assumes that the FennimalObj.item codes for the correct item and gives feedback accordingly
 QuizFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCont){
     let that = this
-    let FennimalSVGObj = document.getElementById("Fennimal_"+FennimalObj.type)
+
+    //Remove any existing Fennimals on the screen
+    document.getElementById("Fennimal_Container").innerHTML = ""
+
+    //Creating the Fennimal SVG group and a container to hold it in
+    let Fennimal = createFennimal(FennimalObj.head, FennimalObj.body, FennimalObj.primary_color,FennimalObj.secondary_color, FennimalObj.tertiary_color)
+    let Container = document.getElementById("Fennimal_Container")
+    Container.appendChild(Fennimal)
+    Container.style.display = "none"
 
     //Set all items to appear as available
     let ItemAvailability = {}
@@ -3412,34 +3471,6 @@ QuizFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCont){
         ItemAvailability[ItemDetails.All_Items[i]] = "available"
     }
     let ItemCont
-
-    //Sets the correct color-scheme to the Fennimal
-    function setFennimalColors(){
-        //Set primary color regions
-
-        let Primary_regions = FennimalSVGObj.getElementsByClassName("Fennimal_primary_color")
-        for(let i = 0; i< Primary_regions.length; i++){
-            Primary_regions[i].style.fill = FennimalObj.primary_color
-        }
-
-        //Set secondary colors
-        let Secondary_regions =  FennimalSVGObj.getElementsByClassName("Fennimal_secondary_color")
-        for(let i = 0; i< Secondary_regions.length; i++){
-            Secondary_regions[i].style.fill = FennimalObj.secondary_color
-        }
-
-        //Set tertiary colors
-        let Tertiary_regions =  FennimalSVGObj.getElementsByClassName("Fennimal_tertiary_color")
-        for(let i = 0; i< Tertiary_regions.length; i++){
-            Tertiary_regions[i].style.fill = FennimalObj.tertiary_color
-        }
-    }
-    function showFennimal(){
-        FennimalSVGObj.style.display = "inherit"
-    }
-    function hideFennimal(){
-        FennimalSVGObj.style.display = "none"
-    }
 
     function show_Fennimal_background_mask(){
         SVGObjects.Splashscreen_Fennimal.Mask.style.display = "inherit"
@@ -3461,34 +3492,34 @@ QuizFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCont){
     showFeedback = function(answer_given, correct_answer){
         if(answer_given === correct_answer){
             FeedbackGen = new ItemGivenPositiveFeedbackController(FennimalObj.item, FennimalObj.name)
-            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Correct! The " + FennimalObj.name + " likes the " + correct_answer
+            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Correct! " + FennimalObj.name + " likes the " + correct_answer
         }else{
             //Inform the subject that a mistake has been made
             SVGObjects.Prompts.Feedback.Prompt.style.display = "inherit"
-            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Oops! The " + FennimalObj.name + " likes the " + correct_answer
+            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Oops! " + FennimalObj.name + " likes the " + correct_answer
 
             //Animate the item being thrown back
             let ItemObj = document.getElementById("item_" + answer_given)
 
             //Store the original transition styles
             let previous_item_transition_style = ItemObj.style.transition
-            let previous_Fennimal_transition_style = FennimalSVGObj.style.transition
+            let previous_Container_transition_style = Container.style.transition
 
             ItemObj.style.transition = "1000ms ease-out"
-            FennimalSVGObj.style.transition = "1000ms ease-out"
+            Container.style.transition = "1000ms ease-out"
 
             setTimeout(function(){
                 translate_pos_relative(ItemObj,0,250)
             },1000)
 
             //Animate the Fennimal Object disappearing
-            setTimeout(function(){FennimalSVGObj.style.opacity = 0},2000)
+            setTimeout(function(){Container.style.opacity = 0},2000)
 
             //After both animations are concluded, reset the transition styles
             setTimeout(function(){
                 ItemObj.style.transition = previous_item_transition_style
-                FennimalSVGObj.style.transition = previous_Fennimal_transition_style
-                FennimalSVGObj.style.opacity = 1
+                Container.style.transition = previous_Container_transition_style
+                Container.style.opacity = 1
                 ItemObj.style.display = "none"
             },5000)
 
@@ -3504,7 +3535,7 @@ QuizFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCont){
                 }
 
                 ExpCont.FennimalInteractionCompleted(FennimalObj)
-                hideFennimal()
+                document.getElementById("Fennimal_Container").innerHTML = ""
                 hide_Fennimal_background_mask()
                 SVGObjects.Prompts.Feedback.Prompt.style.display = "none"
             },500)
@@ -3512,14 +3543,8 @@ QuizFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCont){
     }
 
     // ON CONSTRUCTION
-    setFennimalColors()
-
-    //Set and show the prompt text
+    //Show the correct layers
     SVGObjects.Layers.Item_Bar.style.display = "inherit"
-
-
-    //Show the Fennimals layer
-    SVGObjects.Layers.Fennimals.style.display = "inherit"
     SVGObjects.Layers.Stage.style.display = "inherit"
 
     let StartTime
@@ -3528,12 +3553,13 @@ QuizFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCont){
         // Reaction time measurement
         StartTime = Date.now()
 
-        SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "What toy did the "+ FennimalObj.name + " like?"
+        SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "What toy did "+ FennimalObj.name + " like?"
         SVGObjects.Prompts.Feedback.Prompt.style.opacity = 1
         SVGObjects.Prompts.Feedback.Prompt.style.display = "inherit"
 
         show_Fennimal_background_mask()
-        showFennimal()
+        Container.style.display = "inherit"
+
         setTimeout(function(){
             ItemCont =  new ItemController(FennimalObj, ItemAvailability, ItemDetails,LocCont, that)
         },2000)
@@ -3546,38 +3572,17 @@ QuizFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCont){
 //Call to manage a test trial
 TestPhaseFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCont){
     let that = this
-    let FennimalSVGObj = document.getElementById("Fennimal_"+FennimalObj.type)
+    //Remove any existing Fennimals on the screen
+    document.getElementById("Fennimal_Container").innerHTML = ""
+
+    //Creating the Fennimal SVG group and a container to hold it in
+    let Fennimal = createFennimal(FennimalObj.head, FennimalObj.body, FennimalObj.primary_color,FennimalObj.secondary_color, FennimalObj.tertiary_color)
+    let Container = document.getElementById("Fennimal_Container")
+    Container.appendChild(Fennimal)
+    Container.style.display = "none"
 
     //Set all items
     let ItemCont
-
-    //Sets the correct color-scheme to the Fennimal
-    function setFennimalColors(){
-        //Set primary color regions
-
-        let Primary_regions = FennimalSVGObj.getElementsByClassName("Fennimal_primary_color")
-        for(let i = 0; i< Primary_regions.length; i++){
-            Primary_regions[i].style.fill = FennimalObj.primary_color
-        }
-
-        //Set secondary colors
-        let Secondary_regions =  FennimalSVGObj.getElementsByClassName("Fennimal_secondary_color")
-        for(let i = 0; i< Secondary_regions.length; i++){
-            Secondary_regions[i].style.fill = FennimalObj.secondary_color
-        }
-
-        //Set tertiary colors
-        let Tertiary_regions =  FennimalSVGObj.getElementsByClassName("Fennimal_tertiary_color")
-        for(let i = 0; i< Tertiary_regions.length; i++){
-            Tertiary_regions[i].style.fill = FennimalObj.tertiary_color
-        }
-    }
-    function showFennimal(){
-        FennimalSVGObj.style.display = "inherit"
-    }
-    function hideFennimal(){
-        FennimalSVGObj.style.display = "none"
-    }
 
     function show_Fennimal_background_mask(){
         SVGObjects.Splashscreen_Fennimal.Mask.style.display = "inherit"
@@ -3604,22 +3609,22 @@ TestPhaseFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCon
 
         //Store the original transition styles
         let previous_item_transition_style = ItemObj.style.transition
-        let previous_Fennimal_transition_style = FennimalSVGObj.style.transition
+        let previous_Fennimal_transition_style = Container.style.transition
 
         ItemObj.style.transition = "1000ms ease-out"
-        FennimalSVGObj.style.transition = "1000ms ease-out"
+        Container.style.transition = "1000ms ease-out"
 
         //Animate the Fennimal and the item disappearing
         setTimeout(function(){
-            FennimalSVGObj.style.opacity = 0
+            Container.style.opacity = 0
             ItemObj.style.opacity = 0
         },1500)
 
         //After both animations are concluded, reset the transition styles
         setTimeout(function(){
             ItemObj.style.transition = previous_item_transition_style
-            FennimalSVGObj.style.transition = previous_Fennimal_transition_style
-            FennimalSVGObj.style.opacity = 1
+            Container.style.transition = previous_Fennimal_transition_style
+            Container.style.opacity = 1
             ItemObj.style.opacity = 1
             ItemObj.style.display = "none"
         },3000)
@@ -3628,7 +3633,7 @@ TestPhaseFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCon
         //After a timeout, tell the ExpCon that this quiz trial is completed
         setTimeout(function(){
             ExpCont.test_trial_completed(FennimalObj)
-            hideFennimal()
+            Container.innerHTML = ""
             hide_Fennimal_background_mask()
         },2500)
     }
@@ -3642,11 +3647,10 @@ TestPhaseFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCon
         console.log("starting time measurement")
 
         show_Fennimal_background_mask()
-        showFennimal()
+        Container.style.display = "inherit"
         ItemCont =  new ItemController(FennimalObj, FennimalObj.items_available, ItemDetails,LocCont, that)
 
-    },750)
-    setFennimalColors()
+    },1500)
 
     //Set and show the prompt text. This should simply say which item was forgotten
     let forgotten_items = []
@@ -3665,25 +3669,35 @@ TestPhaseFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCon
         }
     }
     SVGObjects.Layers.Item_Bar.style.display = "inherit"
-
     SVGObjects.Prompts.Feedback.Prompt.style.opacity = 1
     SVGObjects.Prompts.Feedback.Prompt.style.display = "inherit"
 
     //Show the Fennimals layer
-    SVGObjects.Layers.Fennimals.style.display = "inherit"
     SVGObjects.Layers.Stage.style.display = "inherit"
 
 }
 
 //Call to create an already-disovered Fennimal. Paints the Fennimal itself and animates in the object / prompt.
 CompletedFennimalController = function(FennimalObj){
-    let FennimalSVGObj = document.getElementById("Fennimal_"+FennimalObj.type)
+    //Remove any existing Fennimals on the screen
+    document.getElementById("Fennimal_Container").innerHTML = ""
+
+    //Creating the Fennimal SVG group and a container to hold it in
+    let Fennimal = createFennimal(FennimalObj.head, FennimalObj.body, FennimalObj.primary_color,FennimalObj.secondary_color, FennimalObj.tertiary_color)
+    let Container = document.getElementById("Fennimal_Container")
+    Container.appendChild(Fennimal)
+    Container.style.display = "inherit"
+
+    //Show the correct layers
+    SVGObjects.Layers.Stage.style.display = "inherit"
+
+    //Item and associates
     let Item = document.getElementById("item_"+FennimalObj.item)
     let item_transition_style = Item.style.transition
     Item.style.transition = ""
     Item.style.display = "inherit"
 
-    let DropTarget = document.getElementById("Fennimal_" + FennimalObj.type + "_droptarget")
+    let DropTarget = document.getElementById("Fennimal_Container").getElementsByClassName("Fennimal_droptarget")[0]
     DropTarget.style.display = "inherit"
 
     setTimeout(function(){
@@ -3696,40 +3710,8 @@ CompletedFennimalController = function(FennimalObj){
     SVGObjects.Layers.Item_Bar.style.display = "inherit"
     document.getElementById("item_bar").style.display = "none"
 
-    //Show the correct layers: Fennimals Layer and the Fennimals stage layer
-    SVGObjects.Layers.Fennimals.style.display = "inherit"
-    SVGObjects.Layers.Stage.style.display = "inherit"
-
+    //Create a feedback generator
     let FeedbackGen = new ItemGivenPositiveFeedbackController(FennimalObj.item, FennimalObj.name)
-
-    //Sets the correct color-scheme to the Fennimal
-    function setFennimalColors(){
-        //Set primary color regions
-
-        let Primary_regions = FennimalSVGObj.getElementsByClassName("Fennimal_primary_color")
-        for(let i = 0; i< Primary_regions.length; i++){
-            Primary_regions[i].style.fill = FennimalObj.primary_color
-        }
-
-        //Set secondary colors
-        let Secondary_regions =  FennimalSVGObj.getElementsByClassName("Fennimal_secondary_color")
-        for(let i = 0; i< Secondary_regions.length; i++){
-            Secondary_regions[i].style.fill = FennimalObj.secondary_color
-        }
-
-        //Set tertiary colors
-        let Tertiary_regions =  FennimalSVGObj.getElementsByClassName("Fennimal_tertiary_color")
-        for(let i = 0; i< Tertiary_regions.length; i++){
-            Tertiary_regions[i].style.fill = FennimalObj.tertiary_color
-        }
-    }
-
-    function showFennimal(){
-        FennimalSVGObj.style.display = "inherit"
-    }
-    function hideFennimal(){
-        FennimalSVGObj.style.display = "none"
-    }
 
     function show_Fennimal_background_mask(){
         SVGObjects.Splashscreen_Fennimal.Mask.style.display = "inherit"
@@ -3739,21 +3721,16 @@ CompletedFennimalController = function(FennimalObj){
     }
 
     this.interactionAborted = function(){
-        hideFennimal()
+        document.getElementById("Fennimal_Container").innerHTML = ""
         hide_Fennimal_background_mask()
         if(FeedbackGen !== false){
             FeedbackGen.location_left()
             FeedbackGen = false
         }
         Item.style.display = "none"
-        //MoveElemToCoords(Item, -500,-500)
     }
 
-    setFennimalColors()
     show_Fennimal_background_mask()
-    showFennimal()
-
-
 }
 
 //Given an array  of items, manages all the item interactions.
@@ -3771,7 +3748,7 @@ ItemController = function(FennimalObj, ItemAvailability, ItemDetails,LocCont, Fe
     }
 
     //Keep track of the drop target
-    let DropTarget = document.getElementById("Fennimal_" + FennimalObj.type + "_droptarget")
+    let DropTarget = document.getElementById("Fennimal_Container").getElementsByClassName("Fennimal_droptarget")[0]
 
     //Reference to the feedback controller
     let FeedbackCont = false
@@ -3868,7 +3845,7 @@ ItemController = function(FennimalObj, ItemAvailability, ItemDetails,LocCont, Fe
             let item_selected_by_subject = dragging_state
             dragging_state = "frozen"
 
-           Fennimal_interaction_completed(item_selected_by_subject)
+            Fennimal_interaction_completed(item_selected_by_subject)
 
         }else{
             //Nothing has been given yet
@@ -4046,9 +4023,9 @@ ItemController = function(FennimalObj, ItemAvailability, ItemDetails,LocCont, Fe
         SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Oops! You did not bring the correct item with you"
     }else{
         if(Available_Items_On_Screen.length === 1){
-            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Give the " + FennimalObj.item + " to the " + FennimalObj.name
+            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Give the " + FennimalObj.item + " to " + FennimalObj.name
         }else{
-            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Give one of the available items to the " + FennimalObj.name
+            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Give one of the available items to " + FennimalObj.name
         }
     }
 
@@ -4066,7 +4043,7 @@ ItemGivenPositiveFeedbackController = function(item_name, fennimal_name){
     let animation_interval = false
 
     //Set and show the prompt text
-    SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "The "+ fennimal_name + " likes the " + item_name
+    SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = fennimal_name + " likes the " + item_name
     SVGObjects.Prompts.Feedback.Prompt.style.opacity = 1
     SVGObjects.Prompts.Feedback.Prompt.style.display = "inherit"
 
@@ -4183,7 +4160,7 @@ ItemGivenPositiveFeedbackController = function(item_name, fennimal_name){
         //Squeezing interval
         squeeze()
         animation_interval = setInterval(function(){
-           squeeze()
+            squeeze()
         },_time_per_squeeze)
 
     }
@@ -4460,10 +4437,10 @@ ObjectiveAchievedController = function(text_top, text_bottom, show_mask){
         },150)
     }, 250)
 
-   //After a period of time, hide all feedback and stop generating new starts
+    //After a period of time, hide all feedback and stop generating new starts
     function hide(){
 
-       // document.querySelectorAll('.objective_achieved_star').forEach(e => e.remove());
+        // document.querySelectorAll('.objective_achieved_star').forEach(e => e.remove());
         ObjectiveAchievedLayer.style.display = "none"
     }
     function stop_generating_hearts(){
@@ -4599,6 +4576,22 @@ InstructionsController = function(ExpCont, LocCont){
 
     //Subcontroller and variables for the backpack item selection
     let current_item_in_backpack = false
+
+    // Creates and returns a miniature outline of a Fennimal
+    function createFennimalIcon(head, body, x){
+        //Check if any previous icons already exist. If so, delete them
+        if (document.contains(document.getElementById("Fennimal_Icon"))) {
+            document.getElementById("Fennimal_Icon").remove();
+        }
+
+        let OutlineSVG = createFennimalOutline(current_search_head,current_search_body)
+        OutlineSVG.style.transform = "scale(0.4,0.4)"
+        let OutlineMoveContainer = document.createElementNS("http://www.w3.org/2000/svg", 'g')
+        OutlineMoveContainer.appendChild(OutlineSVG)
+        OutlineMoveContainer.style.transform = "translate(" + x + "px,115px)"
+        OutlineMoveContainer.id = "Fennimal_Icon"
+        return(OutlineMoveContainer)
+    }
 
     BackpackItemButtonController = function(item_name, position, backgroundcolor, xpos,  InstrCon){
         //Get the correct SVG references
@@ -4754,28 +4747,28 @@ InstructionsController = function(ExpCont, LocCont){
 
     // SEARCH PHASE //
     //////////////////
-    let current_search_location, current_search_type
-    this.showSearchInstructions = function(type_name, location_name){
+    let current_search_location, current_search_head, current_search_body, current_search_name
+    this.showSearchInstructions = function(head, body, name, location_name){
         current_search_location = location_name
-        current_search_type = type_name
+        current_search_head = head
+        current_search_body = body
+        current_search_name = name
 
         //Set the correct state for the button.
         current_instructions_state = "search"
         showSearchPage()
     }
     function showSearchPage(){
-
         //Show only the correct page (and the layer)
         hide_all_instruction_pages()
         SVGObjects.Instructions.Layer.style.display = "inherit"
         SVGObjects.Instructions.Pages.Search.style.display = "inherit"
-        SVGObjects.Instructions.OutlineIconLayer.style.display = "inherit"
 
         //Show the map background
         show_map_background()
 
-        //Show the correct hint and outline
-        set_outline()
+        //Show the  outline
+        SVGObjects.Instructions.Pages.Search.appendChild(createFennimalIcon(current_search_head,current_search_body,50))
 
         //Create a container for the title and text elements
         let Container = createInstructionContainer()
@@ -4786,29 +4779,18 @@ InstructionsController = function(ExpCont, LocCont){
 
         //Show the correct hint
         if(Param.hints_based_on_location){
-            document.getElementById("instructions_search_hint").childNodes[0].innerHTML = Param.HintsBasedOnLocation[current_search_location]
+            document.getElementById("instructions_search_hint").childNodes[0].innerHTML = current_search_name + " " +  Param.HintsBasedOnLocation[current_search_location]
         }else{
-            document.getElementById("instructions_search_hint").childNodes[0].innerHTML = Param.RegionData[Param.LocationTransitionData["location_"+ current_search_location].region].hint
+            document.getElementById("instructions_search_hint").childNodes[0].innerHTML = current_search_name + " " + Param.RegionData[Param.LocationTransitionData["location_"+ current_search_location].region].hint
         }
 
         //Set the event handlers for the two buttons. Continue should go to the map, Instructions should go to the welcome page.
         document.getElementById("button_instructions_search_continue").onclick = function(){
-           ExpCont.search_instruction_page_closed()
+            ExpCont.search_instruction_page_closed()
         }
         document.getElementById("button_instructions_search_welcome").onclick = function(){
             showWelcomeScreen()
         }
-
-    }
-
-    //Assumes that current_search_type has already been correctly set
-    function set_outline(){
-        //Hide all outline icons and show only the correct one
-        let AllIcons = document.getElementsByClassName("Fennimal_Search_Target")
-        for(let i=0;i<AllIcons.length;i++){
-            AllIcons[i].style.display = "none"
-        }
-        document.getElementById("Fennimal_Search_Target_" + current_search_type).style.display = "inherit"
 
     }
 
@@ -4830,10 +4812,12 @@ InstructionsController = function(ExpCont, LocCont){
         document.getElementById("button_instructions_delivery_continue").style.display = "inherit"
 
     }
-    this.showDeliveryInstructions = function(type_name, location_name, _ItemDetails){
+    this.showDeliveryInstructions = function(head, body, name, location_name, _ItemDetails){
         ItemDetails = _ItemDetails
         current_search_location = location_name
-        current_search_type = type_name
+        current_search_head = head
+        current_search_body = body
+        current_search_name = name
 
         //Set the correct state for the button.
         current_instructions_state = "delivery"
@@ -4845,18 +4829,17 @@ InstructionsController = function(ExpCont, LocCont){
         hide_all_instruction_pages()
         SVGObjects.Instructions.Layer.style.display = "inherit"
         SVGObjects.Instructions.Pages.Delivery.style.display = "inherit"
-        SVGObjects.Instructions.OutlineIconLayer.style.display = "inherit"
         SVGObjects.Instructions.Hint_and_pack_item_boxes.style.display = "inherit"
 
         //Show the map background
         show_map_background()
 
         //Show the correct hint and outline
-        set_outline()
+        SVGObjects.Instructions.Hint_and_pack_item_boxes.appendChild(createFennimalIcon(current_search_head,current_search_body,20))
         if(Param.hints_based_on_location){
-            document.getElementById("instructions_delivery_hint").childNodes[0].innerHTML = Param.HintsBasedOnLocation[current_search_location]
+            document.getElementById("instructions_delivery_hint").childNodes[0].innerHTML = current_search_name + " " +  Param.HintsBasedOnLocation[current_search_location]
         }else{
-            document.getElementById("instructions_delivery_hint").childNodes[0].innerHTML = Param.RegionData[Param.LocationTransitionData["location_"+ current_search_location].region].hint
+            document.getElementById("instructions_delivery_hint").childNodes[0].innerHTML = current_search_name + " " +  Param.RegionData[Param.LocationTransitionData["location_"+ current_search_location].region].hint
         }
 
         //Set the text to indicate that no item has been selected thus far
@@ -4959,10 +4942,12 @@ InstructionsController = function(ExpCont, LocCont){
         document.getElementById("button_instructions_remedial_continue").style.display = "inherit"
 
     }
-    this.showRemedialInstructions = function(type_name, location_name, _ItemDetails){
+    this.showRemedialInstructions = function(head,body,name, location_name, _ItemDetails){
         ItemDetails = _ItemDetails
         current_search_location = location_name
-        current_search_type = type_name
+        current_search_head = head
+        current_search_body = body
+        current_search_name = name
 
         //Set the correct state for the button.
         current_instructions_state = "remedial"
@@ -4974,18 +4959,17 @@ InstructionsController = function(ExpCont, LocCont){
         hide_all_instruction_pages()
         SVGObjects.Instructions.Layer.style.display = "inherit"
         SVGObjects.Instructions.Pages.Remedial.style.display = "inherit"
-        SVGObjects.Instructions.OutlineIconLayer.style.display = "inherit"
         SVGObjects.Instructions.Hint_and_pack_item_boxes.style.display = "inherit"
 
         //Show the map background
         show_map_background()
 
         //Show the correct hint and outline
-        set_outline()
+        SVGObjects.Instructions.Hint_and_pack_item_boxes.appendChild(createFennimalIcon(current_search_head,current_search_body,20))
         if(Param.hints_based_on_location){
-            document.getElementById("instructions_delivery_hint").childNodes[0].innerHTML = Param.HintsBasedOnLocation[current_search_location]
+            document.getElementById("instructions_delivery_hint").childNodes[0].innerHTML = current_search_name + " " +  Param.HintsBasedOnLocation[current_search_location]
         }else{
-            document.getElementById("instructions_delivery_hint").childNodes[0].innerHTML = Param.RegionData[Param.LocationTransitionData["location_"+ current_search_location].region].hint
+            document.getElementById("instructions_delivery_hint").childNodes[0].innerHTML = current_search_name + " " +  Param.RegionData[Param.LocationTransitionData["location_"+ current_search_location].region].hint
         }
 
         //Set the text to indicate that no item has been selected thus far
@@ -5233,7 +5217,7 @@ InstructionsController = function(ExpCont, LocCont){
             if(next_screen === "novel_block"){  Button.onclick = function(){showTestPhaseNovelBlockText(passthrough_buttonfunction)} }
             if(next_screen === "repeat_block"){  Button.onclick = function(){showTestPhaseRepeatBlockText(passthrough_buttonfunction)} }
 
-            },500+ current_day*500)
+        },500+ current_day*500)
     }
 
     //Shows the intructions for one of the non-repeat-training test phase blocks
@@ -5312,7 +5296,7 @@ InstructionsController = function(ExpCont, LocCont){
         //Set the dowload instructions
         let DownloadTextField = createTextField(30, 190, 508-2*30,500, "<i><b>DO NOT YET LEAVE THIS PAGE </b>. In order to finish the experiment and submit your data, please press the button below. </i>")
         DownloadTextField.style.textAlign = "center"
-       // DownloadTextField.style.userSelect = "text"
+        // DownloadTextField.style.userSelect = "text"
         Container.appendChild(DownloadTextField)
 
         function downloadButtonFunc(){
@@ -5341,6 +5325,9 @@ InstructionsController = function(ExpCont, LocCont){
 //TODO: set and refer to direction
 TopLayerMaskController = function(_outputfunction, direction, text){
     function clearSVG(){
+        //Remove any existing Fennimals on the screen
+        document.getElementById("Fennimal_Container").innerHTML = ""
+
         //Hide all layers
         for(let layer in SVGObjects.Layers){
             let x =  Object.getOwnPropertyNames(SVGObjects.Layers[layer])
@@ -5356,7 +5343,6 @@ TopLayerMaskController = function(_outputfunction, direction, text){
         }
 
         //Hide all items
-
         let AllItems = document.getElementsByClassName("item_icon")
         for(let i = 0;i<AllItems.length; i++){
             AllItems[i].style.display = "none"
@@ -5805,7 +5791,6 @@ ExperimentController = function(Stimuli, DataController){
     this.FennimalFound = function(FennimalObj){
         //Determining which items are invisible, which are unavailalbe and which are available.
         let ItemAvailability = {}
-        console.log("FennimalFound")
 
         //In the training phase, we sometimes show all items (most set to unavailable), with exception of the delivery phase (in which case only the correct item should be shown)
         if(current_training_subphase === "delivery" || current_training_subphase === "remedial"){
@@ -5880,13 +5865,13 @@ ExperimentController = function(Stimuli, DataController){
                     InstrCont.showExplorationInstructions(LocationVisitationOrder,FennimalsPresentOnMap)
                     break;
                 case("targeted_search"):
-                    InstrCont.showSearchInstructions(CurrentSearchedFennimal.type,CurrentSearchedFennimal.location)
+                    InstrCont.showSearchInstructions(CurrentSearchedFennimal.head, CurrentSearchedFennimal.body,CurrentSearchedFennimal.name,CurrentSearchedFennimal.location)
                     break;
                 case("delivery"):
-                    InstrCont.showDeliveryInstructions(CurrentSearchedFennimal.type,CurrentSearchedFennimal.location, Stimuli.getItemDetails())
+                    InstrCont.showDeliveryInstructions(CurrentSearchedFennimal.head, CurrentSearchedFennimal.body,CurrentSearchedFennimal.name,CurrentSearchedFennimal.location, Stimuli.getItemDetails())
                     break
                 case("remedial"):
-                    InstrCont.showRemedialInstructions(CurrentSearchedFennimal.type,CurrentSearchedFennimal.location, Stimuli.getItemDetails())
+                    InstrCont.showRemedialInstructions(CurrentSearchedFennimal.head, CurrentSearchedFennimal.body,CurrentSearchedFennimal.name,CurrentSearchedFennimal.location, Stimuli.getItemDetails())
                     break
             }
         }
@@ -6037,7 +6022,7 @@ ExperimentController = function(Stimuli, DataController){
             FennimalsPresentOnMap[CurrentSearchedFennimal.location] = CurrentSearchedFennimal
 
             //Show the instructions screen.
-            InstrCont.showSearchInstructions(CurrentSearchedFennimal.type, CurrentSearchedFennimal.location)
+            InstrCont.showSearchInstructions(CurrentSearchedFennimal.head, CurrentSearchedFennimal.body,CurrentSearchedFennimal.name,CurrentSearchedFennimal.location)
 
             //Keep track of which locations are visited
             Search_Trial_Locations_Visited = []
@@ -6120,7 +6105,7 @@ ExperimentController = function(Stimuli, DataController){
             FennimalsPresentOnMap[CurrentSearchedFennimal.location] = CurrentSearchedFennimal
 
             //Show the instructions screen.
-            InstrCont.showDeliveryInstructions(CurrentSearchedFennimal.type, CurrentSearchedFennimal.location, Stimuli.getItemDetails())
+            InstrCont.showDeliveryInstructions(CurrentSearchedFennimal.head, CurrentSearchedFennimal.body,CurrentSearchedFennimal.name, CurrentSearchedFennimal.location, Stimuli.getItemDetails())
 
             //Reset the items in backpack and locations visited
             Items_Taken_In_Backpack_During_Trial = []
@@ -6256,7 +6241,7 @@ ExperimentController = function(Stimuli, DataController){
             FennimalsPresentOnMap[CurrentSearchedFennimal.location] = CurrentSearchedFennimal
 
             //Show the instructions screen.
-            InstrCont.showRemedialInstructions(CurrentSearchedFennimal.type, CurrentSearchedFennimal.location, Stimuli.getItemDetails())
+            InstrCont.showRemedialInstructions(CurrentSearchedFennimal.head, CurrentSearchedFennimal.body,CurrentSearchedFennimal.name, CurrentSearchedFennimal.location, Stimuli.getItemDetails())
         }else{
             remedial_subphase_completed()
         }
@@ -6365,6 +6350,7 @@ ExperimentController = function(Stimuli, DataController){
         InstrCont.show_final_screen(DataCont.get_score(), DataCont.submitDataForm)
     }
 
+
 }
 
 //Create this object to generate and store all the different Fennimals encountered for a participant number.
@@ -6372,22 +6358,17 @@ ExperimentController = function(Stimuli, DataController){
 // Call to start this generator, and then manually synch up some external software to take screenshots on an interval...
 // DO NOT RUN IN CONJUCTION WITH THE EXPERIMENT CONTROLLER!
 FennimalSlideShowGenerator = function(Stimuli){
-    //Delay at the start of the slideshow
-    let starting_delay = 3000
 
     //Feed speed per Fennimal
     let feed_speed = 1000
 
-   //Set to true if there should be two slides per Fennimal: one with just the fennimal and one with the items. If set to false, shows items and Fennimals on the same slide
+    //Set to true if there should be two slides per Fennimal: one with just the fennimal and one with the items. If set to false, shows items and Fennimals on the same slide
     let separate_items_and_fennimals = false
 
     //Set to true if items should be shown on a separate page from the Fennimals themselves. If not, then items are presented with the Fennimals.
     let show_items_on_separate_screen = false
 
     let item_screen_background_color = "black"
-
-    // If set to true, then only shows the item associated to a training trial (applies to training trials only)
-    let training_trials_show_only_related_item
 
     // Loading relevant information
     let ItemDetails = Stimuli.getItemDetails()
@@ -6400,7 +6381,6 @@ FennimalSlideShowGenerator = function(Stimuli){
             TestTrails.push(TestBlocks[i].Trials[j])
         }
     }
-    console.log(TestTrails)
 
     // HELPER FUNCTIONS ///
     ///////////////////////
@@ -6477,36 +6457,20 @@ FennimalSlideShowGenerator = function(Stimuli){
     //Shows the Fennimal, including the background mask
     function showFennimal(FennimalObj){
         //Show the Fennimals stage layer
-        SVGObjects.Layers.Fennimals.style.display = "inherit"
         SVGObjects.Layers.Stage.style.display = "inherit"
 
         //Show the opague background mask
         SVGObjects.Splashscreen_Fennimal.Mask.style.display = "inherit"
 
-        //Find the SVG object of the Fennimal
-        let FennimalSVGObj = document.getElementById("Fennimal_"+FennimalObj.type)
+        //Remove any existing Fennimals on the screen
+        document.getElementById("Fennimal_Container").innerHTML = ""
 
-        //Set the correct colors
-        //Set primary color regions
-        let Primary_regions = FennimalSVGObj.getElementsByClassName("Fennimal_primary_color")
-        for(let i = 0; i< Primary_regions.length; i++){
-            Primary_regions[i].style.fill = FennimalObj.primary_color
-        }
-
-        //Set secondary colors
-        let Secondary_regions =  FennimalSVGObj.getElementsByClassName("Fennimal_secondary_color")
-        for(let i = 0; i< Secondary_regions.length; i++){
-            Secondary_regions[i].style.fill = FennimalObj.secondary_color
-        }
-
-        //Set tertiary colors
-        let Tertiary_regions =  FennimalSVGObj.getElementsByClassName("Fennimal_tertiary_color")
-        for(let i = 0; i< Tertiary_regions.length; i++){
-            Tertiary_regions[i].style.fill = FennimalObj.tertiary_color
-        }
-
-        //Show the Fennimal
-        FennimalSVGObj.style.display = "inherit"
+        //Creating the Fennimal SVG group and a container to hold it in
+        let Fennimal = createFennimal(FennimalObj.head, FennimalObj.body, FennimalObj.primary_color,FennimalObj.secondary_color, FennimalObj.tertiary_color)
+        let Container = document.getElementById("Fennimal_Container")
+        Container.appendChild(Fennimal)
+        Container.style.display = "inherit"
+        SVGObjects.Layers.Stage.style.display = "inherit"
     }
 
     //Shows the items on whathever screen is currently being shown.
@@ -6516,7 +6480,6 @@ FennimalSlideShowGenerator = function(Stimuli){
         //      "unavailable": item will shown as "not available"
         // During training trials, all items will be shown to be available!
         //Show the Fennimals stage layer
-        SVGObjects.Layers.Fennimals.style.display = "inherit"
         SVGObjects.Layers.Stage.style.display = "inherit"
 
         //Show the item bar
@@ -6825,9 +6788,7 @@ let SVGObjects = {
         Splashscreen: document.getElementById("Fennimals_Splashscreen_Layer"),
         Map: document.getElementById("Map_Layer"),
         Regions: document.getElementById("Regions_Layer"),
-        Fennimals: document.getElementById("Fennimals_layer"),
         Instructions: document.getElementById("Instructions_Layer"),
-        Outline: document.getElementById("Fennimal_outlines_layer"),
         Feedback: document.getElementById("Feedback_layer"),
         Item_Bar: document.getElementById("Item_bar_layer"),
         Sky: document.getElementById("Sky_Layer"),
@@ -6891,5 +6852,25 @@ EC.showStartScreen()
 //EC.start_quiz()
 //EC.start_remedial_subphase()
 //EC.start_test_phase()
+//let SS = new FennimalSlideShowGenerator(Stimuli)
 
 
+/*
+let Fennimal  = createFennimal("D","C","red","gold","darkred")
+SVGObjects.Layers.Stage.style.display = "inherit"
+console.log(SVGObjects.Layers.Stage)
+
+
+SVGObjects.Layers.Stage.appendChild(Fennimal)
+Fennimal.style.transform = "scale(0.5,0.5)"
+console.log(Fennimal)
+
+SVGObjects.Layers.Stage.appendChild(createFennimalOutline("H","H"))
+
+
+ */
+
+//TODO
+// Test phase item text
+// Change X - coords (future)
+// Fix flashing light at test
