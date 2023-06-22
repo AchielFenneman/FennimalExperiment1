@@ -5632,6 +5632,9 @@ DataController = function(participant_number, Stimuli){
 
     //Call to submit the hidden form with the subject's data
     this.submitDataForm = function(){
+        //Downloading hard copy
+        downloadObjectAsJson(Data, "data participant "+ participant_number + ".json")
+        
         //Populating the form
         document.getElementById("data_form_field").innerHTML = JSON.stringify(Data)
 
