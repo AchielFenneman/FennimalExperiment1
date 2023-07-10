@@ -301,18 +301,27 @@ function SplitArrayIntoParts(arr, size_per_part){
     return(Segments)
 }
 
+//Deletes all the elements with the given class name from the given element
+function deleteClassNamesFromElement(Element, Classname){
+    let Objects = Element.getElementsByClassName(Classname)
+    while(Objects.length > 0){
+        Objects[0].remove();
+    }
+
+}
+
 //Returns an SVG group object with the requested Fennimal (all set to visible). Also includes the target.
-function createFennimal(head,body, primary_color,secondary_color,tertiary_color){
+function createFennimal(FennimalObj){
     //Create a new group to hold the Fennimal
     let Container = document.createElementNS("http://www.w3.org/2000/svg", 'g')
 
     //First copy the body
-    let BodyObj = document.getElementById("body_" + body).cloneNode(true)
+    let BodyObj = document.getElementById("body_" + FennimalObj.body).cloneNode(true)
     Container.appendChild(BodyObj)
     BodyObj.style.display = "inherit"
 
     //Then the head
-    let HeadObj = document.getElementById("head_" + head).cloneNode(true)
+    let HeadObj = document.getElementById("head_" + FennimalObj.head).cloneNode(true)
     Container.appendChild(HeadObj)
     HeadObj.style.display = "inherit"
 
@@ -320,31 +329,58 @@ function createFennimal(head,body, primary_color,secondary_color,tertiary_color)
     let TargetObj = document.getElementById("Fennimal_droptarget").cloneNode(true)
     Container.appendChild(TargetObj)
 
-    //Color the elements
+    //Color the BODY
     //Set primary color regions
-    let Primary_regions = Container.getElementsByClassName("Fennimal_primary_color")
+    let Primary_regions = BodyObj.getElementsByClassName("Fennimal_primary_color")
     for(let i = 0; i< Primary_regions.length; i++){
-        Primary_regions[i].style.fill = primary_color
+        Primary_regions[i].style.fill = FennimalObj.body_color_scheme.primary_color
     }
 
     //Set secondary colors
-    let Secondary_regions =  Container.getElementsByClassName("Fennimal_secondary_color")
+    let Secondary_regions =  BodyObj.getElementsByClassName("Fennimal_secondary_color")
     for(let i = 0; i< Secondary_regions.length; i++){
-        Secondary_regions[i].style.fill = secondary_color
+        Secondary_regions[i].style.fill = FennimalObj.body_color_scheme.secondary_color
     }
 
     //Set tertiary colors
-    let Tertiary_regions =  Container.getElementsByClassName("Fennimal_tertiary_color")
+    let Tertiary_regions =  BodyObj.getElementsByClassName("Fennimal_tertiary_color")
     for(let i = 0; i< Tertiary_regions.length; i++){
-        Tertiary_regions[i].style.fill = tertiary_color
+        Tertiary_regions[i].style.fill = FennimalObj.body_color_scheme.tertiary_color
     }
+
+
+    //Color the HEAD
+    //Set primary color regions
+    Primary_regions = HeadObj.getElementsByClassName("Fennimal_primary_color")
+    for(let i = 0; i< Primary_regions.length; i++){
+        Primary_regions[i].style.fill = FennimalObj.head_color_scheme.primary_color
+    }
+
+    //Set secondary colors
+    Secondary_regions =  HeadObj.getElementsByClassName("Fennimal_secondary_color")
+    for(let i = 0; i< Secondary_regions.length; i++){
+        Secondary_regions[i].style.fill = FennimalObj.head_color_scheme.secondary_color
+    }
+
+    //Set tertiary colors
+    Tertiary_regions =  HeadObj.getElementsByClassName("Fennimal_tertiary_color")
+    for(let i = 0; i< Tertiary_regions.length; i++){
+        Tertiary_regions[i].style.fill = FennimalObj.head_color_scheme.tertiary_color
+    }
+
+    //Resizing head and bodies
+    HeadObj.style.transformOrigin = "50% 35%"
+    HeadObj.style.transform = "scale(1.25)"
+
+    BodyObj.style.transformOrigin = "50% 10%"
+    BodyObj.style.transform = "scale(0.9)"
 
     // Returns SVG layer
     return(Container)
 }
 
 //Returns an SVG group object with the requested Fennimal outline. Also contains the search targets
-function createFennimalOutline(head,body){
+function createFennimalOutline(head,body, include_targets){
     let Container = document.createElementNS("http://www.w3.org/2000/svg", 'g')
 
     //Copy the body outline
@@ -359,162 +395,49 @@ function createFennimalOutline(head,body){
     HeadObj.id = "outline_head"
     HeadObj.style.display = "inherit"
 
-    //Then the targets for both the head and the body
-    let BodyTargets = document.getElementById("targets_body_" + body).cloneNode(true)
-    Container.appendChild(BodyTargets)
-    let HeadTargets = document.getElementById("targets_head_" + head).cloneNode(true)
-    Container.appendChild(HeadTargets)
+    //Then the targets for both the head and the body, if required
+    if(include_targets){
+        let BodyTargets = document.getElementById("targets_body_" + body).cloneNode(true)
+        Container.appendChild(BodyTargets)
+        let HeadTargets = document.getElementById("targets_head_" + head).cloneNode(true)
+        Container.appendChild(HeadTargets)
+    }
+
+
+    //Resizing head and bodies
+    HeadObj.style.transformOrigin = "50% 35%"
+    HeadObj.style.transform = "scale(1.25)"
+
+    BodyObj.style.transformOrigin = "50% 10%"
+    BodyObj.style.transform = "scale(0.9)"
 
     //Return SVG layer
     return(Container)
 
 }
 
+//Creates a name based on the letters of the head and body of a Fennimal. Note that the prefixes and suffixes are hardcoded based on the look of the parts
+function createConjunctiveName(head,body){
+    return( Param.NamePrefixes_Body[body] + " " + Param.Names_Head[head])
+
+
+}
+
 STIMULUSDATA = function(participant_number){
-    // SETTING STIMULUS PARAMETERS //
-    /////////////////////////////////
-    //Determines the number of location-based pairs in the training set (two different Fennimals in different locations of the same region)
-    let location_pairs_in_training_set = 2
-    //Determines the number of type-based pairs in the training set (two of the same Fennimals in different regions)
-    let type_pairs_in_training_set = 1
-
-    // TODO: REMOVE FOR ACTUAL EXPERIMENT. In actual experiment, define pairs directly. This is just for pilotting purposes!
-    if(Math.random() > 0.5){
-        location_pairs_in_training_set = 2
-        type_pairs_in_training_set = 1
-    }else{
-        location_pairs_in_training_set = 1
-        type_pairs_in_training_set = 2
-    }
-
-    //If set to TRUE, then the tertiary color of a Fennimal is always set to equal the location of the Fennimal.
-    //If set to FALSE, then tertiary colors are (pseudo)randomly assigned
-    let tertiary_colors_based_on_location = true
-
-    // This governs the logic for the color scheme sampling. There are three ways to determine the primary and secondary color schemes.
-    //      unique: all Fennimals will have a unique color scheme. Sampled to be differentiated (different primary colors) between training pairs AND between training / test.
-    //      both_training_same: pairs in the same training pair will have the same color scheme, each of the test trials will have a different color scheme (sampled to be differentiated)
-    //      training_test_same: each training trial will have a different color scheme (sampled to be differentiated within a pair), each test trial matches its associated training trial
-    //      location: colors are always set to match the color schemes of the regions in which the Fennimals reside.
-    let color_sampling_method = "both_training_same"
-
-    // Defines the maximum number of test trials.
-    // Note that for some combinations of location and type pairs, the actual number of possible unique test trials can be substantially lower than this.
-    //      The strongest limiting factor here is the number of regions.
-    //          There are 8 regions in total. Each type pair consumes 2 region, each location pair consumes 1 region.
-    //          Each remaining region contributes 2 possible locations for each trial.
-    // The number of possible test trials is determined as: (8-consumed regions)*2( locations per remaining region) * (total number of pairs)
-    //  If the number of max test trials is set to lower than this amount, test trials will be sampled across pairs to be as uniform over the remaining locations as possible.
-    let max_number_of_test_trials_per_training_trial = 2
-
-    // Can be set to false (both Fennimals in a training set never share any features), "body" (training pairs always have the same body) or "head" (training pairs always have the same head).
-    // NB: this only affects location pairs! (type pairs already have the same bodies and heads)
-    // NB: If set to body (or head), then for location pairs each test-phase Fennimal will have a unique body (head)
-    let parts_shared_by_training_pair = "body"
-
     // RESETTING THE RNG SEED HERE //
     ////////////////////////////////
     // NO CALLS TO RANDOMIZATION SHOULD BE MADE ABOVE THIS LINE //
     RNG = new RandomNumberGenerator(participant_number)
 
-    // CREATING ALL THE FENNIMAL OBJECTS (SANS COLORS) HERE //
-    //The following two variables keep track of which regions have been assigned in the stimulus creating process.
+    //Defining the number of test trials per training PAIR. Please check whether there are sufficient bodies and heads available, depending on specification.
+    let number_of_test_trials_per_training_pair = 2
+
+    // DEFINING THE AVAILABLE FEATURES
     let Available_Heads = shuffleArray(Param.Available_Fennimal_Heads)
     let Available_Bodies = shuffleArray(Param.Available_Fennimal_Bodies)
-    let Available_Names = shuffleArray(Param.Available_Names)
-
-    //Creating each pair as an element in an array (each element containing an array of two objects). Here we initialize the FennimalObjects.
-    // Regions are draw by order of inclusion (to maximize dis-similarity for the training pairs)
-    let Available_Regions = JSON.parse(JSON.stringify(Param.region_names_by_order_of_inclusion))
-    let Regions_for_training_pairs = shuffleArray( Available_Regions.splice(0,location_pairs_in_training_set + 2*type_pairs_in_training_set) )
-
-    let TrainingPairs = []
-    //Adding the location pairs
-    for(let i = 0; i<location_pairs_in_training_set;i++){
-        //Destructively draw a region and randomly sample the associated locations to A and B
-        let sampled_region = Regions_for_training_pairs.splice(0,1)[0]
-        let sampled_locations = shuffleArray(JSON.parse(JSON.stringify(Param.RegionData[sampled_region].Locations)))
-
-        //Now we need to sample the body parts of the Fennimals. The exact sampling depends on the setting defined above
-        let head_A, head_B, body_A, body_B
-        switch(parts_shared_by_training_pair){
-            case(false):
-                // Both Fennimals have unique bodies and heads
-                head_A = Available_Heads.splice(0,1)[0]
-                head_B = Available_Heads.splice(0,1)[0]
-                body_A = Available_Bodies.splice(0,1)[0]
-                body_B = Available_Bodies.splice(0,1)[0]
-                break
-            case("head"):
-                // Both Fennimals share the same head, but with different bodies
-                head_A = Available_Heads.splice(0,1)[0]
-                head_B = head_A
-                body_A = Available_Bodies.splice(0,1)[0]
-                body_B = Available_Bodies.splice(0,1)[0]
-                break
-            case("body"):
-                // Both Fennimals share the same body, but with different heads
-                head_A = Available_Heads.splice(0,1)[0]
-                head_B = Available_Heads.splice(0,1)[0]
-                body_A = Available_Bodies.splice(0,1)[0]
-                body_B = body_A
-                break
-        }
-
-        //Determine the names
-        let name_A = Available_Names.splice(0,1)[0]
-        let name_B = Available_Names.splice(0,1)[0]
-
-        //Determine a random shift in the x-position
-        let shifted_x_A = randomIntFromInterval(0,Param.max_x_shift)
-        let shifted_x_B = randomIntFromInterval(0,Param.max_x_shift)
-
-        //Push to TrainingPairs
-        TrainingPairs.push([
-            {name: name_A, head: head_A, body: body_A, region: sampled_region, location: sampled_locations[0],shifted_x: shifted_x_A, pairtype: "location"},
-            {name: name_B, head: head_B, body: body_B, region: sampled_region, location: sampled_locations[1],shifted_x: shifted_x_B, pairtype: "location"}, ])
-    }
-
-    //Adding the type pairs
-    for(let i =0; i<type_pairs_in_training_set; i++){
-        //Destructively draw two regions, and randomly sample a location from either
-        let sampled_region_A = Regions_for_training_pairs.splice(0,1)[0]
-        let sampled_region_B = Regions_for_training_pairs.splice(0,1)[0]
-
-        let sampled_location_A = shuffleArray(JSON.parse(JSON.stringify(Param.RegionData[sampled_region_A].Locations)))[0]
-        let sampled_location_B = shuffleArray(JSON.parse(JSON.stringify(Param.RegionData[sampled_region_B].Locations)))[0]
-
-        //Destructively sample one head and one body
-        let head = Available_Heads.splice(0,1)[0]
-        let body = Available_Bodies.splice(0,1)[0]
-
-        //Determine the names
-        let name_A = Available_Names.splice(0,1)[0]
-        let name_B = Available_Names.splice(0,1)[0]
-
-        //Determine a random shift in the x-position
-        let shifted_x_A = randomIntFromInterval(0,Param.max_x_shift)
-        let shifted_x_B = randomIntFromInterval(0,Param.max_x_shift)
-
-        // Push to TrainingPairs
-        TrainingPairs.push([
-            {name: name_A, head: head, body: body, region: sampled_region_A, location: sampled_location_A,shifted_x: shifted_x_A, pairtype: "type"},
-            {name: name_B, head: head, body: body, region: sampled_region_B, location: sampled_location_B,shifted_x: shifted_x_B, pairtype: "type"}])
-    }
-
-    //Shuffle the pairs
-    shuffleArray(TrainingPairs)
 
     // SETTING THE ITEMS USED
     // Algorithm used is defined above
-    let Items_Used_In_Experiment
-    let number_of_items_required = 2 * (type_pairs_in_training_set + location_pairs_in_training_set)
-    if(number_of_items_required > Param.Available_items.length){
-        console.error("Attempting to assign more items (" + number_of_items_required + ") than available in Parameters (" + Param.Available_items.length + ")" )
-    }else{
-        Items_Used_In_Experiment = drawRandomElementsFromArray(Param.Available_items, number_of_items_required, false )
-    }
-
     //Given an array of used items, generates the set of items used and their color. Stores in Item_Details an object keyed on the item names, with two properties: location_on_screen (numeric) and backgroundColor
     function generate_item_details(Items_Used){
         //Location on screen ranges from 1 - N
@@ -535,604 +458,250 @@ STIMULUSDATA = function(participant_number){
         }
         return(ItemObj)
     }
-    let Item_Details = generate_item_details(Items_Used_In_Experiment)
+    let Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 6, false ))
 
     //Assign items to the pairs
     let Random_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
 
-    for(let i =0;i<TrainingPairs.length;i++){
-        // The first pair should have items [0,1]. The second pair should have [2,3] ... the last pair should have [2n-1,2n], with n being the number of pairs.
-        //      Hence: pair i should have items [2i, 2i+1], with i starting at 0
-        TrainingPairs[i][0].item = Random_Items[2*i]
-        TrainingPairs[i][1].item = Random_Items[2*i + 1]
-    }
+    // DEFINING THE STIMULUS BLUEPRINTS
+    // Defining which locations co-occur in the same training pair. Strings should match locations in Param.RegionData
+    // These blueprints also determine the number of training and test Fennimals
+    let Paired_Regions = [
+        ["North", "Desert"],
+        ["Village", "Jungle"],
+        ["Swamp", "Flowerfields"],]
 
-    // GENERATING THE TEST TRIALS
-    // If possible, we would like the test trials to be as unique as possible. Therefore, we'll spread out the available locations (not regions!) and types as much as possible
-    let UseCountsOfAvailableHeads = {}
-    for(let i = 0;i<Available_Heads.length;i++){
-        UseCountsOfAvailableHeads[Available_Heads[i]] = 0
-    }
+    // Defining which parts (head, body, both or neither) are shared between the two training trials.
+    // Any shared parts will be colored based on the location of the indirect pair.
+    // Note that the parts not included here will be shared between the direct target and the test Fennimal (taking the color of the direct target's location)
+    let shared_body_parts_in_training_pair = ["head"]
+    let shared_color_schemes_in_training_pair = ["head"]
 
-    let UseCountsOfAvailableBodies = {}
-    for(let i = 0;i<Available_Bodies.length;i++){
-        UseCountsOfAvailableBodies[Available_Bodies[i]] = 0
-    }
+    // CREATING THE STIMULUS SETS HERE
+    // If the head or body are shared by the training set, then they both will have the color of the indirect target.
+    // If the head or body are not shared by the training set, then each they assume the color of the direct target's location.
+    // Training trails are always in the same location as the direct target.
+    let TrainingStimuli= []
+    let TestStimuli = []
 
-    let UseCountsOfAvailableLocations = {}
-    for(let i=0; i<Available_Regions.length;i++){
-        UseCountsOfAvailableLocations[ Param.RegionData[Available_Regions[i]].Locations[0]  ] = 0
-        UseCountsOfAvailableLocations[ Param.RegionData[Available_Regions[i]].Locations[1]  ] = 0
-    }
+    //The DirectTrainingItems and DirectTrainingItems arrays simply hold the items associated to the direct and indirect trials for all pairs. Makes it easier to search a bit later.
+    let DirectTrainingItems = []
+    let IndirectTrainingItems= []
 
-    //Now we shuffle the training pairs again, to prevent any unwanted patterns to pop up later.
-    shuffleArray(TrainingPairs)
+    for(let training_trial_pair = 0; training_trial_pair < Paired_Regions.length; training_trial_pair++){
+        let region_dir, region_ind, location_dir, location_ind,
+            head_dir, head_color_dir, body_dir, body_color_dir, item_dir, name_dir,
+            head_ind, head_color_ind, body_ind, body_color_ind, item_ind, name_ind
 
-    //This helper function takes a Count object (that is, an object where each property has a positive integer value) and returns an array of keys with n elements with the lowest counts (no replacements, ties broken randomly)
-    function get_n_elements_with_lowest_counts(n, CountObj){
-        let Arr = []
-        let Properties = Object.getOwnPropertyNames(CountObj)
-        for(let i=0;i<Properties.length;i++){
-            Arr.push(CountObj[Properties[i]])
+        //Shuffling and drawing the regions of the pair
+        shuffleArray(Paired_Regions[training_trial_pair])
+        region_dir = Paired_Regions[training_trial_pair][0]
+        region_ind = Paired_Regions[training_trial_pair][1]
+
+        // Drawing random locations with the selected regions
+        location_ind = shuffleArray(JSON.parse(JSON.stringify(Param.RegionData[region_ind].Locations))).splice(0,1)[0]
+        location_dir = shuffleArray(JSON.parse(JSON.stringify(Param.RegionData[region_dir].Locations))).splice(0,1)[0]
+
+        //Drawing the head, body and their respective color schemes for the indirect target
+        head_ind = Available_Heads.splice(0,1)[0]
+        body_ind = Available_Bodies.splice(0,1)[0]
+        head_color_ind = Param.RegionData[region_ind].Fennimal_location_colors
+        body_color_ind = Param.RegionData[region_ind].Fennimal_location_colors
+
+        //Determining the head and body shapes for the direct target
+        if(shared_body_parts_in_training_pair.includes("head")){
+            //Direct and indirect share the same head.
+            head_dir = head_ind
+        }
+        else{
+            //Draw different head for the direct target.
+            head_dir = Available_Heads.splice(0,1)[0]
         }
 
-        //Picking the element with the highest number of remaining options (i.e., the one least used yet). Break ties at random. This will be our P1 color
-        let Sampled_Indexes = getIndexesOfNSmallestElementsInArray(Arr,n)
-        let Arr_Out = []
-        for(let i = 0;i<n;i++){
-            Arr_Out.push(Properties[Sampled_Indexes[i]])
+        if(shared_body_parts_in_training_pair.includes("body")){
+            //Direct and indirect share the same body
+            body_dir = body_ind
         }
-        return(Arr_Out)
+        else{
+            //Draw different body for the direct target. The color scheme should match the region of the direct target.
+            body_dir = Available_Bodies.splice(0,1)[0]
+        }
+
+        //Determining the color schemes for the direct target. If the colors are shared, then they take the color scheme of the indirect target.
+        if(shared_color_schemes_in_training_pair.includes("head")){
+            head_color_dir = head_color_ind
+        }
+        else{
+            head_color_dir = Param.RegionData[region_dir].Fennimal_location_colors
+        }
+
+        if(shared_color_schemes_in_training_pair.includes("body")){
+            body_color_dir = body_color_ind
+        }
+        else{
+            body_color_dir = Param.RegionData[region_dir].Fennimal_location_colors
+        }
+
+        // Setting items for both Fennimals
+        item_ind = Random_Items.splice(0,1)[0]
+        item_dir = Random_Items.splice(0,1)[0]
+        IndirectTrainingItems.push(item_ind)
+        DirectTrainingItems.push(item_dir)
+
+        // Setting names for both Fennimals
+        name_ind = createConjunctiveName(head_ind, body_ind)
+        name_dir = createConjunctiveName(head_dir, body_dir)
+
+        //Creating IDs (for condensing the data later). ID's are defined as [pair]_dir and [pair_ind]
+        let id_dir = training_trial_pair + "_dir"
+        let id_ind = training_trial_pair + "_ind"
+
+
+        // Creating training Fennimal objects
+        let DirectFennimal = {name: name_ind, region: region_ind, location: location_ind, head: head_ind, body: body_ind, head_color_scheme: head_color_ind, body_color_scheme: body_color_ind, item: item_ind, ID: id_ind}
+        let IndirectFennimal = {name: name_dir, region: region_dir, location: location_dir, head: head_dir, body: body_dir, head_color_scheme: head_color_dir, body_color_scheme: body_color_dir, item: item_dir, ID: id_dir}
+        TrainingStimuli.push(DirectFennimal)
+        TrainingStimuli.push(IndirectFennimal)
+
+        // TEST STIMULI
+        for(let test_stim_index = 0; test_stim_index < number_of_test_trials_per_training_pair; test_stim_index++){
+            //Region and location are always shared with the direct target
+            let region = region_dir
+            let location = location_dir
+            let location_color_scheme = Param.RegionData[region].Fennimal_location_colors
+
+            //Determining which body parts are shared with the direct target, and which are unique.
+            //  Any parts which are NOT shared between the indirect and direct target are instead shared between the test trial and the direct target.
+            let head, head_color, body, body_color
+            if(shared_body_parts_in_training_pair.includes("head")){
+                //Draw different head for the test trial
+                head = Available_Heads.splice(0,1)[0]
+            }
+            else{
+                //Direct and indirect do not have the same head. So direct and test should have the same
+                head = head_dir
+            }
+
+            if(shared_body_parts_in_training_pair.includes("body")){
+                //Draw different body for the test trial
+                body = Available_Bodies.splice(0,1)[0]
+            }
+            else{
+                //Direct and indirect do not have the same body. So direct and test should have the same
+                body = body_dir
+
+            }
+
+            // The colors of the test trials are always based on their location
+            head_color = location_color_scheme
+            body_color = location_color_scheme
+
+            // Set a name for the test trial
+            let name =  createConjunctiveName(head,body)
+
+            //Set an ID code for this test trial
+            let id = training_trial_pair + "_test_" + test_stim_index
+
+            // Push to the TestStimuli
+            TestStimuli.push({name: name, region: region, location: location, head: head, body: body, head_color_scheme: head_color, body_color_scheme: body_color, item_direct: item_dir,item_indirect: item_ind, ID: id})
+        }
+
+
     }
+    console.log(TrainingStimuli)
+    console.log(TestStimuli)
 
-    //Determining the maximum number of test trials that can be constructed for each training trial (NB: not per pair, but per individual trial!).
-    //  For every location_pair training trial, we can construct one test trial for each available location (using the same Fennimal as from the training trial)
-    //  For every type_pair training trial, we can construct one test trial for each available type (using the same Region [but different location] as the training trial).
-    //  We want to avoid having different numbers of test trials for location versus type pairs, so the minimum of these restrictions counts.
-    //      In addition, the number of test trials per training trial may be limited by the input given above.
-    //      If there is a restriction, we want to vary the locations and types used as much as possible.
-    let number_of_available_locations = Object.getOwnPropertyNames(UseCountsOfAvailableLocations).length
-    let number_of_available_heads = Object.getOwnPropertyNames(UseCountsOfAvailableHeads).length
-    let number_of_available_bodies = Object.getOwnPropertyNames(UseCountsOfAvailableBodies).length
-    let number_of_test_trials_per_training_trial = Math.min(number_of_available_locations, number_of_available_bodies, number_of_available_heads, max_number_of_test_trials_per_training_trial)
+    // CREATING THE STRUCTURE FOR THE TEST PHASE.
+    //  In the first and fourth block, participants see the test Fennimals and can give them any of the items associated to the DIRECT Fennimals (receiving correct feedback for the item associated to the direct Fennimal)
+    //  In the second and fifth block, participants see the test Fennimals and can give them any of the items associated to the INDIRECT Fennimals (no feedback given).
+    //  In the third block, participants see the original Training Fennimals again and can give them any of the items. Receiving correct feedback only for the correct associations.
+    let Block_1, Block_2, Block_3, Block_4, Block_5
 
-    //Generating test trials here
-    let TestTrialsPerPair = []
-    for(let i = 0; i<TrainingPairs.length;i++){
-        let pair_type = TrainingPairs[i][0].pairtype
-        let AssociatedTestTrials = [[],[]]
+    // Order is randomized in each block but with one exception: no two Fennimals with the same region may be back-to-back. Use this function to shuffle
+    let pseudo_randomly_shuffle_block = function(TrialsArr){
+        while(true){
+            //Try a new random shuffle
+            let NewArray = shuffleArray(JSON.parse(JSON.stringify(TrialsArr)))
 
-        if(pair_type === "location"){
-            for(let num_in_pair = 0; num_in_pair <= 1; num_in_pair++){
-                let TrainingTrial = TrainingPairs[i][num_in_pair]
-
-                //Find the n least used locations.
-                let Sampled_Locations = get_n_elements_with_lowest_counts(number_of_test_trials_per_training_trial, UseCountsOfAvailableLocations)
-
-                //Creating the Fennimal object (sans color scheme!)
-                for(let location_ind = 0; location_ind < Sampled_Locations.length; location_ind++){
-                    //The test trials associated to a location pair always have one of the pair's Fennimals location.
-                    //Note: if parts are shared between the location pairs, then a new part has to be selected here
-                    let head = TrainingTrial.head
-                    let body = TrainingTrial.body
-                    if(parts_shared_by_training_pair === "body"){
-                        //The body is the same for both training stimuli. To prevent direct overlaps, create a new body for the test phase Fennimal here
-                        body = get_n_elements_with_lowest_counts(1, UseCountsOfAvailableBodies)[0]
-                        UseCountsOfAvailableBodies[body] = UseCountsOfAvailableBodies[body] + 1
-                    }
-                    if(parts_shared_by_training_pair === "head"){
-                        head = get_n_elements_with_lowest_counts(1, UseCountsOfAvailableHeads)[0]
-                        UseCountsOfAvailableHeads[head] = UseCountsOfAvailableHeads[head] + 1
-                    }
-
-                    let TestFennimal = {
-                        head: head,
-                        body: body,
-                        location: Sampled_Locations[location_ind],
-                        region: Param.get_region_of_location(Sampled_Locations[location_ind]),
-                        name: Available_Names.splice(0,1)[0],
-                        shifted_x: randomIntFromInterval(0,Param.max_x_shift)
-                    }
-
-                    //Finding direct and indirectly associated items
-                    if(num_in_pair === 0 ){
-                        TestFennimal.direct_item = TrainingPairs[i][0].item
-                        TestFennimal.indirect_item = TrainingPairs[i][1].item
-                    }else{
-                        TestFennimal.direct_item = TrainingPairs[i][1].item
-                        TestFennimal.indirect_item = TrainingPairs[i][0].item
-                    }
-
-                    //Incrementing the locations used count
-                    UseCountsOfAvailableLocations[Sampled_Locations[location_ind]] = UseCountsOfAvailableLocations[Sampled_Locations[location_ind]] + 1
-
-                    //Push to the output array
-                    AssociatedTestTrials[num_in_pair].push(TestFennimal)
-                }
-            }
-        }
-
-        if(pair_type === "type"){
-            for(let num_in_pair = 0; num_in_pair <= 1; num_in_pair++){
-                let TrainingTrial = TrainingPairs[i][num_in_pair]
-
-                //Find the n least used heads and bodies
-                let Sampled_Heads = get_n_elements_with_lowest_counts(number_of_test_trials_per_training_trial, UseCountsOfAvailableHeads)
-                let Sampled_Bodies = get_n_elements_with_lowest_counts(number_of_test_trials_per_training_trial, UseCountsOfAvailableBodies)
-
-                //Creating the Fennimal object (sans color scheme!)
-                for(let type_ind = 0; type_ind < number_of_test_trials_per_training_trial; type_ind++){
-                    //The test trials associated to a location pair always have one of the pair's Fennimals
-                    let TestFennimal = {
-                        head: Sampled_Heads[type_ind],
-                        body: Sampled_Bodies[type_ind],
-                        location: TrainingTrial.location,
-                        region: Param.get_region_of_location(TrainingTrial.location),
-                        name: Available_Names.splice(0,1)[0],
-                        shifted_x: randomIntFromInterval(0,Param.max_x_shift)
-                    }
-
-                    //Finding direct and indirectly associated items
-                    if(num_in_pair === 0 ){
-                        TestFennimal.direct_item = TrainingPairs[i][0].item
-                        TestFennimal.indirect_item = TrainingPairs[i][1].item
-                    }else{
-                        TestFennimal.direct_item = TrainingPairs[i][1].item
-                        TestFennimal.indirect_item = TrainingPairs[i][0].item
-                    }
-
-                    //Incrementing the locations used count
-                    UseCountsOfAvailableHeads[Sampled_Heads[type_ind]] = UseCountsOfAvailableHeads[Sampled_Heads[type_ind]] + 1
-                    UseCountsOfAvailableBodies[Sampled_Bodies[type_ind]] = UseCountsOfAvailableBodies[Sampled_Bodies[type_ind]] + 1
-
-                    //Push to the output array
-                    AssociatedTestTrials[num_in_pair].push(TestFennimal)
-                }
-            }
-        }
-        TestTrialsPerPair.push(AssociatedTestTrials)
-    }
-
-    //Collapses the ColorAvailable object (assumed to be an object with one key for each color, each containing an array for available secondary colors) to a singe array of available color pairs.
-    // Each color pair is represented as an object with {primary_color, secondary_color}  properties
-    function collapse_ColorsAvailable_to_array(_ColorsAvailable){
-        let Arr = []
-        for(let color in _ColorsAvailable){
-            for(let i =0;i<_ColorsAvailable[color].length;i++){
-                Arr.push({primary_color: color, secondary_color: _ColorsAvailable[color][i]})
-            }
-        }
-        return(Arr)
-    }
-
-    //Collapses a given object to an array. Ignores all keys, simply returns an array of all values
-    function collapse_Obj_to_array(_Obj){
-        let Arr = []
-        for(let key in _Obj){
-            Arr.push(_Obj[key])
-        }
-        return(Arr)
-    }
-
-    //Now we can assign all the colors. Here the process differs based on which sampling method is used.
-    let ColorScheme, ColorsAvailable, Primary_Colors_Available, Secondary_Colors_Available, Tertiary_Colors_Available
-
-    switch(color_sampling_method){
-        case("unique"):
-            // Here we take the most distinct approach: each Fennimal should have a unique color scheme.
-            //      Training pairs should be selected to have the most distinct colors.
-            //      Next, test trials should have color schemes that are distinct from both training pairs.
-            ColorScheme = new FENNIMALCOLORSCHEMES(2 * (location_pairs_in_training_set + type_pairs_in_training_set))
-
-            //First randomly shuffle all the availalbe colors
-            Primary_Colors_Available = shuffleArray( ColorScheme.getColorBases())
-
-            // Shifting the secondary colors by 3 indexes prevents unwanted patterns.
-            Secondary_Colors_Available = shift_array_values_by_n(Primary_Colors_Available,3)
-
-            // Tertiary colors can be sampled randomly
-            Tertiary_Colors_Available = shift_array_values_by_n(Primary_Colors_Available,5)
-
-            //Creating an object that holds all combinations of primary and secondary colors (monochrome pairs not allowed).
-            ColorsAvailable = ColorScheme.getKeyedColorSchemeObject(true)
-
-            //Store the colors used for the training pairs
-            let ColorsUsedByTrainingPairs = []
-
-            //Setting colors for all the training stimuli
-            for(let i =0; i<TrainingPairs.length;i++){
-                //Transforming to HEX values
-                let primary_color_A = ColorScheme.getColorSchemes().PrimaryColors[Primary_Colors_Available[2*i]]
-                let primary_color_B = ColorScheme.getColorSchemes().PrimaryColors[Primary_Colors_Available[2*i + 1]]
-                let secondary_color_A = ColorScheme.getColorSchemes().SecondaryColors[Secondary_Colors_Available[2*i]]
-                let secondary_color_B = ColorScheme.getColorSchemes().SecondaryColors[Secondary_Colors_Available[2*i +1]]
-                let tertiary_color_A =  ColorScheme.getColorSchemes().TertiaryColors[Tertiary_Colors_Available[2*i]]
-                let tertiary_color_B =  ColorScheme.getColorSchemes().TertiaryColors[Tertiary_Colors_Available[2*i + 1]]
-
-                //If the tertiary colors should be based on the location, then overwrite these values
-                if(tertiary_colors_based_on_location){
-                    tertiary_color_A = Param.RegionData[TrainingPairs[i][0].region].Fennimal_location_colors.tertiary
-                    tertiary_color_B = Param.RegionData[TrainingPairs[i][1].region].Fennimal_location_colors.tertiary
-                }
-
-                TrainingPairs[i][0].primary_color = primary_color_A
-                TrainingPairs[i][0].secondary_color = secondary_color_A
-                TrainingPairs[i][0].tertiary_color = tertiary_color_A
-
-                TrainingPairs[i][1].primary_color = primary_color_B
-                TrainingPairs[i][1].secondary_color = secondary_color_B
-                TrainingPairs[i][1].tertiary_color = tertiary_color_B
-
-                //Removing these color combinations from the ColorsAvailable object
-                ColorsUsedByTrainingPairs.push([
-                    {primary_color: Primary_Colors_Available[2*i], secondary_color: Secondary_Colors_Available[2*i], tertiary_color: Tertiary_Colors_Available[2*i]},
-                    {primary_color: Primary_Colors_Available[2*i+1], secondary_color: Secondary_Colors_Available[2*i+1], tertiary_color: Tertiary_Colors_Available[2*i+1]}])
-
-                ColorsAvailable[Primary_Colors_Available[2*i]] = ColorsAvailable[Primary_Colors_Available[2*i]].filter(e => e !== Secondary_Colors_Available[2*i])
-                ColorsAvailable[Primary_Colors_Available[2*i+1]] = ColorsAvailable[Primary_Colors_Available[2*i+1]].filter(e => e !== Secondary_Colors_Available[2*i+1])
-            }
-
-            //For each set of test stimili, we draw primary and secondary colors NOT in the relevant training set.
-            for(let i =0;i<TrainingPairs.length;i++){
-                //Retrieve the primary and secondary colors already used by this pair
-                let TrainingPair_ColorsUsed = ColorsUsedByTrainingPairs[i]
-
-                //Make a deep copy of the ColorsAvailable
-                let ColorsAvailableCopy = JSON.parse(JSON.stringify(ColorsAvailable))
-
-                //Remove the primary colors already used
-                delete ColorsAvailableCopy[TrainingPair_ColorsUsed[0].primary_color]
-                delete ColorsAvailableCopy[TrainingPair_ColorsUsed[1].primary_color]
-                delete ColorsAvailableCopy[TrainingPair_ColorsUsed[0].secondary_color]
-                delete ColorsAvailableCopy[TrainingPair_ColorsUsed[1].secondary_color]
-
-                //Remove the secondary colors already used
-                for(let color in ColorsAvailableCopy){
-                    ColorsAvailableCopy[color] = ColorsAvailableCopy[color].filter(e => e !== TrainingPair_ColorsUsed[0].primary_color &&
-                        e !== TrainingPair_ColorsUsed[1].primary_color &&
-                        e !== TrainingPair_ColorsUsed[0].secondary_color &&
-                        e !== TrainingPair_ColorsUsed[1].secondary_color)
-                }
-
-                //Now for each training trial we draw one available primary color (trying to spread out the drawn primary colors as much as possible)
-                // Then we draw one secondary color that is available for this primary color (again trying to spread out the drawn secondary colors as much as possible).
-                let PrimaryColorsCount = {}
-                let SecondaryColorsCount = {}
-                for(let color in ColorsAvailableCopy){
-                    PrimaryColorsCount[color] = 0
-                    SecondaryColorsCount[color] = 0
-                }
-
-                for(let num_in_pair = 0;num_in_pair<=1;num_in_pair++){
-                    for(let test_trial_index = 0; test_trial_index<TestTrialsPerPair[i][num_in_pair].length; test_trial_index++){
-                        //Draw a primary color
-                        let primary_color_name = get_n_elements_with_lowest_counts(1,PrimaryColorsCount)[0]
-
-                        //Find which secondary colors are available
-                        let Secondary_Colors_Available = ColorsAvailableCopy[primary_color_name]
-
-                        //Create a copy of the SecondaryCount colors object, and delete any colors not currently available
-                        let SecondaryColorsCountCopy = JSON.parse(JSON.stringify(SecondaryColorsCount))
-                        for(let x = 0; x<Object.getOwnPropertyNames(SecondaryColorsCountCopy).length;x++){
-                            if(! Secondary_Colors_Available.includes(Object.getOwnPropertyNames(SecondaryColorsCountCopy)[x])){
-                                delete SecondaryColorsCountCopy[Object.getOwnPropertyNames(SecondaryColorsCountCopy)[x]]
-                            }
-                        }
-
-                        //Draw the secondary color with the lowest usage in these test trials
-                        let secondary_color_name = get_n_elements_with_lowest_counts(1,SecondaryColorsCountCopy)[0]
-
-                        //Now we have the color names for the primary and secondary color. Transforming to HEX values.
-                        let primary_color = ColorScheme.getColorSchemes().PrimaryColors[primary_color_name]
-                        let secondary_color = ColorScheme.getColorSchemes().SecondaryColors[secondary_color_name]
-
-                        // Determining tertiary color. This can be any color NOT used in the test sets.
-                        let tertiary_colors_available = Object.getOwnPropertyNames(ColorScheme.getColorSchemes().TertiaryColors).filter(e =>
-                            e !== TrainingPair_ColorsUsed[0].primary_color &&
-                            e !== TrainingPair_ColorsUsed[1].primary_color &&
-                            e !== TrainingPair_ColorsUsed[0].secondary_color &&
-                            e !== TrainingPair_ColorsUsed[1].secondary_color &&
-                            e !== TrainingPair_ColorsUsed[0].tertiary_color &&
-                            e !== TrainingPair_ColorsUsed[1].tertiary_color )
-                        let tertiary_color = ColorScheme.getColorSchemes().TertiaryColors[drawRandomElementsFromArray(tertiary_colors_available, 1, false)[0]]
-                        if(tertiary_colors_based_on_location){
-                            tertiary_color = Param.RegionData[TrainingPairs[i][num_in_pair].region].Fennimal_location_colors.tertiary // TestTrialsPerPair[i][num_in_pair][test_trial_index].location
-                        }
-
-                        //Setting the correct colors to the FennimalObj in the training trial
-                        TestTrialsPerPair[i][num_in_pair][test_trial_index].primary_color = primary_color
-                        TestTrialsPerPair[i][num_in_pair][test_trial_index].secondary_color = secondary_color
-                        TestTrialsPerPair[i][num_in_pair][test_trial_index].tertiary_color = tertiary_color
-
-                        //Increment the counting objects
-                        PrimaryColorsCount[primary_color_name]++// = PrimaryColorsCount[primary_color_name] + 1
-                        SecondaryColorsCount[secondary_color_name]++
-
-                    }
-                }
-            }
-            break
-        case("train_test_same"):
-            // Here each training pair has two distinct color schemes.
-            // We need to draw for different colors for each pair. Plus, we want these colors to be as different as possible between pairs.
-            //      We do this by having each pair have 2 primary colors drawn
-            //      The next pair then has these secondary colors as its primary colors, and a new set as secondary colors.
-            // Next, all test trials use the color scheme of their associated training trial.
-            ColorScheme = new FENNIMALCOLORSCHEMES(2 * (location_pairs_in_training_set + type_pairs_in_training_set))
-
-            //First randomly shuffle all the availalbe colors
-            Primary_Colors_Available = shuffleArray( ColorScheme.getColorBases())
-
-            // Shifting the secondary colors by 3 indexes prevents unwanted patterns.
-            Secondary_Colors_Available = shift_array_values_by_n(Primary_Colors_Available,3)
-
-            // Tertiary colors can be set to be the same hue as the secondary color
-            Tertiary_Colors_Available = shift_array_values_by_n(Primary_Colors_Available,5)
-
-            //Setting colors for all the training stimuli
-            for(let i =0; i<TrainingPairs.length;i++){
-                //Transforming to HEX values
-                let primary_color_A = ColorScheme.getColorSchemes().PrimaryColors[Primary_Colors_Available[2*i]]
-                let primary_color_B = ColorScheme.getColorSchemes().PrimaryColors[Primary_Colors_Available[2*i + 1]]
-                let secondary_color_A = ColorScheme.getColorSchemes().SecondaryColors[Secondary_Colors_Available[2*i]]
-                let secondary_color_B = ColorScheme.getColorSchemes().SecondaryColors[Secondary_Colors_Available[2*i +1]]
-                let tertiary_color_A =  ColorScheme.getColorSchemes().TertiaryColors[Tertiary_Colors_Available[2*i]]
-                let tertiary_color_B =  ColorScheme.getColorSchemes().TertiaryColors[Tertiary_Colors_Available[2*i + 1]]
-
-                //If the tertiary colors should be based on the location, then overwrite these values
-                if(tertiary_colors_based_on_location){
-                    tertiary_color_A = Param.RegionData[TrainingPairs[i][0].region].Fennimal_location_colors.tertiary
-                    tertiary_color_B = Param.RegionData[TrainingPairs[i][1].region].Fennimal_location_colors.tertiary
-                }
-
-                TrainingPairs[i][0].primary_color = primary_color_A
-                TrainingPairs[i][0].secondary_color = secondary_color_A
-                TrainingPairs[i][0].tertiary_color = tertiary_color_A
-
-                TrainingPairs[i][1].primary_color = primary_color_B
-                TrainingPairs[i][1].secondary_color = secondary_color_B
-                TrainingPairs[i][1].tertiary_color = tertiary_color_B
-            }
-
-            //Now we can assign colors to the Test stimuli
-            for(let i =0;i<TrainingPairs.length;i++){
-                for(let num_in_pair = 0;num_in_pair<=1;num_in_pair++){
-                    let AssociatedTrainingTrial = TrainingPairs[i][num_in_pair]
-                    for(let test_trial_index = 0; test_trial_index<TestTrialsPerPair[i][num_in_pair].length; test_trial_index++){
-                        TestTrialsPerPair[i][num_in_pair][test_trial_index].primary_color = AssociatedTrainingTrial.primary_color
-                        TestTrialsPerPair[i][num_in_pair][test_trial_index].secondary_color = AssociatedTrainingTrial.secondary_color
-                        TestTrialsPerPair[i][num_in_pair][test_trial_index].tertiary_color = AssociatedTrainingTrial.tertiary_color
-                    }
-                }
-            }
-            break
-        case("both_training_same"):
-            //Here each training pair has the same primary and second color schemes. The test trials can have any color scheme, as long as their colors do not overlap with this primary / secondary pair.
-            //So: we first determine the colors for each training pair. We sample primary and secondary colors to equally spread over the available colors. Sample destructively from ColorsAvailable.
-            //Creating colorscheme
-            ColorScheme = new FENNIMALCOLORSCHEMES(location_pairs_in_training_set + type_pairs_in_training_set + number_of_test_trials_per_training_trial)
-            ColorsAvailable = ColorScheme.getKeyedColorSchemeObject(true)
-            let Color_Names = shuffleArray(Object.getOwnPropertyNames(ColorsAvailable))
-
-            //Here we want each training PAIR to have a unique combination of colors. Hence, we can have each pair have the colors [n,n+1] (save for the last, which should be [n,0]
-            let ColorsPerTrainingPair = []
-            for(let i =0;i<TrainingPairs.length;i++){
-                let primary_color = Color_Names[i]
-                let secondary_color
-                if(i === TrainingPairs.length-1){
-                    secondary_color = Color_Names[0]
+            //Check the ordering
+            let check = true
+            let region = NewArray[0].region
+            for(let i=1;i<NewArray.length;i++){
+                if(region === NewArray[i].region){
+                    check = false
                 }else{
-                    secondary_color = Color_Names[i+1]
-                }
-
-                //Remove this color combo from ColorsAvailable and pushing the color scheme to the ColorsPerTrainingPair array
-                ColorsAvailable[primary_color] = ColorsAvailable[primary_color].filter(e => e !== secondary_color)
-                ColorsPerTrainingPair.push([{primary_color: primary_color, secondary_color: secondary_color}, {primary_color: primary_color, secondary_color: secondary_color}])
-
-                //Determining tertiary color pairs. These can either be randomly sampled, or based on location
-                let tertiary_color_A = ColorScheme.getColorSchemes().TertiaryColors[secondary_color]
-                let tertiary_color_B = ColorScheme.getColorSchemes().TertiaryColors[secondary_color]
-
-                if(tertiary_colors_based_on_location){
-                    tertiary_color_A = Param.RegionData[TrainingPairs[i][0].region].Fennimal_location_colors.tertiary
-                    tertiary_color_B = Param.RegionData[TrainingPairs[i][1].region].Fennimal_location_colors.tertiary
-                }
-
-                //Set the correct colors to the FennimalObj
-                TrainingPairs[i][0].primary_color = ColorScheme.getColorSchemes().PrimaryColors[primary_color]
-                TrainingPairs[i][0].secondary_color = ColorScheme.getColorSchemes().SecondaryColors[secondary_color]
-                TrainingPairs[i][0].tertiary_color = tertiary_color_A
-
-                TrainingPairs[i][1].primary_color = ColorScheme.getColorSchemes().PrimaryColors[primary_color]
-                TrainingPairs[i][1].secondary_color = ColorScheme.getColorSchemes().SecondaryColors[secondary_color]
-                TrainingPairs[i][1].tertiary_color = tertiary_color_B
-            }
-
-            //Now we can go over the test trials. Each test is NOT allowed to have any of the colors in the training pair.
-            //  Any other color combination is allowed. Attempt to sample evenly over the remaining available color combinations.
-            for(let i =0;i<TestTrialsPerPair.length;i++){
-                //Make a deepcopy of the ColorsAvailable object and remove any color combinations which contain the primary and secondary colors of the training trial
-                let primary_color_in_training_trials = ColorsPerTrainingPair[i][0].primary_color
-                let secondary_color_in_training_trials = ColorsPerTrainingPair[i][0].secondary_color
-
-                let ColorsAvailableCopy = JSON.parse(JSON.stringify(ColorsAvailable))
-                delete ColorsAvailableCopy[primary_color_in_training_trials]
-                delete ColorsAvailableCopy[secondary_color_in_training_trials]
-
-                for(let color in ColorsAvailableCopy){
-                    ColorsAvailableCopy[color] = ColorsAvailableCopy[color].filter(e => e !== primary_color_in_training_trials && e !== secondary_color_in_training_trials)
-                }
-
-                for(let num_in_pair = 0;num_in_pair<=1;num_in_pair++){
-                    let Array_Of_Available_Color_Schemes = collapse_ColorsAvailable_to_array(ColorsAvailableCopy)
-                    let CountOfAvailableArrayColors = {}
-                    for(let i = 0;i<Array_Of_Available_Color_Schemes.length;i++){
-                        CountOfAvailableArrayColors[i] = 0
-                    }
-
-                    //Now we can randomly sample from this list and add to easy of the TestTrials.
-                    for(let test_trial_index = 0; test_trial_index<TestTrialsPerPair[i][num_in_pair].length; test_trial_index++){
-                        //Sample the least_used available color pair, breaking ties randomly
-                        let sampled_pair_index =  get_n_elements_with_lowest_counts(1,CountOfAvailableArrayColors)[0]
-                        let Sampled_Pair = Array_Of_Available_Color_Schemes[sampled_pair_index]
-
-                        //Increment the count object
-                        CountOfAvailableArrayColors[sampled_pair_index] = CountOfAvailableArrayColors[sampled_pair_index] + 1
-
-                        //Figure out which tertiary color to use.
-                        let tertiary_color
-                        if(tertiary_colors_based_on_location){
-                            tertiary_color = Param.RegionData[TestTrialsPerPair[i][num_in_pair][test_trial_index].region].Fennimal_location_colors.tertiary
-                        }else{
-                            tertiary_color = drawRandomElementsFromArray(collapse_Obj_to_array(ColorScheme.getColorSchemes().TertiaryColors).filter(e => e !== TrainingPairs[i][0].tertiary_color), 1, false)[0]
-                        }
-
-                        //Now we can assign all the colors as properties to the test trial
-                        TestTrialsPerPair[i][num_in_pair][test_trial_index].primary_color = ColorScheme.getColorSchemes().PrimaryColors[Sampled_Pair.primary_color]
-                        TestTrialsPerPair[i][num_in_pair][test_trial_index].secondary_color = ColorScheme.getColorSchemes().SecondaryColors[Sampled_Pair.secondary_color]
-                        TestTrialsPerPair[i][num_in_pair][test_trial_index].tertiary_color = tertiary_color
-                    }
+                    region = NewArray[i].region
                 }
             }
-            break
-        case("location"):
-            //Here all colors schemes are based on the Fennimal's location.
-            //  Colors can be found in Param.RegionData
-            for(let i =0;i<TrainingPairs.length;i++){
-                TrainingPairs[i][0].primary_color = Param.RegionData[TrainingPairs[i][0].region].Fennimal_location_colors.primary
-                TrainingPairs[i][0].secondary_color = Param.RegionData[TrainingPairs[i][0].region].Fennimal_location_colors.secondary
-                TrainingPairs[i][0].tertiary_color = Param.RegionData[TrainingPairs[i][0].region].Fennimal_location_colors.tertiary
-
-                TrainingPairs[i][1].primary_color = Param.RegionData[TrainingPairs[i][1].region].Fennimal_location_colors.primary
-                TrainingPairs[i][1].secondary_color = Param.RegionData[TrainingPairs[i][1].region].Fennimal_location_colors.secondary
-                TrainingPairs[i][1].tertiary_color = Param.RegionData[TrainingPairs[i][1].region].Fennimal_location_colors.tertiary
-            }
-
-            //Now we can go over the test trials. Each test is NOT allowed to have any of the colors in the training pair.
-            //  Any other color combination is allowed. Attempt to sample evenly over the remaining available color combinations.
-            for(let i =0;i<TestTrialsPerPair.length;i++){
-                for(let num_in_pair = 0;num_in_pair<=1;num_in_pair++){
-                    for(let test_trial_index = 0; test_trial_index<TestTrialsPerPair[i][num_in_pair].length; test_trial_index++){
-                        TestTrialsPerPair[i][num_in_pair][test_trial_index].primary_color = Param.RegionData[TestTrialsPerPair[i][num_in_pair][test_trial_index].region].Fennimal_location_colors.primary
-                        TestTrialsPerPair[i][num_in_pair][test_trial_index].secondary_color = Param.RegionData[TestTrialsPerPair[i][num_in_pair][test_trial_index].region].Fennimal_location_colors.secondary
-                        TestTrialsPerPair[i][num_in_pair][test_trial_index].tertiary_color = Param.RegionData[TestTrialsPerPair[i][num_in_pair][test_trial_index].region].Fennimal_location_colors.tertiary
-                    }
-                }
-            }
-    }
-
-    //Almost done. All that remains is to unlist all the TrainingPairs into the TrainingSetFennimals array, and the same for the TestTrialsPerPair into TestSetFennimals
-    let TrainingSetFennimals = []
-
-    //Unpacking the Training set Fennimals
-    for(let i = 0;i<TrainingPairs.length;i++){
-        let ObjA = TrainingPairs[i][0]
-        ObjA.trialtype = "training"
-        ObjA.pair_ID = i
-
-        let ObjB = TrainingPairs[i][1]
-        ObjB.trialtype = "training"
-        ObjB.pair_ID = i
-        TrainingSetFennimals.push(ObjA)
-        TrainingSetFennimals.push(ObjB)
-    }
-
-    //ADDING STRUCTURE TO THE TEST TRIALS
-    //  There will be a total of (number of unique Fennimals)x(number of trials per pair)x(direct v indirect) test trials, plus (number of unique Fennimals) repeated trials.
-    //  These will be structured in three main segments:
-    //     First show (number of unique training Fennimals)x(number of test trials per training pair) test trials. For each training pair-trials, pick EITHER the direct or Indirect trial for this block (selected at random)
-    //     Then, at the half-way point, show a block of the original training Fennimals
-    //     Finally, show the remaining (number of unique training Fennimals)x(number of test trials per training pair) test trials.
-    //  To break of the pacing a bit, split the first and last segments into (number of test trials per training pair) blocks with each having (number of unique training Fennimals) trials each. Selected at random from their respective segments.
-    let Segment_One = [], Repeat_Trials = [], Segment_Two = []
-
-    //Assigning test trials to segments one and two
-    for(let i = 0;i<TestTrialsPerPair.length;i++){
-        for(let num_in_pair = 0;num_in_pair<=1;num_in_pair++){
-            for(let test_trial_index = 0; test_trial_index<TestTrialsPerPair[i][num_in_pair].length; test_trial_index++){
-                //NB: Each key should be set to either invisible (item not displayed on the bar), "available" (present and availalbe) or "unavailable" (present, but grayed out).
-                let All_Items = Item_Details.All_Items
-
-                //CREATING THE DIRECT TEST FENNIMAL.
-                //  Here one item (which is neither the direct NOR the indirect item) is set to be unavailable
-                let DirectFennimalObj = JSON.parse(JSON.stringify(TestTrialsPerPair[i][num_in_pair][test_trial_index]))
-                let direct_trial_unavailable_item = drawRandomElementsFromArray(All_Items.filter(e => e !== DirectFennimalObj.direct_item && e !== DirectFennimalObj.indirect_item), 1, false)[0]
-
-                let ItemKeysDirect = {}
-                for(let x = 0; x<All_Items.length; x++){
-                    if(All_Items[x] === direct_trial_unavailable_item){
-                        ItemKeysDirect[All_Items[x]] = "unavailable"
-                    }else{
-                        ItemKeysDirect[All_Items[x]] = "available"
-                    }
-                }
-                DirectFennimalObj.items_available = ItemKeysDirect
-                DirectFennimalObj.trialtype = "test_direct"
-                DirectFennimalObj.pair_ID = i
-
-                //CREATING THE INDIRECT TEST FENNIMAL
-                // Here the direct item should be set to unavailable.
-                let IndirectFennimalObj = JSON.parse(JSON.stringify(TestTrialsPerPair[i][num_in_pair][test_trial_index]))
-
-                let ItemKeysIndirect = {}
-                for(let x = 0; x<All_Items.length; x++){
-                    if(All_Items[x] ===DirectFennimalObj.direct_item){
-                        ItemKeysIndirect[All_Items[x]] = "unavailable"
-                    }else{
-                        ItemKeysIndirect[All_Items[x]] = "available"
-                    }
-                }
-                IndirectFennimalObj.items_available = ItemKeysIndirect
-                IndirectFennimalObj.trialtype = "test_indirect"
-                IndirectFennimalObj.pair_ID = i
-
-                //Randomly assigning to segments here
-                if(RNG.rand()>0.5){
-                    Segment_One.push(DirectFennimalObj)
-                    Segment_Two.push(IndirectFennimalObj)
-                }else{
-                    Segment_Two.push(DirectFennimalObj)
-                    Segment_One.push(IndirectFennimalObj)
-                }
-
+            if(check){
+                return(NewArray)
             }
         }
     }
-    // Assigns the Repeated trials
-    for(let i = 0;i<TrainingPairs.length;i++){
-        for(let num_in_pair = 0;num_in_pair<=1;num_in_pair++){
-            //Setting all items to available
-            let All_Items = Item_Details.All_Items
 
-            let ItemKeys = {}
-            for(let x = 0; x<All_Items.length; x++){
-                ItemKeys[All_Items[x]] = "available"
-            }
-
-            //Adding to the array
-            let FennimalObj = TrainingPairs[i][num_in_pair]
-            FennimalObj.items_available = ItemKeys
-            FennimalObj.trialtype = "test_training"
-            FennimalObj.pair_ID = i
-            Repeat_Trials.push(FennimalObj)
-        }
+    //Filling blocks 1 and 4
+    let BlockData1_4 = []
+    for(let i =0; i<TestStimuli.length; i++){
+        let Fennimal = JSON.parse(JSON.stringify(TestStimuli[i]))
+        Fennimal.items_available = DirectTrainingItems
+        Fennimal.correct_item = Fennimal.item_direct
+        Fennimal.feedback = true
+        Fennimal.blocktype = "test_direct"
+        BlockData1_4.push(Fennimal)
     }
+    Block_1 = pseudo_randomly_shuffle_block(JSON.parse(JSON.stringify(BlockData1_4)))
+    Block_4 = pseudo_randomly_shuffle_block(JSON.parse(JSON.stringify(BlockData1_4)))
 
-    //Creating blocks. Each block should an object containing a block_type (test or repeat) and an array of (number of unique training fennimals) trials.
-    let Blocks = SplitArrayIntoParts(shuffleArray(Segment_One), TrainingSetFennimals.length)
-    Blocks = Blocks.concat([Repeat_Trials])
-    Blocks = Blocks.concat(SplitArrayIntoParts(shuffleArray(Segment_Two), TrainingSetFennimals.length))
 
-    let TestPhaseData = []
-    for(let i = 0; i<Blocks.length;i++){
-        let blocktype = "test"
-        if(i === Math.floor(Blocks.length / 2)) {blocktype = "repeat"}
-        TestPhaseData.push({
-            number: i+1,
-            type: blocktype,
-            Trials: Blocks[i]
-        })
+    //Filling blocks 2 and 5
+    let BlockData2_5 = []
+    for(let i =0; i<TestStimuli.length; i++){
+        let Fennimal = JSON.parse(JSON.stringify(TestStimuli[i]))
+        Fennimal.items_available = IndirectTrainingItems
+        Fennimal.correct_item = Fennimal.item_indirect
+        Fennimal.feedback = false
+        Fennimal.blocktype = "test_indirect"
+        BlockData2_5.push(Fennimal)
     }
+    Block_2 = pseudo_randomly_shuffle_block(JSON.parse(JSON.stringify(BlockData2_5)))
+    Block_5 = pseudo_randomly_shuffle_block(JSON.parse(JSON.stringify(BlockData2_5)))
+
+    //Filling block 3
+    Block_3 = []
+    for(let i=0; i<TrainingStimuli.length; i++){
+        let Fennimal = JSON.parse(JSON.stringify(TrainingStimuli[i]))
+        Fennimal.items_available = DirectTrainingItems.concat(IndirectTrainingItems)
+        Fennimal.correct_item = Fennimal.item
+        Fennimal.feedback = true
+        Fennimal.blocktype = "test_training"
+        Block_3.push(Fennimal)
+    }
+    Block_3 = shuffleArray(Block_3)
+
+    //Combining into a single object
+    let TestPhaseData = [{
+        Trials: Block_1,
+        type: "direct",
+        number: 1
+    },{
+        Trials: Block_2,
+        type: "direct",
+        number: 2
+    },{
+        Trials: Block_3,
+        type: "training",
+        number: 3
+    },{
+        Trials: Block_4,
+        type: "direct",
+        number: 4
+    },{
+        Trials: Block_5,
+        type: "direct",
+        number: 5
+    }]
+
+
 
     // CALL FUNCTIONS //
     ////////////////////
@@ -1153,13 +722,13 @@ STIMULUSDATA = function(participant_number){
         }
 
         //Now we can go through all the Training set Fennimals and add them to the Fennimal locations
-        for(let i = 0;i<TrainingSetFennimals.length;i++){
-            FennimalLocations[TrainingSetFennimals[i].location] = TrainingSetFennimals[i]
+        for(let i = 0;i<TrainingStimuli.length;i++){
+            FennimalLocations[TrainingStimuli[i].location] = TrainingStimuli[i]
         }
 
         //Adding some meta-data
         FennimalLocations.MetaData = {
-            total_number_of_Fennimals: 2 * (location_pairs_in_training_set + type_pairs_in_training_set),
+            total_number_of_Fennimals: 2 * Paired_Regions.length,
             total_number_of_locations: Param.location_Names.length
         }
 
@@ -1169,7 +738,7 @@ STIMULUSDATA = function(participant_number){
     //Call to return a deepcopy of the training set Fennimals, in an array. Each element is an object containing a single Fennimal. Order is not randomized!
     this.getTrainingSetFennimalsInArray = function(){
         //Create deep copy
-        let TrainingSetCopy = JSON.parse(JSON.stringify(TrainingSetFennimals))
+        /*let TrainingSetCopy = JSON.parse(JSON.stringify(TrainingStimuli))
         let FennimalArray = []
 
         for (const Fennimal in TrainingSetCopy) {
@@ -1178,45 +747,32 @@ STIMULUSDATA = function(participant_number){
             }
         }
 
-        return(FennimalArray)
+         */
+
+        return(JSON.parse(JSON.stringify(TrainingStimuli)))
     }
 
-    //Call with an array of Fennimal objects to get these Fennimals into a single object, keyed on location. Empty locations are represented with false
-    this.key_array_of_Fennimals_on_location = function(FennimalObjArr){
-        //Get all locations
-        let LocationObj = {}
-        for(let i =0; i<Param.location_Names.length;i++){
-            LocationObj[Param.location_Names[i]] = false
-        }
-
-        //Filling with Fennimals
-        for(let i=0;i<FennimalObjArr.length;i++){
-            LocationObj[FennimalObjArr[i].location] = FennimalObjArr[i]
-        }
-
-        return(LocationObj)
+    //Returns a deepcopy of the test set Fennimals in an array.
+    this.getTestSetFennimalsInArray = function(){
+        return(JSON.parse(JSON.stringify(TestStimuli)))
     }
+
 
     //Call to get a deep copy of the ItemDetails object (keyed on item)
     this.getItemDetails = function(){
         return(JSON.parse(JSON.stringify(Item_Details)))
     }
 
-    //Returns an array containing all the TestsetFennimals (in unshuffled format!)
-    this.getTestSetData = function(){
+    //Returns an array containing all the blocks of the test phase
+    this.getTestPhaseData = function(){
         return(JSON.parse(JSON.stringify(TestPhaseData)))
     }
 
-    console.log(TrainingSetFennimals)
-    console.log(TestPhaseData)
+
 }
 
 //Defines all experiment parameters which are not part of the stimuli
 PARAMETERS = function() {
-    //Number of times each Fennimal is repeated during the Search and Delivery subphases of training
-    this.number_of_search_repetitions = 2
-    this.number_of_delivery_repetitions = 2
-
     //Determines whether the text hints are based on the Fennimals location or region. Default is region.
     this.hints_based_on_location = false
 
@@ -1225,7 +781,7 @@ PARAMETERS = function() {
     ////////////////////
     //Setting the walking speed in the map. Note that this is the number of ms per step, so a lower number corresponds to a higher walking speed
     this.walking_interval_time = 1
-    this.total_zoom_time = 2000 //in ms
+    this.total_zoom_time = 1500 //in ms
     this.location_movement_transition = ""
 
     /////////////////////////
@@ -1234,40 +790,8 @@ PARAMETERS = function() {
     this.location_Names = ["Pineforest", "Iceberg", "Windmill", "Garden", "Waterfall", "Mine", "Church", "Farm","Marsh", "Cottage","Oasis", "Cactus", "Beachbar", "Port", "Bush", "Jungleforest"]
     //["Crab", "Snake", "Giraffe", "Mushroom", "Ant", "Beaver", "Spider","Flamingo","Grasshopper",
     // "Frog", "Dragon", "Bunny", "Bird", "Elephant", "Tiger", "Walrus", "Turtle", "Crocodile", "Gnome", "Plant", "Robot"]
-    this.Available_Fennimal_Heads = ["A", "B", "C", "D", "E", "F","G","H"]
-    this.Available_Fennimal_Bodies = ["A", "B", "C", "D", "E", "F","G","H"]
-    this.Available_Names = [
-        "Alexander",
-        "Olivia",
-        "Benjamin",
-        "Sophia",
-        "Ethan",
-        "Ava",
-        "Noah",
-        "Mia",
-        "Samuel",
-        "Isabella",
-        "Gabriel",
-        "Sarah",
-        "Lucas",
-        "Amelia",
-        "Matthew",
-        "Charlotte",
-        "Daniel",
-        "Harper",
-        "Christopher",
-        "Grace",
-        "Steve",
-        "Lily",
-        "William",
-        "Abigail",
-        "James",
-        "Emily",
-        "Joseph",
-        "Elizabeth",
-        "Michael",
-        "Victoria"
-    ]
+    this.Available_Fennimal_Heads = ["A", "B", "C", "D", "E", "F","G","H", "I"]
+    this.Available_Fennimal_Bodies = ["A", "B", "C", "D", "E", "F","G","H", "I"]
 
     this.LocationTransitionData = {
         //This object holds all the location transitions.
@@ -1744,22 +1268,22 @@ PARAMETERS = function() {
             prefix: "Arctic",
             hint: "can be found in cold places...",
             Fennimal_location_colors:{
-                primary: "#526785",
-                secondary: "#b0c9d4",
-                tertiary: "#1a46b8",
+                primary_color: "#526785",
+                secondary_color: "#b0c9d4",
+                tertiary_color: "#1a46b8",
             }
         },
         Jungle: {
             Locations : ["Bush", "Jungleforest"],
-            lighter_color: "#98e092",
-            color: "#278b1e",
-            darker_color: "#175412",
+            lighter_color: "#b5e092",
+            color: "#588b1e",
+            darker_color: "#235412",
             prefix: "Jungle",
             hint: "lives in tropical forests...",
             Fennimal_location_colors:{
-                primary: "#6c8a55",
-                secondary: "#beedc6",
-                tertiary: "#53ab09",
+                primary_color: "#566e44",
+                secondary_color: "#cfedbe",
+                tertiary_color: "#78ab09",
             }
         },
         Desert: {
@@ -1770,9 +1294,9 @@ PARAMETERS = function() {
             prefix: "Desert",
             hint: "likes the extreme heat...",
             Fennimal_location_colors:{
-                primary: "#8c8c15",
-                secondary: "#d1caa9",
-                tertiary: "#d2d911",
+                primary_color: "#8c8c15",
+                secondary_color: "#d1caa9",
+                tertiary_color: "#d2d911",
             }
         },
         Mountains: {
@@ -1783,9 +1307,9 @@ PARAMETERS = function() {
             prefix: "Mountain",
             hint: "can be found in high places...",
             Fennimal_location_colors:{
-                primary: "#ded3d6",
-                secondary: "#dedcdc",
-                tertiary: "#b09a90",
+                primary_color: "#ded3d6",
+                secondary_color: "#dedcdc",
+                tertiary_color: "#b09a90",
             }
         },
         Beach: {
@@ -1796,9 +1320,9 @@ PARAMETERS = function() {
             prefix: "Beach",
             hint: "lives near the shore...",
             Fennimal_location_colors:{
-                primary: "#665244",
-                secondary: "#f7cdbc",
-                tertiary: "#f2e7df",
+                primary_color: "#665244",
+                secondary_color: "#f7cdbc",
+                tertiary_color: "#f2e7df",
             }
         },
         Flowerfields: {
@@ -1809,9 +1333,9 @@ PARAMETERS = function() {
             prefix: "Flowerland",
             hint: "likes to live near flowers...",
             Fennimal_location_colors:{
-                primary:  "#4d2f49",
-                secondary: "#d5bfd9",
-                tertiary: "#950fbd",
+                primary_color:  "#4d2f49",
+                secondary_color: "#d3bfd9",
+                tertiary_color: "#890fbd",
             }
         },
         Village: {
@@ -1822,9 +1346,9 @@ PARAMETERS = function() {
             prefix: "Domestic",
             hint: "likes to live near people...",
             Fennimal_location_colors:{
-                primary: "#734b53",
-                secondary: "#ccb1b8",
-                tertiary: "#d10f0f",
+                primary_color: "#734b53",
+                secondary_color: "#ccb1b8",
+                tertiary_color: "#d10f0f",
             }
         },
         Swamp: {
@@ -1835,9 +1359,9 @@ PARAMETERS = function() {
             prefix: "Wetland",
             hint: "lives in the wetlands...",
             Fennimal_location_colors:{
-                primary: "#5b7875",
-                secondary: "#c2f0df",
-                tertiary:  "#00b3a0"
+                primary_color: "#5b7878",
+                secondary_color: "#c2f0ea",
+                tertiary_color:  "#00b3b3"
             }
         },
         Home: {
@@ -1887,109 +1411,6 @@ PARAMETERS = function() {
         Jungleforest: "lives in dense forests..."
     }
 
-    //Determines how much right the Fennimals are allowed to move on screen
-    this.max_x_shift = 150
-
-    // COLOR SETTINGS //
-    ////////////////////
-    //Holds all the color schemes used to fill in the Fennimals.
-    /*this.ColorSchemes = {
-        //All colors are drawn via k-means random clustering in the HCL color space.
-
-        //Here we define colors by their Hue (H) value. We use the following bins
-        //  Some gaps are included between groups, to make them more distinct
-        //  Red: 0 - 40
-        //  Yellow: 60-100
-        //  Green: 110 - 190
-        //  Blue: 195 - 300
-        //  Purple: 310 - 340
-        // (Note: we can't just randomly sample X colors over the entire range, as some hues are easier to differentiate by humans than others.
-        //      Hence, we want to over-sample yellows and greens, relative to blues and purples)
-
-        //The color types (primary, secondary, tertiary) are all defined based on their Chroma (C) and Lightness (L) values.
-        //PRIMARY COLORS:
-        //  C: ranging between 50-100
-        //: L: ranging between 50-70
-
-        //SECONDARY COLORS:
-        //  C: ranging between 10-50
-        //  L: Ranging from 70-90
-
-        //TERTIARY COLORS:
-        //  C: ranging from 10-70
-        //  L: ranging from 25-50
-
-        //Within each of the color types (primary, secondary, tertiary), we next sample 5 clusters
-        //  (randomly clustering random samples within the relevant color space).
-        PrimaryColors : {
-            Reds: ["#e94e78",
-                "#d85f5e",
-                "#ee4544",
-                "#ec6e5a"] ,
-            Yellows: ["#e78919",
-                "#bd751f",
-                "#c89032",
-                "#ae9620"]  ,
-            Greens: ["#7c9b2e",
-                "#50ac2c",
-                "#46a34c",
-                "#23b677"] ,
-            Blues: ["#3295e9",
-                "#4483f2",
-                "#6e8de9",
-                "#6e73f3"] ,
-            Purples: ["#b95fed",
-                "#bb72d1",
-                "#e546d9",
-                "#d865c8"],
-        },
-        SecondaryColors : {
-            Reds: ["#eba6b5",
-                "#f79593",
-                "#eab2ae",
-                "#d59e9a"],
-            Yellows: ["#c9aa8c",
-                "#e8bc83",
-                "#d8c3a7",
-                "#e4c77a"],
-            Greens: ["#a8d083",
-                "#bcd5af",
-                "#7ddab4",
-                "#9dc2b3"] ,
-            Blues: ["#6bd4e5",
-                "#99cce7",
-                "#9ab5f1",
-                "#b6bfe1"],
-            Purples: ["#cabad2",
-                "#dbb7e0",
-                "#e3adeb",
-                "#eea1ec"],
-        },
-        TertiaryColors : {
-            Reds: ["#9d2d4f",
-                "#824548",
-                "#be3c42",
-                "#952927"],
-            Yellows: ["#5b523a",
-                "#8b6425",
-                "#6b4c33",
-                "#694917"],
-            Greens: ["#416c21",
-                "#405437",
-                "#327249",
-                "#406b5d"],
-            Blues: ["#387185",
-                "#3a546a",
-                "#415789",
-                "#3e56b0"],
-            Purples: ["#772f8a",
-                "#6b516f",
-                "#7d4381",
-                "#9f358c"],
-        },
-    }
-     */
-
     this.Available_items = ["car","spinner","boomerang","balloon","shovel","trumpet"]// ["bear","ball","bone","car", "duck", "plane"]
 
     //Indexed first on the number of items, then left-to-right  = A,B, ... on the item bar
@@ -2004,10 +1425,10 @@ PARAMETERS = function() {
     }
 
     //Radius for the flashlight cone
-    this.flashlight_radius = 60
+    this.flashlight_radius = 50
 
     //The distance to which the flashlight must approach the outline targets before a hit is registered
-    this.flashlight_target_sensitivity = 50
+    this.flashlight_target_sensitivity = 40
 
     //Minimum distance to the target before a dropped item is registered as given
     this.minimum_drop_target_distance = 35
@@ -2035,6 +1456,43 @@ PARAMETERS = function() {
         6: [1/12, 3/12, 5/12, 7/12, 9/12, 11/12 ],
     }
 
+    //Denotes the X and Y positions for all items
+    this.ItemCoords = {
+        flashlight: {x: 0, y: 0},
+        0: {x: 126, y: 132},
+        1: {x: 140, y: 203},
+        2: {x: 215, y: 256},
+        3: {x: 300, y: 256},
+        4: {x: 370, y: 203},
+        5: {x: 389, y: 132},
+    }
+
+    //NAMES
+    // Adjective of a name based on the body
+    this.NamePrefixes_Body = {
+        A: "Striped",
+        B: "Furry",
+        C: "Sprouting",
+        D: "Armoured",
+        E: "Spotted",
+        F: "Boxy",
+        G: "Six-legged",
+        H: "Big-armed",
+        I: "Scaled",
+    }
+    // Description of the head
+    this.Names_Head = {
+        A: "Elephant",
+        B: "Widehead",
+        C: "Slither",
+        D: "Antler",
+        E: "Chirpy",
+        F: "Punk",
+        G: "Antenna",
+        H: "Scout",
+        I: "Unihorn",
+    }
+
     //Given a location name, returns its associated region. If no region contains this location, returns false
     this.get_region_of_location = function(location){
         let RegionNames = Object.getOwnPropertyNames(this.RegionData)
@@ -2046,276 +1504,13 @@ PARAMETERS = function() {
         return(false)
     }
 
-}
+    //Set to TRUE if this experiment is hosted in Mturk (makes some changes to the instructions and submission page
+    this.ExperimentOnMturk = true
 
-FENNIMALCOLORSCHEMES = function(number_of_base_pairs){
-    //Set to true if the console should print the colors on creation (good for debugging)
-    let print_colors_to_console = true
-    //Currently allows color schemse with 4-10 bases. Add more toe the AllColorHueValues is additional schemes are required.
-    //Some functions to easily transfer between color spaces
-    function HEXtoHSL(hex) {
-        hex = hex.replace(/#/g, '');
-        if (hex.length === 3) {
-            hex = hex.split('').map(function (hex) {
-                return hex + hex;
-            }).join('');
-        }
-        var result = /^([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})[\da-z]{0,0}$/i.exec(hex);
-        if (!result) {
-            return null;
-        }
-        var r = parseInt(result[1], 16);
-        var g = parseInt(result[2], 16);
-        var b = parseInt(result[3], 16);
-        r /= 255, g /= 255, b /= 255;
-        var max = Math.max(r, g, b),
-            min = Math.min(r, g, b);
-        var h, s, l = (max + min) / 2;
-        if (max == min) {
-            h = s = 0;
-        } else {
-            var d = max - min;
-            s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-            switch (max) {
-                case r:
-                    h = (g - b) / d + (g < b ? 6 : 0);
-                    break;
-                case g:
-                    h = (b - r) / d + 2;
-                    break;
-                case b:
-                    h = (r - g) / d + 4;
-                    break;
-            }
-            h /= 6;
-        }
-        s = s * 100;
-        s = Math.round(s);
-        l = l * 100;
-        l = Math.round(l);
-        h = Math.round(360 * h);
-
-        return {
-            h: h,
-            s: s,
-            l: l
-        };
+    this.MturkPaymentSettings = {
+        base_reward: 2.50,
+        bonus_per_star: 0.75
     }
-
-    function HSLtoHEX(h, s, l) {
-        l /= 100;
-        const a = s * Math.min(l, 1 - l) / 100;
-        const f = n => {
-            const k = (n + h / 30) % 12;
-            const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-            return Math.round(255 * color).toString(16).padStart(2, '0');   // convert to Hex and prefix "0" if needed
-        };
-        return `#${f(0)}${f(8)}${f(4)}`;
-    }
-
-    //Saturation and lightness can either be specified as a specific value (which will then be used), or as a range of [min,max].
-    // If a range is specified, then a random int in this range is specified is drawn for each color (one sample per color).
-    //Defining which transformations in HSL space are used for the primary, secondary and tertiary colors.
-    let primary_color_saturation = [70,80]
-    let primary_color_lightness = [35,40]
-
-    let secondary_color_saturation = [35,45]
-    let secondary_color_lightness = [70,80]
-
-    let tertiary_color_saturation = [50,60]
-    let tertiary_color_lightness = [25,35]
-
-    //Defining named primary colors, with different colors used for different numbers of required basepairs.
-    let AllColorHueValues = {
-        4: {
-            red: 338,
-            yellow: 60,
-            green: 135,
-            purple: 280
-        },
-        5:{
-            red: 0,
-            yellow: 61,
-            green: 144,
-            blue: 216,
-            purple: 288,
-        },
-        6: {
-            red: 0,
-            yellow: 60,
-            green: 100,
-            lightblue: 180,
-            darkblue: 260,
-            purple: 300,
-        },
-        7:{
-            red: 0,
-            gold: 50,
-            lightgreen: 75,
-            bluegreen: 168,
-            darkblue: 211,
-            purple: 270,
-            pink: 310
-        },
-        8: {
-            red: 0,
-            orange: 36,
-            yellow: 62,
-            green: 113,
-            lightblue: 179,
-            darkblue: 225,
-            purple: 270,
-            pink: 315,
-        },
-        9: {
-            red: 0,
-            orange: 40,
-            limegreen: 61,
-            green: 85,
-            bluegreen: 160,
-            lightblue: 185,
-            darkblue: 240,
-            purple: 278,
-            pink: 302,
-        },
-        10 : {
-            red: 0,
-            darkorange: 28,
-            lightgold: 52,
-            lightgreen: 66,
-            green: 114,
-            bluegreen: 167,
-            lightblue: 201,
-            darkblue: 233,
-            purple:288,
-            pink:324,
-
-        }
-    }
-
-    //Sets the color scheme object, with Primary, Secondary and Tertiary color objects.
-    let ColorSchemeObj = {
-        PrimaryColors: {},
-        SecondaryColors: {},
-        TertiaryColors: {}
-    }
-    let ColorsHues = AllColorHueValues[number_of_base_pairs]
-    let Color_Names = Object.getOwnPropertyNames(ColorsHues)
-
-    //Sampling and setting primary colors
-    for(let i=0;i<Color_Names.length;i++){
-        let saturation = primary_color_saturation
-        if(typeof primary_color_saturation === "object"){
-            saturation = randomIntFromInterval(primary_color_saturation[0], primary_color_saturation[1])
-        }
-        let lightness = primary_color_lightness
-        if(typeof primary_color_lightness === "object"){
-            lightness = randomIntFromInterval(primary_color_lightness[0], primary_color_lightness[1])
-        }
-
-        ColorSchemeObj.PrimaryColors[Color_Names[i]] = HSLtoHEX(ColorsHues[Color_Names[i]], saturation,lightness)
-    }
-
-    //Secondary colors
-    for(let i=0;i<Color_Names.length;i++){
-        let saturation = secondary_color_saturation
-        if(typeof secondary_color_saturation === "object"){
-            saturation = randomIntFromInterval(secondary_color_saturation[0], secondary_color_saturation[1])
-        }
-        let lightness = secondary_color_lightness
-        if(typeof secondary_color_lightness === "object"){
-            lightness = randomIntFromInterval(secondary_color_lightness[0], secondary_color_lightness[1])
-        }
-
-        ColorSchemeObj.SecondaryColors[Color_Names[i]] = HSLtoHEX(ColorsHues[Color_Names[i]], saturation,lightness)
-    }
-
-    //Tertiary colors
-    for(let i=0;i<Color_Names.length;i++){
-        let saturation = tertiary_color_saturation
-        if(typeof tertiary_color_saturation === "object"){
-            saturation = randomIntFromInterval(tertiary_color_saturation[0], tertiary_color_saturation[1])
-        }
-        let lightness = tertiary_color_lightness
-        if(typeof tertiary_color_lightness=== "object"){
-            lightness = randomIntFromInterval(tertiary_color_lightness[0], tertiary_color_lightness[1])
-        }
-
-        ColorSchemeObj.TertiaryColors[Color_Names[i]] = HSLtoHEX(ColorsHues[Color_Names[i]], saturation,lightness)
-    }
-
-    //Print all the examples to the console if required. This makes testing the colors a lot easier
-    if(print_colors_to_console){
-        console.log("GENERATING THE FOLLOWING " + number_of_base_pairs +  " COLOR SCHEMES: ")
-        for(let i =0;i<Color_Names.length;i++){
-            console.log("%c Color " + Color_Names[i] +  " primary", 'background:' + ColorSchemeObj.PrimaryColors[Color_Names[i]])
-            console.log("%c Color " + Color_Names[i] +  " secondary", 'background:' + ColorSchemeObj.SecondaryColors[Color_Names[i]])
-            console.log("%c Color " + Color_Names[i] +  " tertiary", 'background:' + ColorSchemeObj.TertiaryColors[Color_Names[i]])
-        }
-    }
-
-    //Returns a deep copy of the ColorSchemeObj
-    this.getColorSchemes = function(){
-        return(JSON.parse(JSON.stringify(ColorSchemeObj)))
-    }
-
-    //Return an array of all unique combination of primary and secondary colors.
-    // _remove_monochrome_pairs determines whether or not pairs with the same color are removed (true) from, or included in (true) this list.
-    this.getArrayOfUniquePrimaryAndSecondaryColorCombinations = function(_remove_monochrome_pairs){
-        let Arr = []
-        for(let i = 0; i<Color_Names.length;i++){
-            let primary_col_name = Color_Names[i]
-            for(let j = 0; j<Color_Names.length;j++){
-                let secondary_col_name = Color_Names[j]
-                if(_remove_monochrome_pairs){
-                    if(primary_col_name !== secondary_col_name){
-                        Arr.push([primary_col_name,secondary_col_name])
-                    }
-                }else{
-                    Arr.push([primary_col_name,secondary_col_name])
-                }
-
-            }
-        }
-        return(Arr)
-
-
-    }
-
-    //Returns an object keyed on primary colors, with each key containing an array of secondary colors
-    this.getKeyedColorSchemeObject = function(_remove_monochrome_pairs){
-        let Obj = {}
-        for(let i = 0; i<Color_Names.length;i++){
-            let Arr = []
-            for(let j=0;j<Color_Names.length;j++){
-                if(! _remove_monochrome_pairs){
-                    Arr.push(Color_Names[j])
-                }else{
-                    if(i !== j ){
-                        Arr.push(Color_Names[j])
-                    }
-                }
-            }
-            Obj[Color_Names[i]] = Arr
-        }
-        return(Obj)
-    }
-
-    //Returns an array of color base names
-    this.getColorBases = function(){
-        return(JSON.parse(JSON.stringify(Color_Names)))
-    }
-
-    //Returns an object with one property for each color base name, with an associated value of VAL
-    this.getEmptyColorSchemeObj = function(val){
-        let EmptyColorObj = {}
-        for(let i=0;i<Color_Names.length; i++){
-            EmptyColorObj[Color_Names[i]] = val
-        }
-
-        return {PrimaryColors: JSON.parse(JSON.stringify(EmptyColorObj)), SecondaryColors: JSON.parse(JSON.stringify(EmptyColorObj)), TertiaryColors: JSON.parse(JSON.stringify(EmptyColorObj))}
-    }
-
 
 }
 
@@ -2344,10 +1539,15 @@ LocationController = function(ExpCont){
     // Prevents double clicks when travelling on the map.
     let currently_moving_to_location_flag = false
 
+    //Check this flag before allowing participant to move to a different location
+    let location_move_blocked_flag = false
+
+    //Check this flag when trying to place new location arrows on the screen
+    let available_to_show_location_arrows_flag = true
+
     //Making sure some levels are shown, whilst some others are hidden
     document.getElementById("interface_elements").style.display = "inherit"
 
-    ///////////////////
     // MAP FUNCTIONS //
     ///////////////////
     //Controller to handle all the map-based interactions (player walking around etc.
@@ -2599,6 +1799,9 @@ LocationController = function(ExpCont){
         if(IngameHintsGiven.map_first_travel === false){
             show_ingame_hint((508-218)/2+15,(285.8-125)/2,218,125,"You can move to any part of the island by pressing down (and holding) any of the flashing icons on the map.")
         }
+
+        //No location arrows may be displayed on the map
+        available_to_show_location_arrows_flag = false
     }
 
     //Goes to the home page (showing instructions
@@ -2657,10 +1860,9 @@ LocationController = function(ExpCont){
         setTimeout(function(){currently_moving_to_location_flag = false},200)
     }
 
-    ///////////////////////////////
     // REGION LOCATION FUNCTIONS //
     ///////////////////////////////
-    let currentLocation, CurrentLocationData, CurrentLocationSVGObj, currentZoomPoint
+    let currentLocation, CurrentLocationData, CurrentLocationSVGObj
 
     //Hides all location arrows. This also removes any click eventListeners associated to them
     function hide_all_location_arrows(){
@@ -2685,26 +1887,31 @@ LocationController = function(ExpCont){
 
     //Shows an arrow and creates an event listener for a given target. DO NOT USE FOR THE ZOOM ARROWS
     function create_next_location_arrow(arrow_name, target_location){
-        //Find the arrow object
-        let ArrowObj = document.getElementById(arrow_name)
-        ArrowObj.style.display = "inherit"
+        // Check if there is no flag raised against showing the location arrows
+        if(available_to_show_location_arrows_flag){
+            //Find the arrow object
+            let ArrowObj = document.getElementById(arrow_name)
+            ArrowObj.style.display = "inherit"
 
-        //Create event listener. Special case for the back-to-map arrow
-        ArrowObj.addEventListener("click", function(){
+            //Create event listener. Special case for the back-to-map arrow
+            ArrowObj.addEventListener("click", function(){
 
-            //If we're leaving a location with possible Fennimals, then inform the experiment controller
-            if(Param.LocationTransitionData[currentLocation].may_contain_Fennimals){
-                leaving_location_with_possible_Fennimal()
-            }
+                if(! currently_moving_to_location_flag){
+                    //If we're leaving a location with possible Fennimals, then inform the experiment controller
+                    if(Param.LocationTransitionData[currentLocation].may_contain_Fennimals){
+                        leaving_location_with_possible_Fennimal()
+                    }
 
-            if(target_location === "map"){
-                go_to_map();
-            }else{
-                //Here we need to know whether we are leaving a terminal location (that is, a location with Fennimals) or not
-                go_to_location(target_location, Param.LocationTransitionData[currentLocation].may_contain_Fennimals )
-            }
+                    if(target_location === "map"){
+                        go_to_map();
+                    }else{
+                        //Here we need to know whether we are leaving a terminal location (that is, a location with Fennimals) or not
+                        go_to_location(target_location, Param.LocationTransitionData[currentLocation].may_contain_Fennimals )
+                    }
+                }
+            })
+        }
 
-        })
     }
 
     //Call when leaving a location with a possible Fennimal
@@ -2712,45 +1919,6 @@ LocationController = function(ExpCont){
         ExpCont.location_left()
     }
 
-    //Shows and creates a zoom arrow. Supply with either "forward" or "backward" as direction
-    /*  function create_zoom_arrow(direction){
-          //Find a reference to the correct arrow
-          let ArrowObj
-          if(direction === "forward"){
-              ArrowObj = document.getElementById("arrow_zoom_forward")
-          }else{
-              ArrowObj = document.getElementById("arrow_zoom_back")
-          }
-
-          //After a brief delay to match with the zoom animation
-          setTimeout(function(){
-              //Show the Arrow on screen
-              ArrowObj.style.display = "inherit"
-
-              //Find out what index the currentZoomPoint is in, and which are the following points
-              let currentZoomIndex = Param.LocationTransitionData.Zoom_Points.indexOf(currentZoomPoint)
-
-              //Set the correct event listener
-              if(direction === "forward"){
-                  ArrowObj.addEventListener("click", function(){
-                      //move_within_location(currentZoomDepth + Param.LocationData.zoom_speed)
-                      if(currentZoomIndex < (Param.LocationTransitionData.Zoom_Points.length - 1)){
-                          move_within_location(Param.LocationTransitionData.Zoom_Points[currentZoomIndex +1] )
-                      }
-                  })
-              }else{
-                  ArrowObj.addEventListener("click", function(){
-                      if(currentZoomIndex > 0){
-                          move_within_location(Param.LocationTransitionData.Zoom_Points[currentZoomIndex -1] )
-                      }
-
-                  })
-              }
-          },Param.LocationTransitionData.zoom_arrow_reappear_speed)
-
-      }
-
-     */
     //Hides all sky sublayers
     function hide_sky_sublayers(){
         let All_Skies = document.getElementsByClassName("location_sky")
@@ -2771,6 +1939,11 @@ LocationController = function(ExpCont){
 
     //Go to a specified location. Call with a string denoting the name of the location, and a zoom depth.
     function go_to_location(name, arriving_from_terminal_location){
+        console.log("Entering location " + name + ". From terminal location " + arriving_from_terminal_location )
+        //While we are in transit, block the showing of location arrows
+        available_to_show_location_arrows_flag = false
+        currently_moving_to_location_flag = true
+
         //Hide the map and instructions
         SVGReferences.Layers.Map.style.display = "none"
         SVGReferences.Layers.Instructions.style.display = "none"
@@ -2793,18 +1966,24 @@ LocationController = function(ExpCont){
             if(arriving_from_terminal_location){
                 //Set zoom to end
                 CurrentLocationSVGObj.style.transition = ""
-                CurrentLocationSVGObj.style.transform = "scale(10,10)"
+                setTimeout(function(){
+                    CurrentLocationSVGObj.style.transform = "scale(10,10)"
+                }, 5)
 
                 //Show the arrows after a brief delay
                 setTimeout(function(){
+                    available_to_show_location_arrows_flag = true
+                    currently_moving_to_location_flag = false
                     show_next_location_arrows(CurrentLocationData.AdjacentRegions)
-                },500)
+                },100)
 
             }else{
                 animate_movement_through_location(CurrentLocationSVGObj, CurrentLocationData)
             }
         }else{
             //Set any relevant next-region arrows on the screen
+            available_to_show_location_arrows_flag = true
+            currently_moving_to_location_flag = false
             show_next_location_arrows(CurrentLocationData.AdjacentRegions)
         }
 
@@ -2851,6 +2030,8 @@ LocationController = function(ExpCont){
         let color_dark = Param.RegionData[Param.LocationTransitionData[name].region].darker_color
         document.getElementById("item_bar").style.fill = color_light + "AA"
         document.getElementById("item_bar").style.stroke = color_dark + "AA"
+        document.getElementById("item_bar_circular").style.fill = color_light + "AA"
+        document.getElementById("item_bar_circular").style.stroke = color_dark + "AA"
 
         let FlashlightPrompt = document.getElementById("prompt_flashlight")
         FlashlightPrompt.getElementsByTagName("rect")[0].style.fill = color_light + "AA"
@@ -2864,58 +2045,25 @@ LocationController = function(ExpCont){
 
     }
 
-    //Moves within a location (changing only zoom and arrows). Faster to run when a location has already been loaded with go_to_location before.
-    // Should only be used for the zoom forward / backward arrows!
-    /*function move_within_location(new_zoom_point){
-        currentZoomPoint = new_zoom_point
-
-        //Set zoom depth to the svg
-        CurrentLocationSVGObj.style.transform = "scale(" + new_zoom_point + "," + new_zoom_point + ")"
-
-        //Remove all location arrows
-        hide_all_location_arrows()
-
-        //Creating new zoom arrows
-        //Find out what index the currentZoomPoint is in, and which are the following points
-        let currentZoomIndex = Param.LocationTransitionData.Zoom_Points.indexOf(currentZoomPoint)
-
-        //The backward arrow should appear on anything but the first depth
-        if(currentZoomIndex > 0){
-            create_zoom_arrow("backward")
-        }
-
-        //The forward arrow should appear as long as the last zoom point hasnt been reached
-        if(currentZoomIndex< Param.LocationTransitionData.Zoom_Points.length-1){
-            create_zoom_arrow("forward")
-        }
-
-        //Depending on the new zoom point, more arrows may need to be created.
-        let Arrows_To_Be_Shown = CurrentLocationData.AdjacentRegions[new_zoom_point]
-        if(Arrows_To_Be_Shown !== undefined){
-            for(let i=0;i<Arrows_To_Be_Shown.length;i++){
-                create_next_location_arrow(Arrows_To_Be_Shown[i].arrow_id, Arrows_To_Be_Shown[i].target_region, Arrows_To_Be_Shown[i].target_zoom_point)
-            }
-        }
-    }
-
-     */
-
     //Animates the transfer across a location, ending at the last zoom level (11). Then shows all arrows in the provided array (should contain DOM element references)
     function animate_movement_through_location(LocationSVGObject, CurrentLocationData){
+        console.log("Moving through location")
         //Resetting location if needed
         LocationSVGObject.style.transition = ""
         LocationSVGObject.style.transform = "scale(1,1)"
 
         setTimeout(function(){
-            LocationSVGObject.style.transition = "all " + Param.total_zoom_time + "ms ease-in-out" // "all 3000ms linear" // + Param.total_zoom_time + "ms ease_in_out"
+            LocationSVGObject.style.transition = "all " + Param.total_zoom_time + "ms ease-in-out"
             setTimeout(function(){
                 LocationSVGObject.style.transform = "scale(10,10)"
             }, 250)
         }, 10)
 
         setTimeout(function(){
+            available_to_show_location_arrows_flag = true
+            currently_moving_to_location_flag = false
             show_next_location_arrows(CurrentLocationData.AdjacentRegions)
-        }, 250 + Param.total_zoom_time)
+        }, 400 + Param.total_zoom_time)
     }
 
     //Call after having jumped to home to reset all the zoom levels
@@ -2936,7 +2084,11 @@ LocationController = function(ExpCont){
         //throw "Deliberate Error!";
         if(bool){
             hide_all_location_arrows()
+            location_move_blocked_flag = true
         }else{
+            location_move_blocked_flag = false
+            available_to_show_location_arrows_flag = true
+
             let Arrows_To_Be_Shown = CurrentLocationData.AdjacentRegions
             if(Arrows_To_Be_Shown !== undefined){
                 for(let i=0;i<Arrows_To_Be_Shown.length;i++){
@@ -3041,7 +2193,6 @@ Flashlight_Controller = function(FennimalObj,LocCont, ExpCont){
 
             return(gradient)
         }else{
-            console.warn("Radial gradient called with pre-existing ID. Returning object with given ID instead.")
             return(document.getElementById(id))
         }
 
@@ -3332,14 +2483,13 @@ Flashlight_Controller = function(FennimalObj,LocCont, ExpCont){
     // ON CONSTRUCTION //
     /////////////////////
     let Targets, Container, HeadObject, BodyObject
-
     document.getElementById("Fennimal_Container").innerHTML = ""
 
     //Check if there is a Fennimal in this location
     if(FennimalObj !== false){
         Container = document.getElementById("Fennimal_Container")
         //Creating the outline object and attaching it to the Container
-        let OutlineObject = createFennimalOutline(FennimalObj.head,FennimalObj.body)
+        let OutlineObject = createFennimalOutline(FennimalObj.head,FennimalObj.body, true)
         Container.appendChild(OutlineObject)
 
         //Storing references to the head and body part of the outline
@@ -3356,6 +2506,7 @@ Flashlight_Controller = function(FennimalObj,LocCont, ExpCont){
         let TargetsList = OutlineObject.getElementsByClassName("outline_target")
         Targets = createTargets(TargetsList)
     }
+    LocCont.prevent_subject_from_leaving_location(false)
 
     //Showing the layers on screen
     SVGObjects.Layers.Stage.style.display = "inherit"
@@ -3429,17 +2580,18 @@ TrainingPhaseFennimalController = function(FennimalObj, ItemDetails, ItemAvailab
     document.getElementById("Fennimal_Container").innerHTML = ""
 
     //Creating the Fennimal SVG group and a container to hold it in
-    let Fennimal = createFennimal(FennimalObj.head, FennimalObj.body, FennimalObj.primary_color,FennimalObj.secondary_color, FennimalObj.tertiary_color)
+    let Fennimal = createFennimal(FennimalObj)
     let Container = document.getElementById("Fennimal_Container")
     Container.appendChild(Fennimal)
     Container.style.display = "inherit"
     SVGObjects.Layers.Stage.style.display = "inherit"
 
     //Set and show the prompt text
+    document.getElementById("item_bar_circular").style.display = "none"
     document.getElementById("item_bar").style.display = "none"
     SVGObjects.Layers.Item_Bar.style.display = "inherit"
 
-    SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "This Fennimal is called "+ FennimalObj.name
+    SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "This Fennimal is a "+ FennimalObj.name
 
     SVGObjects.Prompts.Feedback.Prompt.style.opacity = 1
     SVGObjects.Prompts.Feedback.Prompt.style.display = "inherit"
@@ -3455,12 +2607,13 @@ TrainingPhaseFennimalController = function(FennimalObj, ItemDetails, ItemAvailab
 //Displays all items as available. Assumes that the FennimalObj.item codes for the correct item and gives feedback accordingly
 QuizFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCont){
     let that = this
+    console.log(FennimalObj.item)
 
     //Remove any existing Fennimals on the screen
     document.getElementById("Fennimal_Container").innerHTML = ""
 
     //Creating the Fennimal SVG group and a container to hold it in
-    let Fennimal = createFennimal(FennimalObj.head, FennimalObj.body, FennimalObj.primary_color,FennimalObj.secondary_color, FennimalObj.tertiary_color)
+    let Fennimal = createFennimal(FennimalObj)
     let Container = document.getElementById("Fennimal_Container")
     Container.appendChild(Fennimal)
     Container.style.display = "none"
@@ -3492,11 +2645,11 @@ QuizFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCont){
     showFeedback = function(answer_given, correct_answer){
         if(answer_given === correct_answer){
             FeedbackGen = new ItemGivenPositiveFeedbackController(FennimalObj.item, FennimalObj.name)
-            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Correct! " + FennimalObj.name + " likes the " + correct_answer
+            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Correct! The " + FennimalObj.name + " likes the " + correct_answer
         }else{
             //Inform the subject that a mistake has been made
             SVGObjects.Prompts.Feedback.Prompt.style.display = "inherit"
-            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Oops! " + FennimalObj.name + " likes the " + correct_answer
+            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Oops! The " + FennimalObj.name + " likes the " + correct_answer
 
             //Animate the item being thrown back
             let ItemObj = document.getElementById("item_" + answer_given)
@@ -3521,7 +2674,7 @@ QuizFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCont){
                 Container.style.transition = previous_Container_transition_style
                 Container.style.opacity = 1
                 ItemObj.style.display = "none"
-            },5000)
+            },4000)
 
         }
 
@@ -3539,7 +2692,7 @@ QuizFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCont){
                 hide_Fennimal_background_mask()
                 SVGObjects.Prompts.Feedback.Prompt.style.display = "none"
             },500)
-        },4000)
+        },3000)
     }
 
     // ON CONSTRUCTION
@@ -3553,7 +2706,7 @@ QuizFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCont){
         // Reaction time measurement
         StartTime = Date.now()
 
-        SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "What toy did "+ FennimalObj.name + " like?"
+        SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "What toy did the "+ FennimalObj.name + " like?"
         SVGObjects.Prompts.Feedback.Prompt.style.opacity = 1
         SVGObjects.Prompts.Feedback.Prompt.style.display = "inherit"
 
@@ -3576,14 +2729,13 @@ TestPhaseFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCon
     document.getElementById("Fennimal_Container").innerHTML = ""
 
     //Creating the Fennimal SVG group and a container to hold it in
-    let Fennimal = createFennimal(FennimalObj.head, FennimalObj.body, FennimalObj.primary_color,FennimalObj.secondary_color, FennimalObj.tertiary_color)
+    let Fennimal = createFennimal(FennimalObj)
     let Container = document.getElementById("Fennimal_Container")
     Container.appendChild(Fennimal)
     Container.style.display = "none"
 
     //Set all items
     let ItemCont
-
     function show_Fennimal_background_mask(){
         SVGObjects.Splashscreen_Fennimal.Mask.style.display = "inherit"
     }
@@ -3595,15 +2747,23 @@ TestPhaseFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCon
         FennimalObj.selected_item = selected_item
         FennimalObj.reaction_time = Date.now() - StartTime
         console.log("stopping time measurement: " + (Date.now() - StartTime))
+        FennimalObj.correct_item_selected = FennimalObj.selected_item === FennimalObj.correct_item
 
         //TODO: store the reaction time
         showFeedback()
     }
 
-    //Shows the feedback for the quiz trial
+    //Shows the feedback (only for direct trials)
     let FeedbackGen = false
-    showFeedback = function(){
-        SVGObjects.Prompts.Feedback.Prompt.style.display = "none"
+    function showFeedback(){
+        let time_to_feedback_end = 2500
+        //There are three types of feedback:
+        //      None: the Fennimal takes the toy and leaves
+        //      Correct: the Fennimal plays with the toy (hearts)
+        //      Incorrect: the Fennimal throws the toy away
+
+        //Finding relevant elements
+        SVGObjects.Prompts.Feedback.Prompt.style.display = "inherit"
         //Fade out the Fennimal and the item over time
         let ItemObj = document.getElementById("item_" + FennimalObj.selected_item)
 
@@ -3614,29 +2774,61 @@ TestPhaseFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCon
         ItemObj.style.transition = "1000ms ease-out"
         Container.style.transition = "1000ms ease-out"
 
-        //Animate the Fennimal and the item disappearing
-        setTimeout(function(){
-            Container.style.opacity = 0
-            ItemObj.style.opacity = 0
-        },1500)
+        //ANIMATE NO FEEDBACK
+        if(!FennimalObj.feedback){
+            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "The " + FennimalObj.name + " takes the toy to its home for further inspection"
 
-        //After both animations are concluded, reset the transition styles
+            //Animate the Fennimal and the item disappearing
+            setTimeout(function(){
+                Container.style.opacity = 0
+                ItemObj.style.opacity = 0
+            },1500)
+        }
+
+        //ANIMATE POSITVE FEEDBACK
+        if(FennimalObj.feedback){
+            //Determine positive or negative feedback
+            if(FennimalObj.correct_item_selected ){
+                //Correct item selected
+                FeedbackGen = new ItemGivenPositiveFeedbackController(FennimalObj.selected_item, FennimalObj.name)
+                SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Correct! The " + FennimalObj.name + " likes the " + FennimalObj.correct_item
+
+                //After the animations, tell the feedback generator to reset
+                setTimeout(function(){FeedbackGen.location_left(); ItemObj.style.display = "none"},time_to_feedback_end )
+
+            }else{
+                //Inform the subject that a mistake has been made
+                SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Oops! The " + FennimalObj.name + " does NOT like the " + FennimalObj.selected_item
+
+                setTimeout(function(){
+                    translate_pos_relative(ItemObj,0,250)
+                },1000)
+
+            }
+        }
+
+        //Animate the Fennimal Object disappearing
+        setTimeout(function(){Container.style.opacity = 0},time_to_feedback_end)
+
+
+        //After animations are concluded, reset the transition styles
         setTimeout(function(){
             ItemObj.style.transition = previous_item_transition_style
             Container.style.transition = previous_Fennimal_transition_style
             Container.style.opacity = 1
             ItemObj.style.opacity = 1
             ItemObj.style.display = "none"
-        },3000)
+        },time_to_feedback_end + 500)
 
 
-        //After a timeout, tell the ExpCon that this quiz trial is completed
+        //After a timeout, tell the ExpCon that this trial is completed.
         setTimeout(function(){
             ExpCont.test_trial_completed(FennimalObj)
             Container.innerHTML = ""
             hide_Fennimal_background_mask()
-        },2500)
+        },time_to_feedback_end)
     }
+
 
     // ON CONSTRUCTION.
     let StartTime
@@ -3648,26 +2840,24 @@ TestPhaseFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCon
 
         show_Fennimal_background_mask()
         Container.style.display = "inherit"
-        ItemCont =  new ItemController(FennimalObj, FennimalObj.items_available, ItemDetails,LocCont, that)
+
+        //Figure out which items are available and put them into the correct format for the item controller
+        let ItemAvailability = {}
+        for(let i = 0;i<ItemDetails.All_Items.length;i++){
+            if(FennimalObj.items_available.includes(ItemDetails.All_Items[i])){
+                ItemAvailability[ItemDetails.All_Items[i]] = "available"
+            }else{
+                ItemAvailability[ItemDetails.All_Items[i]] = "unavailable"
+            }
+        }
+
+
+        ItemCont =  new ItemController(FennimalObj, ItemAvailability, ItemDetails,LocCont, that)
 
     },1500)
 
     //Set and show the prompt text. This should simply say which item was forgotten
-    let forgotten_items = []
-    for(let item in FennimalObj.items_available){
-        if(FennimalObj.items_available[item] === "unavailable"){
-            forgotten_items.push(item)
-        }
-    }
-    if(forgotten_items.length === 0){
-        SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Give one of the items to this Fennimal"
-    }else{
-        if(forgotten_items.length === 1){
-            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Oops! Your assistant forgot to bring the " + forgotten_items[0]
-        }else{
-            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Oops! Your assistant forgot to bring some of the items"
-        }
-    }
+    SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Oops! Your assistant forgot to bring some of the toys..."
     SVGObjects.Layers.Item_Bar.style.display = "inherit"
     SVGObjects.Prompts.Feedback.Prompt.style.opacity = 1
     SVGObjects.Prompts.Feedback.Prompt.style.display = "inherit"
@@ -3675,15 +2865,16 @@ TestPhaseFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCon
     //Show the Fennimals layer
     SVGObjects.Layers.Stage.style.display = "inherit"
 
+
 }
 
 //Call to create an already-disovered Fennimal. Paints the Fennimal itself and animates in the object / prompt.
-CompletedFennimalController = function(FennimalObj){
+CompletedFennimalController = function(FennimalObj, LocCont){
     //Remove any existing Fennimals on the screen
     document.getElementById("Fennimal_Container").innerHTML = ""
 
     //Creating the Fennimal SVG group and a container to hold it in
-    let Fennimal = createFennimal(FennimalObj.head, FennimalObj.body, FennimalObj.primary_color,FennimalObj.secondary_color, FennimalObj.tertiary_color)
+    let Fennimal = createFennimal(FennimalObj)
     let Container = document.getElementById("Fennimal_Container")
     Container.appendChild(Fennimal)
     Container.style.display = "inherit"
@@ -3708,6 +2899,7 @@ CompletedFennimalController = function(FennimalObj){
     },5)
 
     SVGObjects.Layers.Item_Bar.style.display = "inherit"
+    document.getElementById("item_bar_circular").style.display = "none"
     document.getElementById("item_bar").style.display = "none"
 
     //Create a feedback generator
@@ -3731,13 +2923,20 @@ CompletedFennimalController = function(FennimalObj){
     }
 
     show_Fennimal_background_mask()
+
+    //Since there is no interaction to be done here, the participant can leave whenever
+    LocCont.prevent_subject_from_leaving_location(false)
 }
 
 //Given an array  of items, manages all the item interactions.
 ItemController = function(FennimalObj, ItemAvailability, ItemDetails,LocCont, FenCont){
     //References to the item bar
-    let ItemBar = document.getElementById("item_bar")
+    let ItemBar = document.getElementById("item_bar_circular")
     SVGObjects.Layers.Item_Bar.style.display = "inherit"
+
+    //Reference to the open-backpack icon
+    let OpenBackpackIcon = document.getElementById("open_backpack_icon")
+    let OpenBackpackIconPressable = document.getElementById("open_backpack_icon_center")
 
     //Calculate which items should be shown on the screen
     let Available_Items_On_Screen = []
@@ -3754,24 +2953,21 @@ ItemController = function(FennimalObj, ItemAvailability, ItemDetails,LocCont, Fe
     let FeedbackCont = false
 
     //Controls the interactions for a single button. Create with an item name and the relative X location on the item bar
-    ItemIcon = function (item_name, relative_x_pos_on_bar, background_color, Controller){
+    ItemIcon = function (item_name, index, background_color, Controller){
         //Find a reference to the icon element in the SVG
         let IconElem = document.getElementById("item_icon_" + item_name)
         IconElem.style.display = "inherit"
-        let ItemBar = document.getElementById("item_bar")
 
         //Set the correct color to the background rect
         let IconElem_background = document.getElementById("item_icon_" + item_name + "_background")
         IconElem_background.style.fill = background_color
 
-        //Get the correct x and y pos on the item bar
-        let item_bar_x = parseFloat(ItemBar.getAttribute("x"))
-        let item_bar_width = parseFloat(ItemBar.getAttribute("width"))
-        let item_bar_y = parseFloat(ItemBar.getAttribute("y"))
-        let item_bar_height = parseFloat(ItemBar.getAttribute("height"))
+        //Get the correct x and y pos on the screen
+        let x = Param.ItemCoords[index].x
+        let y = Param.ItemCoords[index].y
 
         //Translate the icon to the right position on the item bar
-        MoveElemToCoords(IconElem,item_bar_x + relative_x_pos_on_bar*item_bar_width,item_bar_y + 0.5 * item_bar_height)
+        MoveElemToCoords(IconElem,x,y)
 
         //Hides the icon button element
         this.hideButton = function(){
@@ -3797,20 +2993,17 @@ ItemController = function(FennimalObj, ItemAvailability, ItemDetails,LocCont, Fe
     }
 
     //Adds a not-available icon on the item bar
-    NotAvailableIcon = function(item_name, relative_x_pos_on_bar){
+    NotAvailableIcon = function(item_name, index){
         //Find a reference to the icon element in the SVG
         let IconElem = document.getElementById("item_icon_" + item_name + "_not_available")
         IconElem.style.display = "inherit"
-        let ItemBar = document.getElementById("item_bar")
 
         //Get the correct x and y pos on the item bar
-        let item_bar_x = parseFloat(ItemBar.getAttribute("x"))
-        let item_bar_width = parseFloat(ItemBar.getAttribute("width"))
-        let item_bar_y = parseFloat(ItemBar.getAttribute("y"))
-        let item_bar_height = parseFloat(ItemBar.getAttribute("height"))
+        let x = Param.ItemCoords[index].x
+        let y = Param.ItemCoords[index].y
 
         //Translate the icon to the right position on the item bar
-        MoveElemToCoords(IconElem,item_bar_x + relative_x_pos_on_bar*item_bar_width,item_bar_y + 0.5 * item_bar_height - 3)
+        MoveElemToCoords(IconElem,x,y)
 
         this.hideButton = function(){
             IconElem.style.display = "none"
@@ -3819,8 +3012,6 @@ ItemController = function(FennimalObj, ItemAvailability, ItemDetails,LocCont, Fe
         this.showButton = function(){
             IconElem.style.display = "inherit"
         }
-
-
     }
 
     // DRAGGING STATE //
@@ -3856,7 +3047,7 @@ ItemController = function(FennimalObj, ItemAvailability, ItemDetails,LocCont, Fe
 
             //Show all item icons
             showIconButtons();
-            document.getElementById("item_bar").style.display = "inherit"
+            document.getElementById("item_bar_circular").style.display = "inherit"
 
             //Show the prompt
             SVGObjects.Prompts.Item.Prompt.style.opacity = 1
@@ -3904,14 +3095,13 @@ ItemController = function(FennimalObj, ItemAvailability, ItemDetails,LocCont, Fe
 
             let item_available = ItemAvailability[itemname]
             let backgroundcolor = ItemDetails[itemname].backgroundColor
-            let xpos = Param.ItemRelativeXPositions[ItemDetails.All_Items.length][i]
 
             if(item_available === "available"){
-                IconButtons[itemname] = new ItemIcon(itemname, xpos, backgroundcolor,that)
+                IconButtons[itemname] = new ItemIcon(itemname, i, backgroundcolor,that)
             }
 
             if(item_available === "unavailable"){
-                IconNotAvailable[itemname] = new NotAvailableIcon(itemname,xpos)
+                IconNotAvailable[itemname] = new NotAvailableIcon(itemname,i)
             }
         }
 
@@ -3968,7 +3158,7 @@ ItemController = function(FennimalObj, ItemAvailability, ItemDetails,LocCont, Fe
     this.buttonSelected = function (item_name, mouse_x,mouse_y){
         //Hide all item icons
         hideIconButtons();
-        document.getElementById("item_bar").style.display = "none"
+        document.getElementById("item_bar_circular").style.display = "none"
 
         //Set the correct dragging state
         dragging_state = item_name
@@ -3990,6 +3180,7 @@ ItemController = function(FennimalObj, ItemAvailability, ItemDetails,LocCont, Fe
     //Call when the interaction is aborted
     this.interactionAborted = function(){
         ItemBar.style.display = "none"
+        OpenBackpackIcon.style.display = "none"
         hideIconButtons()
         hide_all_items()
         if(FeedbackCont !== false){
@@ -3998,39 +3189,54 @@ ItemController = function(FennimalObj, ItemAvailability, ItemDetails,LocCont, Fe
         }
     }
 
-    //Call the prevent the subject from leaving the Fennimal location. True to block leaving, false to release the block
-    function block_subject_from_leaving(bool){
-        LocCont.prevent_subject_from_leaving_location(bool)
-    }
-
     //Call after feedback to resolve the Fennimal interaction.
     function Fennimal_interaction_completed(selected_item){
         //Inform the FC that a Fennimal interaction has been completed
+        //LocCont.prevent_subject_from_leaving_location(false)
         FenCont.interactionCompleted(selected_item)
 
     }
 
+    //Call when the backpack is opened
+    function backpack_opened(){
+        OpenBackpackIcon.style.display = "none"
+        ItemBar.style.display = "inherit"
+        createIconButtonObjects()
+        shimmerAllButtons()
+
+        //Set and show the prompt text
+        if(Available_Items_On_Screen.length === 0){
+            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Oops! You did not bring the correct toy with you"
+            LocCont.prevent_subject_from_leaving_location(false)
+        }else{
+            if(Available_Items_On_Screen.length === 1){
+                SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Give the " + FennimalObj.item + " to the " + FennimalObj.name
+            }else{
+                SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Give one of the available toys to " + FennimalObj.name
+            }
+        }
+
+    }
     // CONSTRUCTION ///
-    ItemBar.style.display = "inherit"
+    ItemBar.style.display = "none"
     //Create objects for the icons on the item bar
     let IconButtons = {}
     let IconNotAvailable = []
-    createIconButtonObjects()
-    shimmerAllButtons()
 
-    //Set and show the prompt text
-    if(Available_Items_On_Screen.length === 0){
-        SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Oops! You did not bring the correct item with you"
-    }else{
-        if(Available_Items_On_Screen.length === 1){
-            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Give the " + FennimalObj.item + " to " + FennimalObj.name
-        }else{
-            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Give one of the available items to " + FennimalObj.name
-        }
-    }
+    //Prevent the subject from leaving during this interaction
+    LocCont.prevent_subject_from_leaving_location(true)
+
+    //Show the backpack open icon
+    OpenBackpackIcon.style.display = "inherit"
+    SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Click on the icon to open your backpack"
+    OpenBackpackIconPressable.onclick = function(){backpack_opened()}
+
 
     SVGObjects.Prompts.Feedback.Prompt.style.opacity = 1
     SVGObjects.Prompts.Feedback.Prompt.style.display = "inherit"
+
+    //Hide the rectangular bar
+    document.getElementById("item_bar").style.display = "none"
 
 }
 
@@ -4043,7 +3249,7 @@ ItemGivenPositiveFeedbackController = function(item_name, fennimal_name){
     let animation_interval = false
 
     //Set and show the prompt text
-    SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = fennimal_name + " likes the " + item_name
+    SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "The " +  fennimal_name + " likes the " + item_name
     SVGObjects.Prompts.Feedback.Prompt.style.opacity = 1
     SVGObjects.Prompts.Feedback.Prompt.style.display = "inherit"
 
@@ -4334,7 +3540,6 @@ ItemGivenPositiveFeedbackController = function(item_name, fennimal_name){
     let heartgenerator = false
 
     setTimeout(function(){
-        animate_item_movement()
         heartgenerator = setInterval(function(){
             //Get a random location within the range. For some reason the heart path seems to be mis-centered, so the constants are to adjust for this
             let ItemCoords = getViewBoxCenterPoint(Item)
@@ -4344,10 +3549,8 @@ ItemGivenPositiveFeedbackController = function(item_name, fennimal_name){
             //Generate a new heart
             let NewHeart = new FeedbackHeart(random_x,random_y)
         },Param.time_between_feedback_hearts)
-    },500)
-
-
-
+        setTimeout(function(){animate_item_movement()},450)
+    },50)
 }
 
 //Inform the subject that an objective has been achieved, including the animated stars
@@ -4453,7 +3656,7 @@ ObjectiveAchievedController = function(text_top, text_bottom, show_mask){
 }
 
 //Controls all the interactions for the instructions and the home buttom
-InstructionsController = function(ExpCont, LocCont){
+InstructionsController = function(ExpCont, LocCont, DataCont){
     let that = this
 
     //Keep track of whether the Welcome stage has already been seen in its entiretey before
@@ -4489,16 +3692,88 @@ InstructionsController = function(ExpCont, LocCont){
 
         //Show the instructions layer and the welcome screen
         SVGObjects.Instructions.Layer.style.display = "inherit"
-        SVGObjects.Instructions.Pages.Start.style.display = "inherit"
 
         //Show the map background
         show_map_background()
 
         //Set event listener for the fullscreen button
-        document.getElementById("button_instructions_fullscreen").addEventListener("mousedown", toggleFullscreen)
-        document.getElementById("button_instructions_fullscreen").addEventListener("mousedown", that.gotoWelcomeScreen)
+        // document.getElementById("button_instructions_fullscreen").addEventListener("mousedown", startScreenCompleted )
+
+        //Create the instructions page with the title and text
+        showNewInstructionsPage()
+
+        //Creating the container to hold all elements
+        let Container = createInstructionContainer()
+        SVGObjects.Instructions.Layer.appendChild(Container)
+        SVGObjects.Instructions.Layer.style.display = "inherit"
+
+        let TextTop = createTextField(30, 40, 508-2*30,250, "<b>This experiment is best experienced by setting your browser to full-screen mode.</b>")
+        TextTop.style.textAlign = "center"
+        TextTop.style.fontSize = "15px"
+        Container.appendChild(TextTop)
+
+        let Text2 = createTextField(30, 90, 508-2*30,250, "Pressing the button below will toggle full-screen mode")
+        Text2.style.textAlign = "center"
+        Text2.style.fontSize = "15px"
+        Container.appendChild(Text2)
+
+        let Text3 = createTextField(30, 120, 508-2*30,250, "On windows you can exit (and re-enter) full-screen mode at any time by pressing [F11]. On Mac, you and ander and leave full-screen mode at any time by pressing [Command]+[Cntrl]+[F].")
+        Text3.style.textAlign = "center"
+        Text3.style.fontSize = "15px"
+        Container.appendChild(Text3)
+
+        let Text4 = createTextField(30, 180, 508-2*30,250, "<i>Important note: this experiment is only supported for Chrome. Using any other browsers may result in unforseen errors! </i>")
+        Text4.style.textAlign = "center"
+        Text4.style.fontSize = "15px"
+        Container.appendChild(Text4)
+
+        let Button = createSVGButtonElem((508-200)/2,245,200,30,"GO TO FULL-SCREEN")
+        Button.addEventListener("mousedown", toggleFullscreen)
+        Button.addEventListener("mousedown", showgeneralstartscreen)
+        Container.appendChild(Button)
     }
 
+    //Give to participants who join for an Mturk experiment. Gives an overview of
+    function showgeneralstartscreen(){
+        //Create the instructions page with the title and text
+        showNewInstructionsPage()
+
+        //Creating the container to hold all elements
+        let Container = createInstructionContainer()
+        SVGObjects.Instructions.Layer.appendChild(Container)
+        SVGObjects.Instructions.Layer.style.display = "inherit"
+
+        if(Param.ExperimentOnMturk){
+            Container.appendChild(createInstructionTitleElem("INSTRUCTIONS FOR THIS HIT"))
+            Container.appendChild(createTextField(30, 35, 508-2*30,250, "In this HIT you will be a participant in an experiment conducted at the University of Vienna. At no point during this HIT will we provide deceiving of erroneous information to you. <br>" +
+                "<br>" +
+                "This HIT is expected to last around 30-40 minutes. For your particpation, you will earn a fixed fee of $" + Param.MturkPaymentSettings.base_reward.toFixed(2) + ". In addition, based on your decisions in the last part of the experiment you can earn of to five stars for your performance. You will earn a bonus of $" + Param.MturkPaymentSettings.bonus_per_star + " per star that you obtain. <br>" +
+                "<br>" +
+                "All the answers and data that you provide are completely anonymous. You will only be known to use via your Mturk Worker ID. We will not store or record any personally identifiable information at any point during the experiment. Your anonymized data will be exclusively used for research-related goals. Your data will be archived and may be shared with other research in the future. <br>" +
+                "<br>" +
+                "By clicking on the button below you state that you are about the ago of 18 and consent to the terms outlined above. <br>" +
+                "<br>" +
+                "Note: this HIT is only supported for Chrome. It is not recommended that you use any other browsers when completing this HIT, as unforseen bugs may prevent you from completing the experiment. "))
+
+        }else{
+            Container.appendChild(createInstructionTitleElem("INSTRUCTIONS FOR THIS EXPERIMENT"))
+            Container.appendChild(createTextField(30, 35, 508-2*30,250, "In this experiment you will be a participant in an experiment conducted at the University of Vienna. At no point during this experiment will we provide deceiving of erroneous information to you. <br>" +
+                "<br>" +
+                "This experiment is expected to last around 30-40 minutes. All the answers and data that you provide are completely anonymous. We will not store or record any personally identifiable information at any point during the experiment. Your anonymized data will be exclusively used for research-related goals. Your data will be archived and may be shared with other research in the future. <br>" +
+                "<br>" +
+                "By clicking on the button below you state that you are about the ago of 18 and consent to the terms outlined above. <br>" +
+                "<br>" +
+                "Note: this experiment is only supported for Chrome. It is not recommended that you use any other browsers when completing this experiment, as unforseen bugs may prevent you from completing the experiment. "))
+
+        }
+
+
+        let Button = createSVGButtonElem((508-150)/2,245,160,30,"CONTINUE")
+        Button.onclick = function(){that.gotoWelcomeScreen()}
+        Container.appendChild(Button)
+    }
+
+    //Shows the basic instructions
     this.gotoWelcomeScreen = function(){
         current_instructions_state = "welcome"
         showWelcomeScreen()
@@ -4577,19 +3852,20 @@ InstructionsController = function(ExpCont, LocCont){
     //Subcontroller and variables for the backpack item selection
     let current_item_in_backpack = false
 
-    // Creates and returns a miniature outline of a Fennimal
-    function createFennimalIcon(head, body, x){
-        //Check if any previous icons already exist. If so, delete them
-        if (document.contains(document.getElementById("Fennimal_Icon"))) {
-            document.getElementById("Fennimal_Icon").remove();
+    // Creates and returns a miniature outline of a Fennimal.
+    function createFennimalIcon(Fennimal, x, y, scale, outline_only){
+        let IconObj
+        if(outline_only){
+            IconObj = createFennimalOutline(Fennimal.head,Fennimal.body, false)
+        }else{
+            IconObj = createFennimal(Fennimal)
         }
 
-        let OutlineSVG = createFennimalOutline(current_search_head,current_search_body)
-        OutlineSVG.style.transform = "scale(0.4,0.4)"
+        IconObj.style.transform = "scale(" + scale + ")"
         let OutlineMoveContainer = document.createElementNS("http://www.w3.org/2000/svg", 'g')
-        OutlineMoveContainer.appendChild(OutlineSVG)
-        OutlineMoveContainer.style.transform = "translate(" + x + "px,115px)"
-        OutlineMoveContainer.id = "Fennimal_Icon"
+        OutlineMoveContainer.appendChild(IconObj)
+        OutlineMoveContainer.style.transform = "translate(" + x + "px," + y +"px)"
+        OutlineMoveContainer.classList.add("Fennimal_Icon")
         return(OutlineMoveContainer)
     }
 
@@ -4642,27 +3918,17 @@ InstructionsController = function(ExpCont, LocCont){
 
     // EXPLORATION PHASE //
     //Shows and updates the exploration instructions screen. Call with the LocationVisitationObject and the FennimalsPresentOnMap object.
-    let CurrentLocationVisitationObject, CurrentFennimalsPresentOnMap
-    this.showExplorationInstructions = function(LocationVisitationObject, FennimalsPresentOnMap){
+    let CurrentLocationVisitationObject, CurrentFennimalsPresentOnMap, TrainingStimuli
+    this.showExplorationInstructions = function(LocationVisitationObject, FennimalsPresentOnMap, TrainingStim){
         CurrentLocationVisitationObject = LocationVisitationObject
         CurrentFennimalsPresentOnMap = FennimalsPresentOnMap
+        TrainingStimuli = TrainingStim
 
         showExplorationPage()
     }
 
-    //Call to show the exploration instructions, assuming the CurrentLocationVisitationObject and CurrentFennimalsPresentOnMap have been declared
-    function showExplorationPage(){
-        //Show only the correct page (and the layer)
-        hide_all_instruction_pages()
-        SVGObjects.Instructions.Layer.style.display = "inherit"
-        SVGObjects.Instructions.Pages.Exploration.style.display = "inherit"
-
-        //Show the map background
-        show_map_background()
-
-        //Set the correct state for the button.
-        current_instructions_state = "welcome"
-
+    //Call to show all the to-be-found location names and Fennimal icons during the exploration phase. Assumes that the exploration phase has already been started.
+    function showExplorationPhaseProgressPage(){
         //Setting the correct text and state for the locations. These are assumed to be provided as an object with one key for each location.
         // If the value of this key is false, then the location has not yet been found. Any other values indicates that the location has been visited.
         let keys = Object.getOwnPropertyNames(CurrentLocationVisitationObject)
@@ -4693,66 +3959,159 @@ InstructionsController = function(ExpCont, LocCont){
 
         }
 
-        //Now we can do the same for the Fennimals. These are indexed by locations, so we first have to transform them into a new object.
-        let FennimalsByNameObj = {}
-        let Fennimal_Locations = []
-
-        for(let key in CurrentFennimalsPresentOnMap){
-            if(CurrentFennimalsPresentOnMap[key] !== false && key !== "MetaData"){
-                FennimalsByNameObj[CurrentFennimalsPresentOnMap[key].name] = !("order_found" in CurrentFennimalsPresentOnMap[key])
-                Fennimal_Locations.push(key)
-            }
+        //Setting the Fennimal icons.
+        // Deleting any previous outlines, if they exist
+        if (document.contains(document.getElementById("Exploration_Icons"))) {
+            document.getElementById("Exploration_Icons").remove();
         }
 
-        //Now we have a list of Fennimal names and wether (true) or not (false) they have already been found. Setting the boxes correctly
-        keys = Object.getOwnPropertyNames(FennimalsByNameObj)
-        for(let i=0;i<keys.length;i++){
-            //All locations are labeled as instructions_exploration_target_location_ix, with i ranging from 1 to 16
+        let Page = SVGObjects.Instructions.Pages.Exploration
+        let IconsContainer = document.createElementNS("http://www.w3.org/2000/svg", 'g')
+        IconsContainer.id = "Exploration_Icons"
+        Page.appendChild(IconsContainer)
+
+        // Here we hardcode the x and y positions on the screen. Messy but easy
+        let Positions = [
+            {x:260,y:98},
+            {x:260,y:150},
+            {x:340,y:98},
+            {x:340,y:150},
+            {x:415,y:98},
+            {x:415,y:150}]
+
+        for(let i =0; i<TrainingStimuli.length; i++){
+            let Fennimal = TrainingStimuli[i]
+
+            //Get the box containing the outline and name
             let Box = document.getElementById("instructions_exploration_target_Fennimal_" + (i+1) + "x")
             Box.style.display = "inherit"
 
-            //Setting the correct text
-            Box.getElementsByTagName("text")[0].childNodes[0].innerHTML = keys[i]
+            //Set the name
+            Box.getElementsByTagName("text")[0].childNodes[0].innerHTML = Fennimal.name
 
-            //Finding correct colors
-            let region_color_light = Param.RegionData[Param.LocationTransitionData["location_"+Fennimal_Locations[i]].region].lighter_color
-            let region_color_dark = Param.RegionData[Param.LocationTransitionData["location_"+Fennimal_Locations[i]].region].darker_color
+            //Finding the correct colors
+            let region_color_light = Param.RegionData[Fennimal.region].lighter_color
+            let region_color_dark = Param.RegionData[Fennimal.region].darker_color
 
+            //Figuring out whether or not the Fennimal has been found
+            let fennimal_found = ("order_found" in CurrentFennimalsPresentOnMap[Fennimal.location])
 
-            //Setting the visible state of the elements
-            if(FennimalsByNameObj[keys[i]]){
+            //Setting the visible state of the box elements
+            if(fennimal_found){
+                Box.getElementsByTagName("path")[0].style.opacity = 1
+                Box.getElementsByTagName("rect")[0].style.fill = region_color_light + "66"
+                Box.getElementsByTagName("text")[0].childNodes[0].style.fill = region_color_dark
+            }else{
                 //Fennimal has not been found
                 Box.getElementsByTagName("path")[0].style.opacity = 0
-                Box.getElementsByTagName("rect")[0].style.fill = region_color_light + "44"
+                Box.getElementsByTagName("rect")[0].style.fill = region_color_light + "33"
                 Box.getElementsByTagName("text")[0].childNodes[0].style.fill = region_color_dark + "55"
-            }else{
-                //
-                Box.getElementsByTagName("path")[0].style.opacity = 1
-                Box.getElementsByTagName("rect")[0].style.fill = region_color_light
-                Box.getElementsByTagName("text")[0].childNodes[0].style.fill = region_color_dark
             }
 
+            //Creating the icon. If the Fennimal has not been found, this should be an outline. Otherwise color the Fennimal
+            let IconObj = createFennimalIcon(Fennimal, Positions[i].x, Positions[i].y, 0.165, !fennimal_found)
+            if(! fennimal_found){
+                IconObj.style.opacity = 0.4
+            }
+            IconsContainer.appendChild(IconObj)
+
         }
 
+    }
+
+    //Call to show the exploration instructions, assuming that the exploration phase has been started
+    function showExplorationPage(){
+        console.log("exploration page")
+        //Show only the correct page (and the layer)
+        hide_all_instruction_pages()
+        SVGObjects.Instructions.Layer.style.display = "inherit"
+        SVGObjects.Instructions.Pages.Exploration.style.display = "inherit"
+
+        //Show the map background
+        show_map_background()
+
+        //Set the correct state for the button.
+        current_instructions_state = "welcome"
+
+        // Show the title and text
+        let Page = SVGObjects.Instructions.Pages.Exploration
+
+        //Clear all the previous elements
+        deleteClassNamesFromElement(Page, "instruction_title")
+        deleteClassNamesFromElement(Page, "basic_instructions_text")
+        deleteClassNamesFromElement(Page, "instructions_button")
+
+        Page.appendChild(createInstructionTitleElem(Instructions.Training_Phase.Exploration.title))
+        Page.appendChild(createTextField(10, 29, 508-2*10,200, Instructions.Training_Phase.Exploration.text_top))
+        let BottomText = createTextField(40, 210, 508-2*40,100, Instructions.Training_Phase.Exploration.text_bottom)
+        BottomText.style.textAlign = "center"
+        BottomText.style.fontStyle = "italic"
+        Page.appendChild(BottomText)
+
+        //Showing the progress
+        showExplorationPhaseProgressPage()
+
+        //Creating the buttons at the bottom of the page
+        let InstructionsButton = createSVGButtonElem(40,250,150,22,"Instructions")
+        let ContinueButton = createSVGButtonElem(320,250,150,22,"Continue")
+        Page.appendChild(InstructionsButton)
+        Page.appendChild(ContinueButton)
+
         //Set the event handlers for the two buttons. Continue should go to the map, Instructions should go to the welcome page.
-        document.getElementById("button_instructions_exploration_continue").onclick = function(){
+        ContinueButton.onclick = function(){
             ExpCont.exploration_instruction_page_closed()
         }
-        document.getElementById("button_instructions_exploration_welcome").onclick = function(){
+        InstructionsButton.onclick = function(){
             showWelcomeScreen()
         }
 
 
     }
 
+    //Call when the exploration phase is completed to show the all the found locations and Fennimals. Assumes that the exploration phase has been started
+    this.showExplorationCompletedPage = function(ContinueButtonFunc){
+        console.log("exploration page complete")
+        //Show only the correct page (and the layer)
+        hide_all_instruction_pages()
+        SVGObjects.Instructions.Layer.style.display = "inherit"
+        SVGObjects.Instructions.Pages.Exploration.style.display = "inherit"
+
+        //Show the map background
+        show_map_background()
+
+        //Clear all the previous elements
+        let Page = SVGObjects.Instructions.Pages.Exploration
+        deleteClassNamesFromElement(Page, "instruction_title")
+        deleteClassNamesFromElement(Page, "basic_instructions_text")
+        deleteClassNamesFromElement(Page, "instructions_button")
+
+        // Show the title and text
+        Page.appendChild(createInstructionTitleElem(Instructions.Training_Phase.Exploration_Completed.title))
+        Page.appendChild(createTextField(10, 38, 508-2*10,200, Instructions.Training_Phase.Exploration_Completed.text_top))
+        let BottomText = createTextField(40, 220, 508-2*40,100, Instructions.Training_Phase.Exploration_Completed.text_bottom)
+        BottomText.style.textAlign = "center"
+        BottomText.style.fontStyle = "italic"
+        Page.appendChild(BottomText)
+
+        //Showing the progress
+        showExplorationPhaseProgressPage()
+
+        //Creating the buttons at the bottom of the page
+        let ContinueButton = createSVGButtonElem((508-150)/2,250,150,22,"Continue")
+        Page.appendChild(ContinueButton)
+
+        //Set the event handlers for the two buttons. Continue should go to the map, Instructions should go to the welcome page.
+        ContinueButton.onclick = ContinueButtonFunc
+
+    }
+
     // SEARCH PHASE //
     //////////////////
-    let current_search_location, current_search_head, current_search_body, current_search_name
-    this.showSearchInstructions = function(head, body, name, location_name){
-        current_search_location = location_name
-        current_search_head = head
-        current_search_body = body
-        current_search_name = name
+    //Search hint can either be "icon" (showing a small icon) or "name" (showing the name)
+    let Current_Search_Trial_Fennimal, current_hint_type
+    this.showSearchInstructions = function(Fennimal, hint_type){
+        Current_Search_Trial_Fennimal = Fennimal
+        current_hint_type = hint_type
 
         //Set the correct state for the button.
         current_instructions_state = "search"
@@ -4767,28 +4126,40 @@ InstructionsController = function(ExpCont, LocCont){
         //Show the map background
         show_map_background()
 
-        //Show the  outline
-        SVGObjects.Instructions.Pages.Search.appendChild(createFennimalIcon(current_search_head,current_search_body,50))
+        //Clear all the previous elements
+        let Page = SVGObjects.Instructions.Pages.Search
+        deleteClassNamesFromElement(Page, "instruction_title")
+        deleteClassNamesFromElement(Page, "basic_instructions_text")
+        deleteClassNamesFromElement(Page, "instructions_button")
+        deleteClassNamesFromElement(Page, "Fennimal_Icon")
 
-        //Create a container for the title and text elements
-        let Container = createInstructionContainer()
-        SVGObjects.Instructions.Pages.Search.appendChild(Container)
+        //Show title and text
+        Page.appendChild(createInstructionTitleElem(Instructions.Training_Phase.Search.title))
+        Page.appendChild(createTextField(30, 40, 508-2*30,200, Instructions.Training_Phase.Search.text))
 
-        Container.appendChild(createInstructionTitleElem(Instructions.Test_Phase.Search.title))
-        Container.appendChild(createTextField(30, 50, 508-2*30,200, Instructions.Test_Phase.Search.text))
-
-        //Show the correct hint
-        if(Param.hints_based_on_location){
-            document.getElementById("instructions_search_hint").childNodes[0].innerHTML = current_search_name + " " +  Param.HintsBasedOnLocation[current_search_location]
-        }else{
-            document.getElementById("instructions_search_hint").childNodes[0].innerHTML = current_search_name + " " + Param.RegionData[Param.LocationTransitionData["location_"+ current_search_location].region].hint
+        if(current_hint_type === "icon"){
+            Page.appendChild(createFennimalIcon(Current_Search_Trial_Fennimal,150, 120,0.4,false))
+        }
+        if(current_hint_type === "name"){
+            let HintText = createTextField((508/2)-25, 130, 50,40, "<b> Hint: </b>")
+            HintText.style.textAlign = "center"
+            Page.appendChild(HintText)
+            let NameText = createTextField((508/2)-125, 150, 250,40, "This Fennimal is a " + Current_Search_Trial_Fennimal.name)
+            NameText.style.fontSize = "20px"
+            NameText.style.textAlign = "center"
+            Page.appendChild(NameText)
         }
 
-        //Set the event handlers for the two buttons. Continue should go to the map, Instructions should go to the welcome page.
-        document.getElementById("button_instructions_search_continue").onclick = function(){
+        //Creating the buttons at the bottom of the page
+        let InstructionsButton = createSVGButtonElem(40,250,150,22,"Instructions")
+        let ContinueButton = createSVGButtonElem(320,250,150,22,"Continue")
+        Page.appendChild(InstructionsButton)
+        Page.appendChild(ContinueButton)
+
+        ContinueButton.onclick = function(){
             ExpCont.search_instruction_page_closed()
         }
-        document.getElementById("button_instructions_search_welcome").onclick = function(){
+        InstructionsButton.onclick = function(){
             showWelcomeScreen()
         }
 
@@ -4809,15 +4180,13 @@ InstructionsController = function(ExpCont, LocCont){
         document.getElementById("instructions_delivery_item_selected_text").childNodes[0].innerHTML = "You have selected to take the " + selected_item_name + " with you"
 
         //Show the continue button
-        document.getElementById("button_instructions_delivery_continue").style.display = "inherit"
+        document.getElementById("DeliveryContinueButton").style.display = "inherit"
 
     }
-    this.showDeliveryInstructions = function(head, body, name, location_name, _ItemDetails){
+    this.showDeliveryInstructions = function(Fennimal, hint_type, _ItemDetails){
+        Current_Search_Trial_Fennimal = Fennimal
+        current_hint_type = hint_type
         ItemDetails = _ItemDetails
-        current_search_location = location_name
-        current_search_head = head
-        current_search_body = body
-        current_search_name = name
 
         //Set the correct state for the button.
         current_instructions_state = "delivery"
@@ -4828,25 +4197,53 @@ InstructionsController = function(ExpCont, LocCont){
         //Show only the correct page (and the layer)
         hide_all_instruction_pages()
         SVGObjects.Instructions.Layer.style.display = "inherit"
-        SVGObjects.Instructions.Pages.Delivery.style.display = "inherit"
         SVGObjects.Instructions.Hint_and_pack_item_boxes.style.display = "inherit"
 
         //Show the map background
         show_map_background()
 
-        //Show the correct hint and outline
-        SVGObjects.Instructions.Hint_and_pack_item_boxes.appendChild(createFennimalIcon(current_search_head,current_search_body,20))
-        if(Param.hints_based_on_location){
-            document.getElementById("instructions_delivery_hint").childNodes[0].innerHTML = current_search_name + " " +  Param.HintsBasedOnLocation[current_search_location]
-        }else{
-            document.getElementById("instructions_delivery_hint").childNodes[0].innerHTML = current_search_name + " " +  Param.RegionData[Param.LocationTransitionData["location_"+ current_search_location].region].hint
+        //Clear all the previous elements
+        let Page = SVGObjects.Instructions.Hint_and_pack_item_boxes
+        deleteClassNamesFromElement(Page, "instruction_title")
+        deleteClassNamesFromElement(Page, "basic_instructions_text")
+        deleteClassNamesFromElement(Page, "instructions_button")
+        deleteClassNamesFromElement(Page, "Fennimal_Icon")
+
+        //Show title and text
+        Page.appendChild(createInstructionTitleElem(Instructions.Training_Phase.Delivery.title))
+        Page.appendChild(createTextField(15, 35, 508-2*15,200, Instructions.Training_Phase.Delivery.text))
+
+        //Show the correct hint
+        if(current_hint_type === "icon"){
+            Page.appendChild(createFennimalIcon(Current_Search_Trial_Fennimal,-38, 120,0.47,false))
+        }
+        if(current_hint_type === "name"){
+            let NameText = createTextField(22, 140, 125,90, "This Fennimal is a <br> " + Current_Search_Trial_Fennimal.name)
+            NameText.style.fontSize = "20px"
+            NameText.style.textAlign = "center"
+            Page.appendChild(NameText)
+        }
+
+        //Creating the buttons at the bottom of the page
+        let InstructionsButton = createSVGButtonElem(40,250,150,22,"Instructions")
+        let ContinueButton = createSVGButtonElem(320,250,150,22,"Continue")
+        Page.appendChild(InstructionsButton)
+        Page.appendChild(ContinueButton)
+
+        //Set the event handlers for the two buttons. Continue should go to the map, Instructions should go to the welcome page.
+        ContinueButton.onclick = function(){
+            ExpCont.delivery_instruction_page_closed(current_item_in_backpack)
+        }
+        InstructionsButton.onclick = function(){
+            showWelcomeScreen()
         }
 
         //Set the text to indicate that no item has been selected thus far
         document.getElementById("instructions_delivery_item_selected_text").childNodes[0].innerHTML = "Click to select one of the available items"
 
         //Hide the continue button until one item has been selected
-        document.getElementById("button_instructions_delivery_continue").style.display = "none"
+        ContinueButton.id = "DeliveryContinueButton"
+        ContinueButton.style.display = "none"
 
         //Create controllers for all of the items
         BackpackItemButtonControllers = []
@@ -4861,13 +4258,7 @@ InstructionsController = function(ExpCont, LocCont){
             that.delivery_page_item_selected(current_item_in_backpack)
         }
 
-        //Set the event handlers for the two buttons. Continue should go to the map, Instructions should go to the welcome page.
-        document.getElementById("button_instructions_delivery_continue").onclick = function(){
-            ExpCont.delivery_instruction_page_closed(current_item_in_backpack)
-        }
-        document.getElementById("button_instructions_delivery_welcome").onclick = function(){
-            showWelcomeScreen()
-        }
+
     }
     //Resets the delivery page to its default state (no item selected)
     this.resetDeliveryPage = function(){
@@ -4875,9 +4266,7 @@ InstructionsController = function(ExpCont, LocCont){
         showDeliveryPage()
 
         //Hide the continue button
-        document.getElementById("button_instructions_delivery_continue").style.display = "none"
-
-
+        document.getElementById("DeliveryContinueButton").style.display = "none"
     }
 
     // QUIZ //
@@ -4885,130 +4274,50 @@ InstructionsController = function(ExpCont, LocCont){
     let first_quiz_instructions_given = false
     this.showQuizInstructions = function(){
         current_instructions_state = "quiz"
-
-
-
         showQuizPage()
     }
     function showQuizPage(){
-        //Show only the correct page (and the layer)
-        hide_all_instruction_pages()
-        SVGObjects.Instructions.Layer.style.display = "inherit"
-        SVGObjects.Instructions.Pages.Quiz.style.display = "inherit"
-
-        //Show the map background
-        show_map_background()
+        showNewInstructionsPage()
 
         //Create a container for the title and text elements
         let Container = createInstructionContainer()
-        SVGObjects.Instructions.Pages.Quiz.appendChild(Container)
+        SVGObjects.Instructions.Layer.appendChild(Container)
 
         if(!first_quiz_instructions_given){
             first_quiz_instructions_given = true
-            Container.appendChild(createInstructionTitleElem(Instructions.Test_Phase.Quiz_Start_First.title))
-            Container.appendChild(createTextField(30, 80, 508-2*30,200, Instructions.Test_Phase.Quiz_Start_First.text))
+            Container.appendChild(createInstructionTitleElem(Instructions.Training_Phase.Quiz_Start_First.title))
+            Container.appendChild(createTextField(30, 60, 508-2*30,200, Instructions.Training_Phase.Quiz_Start_First.text))
         }else{
-            Container.appendChild(createInstructionTitleElem(Instructions.Test_Phase.Quiz_Start_Second.title))
-            Container.appendChild(createTextField(30, 80, 508-2*30,200, Instructions.Test_Phase.Quiz_Start_Second.text))
+            Container.appendChild(createInstructionTitleElem(Instructions.Training_Phase.Quiz_Start_Second.title))
+            Container.appendChild(createTextField(30, 60, 508-2*30,200, Instructions.Training_Phase.Quiz_Start_Second.text))
         }
+
+        //Creating the continue button at the bottom of the page
+        let ContinueButton = createSVGButtonElem((508-150)/2,245,150,20,"Continue")
+        Container.appendChild(ContinueButton)
 
         //Set the event handlers for the two buttons. Continue should start the quiz, Instructions should go to the welcome page.
-        document.getElementById("button_instructions_quiz_start").onclick = function(){
+        ContinueButton.onclick = function(){
             ExpCont.quiz_instructions_page_closed()
         }
-        document.getElementById("button_instructions_quiz_welcome").onclick = function(){
-            showWelcomeScreen()
-        }
-
-
-
 
     }
 
-    // REMEDIAL TRAINING //
-    ///////////////////////
-    this.remedial_page_item_selected = function(selected_item_name){
-        current_item_in_backpack = selected_item_name
+    this.showQuizFailedPage = function(continue_button_func){
+        showNewInstructionsPage()
 
-        //Highlight the selected button
-        for(let i =0; i<BackpackItemButtonControllers.length;i++){
-            BackpackItemButtonControllers[i].item_has_been_selected(selected_item_name)
-        }
+        //Creating the container to hold all elements
+        let Container = createInstructionContainer()
+        SVGObjects.Instructions.Layer.appendChild(Container)
 
-        //Set the correct text
-        document.getElementById("instructions_delivery_item_selected_text").childNodes[0].innerHTML = "You have selected to take the " + selected_item_name + " with you"
+        Container.appendChild(createBackgroundElem())
+        Container.appendChild(createInstructionTitleElem(Instructions.Training_Phase.Quiz_Failed.title))
+        let TextField = createTextField(30, 75, 508-2*30,200, Instructions.Training_Phase.Quiz_Failed.text)
+        Container.appendChild(TextField)
 
-        //Show the continue button
-        document.getElementById("button_instructions_remedial_continue").style.display = "inherit"
-
-    }
-    this.showRemedialInstructions = function(head,body,name, location_name, _ItemDetails){
-        ItemDetails = _ItemDetails
-        current_search_location = location_name
-        current_search_head = head
-        current_search_body = body
-        current_search_name = name
-
-        //Set the correct state for the button.
-        current_instructions_state = "remedial"
-
-        showRemedialPage()
-    }
-    function showRemedialPage(){
-        //Show only the correct page (and the layer)
-        hide_all_instruction_pages()
-        SVGObjects.Instructions.Layer.style.display = "inherit"
-        SVGObjects.Instructions.Pages.Remedial.style.display = "inherit"
-        SVGObjects.Instructions.Hint_and_pack_item_boxes.style.display = "inherit"
-
-        //Show the map background
-        show_map_background()
-
-        //Show the correct hint and outline
-        SVGObjects.Instructions.Hint_and_pack_item_boxes.appendChild(createFennimalIcon(current_search_head,current_search_body,20))
-        if(Param.hints_based_on_location){
-            document.getElementById("instructions_delivery_hint").childNodes[0].innerHTML = current_search_name + " " +  Param.HintsBasedOnLocation[current_search_location]
-        }else{
-            document.getElementById("instructions_delivery_hint").childNodes[0].innerHTML = current_search_name + " " +  Param.RegionData[Param.LocationTransitionData["location_"+ current_search_location].region].hint
-        }
-
-        //Set the text to indicate that no item has been selected thus far
-        document.getElementById("instructions_delivery_item_selected_text").childNodes[0].innerHTML = "Click to select one of the available items"
-
-        //Hide the continue button until one item has been selected
-        document.getElementById("button_instructions_remedial_continue").style.display = "none"
-
-        //Create controllers for all of the items
-        BackpackItemButtonControllers = []
-        for(let i = 0;i<ItemDetails.All_Items.length; i++){
-            let xpos = Param.ItemRelativeXPositions[ItemDetails.All_Items.length][i]
-            //Calculating scale factor. With 6 or more, reduce the scaling to  fit all items on the bar
-            let scalefactor = 1
-            if(ItemDetails.All_Items.length >=6){ scalefactor = 0.9 }
-
-            BackpackItemButtonControllers.push( new BackpackItemButtonController(ItemDetails.All_Items[i], i, ItemDetails[ItemDetails.All_Items[i]].backgroundColor, xpos, that))
-        }
-
-        //If an item has already been selected (which can happen if we come from the instructions page, or from the map), then show this item being selected
-        if(current_item_in_backpack !== false){
-            that.remedial_page_item_selected(current_item_in_backpack)
-        }
-
-        //Set the event handlers for the two buttons. Continue should go to the map, Instructions should go to the welcome page.
-        document.getElementById("button_instructions_remedial_continue").onclick = function(){
-            ExpCont.remedial_instruction_page_closed(current_item_in_backpack)
-        }
-        document.getElementById("button_instructions_remedial_welcome").onclick = function(){
-            showWelcomeScreen()
-        }
-    }
-    //Resets the delivery page to its default state (no item selected)
-    this.resetRemedialPage = function(){
-        current_item_in_backpack = false;
-        showRemedialPage()
-
-        //Hide the continue button
-        document.getElementById("button_instructions_remedial_continue").style.display = "none"
+        let Button = createSVGButtonElem((508-150)/2,245,150,20,"Continue")
+        Button.onclick = continue_button_func
+        Container.appendChild(Button)
     }
 
     // BASE INSTRUCTION ELEMENTS
@@ -5052,7 +4361,7 @@ InstructionsController = function(ExpCont, LocCont){
     function createInstructionTitleElem(text){
         let Title = document.createElementNS("http://www.w3.org/2000/svg", 'text')
         Title.setAttribute("x", 508/2)
-        Title.setAttribute("y", 30)
+        Title.setAttribute("y", 20)
         Title.append(document.createTextNode(text))
         Title.classList.add("instruction_title")
         return(Title)
@@ -5104,6 +4413,7 @@ InstructionsController = function(ExpCont, LocCont){
         return(TextBoxContainer)
     }
 
+    //Creates and returns a ForeignObject containing an input field
     // TEST PHASE //
     ////////////////
     this.showQuizPassedInstructions = function(buttonfunction){
@@ -5112,33 +4422,24 @@ InstructionsController = function(ExpCont, LocCont){
         //Creating the container to hold all elements
         let Container = createInstructionContainer()
         SVGObjects.Instructions.Layer.appendChild(Container)
+        SVGObjects.Instructions.Layer.style.display = "inherit"
 
         Container.appendChild(createBackgroundElem())
         Container.appendChild(createInstructionTitleElem(Instructions.Test_Phase.Quiz_Passed.title))
-        Container.appendChild(createTextField(10, 42, 508-2*10,200, Instructions.Test_Phase.Quiz_Passed.text))
+
+        let text = Instructions.Test_Phase.Quiz_Passed.textTop
+        if(Param.ExperimentOnMturk){
+            text = text + " You will earn a bonus of $" + Param.MturkPaymentSettings.bonus_per_star + " for each star earned. "
+        }
+        text = text + "<br><br>" +  Instructions.Test_Phase.Quiz_Passed.textBottom
+        Container.appendChild(createTextField(10, 40, 508-2*10,250, text))
+
 
         setTimeout(function(){
             let Button = createSVGButtonElem((508-150)/2,245,160,30,"CONTINUE")
             Container.appendChild(Button)
             Button.onclick = buttonfunction
         },1000)
-    }
-
-    this.showTestPhaseInstructions = function(){
-        //Set the correct state for the button.
-        current_instructions_state = "test"
-
-        //Show only the correct page (and the layer)
-        hide_all_instruction_pages()
-        SVGObjects.Instructions.Layer.style.display = "inherit"
-        SVGObjects.Instructions.Pages.Test.style.display = "inherit"
-
-        //Show the map background
-        show_map_background()
-
-        document.getElementById("button_instructions_test_start").onclick = function(){
-            ExpCont.start_next_test_trial()
-        }
     }
 
     // Shows the "Day X" screen. Next_screen can be either "novel_block" or "repeat_training"
@@ -5214,14 +4515,15 @@ InstructionsController = function(ExpCont, LocCont){
         setTimeout(function(){
             let Button = createSVGButtonElem((508-150)/2,230,150,30,"CONTINUE")
             Container.appendChild(Button)
-            if(next_screen === "novel_block"){  Button.onclick = function(){showTestPhaseNovelBlockText(passthrough_buttonfunction)} }
+            if(next_screen === "direct_block"){  Button.onclick = function(){showTestPhaseDirectBlockText(passthrough_buttonfunction)} }
+            if(next_screen === "indirect_block"){  Button.onclick = function(){showTestPhaseIndirectBlockText(passthrough_buttonfunction)} }
             if(next_screen === "repeat_block"){  Button.onclick = function(){showTestPhaseRepeatBlockText(passthrough_buttonfunction)} }
 
         },500+ current_day*500)
     }
 
     //Shows the intructions for one of the non-repeat-training test phase blocks
-    function showTestPhaseNovelBlockText(buttonfunction){
+    function showTestPhaseDirectBlockText(buttonfunction){
         showNewInstructionsPage()
 
         //Creating the container to hold all elements
@@ -5229,8 +4531,27 @@ InstructionsController = function(ExpCont, LocCont){
         SVGObjects.Instructions.Layer.appendChild(Container)
 
         Container.appendChild(createBackgroundElem())
-        Container.appendChild(createInstructionTitleElem(Instructions.Test_Phase.Novel_Fennimal_Block.title))
-        let TextField = createTextField(30, 50, 508-2*30,200, Instructions.Test_Phase.Novel_Fennimal_Block.text)
+        Container.appendChild(createInstructionTitleElem(Instructions.Test_Phase.Direct.title))
+        let TextField = createTextField(30, 30, 508-2*30,200, Instructions.Test_Phase.Direct.text)
+        TextField.style.fontSize = "13px"
+        Container.appendChild(TextField)
+
+        setTimeout(function(){
+            let Button = createSVGButtonElem((508-150)/2,245,160,30,"CONTINUE")
+            Container.appendChild(Button)
+            Button.onclick = buttonfunction
+        },1000)
+    }
+    function showTestPhaseIndirectBlockText(buttonfunction){
+        showNewInstructionsPage()
+
+        //Creating the container to hold all elements
+        let Container = createInstructionContainer()
+        SVGObjects.Instructions.Layer.appendChild(Container)
+
+        Container.appendChild(createBackgroundElem())
+        Container.appendChild(createInstructionTitleElem(Instructions.Test_Phase.Indirect.title))
+        let TextField = createTextField(30, 30, 508-2*30,200, Instructions.Test_Phase.Indirect.text)
         TextField.style.fontSize = "13px"
         Container.appendChild(TextField)
 
@@ -5250,7 +4571,7 @@ InstructionsController = function(ExpCont, LocCont){
 
         Container.appendChild(createBackgroundElem())
         Container.appendChild(createInstructionTitleElem(Instructions.Test_Phase.Repeat_Training_Block.title))
-        let TextField = createTextField(30, 50, 508-2*30,200, Instructions.Test_Phase.Repeat_Training_Block.text)
+        let TextField = createTextField(30, 30, 508-2*30,200, Instructions.Test_Phase.Repeat_Training_Block.text)
         TextField.style.fontSize = "13px"
         Container.appendChild(TextField)
 
@@ -5261,15 +4582,18 @@ InstructionsController = function(ExpCont, LocCont){
         },1000)
     }
 
-    this.show_test_phase_instructions_novel_block = function(current_day, total_days, button_function){
-        showTestPhaseDayScreen(current_day,total_days,"novel_block", button_function)
+    this.show_test_phase_instructions_direct_block = function(current_day, total_days, button_function){
+        showTestPhaseDayScreen(current_day,total_days,"direct_block", button_function)
+    }
+    this.show_test_phase_instructions_indirect_block = function(current_day, total_days, button_function){
+        showTestPhaseDayScreen(current_day,total_days,"indirect_block", button_function)
     }
     this.show_test_phase_instructions_repeat_block = function(current_day, total_days, button_function){
         showTestPhaseDayScreen(current_day,total_days,"repeat_block", button_function)
     }
 
-    //Shows the final screen with the download button
-    this.show_final_screen = function(ScoreObject, datasubmissionFunc){
+    //Shows the score screen with the download button
+    this.show_score_screen = function(ScoreObject, datasubmissionFunc){
         showNewInstructionsPage()
 
         //Show the instructions layer and the welcome screen
@@ -5281,7 +4605,7 @@ InstructionsController = function(ExpCont, LocCont){
         let Container = createInstructionContainer()
         SVGObjects.Instructions.Pages.Finished.appendChild(Container)
 
-        Container.appendChild(createInstructionTitleElem("Experiment Finished"))
+        Container.appendChild(createInstructionTitleElem("EXPERIMENT FINISHED"))
         Container.appendChild(createTextField(30, 50, 508-2*30,500, "Congratulations! You are now an <b> Expert Wildlife Ranger! </b>During your practical experience, you interacted with " + ScoreObject.num_total_Fennimals + " different Fennimals. Of these Fennimals, " + ScoreObject.num_liked_item + " liked the item you gave them! <br>" +
             "<br>" +
             "Based on your performance, you earned the distinguished title of " + ScoreObject.star_rating + "-star Fennimal Expert!"))
@@ -5293,31 +4617,139 @@ InstructionsController = function(ExpCont, LocCont){
             }
         }
 
-        //Set the dowload instructions
-        let DownloadTextField = createTextField(30, 190, 508-2*30,500, "<i><b>DO NOT YET LEAVE THIS PAGE </b>. In order to finish the experiment and submit your data, please press the button below. </i>")
-        DownloadTextField.style.textAlign = "center"
+        //Set the text at the bottom
+        let BottomTextField = createTextField(30, 190, 508-2*30,500, "Before your time in Fenneland is over, on the next page we would like to ask you a question on how you made your decisions.")
+        BottomTextField.style.textAlign = "center"
         // DownloadTextField.style.userSelect = "text"
-        Container.appendChild(DownloadTextField)
+        Container.appendChild(BottomTextField)
 
-        function downloadButtonFunc(){
-            alert("Please send the downloaded file as an attachment to achiel.fenneman@univie.ac.at . Many thanks for your participation! ")
-            datasubmissionFunc()
+        //Creating a button at the end
+        let Button = createSVGButtonElem((508-150)/2,245,160,30,"CONTINUE")
+        Button.onclick = function(){ that.show_open_question_screen(ScoreObject, datasubmissionFunc)}
+        Container.appendChild(Button)
+    }
+
+    //Show the screen with the open question
+    this.show_open_question_screen = function(ScoreObject, datasubmissionfunc){
+        //Create the instructions page with the title and text
+        showNewInstructionsPage()
+
+        //Creating the container to hold all elements
+        let Container = createInstructionContainer()
+        SVGObjects.Instructions.Layer.appendChild(Container)
+        SVGObjects.Instructions.Layer.style.display = "inherit"
+
+        Container.appendChild(createInstructionTitleElem("AN OPEN QUESTION"))
+        Container.appendChild(createTextField(30, 40, 508-2*30,100, "During the the last part of your training to become an Expert Wildlife Ranger, you could freely decide between different toys to give to a Fennimal. How did you decide which toy to give to the Fennimals? What did you do if the toy you wanted to give to the Fennimal was not available?"))
+
+        //Create a text area as a foreign object
+        let TextBoxContainer = document.createElementNS('http://www.w3.org/2000/svg',"foreignObject");
+        TextBoxContainer.setAttribute("x", 30)
+        TextBoxContainer.setAttribute("y", 85)
+        TextBoxContainer.setAttribute("width", 508-2*30)
+        TextBoxContainer.setAttribute("height", 140)
+        TextBoxContainer.style.padding = "10px"
+        Container.appendChild(TextBoxContainer)
+
+        let TextAreaObj = document.createElement('textarea');
+        TextAreaObj.cols = 80;
+        TextAreaObj.rows = 40;
+        TextAreaObj.style.width = "95%"
+        TextAreaObj.style.height = "95%"
+        TextAreaObj.style.pointerEvents = "auto"
+        TextAreaObj.style.fontSize = "13px"
+        TextAreaObj.style.resize = "none"
+        TextAreaObj.style.border = "1px solid black"
+        TextAreaObj.style.borderRadius = "5px"
+        TextAreaObj.style.fontFamily = "Myriad Pro"
+        TextAreaObj.style.padding = "1%"
+        TextBoxContainer.appendChild(TextAreaObj)
+
+        //The text area is not part of the hidden form, so to preserve the data we need to transfer it
+        TextAreaObj.onchange = function(){
+            DataCont.update_open_question_answer( TextAreaObj.value)
+        }
+        TextAreaObj.onfocusout = function(){
+            DataCont.update_open_question_answer( TextAreaObj.value)
+        }
+
+        //Creating a button at the end
+        let Button = createSVGButtonElem((508-150)/2,245,160,30,"CONTINUE")
+        Button.onclick = function(){that.show_color_blindness_question_screen(ScoreObject, datasubmissionfunc)}
+        Container.appendChild(Button)
+    }
+
+    this.show_color_blindness_question_screen = function(ScoreObject, datasubmissionfunc){
+        //Create the instructions page with the title and text
+        showNewInstructionsPage()
+
+        //Creating the container to hold all elements
+        let Container = createInstructionContainer()
+        SVGObjects.Instructions.Layer.appendChild(Container)
+        SVGObjects.Instructions.Layer.style.display = "inherit"
+
+        Container.appendChild(createInstructionTitleElem("ONE LAST QUESTION"))
+        let Text = createTextField(30, 80, 508-2*30,100, "One last question: do you have any form of color-blindness?")
+        Text.style.textAlign = "center"
+        Text.style.fontSize = "20px"
+        Container.appendChild(Text)
+
+        //Creating a button at the end
+        let Button_Yes = createSVGButtonElem((508-410)/2 ,200,120,30,"YES, I DO")
+        let Button_No = createSVGButtonElem((508-410)/2 + 150,200,120,30,"NO, I DONT")
+        let Button_IDK = createSVGButtonElem((508-410)/2 + 300,200,120,30,"Don't know")
+
+        Button_Yes.onclick = function(){
+            DataCont.update_open_question_answer("Y")
+            that.show_submission_screen(ScoreObject, datasubmissionfunc)
+        }
+        Button_No.onclick = function(){
+            DataCont.update_open_question_answer("N")
+            that.show_submission_screen(ScoreObject, datasubmissionfunc)
+        }
+        Button_IDK.onclick = function(){
+            DataCont.update_open_question_answer("IDK")
+            that.show_submission_screen(ScoreObject, datasubmissionfunc)
+        }
+
+        Container.appendChild(Button_Yes)
+        Container.appendChild(Button_No)
+        Container.appendChild(Button_IDK)
+
+    }
+
+    //Shows the final screen with the Token (if in Mturk) telling participants to hit the submit button
+    this.show_submission_screen = function(ScoreObject, datasubmissionFunc){
+        //Create the instructions page with the title and text
+        showNewInstructionsPage()
+
+        //Creating the container to hold all elements
+        let Container = createInstructionContainer()
+        SVGObjects.Instructions.Layer.appendChild(Container)
+        SVGObjects.Instructions.Layer.style.display = "inherit"
+
+        Container.appendChild(createInstructionTitleElem("EXPERIMENT COMPLETED!"))
+
+        if(Param.ExperimentOnMturk){
+            let MturkTokenField = createTextField(30, 60, 508-2*30,200, "You have now completed the HIT. <b>DO NOT LEAVE THIS PAGE YET </b>. <br><br>" +
+                "You earned $" + Param.MturkPaymentSettings.base_reward + " for completing the experiment, as well as a bonus of $" +
+                + Param.MturkPaymentSettings.bonus_per_star+" per star, leading to a total earnings of $ " + ScoreObject.USD_reward + " <br><br> Your participation Token is <b><u>" + ScoreObject.token + "</b></u> . " +
+                "<br><br>" +
+                "Please go to the MTURK assignment page now and submit this Token. " +
+                "Then come back to this page and press the button below. <br><br><b> We can only pay you for your performance if you submitted the Token AND submitted this page! </b>")
+            Container.appendChild(MturkTokenField)
+        }else{
+            Container.appendChild(createTextField(30, 40, 508-2*30,30, "Congratulations! You are now an Expert Wildlife Ranger and your time in Fenneland has come to an end. "))
+
+            let DownloadTextField = createTextField(30, 70, 508-2*30,100, "<i><b>DO NOT YET LEAVE THIS PAGE </b>. In order to finish the experiment and submit your data, please press the button below. </i>")
+            DownloadTextField.style.textAlign = "center"
+            Container.appendChild(DownloadTextField)
         }
 
         let DownloadButton = createSVGButtonElem((508-190)/2,245,190,30,"FINISH EXPERIMENT")
         Container.appendChild(DownloadButton)
+
         DownloadButton.onclick = datasubmissionFunc
-
-
-        //let EmailButton = createSVGButtonElem(300,245,140,30,"SEND EMAIL")
-        //Container.appendChild(EmailButton)
-        //EmailButton.onclick = sendEmail
-
-
-
-
-
-
     }
 }
 
@@ -5360,7 +4792,7 @@ TopLayerMaskController = function(_outputfunction, direction, text){
             Sublayers[i].style.display = "none"
         }
     }
-    clearSVG()
+    //clearSVG()
 
     //Hide both jeeps
     document.getElementById("mask_jeep_outbound").style.display = "none"
@@ -5368,6 +4800,7 @@ TopLayerMaskController = function(_outputfunction, direction, text){
 
     let TextObj = document.getElementById("mask_text")
     let BackgroundObj = document.getElementById("mask_background")
+    console.log(BackgroundObj)
 
     //Show the top-level mask, but make sure all elements are hidden
     TextObj.childNodes[0].innerHTML = text
@@ -5495,6 +4928,7 @@ HUDController = function(){
 
 // Manages all data that needs to be preserved. Call at the end of the experiment to download / store a JSON containing all subject-relevant data.
 DataController = function(participant_number, Stimuli){
+    let that = this
     //Always store data here as a deep copy!
     let Data = {
         participant_number: participant_number,
@@ -5518,7 +4952,6 @@ DataController = function(participant_number, Stimuli){
     }
 
     this.force_download = function(){
-        console.log(Data)
         downloadObjectAsJson(Data, "data participant "+ participant_number + ".json")
     }
 
@@ -5538,10 +4971,11 @@ DataController = function(participant_number, Stimuli){
     // TARGETTED SEARCH //
     //////////////////////
     //Stores the data collected at the end of each trial of the target_search phase
-    this.store_targeted_search_trial = function(FennimalObj, Locations_Visited){
+    this.store_targeted_search_trial = function(FennimalObj, Locations_Visited, hint_type){
         let NewObj = JSON.parse(JSON.stringify(FennimalObj))
         NewObj.Locations_Visited_During_Trial = JSON.parse(JSON.stringify(Locations_Visited))
         NewObj.number_of_locations_travelled = Locations_Visited.length
+        NewObj.hint_type = hint_type
 
         Data.Targeted_Search.push(NewObj)
     }
@@ -5549,11 +4983,13 @@ DataController = function(participant_number, Stimuli){
     // DELIVERY PHASE DATA //
     /////////////////////////
     // Call when a delivery phase has finished
-    this.store_delivery_trial = function(FennimalObj, Items_Brought, Locations_Visited){
+    this.store_delivery_trial = function(FennimalObj, Items_Brought, Locations_Visited, hint_type, delivery_round){
         let NewObj = JSON.parse(JSON.stringify(FennimalObj))
         NewObj.Locations_Visited_During_Trial = JSON.parse(JSON.stringify(Locations_Visited))
         NewObj.number_of_locations_travelled = Locations_Visited.length
         NewObj.Items_Brought_In_Backpack = JSON.parse(JSON.stringify(Items_Brought))
+        NewObj.remedial_block = delivery_round
+        NewObj.hint = hint_type
 
         Data.Delivery.push(NewObj)
     }
@@ -5570,23 +5006,6 @@ DataController = function(participant_number, Stimuli){
         Data.Quiz[current_quiz_number-1].push(JSON.parse(JSON.stringify(FennimalObj)))
     }
 
-    // REMEDIAL PHASE //
-    ///////////////////
-    // Call when a new remedial phase has been started
-    let current_remedial_number = 0
-    this.new_remedial_block_started = function(){
-        current_remedial_number++
-        Data.Remedial.push([])
-    }
-    this.store_remedial_trial = function(FennimalObj, Items_Brought, Locations_Visited){
-        let NewObj = JSON.parse(JSON.stringify(FennimalObj))
-        NewObj.Locations_Visited_During_Trial = JSON.parse(JSON.stringify(Locations_Visited))
-        NewObj.number_of_locations_travelled = Locations_Visited.length
-        NewObj.Items_Brought_In_Backpack = JSON.parse(JSON.stringify(Items_Brought))
-
-        Data.Remedial[current_remedial_number-1].push(NewObj)
-    }
-
     // TEST PHASE //
     ////////////////
     this.store_test_trial = function(FennimalObj){
@@ -5598,22 +5017,12 @@ DataController = function(participant_number, Stimuli){
         Data.experiment_time =  Date.now() - startTime
     }
 
-    //Call after experiment is completed to return the subject's score. Score is an object containing "total_number_of_Fennimals_in_test_phase" (int), "test_phase_Fennimals_who_liked_item" (int) and "star rating" (int, out of 5)
+    //Call after experiment is completed to return the subject's score. Score is an object containing "total_number_of_Fennimals_in_test_phase" (int), "test_phase_Fennimals_who_liked_item" (int) and "star rating" (int, out of 5) and a Token (for Mturk)
     this.get_score = function(){
         let total = 0, liked = 0
         for(let i =0;i<Data.TestTrials.length;i++){
             total++
-            switch(Data.TestTrials[i].trialtype){
-                case("test_training"):
-                    if(Data.TestTrials[i].selected_item === Data.TestTrials[i].item) {liked++;}
-                    break;
-                case("test_direct"):
-                    if(Data.TestTrials[i].selected_item === Data.TestTrials[i].direct_item) {liked++;}
-                    break;
-                case("test_indirect"):
-                    if(Data.TestTrials[i].selected_item === Data.TestTrials[i].indirect_item) {liked++;}
-                    break;
-            }
+            if(Data.TestTrials[i].correct_item_selected) {liked++;}
         }
         let percentage = liked / total
 
@@ -5623,27 +5032,212 @@ DataController = function(participant_number, Stimuli){
         if(percentage > .50){ star_rating = 4}
         if(percentage > .60){ star_rating = 5}
 
+        //Calculating USD reward (if given)
+        let USDReward = (Param.MturkPaymentSettings.base_reward + star_rating * Param.MturkPaymentSettings.bonus_per_star).toFixed(2)
+
         return({
             num_total_Fennimals: total,
             num_liked_item: liked,
-            star_rating: star_rating
+            star_rating: star_rating,
+            USD_reward: USDReward,
+            token: participant_number + "T" + USDReward
         })
+    }
+
+    //Call to record the open question answer
+    let open_question_answer
+    this.update_open_question_answer = function (text){
+        open_question_answer = text
+        console.log(text)
+    }
+
+    let colorblindness
+    this.update_color_blindness_answer = function(ans){
+        colorblindness = ans
+        console.log(ans)
     }
 
     //Call to submit the hidden form with the subject's data
     this.submitDataForm = function(){
         //Downloading hard copy
         downloadObjectAsJson(Data, "data participant "+ participant_number + ".json")
-        
+
+        console.log(Data)
+        console.log(optimize_data())
+
         //Populating the form
-        document.getElementById("data_form_field").innerHTML = JSON.stringify(Data)
+        document.getElementById("data_form_field").innerHTML = JSON.stringify(optimize_data())
+
+        //Give some feedback to the participant
+        let alertmessage
+        if(Param.ExperimentOnMturk){
+            alertmessage = "You are now submitting this page. After submitting you will not be able to go back. If you did not yet submit your token on MTURK, then please do so now! Your token is: " + that.get_score().token
+        }else {
+            alertmessage = "Experiment completed, thanks for participating!"
+        }
+        alert(alertmessage)
 
         //Automatically submit
         document.getElementById("submitbutton").click()
 
-        //Give some feedback to the participant
-        alert("Experiment finished! Thank you for participating!")
 
+
+
+    }
+
+    // Call to the optimize the data, so that we don't have to send a huge amount of redundant data
+    function optimize_data(){
+        function reduce_location_name(long_name){
+            switch(long_name){
+                case("map"): return("map");
+                case("start_North"): return("s_Nor");
+                case("intersection_North"): return("i_Nor");
+                case("location_Pineforest"): return("Pine");
+                case("location_Iceberg"): return("Ice");
+
+                case("start_Mountains"): return("s_Mnt");
+                case("intersection_Mountains"): return("i_Mnt");
+                case("location_Waterfall"): return("WFall");
+                case("location_Mine"): return("Mine");
+
+                case("start_Village"): return("s_Vil");
+                case("intersection_Village"): return("i_Vil");
+                case("location_Church"): return("Chur");
+                case("location_Farm"): return("Farm");
+
+                case("start_Swamp"): return("s_Swa");
+                case("intersection_Swamp"): return("i_Swa");
+                case("location_Cottage"): return("Cott");
+                case("location_Marsh"): return("Mar");
+
+                case("start_Desert"): return("s_Des");
+                case("intersection_Desert"): return("i_Des");
+                case("location_Cactus"): return("Cact");
+                case("location_Oasis"): return("Oas");
+
+                case("start_Beach"): return("s_Bea");
+                case("intersection_Beach"): return("i_Bea");
+                case("location_Beachbar"): return("BBar");
+                case("location_Port"): return("Port");
+
+                case("start_Jungle"): return("s_Jun");
+                case("intersection_Jungle"): return("i_Jun");
+                case("location_Bush"): return("Bush");
+                case("location_Jungleforest"): return("Jfor");
+
+                case("start_Flowerfields"): return("s_Flo");
+                case("intersection_Flowerfields"): return("i_Flo");
+                case("location_Windmill"): return("Wind");
+                case("location_Garden"): return("Gard");
+            }
+        }
+
+        // Instead of copying all the Fennimal properties for each trial, we can simply store the ID codes
+
+        // Optimizing the Exploration phase
+        // Here we only want to preserve the order in which Fennimals have been found and the location sequence (the location visitation order can be extracted from this later)
+        let FennimalsFoundOrder = {}
+        let NewLocationSequence = []
+
+        if("Exploration_Phase" in Data){
+            // Storing the order in which Fennimals have been found
+            for(let key in Data.Exploration_Phase.Fennimals){
+                if(Data.Exploration_Phase.Fennimals[key] !== false){
+                    let FenObj = Data.Exploration_Phase.Fennimals[key]
+                    FennimalsFoundOrder[FenObj.ID] = FenObj.order_found
+                }
+            }
+
+            //Reducing the array size of the location sequence
+            for(let i =0;i<Data.Exploration_Phase.Location_Sequence.length; i++){
+                NewLocationSequence.push(reduce_location_name(Data.Exploration_Phase.Location_Sequence[i]))
+            }
+
+        }
+
+        //Optimizing the Target Search phase
+        let NewOptSearchData = []
+        for(let i =0;i<Data.Targeted_Search.length;i++){
+            let NewLocVisited = []
+            for(let loc =0;loc < Data.Targeted_Search[i].Locations_Visited_During_Trial.length;loc++){
+                NewLocVisited.push(reduce_location_name(Data.Targeted_Search[i].Locations_Visited_During_Trial[loc]))
+            }
+
+            NewOptSearchData.push({
+                tnum: i+1,
+                ID: Data.Targeted_Search[i].ID,
+                locVis: NewLocVisited,
+                numLoc: Data.Targeted_Search[i].number_of_locations_travelled.length
+            })
+        }
+
+        //Optimizing the Delivery phase
+        let NewDeliveryData = []
+        for(let i =0; i<Data.Delivery.length;i++){
+            let NewLocVisited = []
+            for(let loc =0;loc < Data.Delivery[i].Locations_Visited_During_Trial.length;loc++){
+                NewLocVisited.push(reduce_location_name(Data.Delivery[i].Locations_Visited_During_Trial[loc]))
+            }
+            NewDeliveryData.push({
+                tnum: i+1,
+                ID: Data.Delivery[i].ID,
+                locVis: NewLocVisited,
+                numLoc: Data.Delivery[i].number_of_locations_travelled,
+                bpack: Data.Delivery[i].Items_Brought_In_Backpack,
+                bpack_num: Data.Delivery[i].Items_Brought_In_Backpack.length,
+                remed_block: Data.Delivery[i].remedial_block,
+                hint: Data.Delivery[i].hint
+            })
+        }
+
+        //Optimizing the Quiz data
+        let NewQuizData =[]
+        for(let i =0; i<Data.Quiz.length;i++){
+            let QuizAttempt = []
+            for(let trial =0;trial<Data.Quiz[i].length;trial++){
+                QuizAttempt.push({
+                    tnum: trial + 1,
+                    ID: Data.Quiz[i][trial].ID,
+                    correct_item: Data.Quiz[i][trial].item,
+                    sel_item: Data.Quiz[i][trial].selected_item,
+                    correct: Data.Quiz[i][trial].correct_answer,
+                    rt: Data.Quiz[i][trial].reaction_time
+                })
+            }
+            NewQuizData.push(QuizAttempt)
+        }
+
+        //Optimizing the TEST PHASE
+        let OptTestData = []
+        for(let i = 0; i<Data.TestTrials.length;i++){
+            OptTestData.push({
+                type: Data.TestTrials[i].blocktype,
+                tnum: i + 1,
+                ID: Data.TestTrials[i].ID,
+                rt: Data.TestTrials[i].reaction_time,
+                avail: Data.TestTrials[i].items_available,
+                select: Data.TestTrials[i].selected_item,
+                cor: Data.TestTrials[i].correct_item_selected
+
+            })
+        }
+
+        return({
+            Exptime: Data.experiment_time,
+            Part_ID: Data.participant_number,
+            Train_Stim: Stimuli.getTrainingSetFennimalsInArray(),
+            Test_Stim: Stimuli.getTestSetFennimalsInArray(),
+            Expl: {
+                FoundOrdr: FennimalsFoundOrder,
+                LocSeq: NewLocationSequence
+            },
+            TSearch: NewOptSearchData,
+            Delivery: NewDeliveryData,
+            Quiz: NewQuizData,
+            Test: OptTestData,
+            open: open_question_answer,
+            c_blind: colorblindness
+        })
 
     }
 
@@ -5660,7 +5254,7 @@ ExperimentController = function(Stimuli, DataController){
     let LocCont = new LocationController(this)
 
     //Create a controller to handle all the instructions
-    let InstrCont = new InstructionsController(this,LocCont)
+    let InstrCont = new InstructionsController(this,LocCont, DataController)
 
     //Create a controller to handle the HUD
     let HUDCont = new HUDController()
@@ -5693,16 +5287,24 @@ ExperimentController = function(Stimuli, DataController){
         HUDCont.changeHUD(false)
 
         //Check if this is the first time this location is visited during the exploration phase
-        if(current_phase_of_the_experiment === "training" && current_training_subphase === "exploration" && LocationVisitationOrder[location_name] === false){
-            let x = new ObjectiveAchievedController("NEW LOCATION FOUND!", Param.SubjectFacingLocationNames[location_name], false)
-            number_of_locations_visited++
+        if(current_phase_of_the_experiment === "training" && current_training_subphase === "exploration" ){
+            if(LocationVisitationOrder[location_name] === false){
+                let x = new ObjectiveAchievedController("NEW LOCATION FOUND!", Param.SubjectFacingLocationNames[location_name], false)
+                number_of_locations_visited++
 
-            //Prevent the subject from leaving until the animation has been completed
-            LocCont.prevent_subject_from_leaving_location(true)
-            setTimeout(function(){
-                LocCont.prevent_subject_from_leaving_location(false)
-                check_if_exploration_subphase_completed()
-            },3000)
+                //Prevent the subject from leaving until the animation has been completed
+                //LocCont.prevent_subject_from_leaving_location(true)
+                setTimeout(function(){
+                    //LocCont.prevent_subject_from_leaving_location(false)
+                    check_if_exploration_subphase_completed()
+                },3000)
+            }else{
+                //Subjects is free to leave whenever
+                //LocCont.prevent_subject_from_leaving_location(false)
+            }
+
+
+
         }
 
         //Record the visitation of this location
@@ -5716,7 +5318,7 @@ ExperimentController = function(Stimuli, DataController){
         if(FennimalsPresentOnMap[location_name] !== false){
             if("order_found" in FennimalsPresentOnMap[location_name]){
                 //Fennimal has been found: show the feedback
-                FenCont = new CompletedFennimalController(FennimalsPresentOnMap[location_name])
+                FenCont = new CompletedFennimalController(FennimalsPresentOnMap[location_name], LocCont)
 
             }else{
                 //Fennimal has not been found currently
@@ -5837,24 +5439,18 @@ ExperimentController = function(Stimuli, DataController){
 
     //Call when the Fennimal interaction has been completed. Assumes that the FennimalObject now contains a property for "item_selected"
     this.FennimalInteractionCompleted = function(FennimalObj){
-
         //Next steps depend on the phase of the experiment
-        if(current_phase_of_the_experiment === "training" ){
-            switch (current_training_subphase){
-                case("exploration"): exploration_subphase_Fennimal_completed(FennimalObj); break
-                case("targeted_search"): targeted_search_subphase_Fennimal_completed(FennimalObj); break
-                case("delivery"):
-                    delivery_subphase_Fennimal_completed(FennimalObj);
-                    LocCont.prevent_subject_from_leaving_location(true)
-                    break
-                case("quiz"):
-                    if(!FennimalObj.correct_answer) {number_of_quiz_errors++}
-                    start_next_quiz_trial()
-                    //TODO: store data
-                    break
-                case("remedial"): remedial_subphase_Fennimal_completed(FennimalObj); break
-            }
-
+        switch (current_training_subphase){
+            case("exploration"): exploration_subphase_Fennimal_completed(FennimalObj); break
+            case("targeted_search"): targeted_search_subphase_Fennimal_completed(CurrentSearchTrial); break
+            case("delivery"):
+                delivery_subphase_Fennimal_completed(CurrentDeliveryTrial);
+                LocCont.prevent_subject_from_leaving_location(true)
+                break
+            case("quiz"):
+                if(!FennimalObj.correct_answer) {number_of_quiz_errors++}
+                start_next_quiz_trial()
+                break
         }
 
     }
@@ -5865,16 +5461,13 @@ ExperimentController = function(Stimuli, DataController){
         if(current_phase_of_the_experiment === "training"){
             switch(current_training_subphase){
                 case("exploration"):
-                    InstrCont.showExplorationInstructions(LocationVisitationOrder,FennimalsPresentOnMap)
+                    InstrCont.showExplorationInstructions(LocationVisitationOrder,FennimalsPresentOnMap, Stimuli.getTrainingSetFennimalsInArray())
                     break;
                 case("targeted_search"):
-                    InstrCont.showSearchInstructions(CurrentSearchedFennimal.head, CurrentSearchedFennimal.body,CurrentSearchedFennimal.name,CurrentSearchedFennimal.location)
+                    InstrCont.showSearchInstructions(CurrentSearchTrial.Fennimal, CurrentSearchTrial.hint_type)
                     break;
                 case("delivery"):
-                    InstrCont.showDeliveryInstructions(CurrentSearchedFennimal.head, CurrentSearchedFennimal.body,CurrentSearchedFennimal.name,CurrentSearchedFennimal.location, Stimuli.getItemDetails())
-                    break
-                case("remedial"):
-                    InstrCont.showRemedialInstructions(CurrentSearchedFennimal.head, CurrentSearchedFennimal.body,CurrentSearchedFennimal.name,CurrentSearchedFennimal.location, Stimuli.getItemDetails())
+                    InstrCont.showDeliveryInstructions(CurrentDeliveryTrial.Fennimal, CurrentDeliveryTrial.hint_type, Stimuli.getItemDetails())
                     break
             }
         }
@@ -5910,10 +5503,6 @@ ExperimentController = function(Stimuli, DataController){
         }
     }
 
-    //////////////////////////////
-    // TRAINING PHASE FUNCTIONS //
-    //////////////////////////////
-
     // EXPLORATION SUBPHASE //
     //Starts the exploration subphase. Here the map is populated with all training set Fennimals, and the participant has to find all Fennimals and visit all locations at least once.
     //  No jumping back to home at any point.
@@ -5935,7 +5524,7 @@ ExperimentController = function(Stimuli, DataController){
         }
 
         //Show the exploration phase instructions screen
-        InstrCont.showExplorationInstructions(LocationVisitationOrder,FennimalsPresentOnMap)
+        InstrCont.showExplorationInstructions(LocationVisitationOrder,FennimalsPresentOnMap, Stimuli.getTrainingSetFennimalsInArray())
 
     }
     //Call when the exploration instructions page is closed
@@ -5951,9 +5540,11 @@ ExperimentController = function(Stimuli, DataController){
         FennimalObj.order_found = Fennimal_found_number
         Fennimal_found_number++
         FennimalsPresentOnMap[FennimalObj.location] = FennimalObj
+        LocCont.prevent_subject_from_leaving_location(true)
 
         setTimeout(function(){
             let x = new ObjectiveAchievedController("NEW FENNIMAL FOUND!", FennimalObj.name, false)
+
             //Prevent the subject from leaving until the animation has been completed
 
             setTimeout(function(){
@@ -5967,6 +5558,7 @@ ExperimentController = function(Stimuli, DataController){
     //Call to check if the exploration subphase has been completed
     function check_if_exploration_subphase_completed(){
         if(number_of_locations_visited === Param.location_Names.length && Fennimal_found_number === Stimuli.getTrainingSetFennimalsKeyedOnLocation().MetaData.total_number_of_Fennimals){
+            LocCont.prevent_subject_from_leaving_location(true)
             setTimeout(function(){
                 exploration_subphase_completed()
             },2000)
@@ -5977,16 +5569,28 @@ ExperimentController = function(Stimuli, DataController){
         //Storing data
         DataController.store_exploration_phase_data(FennimalsPresentOnMap,LocationVisitationOrder, Exploration_Phase_Location_Visited_Sequence)
 
-        //Show a screen indicating that the exploration subphase is completed
-        MaskCont = new TopLayerMaskController(that.start_targeted_search_subphase, "none", "Exploration complete!")
+        //Cancelling all hints from this point on
+        IngameHintsGiven.location_arrow_first_click = true
+        IngameHintsGiven.map_first_travel = true
+        IngameHintsGiven.flashlight_first_use = true
 
+        //Changing the HUD
+        HUDCont.changeHUD(false)
+
+        //Show a screen indicating that the exploration subphase is completed
+        MaskCont = new TopLayerMaskController(that.go_to_exploration_completed_page, "none", "Exploration complete!")
+
+    }
+    this.go_to_exploration_completed_page = function(){
+        HUDCont.changeHUD(false)
+        InstrCont.showExplorationCompletedPage(that.start_targeted_search_subphase)
     }
 
     // TARGETED SEARCH SUBPHASE //
     //Starts the targeted_search subphase. In the home screen, the participant is given an outline and a hint (tied to location) and has to go out to this location to interact with the Fennimal.
     //  After the item is given to this Fennimal, then jump back to the home screen (no need to walk all the way back).
     // Starts with the first Fennimal already populated
-    let ArrayOfFennimalsToBeFound, CurrentSearchedFennimal, Search_Trial_Locations_Visited
+    let ArrayOfFennimalsToBeFound, CurrentSearchTrial, Search_Trial_Locations_Visited
     this.start_targeted_search_subphase = function(){
         //Reset the state of the world
         clearFennimalsFromMap()
@@ -6000,14 +5604,18 @@ ExperimentController = function(Stimuli, DataController){
             //Reset the state of the world
             clearFennimalsFromMap()
 
-            //Keep an array with all the Fennimals that need to be found during this subphase. This starts with all training phase Fennimals (in random order), and then destructively pops Fennimals one-by-one
+            //Keep an array with all the Fennimals that need to be found during this subphase. First show all training Fennimals by their icon (random order), then all with their name (random order again)
             ArrayOfFennimalsToBeFound = []
-            for(let i = 0; i<Param.number_of_search_repetitions; i++){
-                //Make a shuffled deep copy of the training phase Fennimals and append it to the Array
-                let x = shuffleArray( Stimuli.getTrainingSetFennimalsInArray() )
-                ArrayOfFennimalsToBeFound = ArrayOfFennimalsToBeFound.concat(shuffleArray(JSON.parse(JSON.stringify(x)) ))
+
+            let RandomOrderedStimuli = shuffleArray(JSON.parse(JSON.stringify(Stimuli.getTrainingSetFennimalsInArray())))
+            for(let i = 0; i<RandomOrderedStimuli.length; i++){
+                ArrayOfFennimalsToBeFound = ArrayOfFennimalsToBeFound.concat([{Fennimal: RandomOrderedStimuli[i], hint_type: "icon"}])
             }
 
+            RandomOrderedStimuli = shuffleArray(JSON.parse(JSON.stringify(Stimuli.getTrainingSetFennimalsInArray())))
+            for(let i = 0; i<RandomOrderedStimuli.length; i++){
+                ArrayOfFennimalsToBeFound = ArrayOfFennimalsToBeFound.concat([{Fennimal: RandomOrderedStimuli[i], hint_type: "name"}])
+            }
         }
         //Start the first search trial
         that.start_next_search_round()
@@ -6016,19 +5624,21 @@ ExperimentController = function(Stimuli, DataController){
     this.start_next_search_round = function(){
         //Pop the top element from Array of Fennimals to be found. If there are none, then this part of the training phase is completed
         if(ArrayOfFennimalsToBeFound.length > 0){
-            CurrentSearchedFennimal = ArrayOfFennimalsToBeFound.splice(0,1)[0]
+            CurrentSearchTrial = ArrayOfFennimalsToBeFound.splice(0,1)[0]
 
             //Reset the visitation order
             resetVisitionOrderObj()
 
             //Populate the world with this Fennimal
-            FennimalsPresentOnMap[CurrentSearchedFennimal.location] = CurrentSearchedFennimal
+            FennimalsPresentOnMap[CurrentSearchTrial.Fennimal.location] = CurrentSearchTrial.Fennimal
 
             //Show the instructions screen.
-            InstrCont.showSearchInstructions(CurrentSearchedFennimal.head, CurrentSearchedFennimal.body,CurrentSearchedFennimal.name,CurrentSearchedFennimal.location)
+            InstrCont.showSearchInstructions(CurrentSearchTrial.Fennimal, CurrentSearchTrial.hint_type)
 
             //Keep track of which locations are visited
             Search_Trial_Locations_Visited = []
+
+            console.log(CurrentSearchTrial.Fennimal.location)
 
         }else{
             search_subphase_completed()
@@ -6038,7 +5648,6 @@ ExperimentController = function(Stimuli, DataController){
     this.search_instruction_page_closed = function(){
         //Reset the map, and we're good to go.
         LocCont.reset_map()
-
     }
     //Call when all search trials have been completed
     function search_subphase_completed(){
@@ -6048,15 +5657,16 @@ ExperimentController = function(Stimuli, DataController){
 
     }
     //Call when a Fennimal interaction has been completed
-    function targeted_search_subphase_Fennimal_completed(FennimalObj){
+    function targeted_search_subphase_Fennimal_completed(SearchTrial){
         //Update the Fennimal in the world state
-        FennimalObj.order_found = true
-        FennimalsPresentOnMap[FennimalObj.location] = FennimalObj
+        SearchTrial.Fennimal.order_found = true
+        FennimalsPresentOnMap[SearchTrial.Fennimal.location] = SearchTrial.Fennimal
 
         //Store the data
-        DataController.store_targeted_search_trial(FennimalObj,Search_Trial_Locations_Visited)
+        DataController.store_targeted_search_trial(SearchTrial.Fennimal,Search_Trial_Locations_Visited, SearchTrial.hint_type)
 
         //Allow the participant to jump back to the home screen
+        LocCont.prevent_subject_from_leaving_location(true)
         setTimeout(function(){
             LocCont.show_end_of_trial_button(function(){
                 that.location_left()
@@ -6073,7 +5683,9 @@ ExperimentController = function(Stimuli, DataController){
     // However, now the participant can carry at most one item with them (selected in the Home screen)
     //  After the item is given to the Fennimal, jump back home.
     //// Clear the array that keeps track of which items have been taken during this trial
-    let current_item_in_inventory, ArrayOfFennimalsToBeDelivered, Items_Taken_In_Backpack_During_Trial, Delivery_Locations_Visited
+    let current_item_in_inventory, ArrayOfFennimalsToBeDelivered,CurrentDeliveryTrial, Items_Taken_In_Backpack_During_Trial, Delivery_Locations_Visited
+    //This counter will be zero for the first delivery round. Any higher numbers indicate a remedial round after failing a quiz
+    let current_delivery_round =0
     //Call to start the delivery subphase
     this.start_delivery_subphase = function(){
         if(current_training_subphase !== "delivery"){
@@ -6084,14 +5696,21 @@ ExperimentController = function(Stimuli, DataController){
             //Reset the state of the world
             clearFennimalsFromMap()
 
-            //Keep an array with all the Fennimals that need to be found during this subphase. This starts with all training phase Fennimals (in random order), and then destructively pops Fennimals one-by-one
+            //Keep an array with all the Fennimals that need to be found during this subphase. This starts with all training phase Fennimals (in random order), and then destructively pops Fennimals one-by-one. As with search, we do one set with an icon, and one set with a hint
             ArrayOfFennimalsToBeDelivered = []
-            for(let i = 0; i<Param.number_of_delivery_repetitions; i++){
-                //Make a shuffled deep copy of the training phase Fennimals and append it to the Array
-                let x = shuffleArray(Stimuli.getTrainingSetFennimalsInArray())
-                ArrayOfFennimalsToBeDelivered = ArrayOfFennimalsToBeDelivered.concat(shuffleArray(JSON.parse(JSON.stringify(x)) ))
+            let RandomOrderedStimuli
+
+            if(current_delivery_round === 0){
+                RandomOrderedStimuli = shuffleArray(JSON.parse(JSON.stringify(Stimuli.getTrainingSetFennimalsInArray())))
+                for(let i = 0; i<RandomOrderedStimuli.length; i++){
+                    ArrayOfFennimalsToBeDelivered = ArrayOfFennimalsToBeDelivered.concat([{Fennimal: RandomOrderedStimuli[i], hint_type: "icon"}])
+                }
             }
 
+            RandomOrderedStimuli = shuffleArray(JSON.parse(JSON.stringify(Stimuli.getTrainingSetFennimalsInArray())))
+            for(let i = 0; i<RandomOrderedStimuli.length; i++){
+                ArrayOfFennimalsToBeDelivered = ArrayOfFennimalsToBeDelivered.concat([{Fennimal: RandomOrderedStimuli[i], hint_type: "name"}])
+            }
         }
         //Start the first search trial
         that.start_next_delivery_round()
@@ -6099,16 +5718,17 @@ ExperimentController = function(Stimuli, DataController){
     this.start_next_delivery_round = function(){
         //Pop the top element from Array of Fennimals to be found. If there are none, then this part of the training phase is completed
         if(ArrayOfFennimalsToBeDelivered.length > 0){
-            CurrentSearchedFennimal = ArrayOfFennimalsToBeDelivered.splice(0,1)[0]
+            CurrentDeliveryTrial = ArrayOfFennimalsToBeDelivered.splice(0,1)[0]
 
             //Reset the visitation order
             resetVisitionOrderObj()
 
             //Add or reset this Fennimal in the world
-            FennimalsPresentOnMap[CurrentSearchedFennimal.location] = CurrentSearchedFennimal
+            FennimalsPresentOnMap[CurrentDeliveryTrial.Fennimal.location] = CurrentDeliveryTrial.Fennimal
+            console.log(CurrentDeliveryTrial.Fennimal.location, CurrentDeliveryTrial.Fennimal.item)
 
             //Show the instructions screen.
-            InstrCont.showDeliveryInstructions(CurrentSearchedFennimal.head, CurrentSearchedFennimal.body,CurrentSearchedFennimal.name, CurrentSearchedFennimal.location, Stimuli.getItemDetails())
+            InstrCont.showDeliveryInstructions(CurrentDeliveryTrial.Fennimal, CurrentDeliveryTrial.hint_type, Stimuli.getItemDetails())
 
             //Reset the items in backpack and locations visited
             Items_Taken_In_Backpack_During_Trial = []
@@ -6123,13 +5743,12 @@ ExperimentController = function(Stimuli, DataController){
         updateHUD()
         LocCont.reset_map()
     }
-    function delivery_subphase_Fennimal_completed(FennimalObj){
-        //TODO: store data
-        DataController.store_delivery_trial(FennimalObj,Items_Taken_In_Backpack_During_Trial,Delivery_Locations_Visited)
+    function delivery_subphase_Fennimal_completed(DeliveryTrial){
+        DataController.store_delivery_trial(DeliveryTrial.Fennimal,Items_Taken_In_Backpack_During_Trial,Delivery_Locations_Visited, DeliveryTrial.hint_type, current_delivery_round)
 
         //Update the Fennimal in the world state
-        FennimalObj.order_found = true
-        FennimalsPresentOnMap[FennimalObj.location] = FennimalObj
+        DeliveryTrial.Fennimal.order_found = true
+        FennimalsPresentOnMap[DeliveryTrial.location] = DeliveryTrial
 
         //Allow the participant to jump back to the home screen
         setTimeout(function(){
@@ -6170,13 +5789,15 @@ ExperimentController = function(Stimuli, DataController){
 
     }
     function start_next_quiz_trial(){
+
+        //Check if we need to store a previous quiz trial and update the number of errors
+        if(CurrentQuizTrial !== false){
+            DataController.store_quiz_trial(CurrentQuizTrial)
+        }
+
+
         //Check if there are more trials to be done. If yes, then show the next trial. If not, then the quiz has been completed
         if(QuizTrials.length > 0){
-            //Check if we need to store a previous quiz trial
-            if(CurrentQuizTrial !== false){
-                DataController.store_quiz_trial(CurrentQuizTrial)
-            }
-
             //Splice the first element of the QuizTrials as a new trial
             CurrentQuizTrial = QuizTrials.splice(0,1)[0]
 
@@ -6200,84 +5821,18 @@ ExperimentController = function(Stimuli, DataController){
     }
     function quizCompleted(){
         FenCont = false
-        //TODO: store quiz data
         //If the subject made any errors during the quiz, then show a round of remedial delivery trials (this automatically starts a new quiz afterwards). If not, then the training phase has been completed!
         if(number_of_quiz_errors > 0){
-            that.start_remedial_subphase()
+            quizFailed()
         }else{
+
             new ObjectiveAchievedController("EXAM PASSED!", "Congratulations!", true)
-            setTimeout(function (){that.start_test_phase()},2000)
+            setTimeout(function (){that.start_test_phase()},2500)
         }
     }
-
-    // REMEDIAL TRAINING //
-    ///////////////////////
-    let Remedial_Locations_Visited
-    this.start_remedial_subphase = function(){
-        if(current_training_subphase !== "remedial"){
-            current_training_subphase = "remedial"
-
-            //Inform the datacontroller that a new remedial phase has started
-            DataController.new_remedial_block_started()
-
-            //Keep an array with all the Fennimals that need to be found during this subphase. This starts with all training phase Fennimals (in random order), and then destructively pops Fennimals one-by-one
-            ArrayOfFennimalsToBeDelivered =shuffleArray(JSON.parse(JSON.stringify(Stimuli.getTrainingSetFennimalsInArray())) )
-
-            //Reset the Fennimals on the map
-            clearFennimalsFromMap()
-        }
-        //Start the first search trial
-        this.start_next_remedial_round()
-
-    }
-    this.start_next_remedial_round = function(){
-        //Pop the top element from Array of Fennimals to be found. If there are none, then this part of the training phase is completed
-        if(ArrayOfFennimalsToBeDelivered.length > 0){
-            CurrentSearchedFennimal = ArrayOfFennimalsToBeDelivered.splice(0,1)[0]
-
-            //Reset the visitation order
-            resetVisitionOrderObj()
-            Items_Taken_In_Backpack_During_Trial = []
-            Remedial_Locations_Visited = []
-
-            //Populate the world with this Fennimal
-            FennimalsPresentOnMap[CurrentSearchedFennimal.location] = CurrentSearchedFennimal
-
-            //Show the instructions screen.
-            InstrCont.showRemedialInstructions(CurrentSearchedFennimal.head, CurrentSearchedFennimal.body,CurrentSearchedFennimal.name, CurrentSearchedFennimal.location, Stimuli.getItemDetails())
-        }else{
-            remedial_subphase_completed()
-        }
-    }
-    this.remedial_instruction_page_closed = function(item_selected){
-        current_item_in_inventory = item_selected
-        Items_Taken_In_Backpack_During_Trial.push(item_selected)
-        updateHUD()
-        LocCont.reset_map()
-    }
-    function remedial_subphase_Fennimal_completed(FennimalObj){
-        //Update the Fennimal in the world state
-        FennimalObj.order_found = true
-        FennimalsPresentOnMap[FennimalObj.location] = FennimalObj
-
-        //Store data
-        DataController.store_remedial_trial(FennimalObj,Items_Taken_In_Backpack_During_Trial,Remedial_Locations_Visited)
-
-        //Allow the participant to jump back to the home screen
-        setTimeout(function(){
-            LocCont.show_end_of_trial_button(function(){
-                that.location_left()
-                LocCont.show_passive_map()
-                InstrCont.resetRemedialPage()
-                HUDCont.changeHUD(false)
-                that.start_next_remedial_round()
-            })
-        }, 3500)
-    }
-    function remedial_subphase_completed(){
-        //Remedial training completed, show another quiz.
-        that.start_quiz()
-
+    function quizFailed(){
+        current_delivery_round++
+        InstrCont.showQuizFailedPage(that.start_delivery_subphase)
     }
 
     // TEST PHASE //
@@ -6285,9 +5840,8 @@ ExperimentController = function(Stimuli, DataController){
     let AllTestTrails, CurrentTestTrial,  CurrentBlockData, CurrentBlockTrials, total_number_of_blocks
     this.start_test_phase = function(){
         //Load in all the test trial data. This is stored as an array with each element containing a block of trials
-        AllTestTrails = Stimuli.getTestSetData()
+        AllTestTrails = Stimuli.getTestPhaseData()
         total_number_of_blocks = AllTestTrails.length
-        //AllTestTrails.splice(0,4)
 
         //Show the quiz completed screen. After the continue button is pressed on this screen, start the first block of trials
         InstrCont.showQuizPassedInstructions(this.start_next_test_phase_block)
@@ -6301,10 +5855,13 @@ ExperimentController = function(Stimuli, DataController){
             CurrentBlockTrials = CurrentBlockData.Trials
 
             //Show the correct day and instructions
-            if(CurrentBlockData.type === "test"){
-                InstrCont.show_test_phase_instructions_novel_block(CurrentBlockData.number, total_number_of_blocks,function(){that.start_next_test_trial()})
+            if(CurrentBlockData.type === "direct"){
+                InstrCont.show_test_phase_instructions_direct_block(CurrentBlockData.number, total_number_of_blocks,function(){that.start_next_test_trial()})
             }
-            if(CurrentBlockData.type === "repeat"){
+            if(CurrentBlockData.type === "indirect"){
+                InstrCont.show_test_phase_instructions_indirect_block(CurrentBlockData.number, total_number_of_blocks,function(){that.start_next_test_trial()})
+            }
+            if(CurrentBlockData.type === "training"){
                 InstrCont.show_test_phase_instructions_repeat_block(CurrentBlockData.number, total_number_of_blocks,function(){that.start_next_test_trial()})
             }
         }else{
@@ -6350,10 +5907,11 @@ ExperimentController = function(Stimuli, DataController){
     function experiment_complete(){
         console.log("EXPERIMENT COMPLETED")
         DataCont.experiment_completed()
-        InstrCont.show_final_screen(DataCont.get_score(), DataCont.submitDataForm)
+        InstrCont.show_score_screen(DataCont.get_score(), DataCont.submitDataForm)
     }
 
 
+    // InstrCont.show_score_screen(DataCont.get_score(), DataCont.submitDataForm)
 }
 
 //Create this object to generate and store all the different Fennimals encountered for a participant number.
@@ -6469,7 +6027,7 @@ FennimalSlideShowGenerator = function(Stimuli){
         document.getElementById("Fennimal_Container").innerHTML = ""
 
         //Creating the Fennimal SVG group and a container to hold it in
-        let Fennimal = createFennimal(FennimalObj.head, FennimalObj.body, FennimalObj.primary_color,FennimalObj.secondary_color, FennimalObj.tertiary_color)
+        let Fennimal = createFennimal(FennimalObj)
         let Container = document.getElementById("Fennimal_Container")
         Container.appendChild(Fennimal)
         Container.style.display = "inherit"
@@ -6689,14 +6247,31 @@ let Stimuli = new STIMULUSDATA(participant_number);
 
 //Instructions shown to the participant
 let Instructions = {
-    Test_Phase: {
+    Training_Phase: {
+        Exploration: {
+            title: "EXPLORING THE ISLAND",
+            text_top: "Hello Trainnee, and welcome to the start of your training. To get you started, let's first explore the island. " +
+                "There are 16 locations for you to discover. " +
+                "While you're out there, there are a number of Fennimals you need to be introduced to. " +
+                "Please find and interact with all of the Fennimals on the list below. You can visit all locations and Fennimals in any order.",
+            text_bottom: "Click the continue button to start your training in Fenneland. You can always return to this screen by moving back to the center of the map by pressing on the Home (H) icon. "
+        },
+        Exploration_Completed: {
+            title: "EXPLORATION COMPLETE",
+            text_top: "Congratulations, you have completed your first expedition across Fenneland! You have found all 16 locations and have interacted with 6 of the local Fennimals. ",
+            text_bottom: "Click the continue button to continue with the next phase of your training. "
+        },
         Search: {
-            title: "Find that Fennimal",
-            text: "Well done! Now you have a feeling for the island and its inhabitants. <br> " +
-                "For the next part of your training, you will learn to find different Fennimals all over the island. I'll give you an outline of a Fennimal and a hint. Please find this Fennimal and give it a toy! "
+            title: "FIND THAT FENNIMAL",
+            text: "Well done! Now you have a feeling for the island and its inhabitants. " +
+                "For the next part of your training, you will learn to find different Fennimals all over the island. I'll give you a hint below. Please find this Fennimal and give it the toy it likes! "
+        },
+        Delivery: {
+            title: "DELIVER TOYS TO THE FENNIMALS",
+            text: "You're starting to get a feeling for the Fennimals that live in Fenneland. Let's kick it up a notch. As before, I will give you a hint below. However, now we will make things a bit more difficult: you will have to decide which item to bring with you. Your backpack only fits one item, so pick wisely! If you pick the wrong item, you can come back to Home to pick an different one. You can select which item to bring by clicking on the icon on the right.  "
         },
         Quiz_Start_First: {
-            title: "The exam to become a Novice!",
+            title: "THE EXAM TO BECOME A NOVICE",
             text: "Well done, Trainee! You are now ready to take the exam to become a <b> Novice </b> wildlife ranger. <br>" +
                 "During this exam you will be driven around the island to meet all the Fennimals you have encountered thus far. " +
                 "Your job is to give each Fennimal the toy that it previously liked. <br>" +
@@ -6707,7 +6282,7 @@ let Instructions = {
                 "Click on the button below to start the exam. "
         },
         Quiz_Start_Second: {
-            title: "Taking the exam again",
+            title: "TAKING THE EXAM AGAIN",
             text: "You're ready to take the exam again! <br>" +
                 "As before, you will now be driven around the island to meet up with all the Fennimals you have encountered thus far. " +
                 "Your job is to give each Fennimal the toy it previously liked.<br>" +
@@ -6719,26 +6294,45 @@ let Instructions = {
                 "<br> " +
                 "Click on the button below to start the exam"
         },
-        Quiz_Passed: {
-            title: "Becoming an expert",
-            text: "Congratulations! You passed the exam and you are now a Novice Wildlife Ranger! All that stands between you and the title of 'Expert Wildlife Ranger' are five days of practical experience in Fenneland. <br>" +
-                "There will <b> not </b> be another exam at the end of the experiment. After you complete your practical experience you will automatically receive the title of Expert.<br> " +
-                "<br>" +
-                "For the remainder of your training, you will be sent across the island to interact with various Fennimals. During these interactions you can apply your previously learned knowledge to select toys for these Fennimals.<br>" +
-                "Because the Fennimals are very shy and you are still unfamiliar to them, you will not get any feedback on whether or not they like the provided toy. Instead, they will investigate the toys by themselves later. You will only learn how many Fennimals liked the toys you gave them at the end of your training.<br>" +
-                "<br>" +
-                "To help you travel across the island more efficiently, you will be assigned a Junior Assistant who will drive you to any new Fennimals that have been spotted. However, your assistant is a bit scatter-brained and often forgets to bring some of the toys. If this happens, then you have to make do with whatever toys are available.  "
+        Quiz_Failed:{
+            title: "LET'S GO OVER THE FENNIMALS AGAIN",
+            text: "Unfortunately, you made at least one mistake during the exam. No problem! <br><br> " +
+                "Let's review all the Fennimals one more time. As before, I will give you an outline of a Fennimal and a hint. Pack the correct toy in your backpack an deliver it to this Fennimal. After you've revisited all the Fennimals you have previously encountered, you can take the exam again! \n"
         },
-        Novel_Fennimal_Block: {
-            title: "New Fennimals have been spotted!",
-            text: "<br><br> A new group of Fennimals has recently started to appear all over the island. While these Fennimals are still very shy, this is a good time to build a connection with them! <br>" +
+
+    },
+    Test_Phase :{
+        Quiz_Passed: {
+            title: "BECOMING AN EXPERT",
+            textTop: "Congratulations! You passed the exam and you're now a Novice Wildlife Ranger! All that stands between you and the title of 'Expert Wildlife Ranger' are five days of practical experience in Fenneland. " +
+                "During these days you will be sent across the island to interact with various Fennimals, where you can apply your previously learned knowledge to select toys for these Fennimals. <br> <br>" +
+                "There will <u> not </u> be another exam at the end of the experiment. After you complete your practical experience you will automatically receive the title of Expert. " +
+                "In addition, you will recieve between 0 and 5 stars based on how well the Fennimals liked their interactions with you during this practical experience. " ,
+            textBottom: "To help you travel across the island more efficiently, you will be assigned a Junior Assistant who will drive you to any new Fennimals that have been spotted. However, your assistant is a bit scatter-brained and often forgets to bring some of the toys. If this happens, then you have to make do with whatever toys are available.  "
+        },
+        Direct: {
+            title: "NEW FENNIMALS HAVE BEEN SPOTTED!",
+            text: "<br><br> A new group of Fennimals has recently started to appear all over the island. This is a good time to build a connection with them! <br>" +
                 "<br>" +
-                "While you have not encountered these new Fennimals before, you can apply your previously learned knowledge to select a fitting toy for these Fennimals. <br>" +
+                "While you have not encountered these new Fennimals before, <u> you can apply your previously learned knowledge </u> to select a fitting toy for these Fennimals. <br>" +
                 "<br>" +
-                "There is no time limit on your decision - you can take as long as you like. After you have selected an item, the Fennimal will return to its home and play with the provided toy. You will then automatically drive to the next Fennimal."
+                "Unfortunately, there is a small problem: your Junior Assistant has forgotten to bring some of the toys in the car. You will have to make do with whatever toys are available.<br>" +
+                "<br>" +
+                "<i>There is no time limit on your decision - you can take as long as you like. After you have selected an item, the Fennimal will either approve of the toy or reject it. You will then automatically drive to the next Fennimal. </i>"
+        },
+        Indirect: {
+            title: "NEW FENNIMALS HAVE BEEN SPOTTED!",
+            text: "<br><br> The new group of Fennimals are back again! It seems that today they are a bit more shy than yesterday though. " +
+                "After you give them a toy, the Fennimals will return to their homes and inspect the toys there. You won't learn whether or not they liked the toys you gave them until the end of this experiment.  <br>" +
+                "<br>" +
+                "Just as yesterday, <b> you can apply your previously learned knowledge to select a fitting toy for these Fennimals.</b> <br>" +
+                "<br>" +
+                "Unfortunately, your Junior Assistant is still learning to get the hang of things and has again forgotten to bring some of the toys in the car. You will have to make do with whatever toys are available.<br>" +
+                "<br>" +
+                "<i>There is no time limit on your decision - you can take as long as you like. After you have selected an item, the Fennimal will return to its home and play with the provided toy. You will then automatically drive to the next Fennimal. </i>"
         },
         Repeat_Training_Block: {
-            title: "Visiting old friends",
+            title: "VISITING OLD FRIENDS",
             text: "<br><br> The original Fennimals from your training period are starting to miss you. Time to pay a visit to your old friends again! <br><br>" +
                 "Do you still remember which items these Fennimals liked? <br>" +
                 "<br>" +
@@ -6762,19 +6356,11 @@ let SVGObjects = {
         OutlineIconLayer: document.getElementById("instructions_outline_icons"),
         Hint_and_pack_item_boxes: document.getElementById("hint_and_pack_item"),
         Pages : {
-            Start: document.getElementById("instructions_start"),
             Welcome: document.getElementById("instructions_welcome"),
             Exploration: document.getElementById("instructions_exploration"),
             Search: document.getElementById("instructions_search"),
-            Delivery: document.getElementById("instructions_delivery"),
-            Quiz: document.getElementById("instructions_quiz"),
-            Remedial: document.getElementById("instruction_remedial"),
             Test: document.getElementById("instructions_test_phase"),
             Finished: document.getElementById("instructions_finished"),
-        },
-        TextAlternatives: {
-            First_Quiz: document.getElementById("instructions_quiz_text_first_attempt"),
-            Follow_Quiz: document.getElementById("instructions_quiz_text_next_attempts")
         }
     },
     Splashscreen_Fennimal : {
@@ -6794,6 +6380,8 @@ let SVGObjects = {
         Instructions: document.getElementById("Instructions_Layer"),
         Feedback: document.getElementById("Feedback_layer"),
         Item_Bar: document.getElementById("Item_bar_layer"),
+        Item_Bar_rectangle: document.getElementById("item_bar"),
+        Item_Bar_circle: document.getElementById("item_bar_circular"),
         Sky: document.getElementById("Sky_Layer"),
         ObjectiveAchieved : {
             Layer: document.getElementById("Objective_Achieved_Layer"),
@@ -6853,27 +6441,9 @@ EC.showStartScreen()
 //EC.start_targeted_search_subphase()
 //EC.start_delivery_subphase()
 //EC.start_quiz()
-//EC.start_remedial_subphase()
 //EC.start_test_phase()
 //let SS = new FennimalSlideShowGenerator(Stimuli)
 
 
-/*
-let Fennimal  = createFennimal("D","C","red","gold","darkred")
-SVGObjects.Layers.Stage.style.display = "inherit"
-console.log(SVGObjects.Layers.Stage)
 
 
-SVGObjects.Layers.Stage.appendChild(Fennimal)
-Fennimal.style.transform = "scale(0.5,0.5)"
-console.log(Fennimal)
-
-SVGObjects.Layers.Stage.appendChild(createFennimalOutline("H","H"))
-
-
- */
-
-//TODO
-// Test phase item text
-// Change X - coords (future)
-// Fix flashing light at test

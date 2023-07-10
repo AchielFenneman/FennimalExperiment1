@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Title</title>
+    <title>Become an Expert Wildlife Ranger</title>
     <style>
         /* General */
         body{
@@ -13,7 +13,8 @@
         svg{
             user-select: none;
             width: 100%;
-            height: 100%
+            height: 100%;
+            background-color: dimgray;
         }
         /* INSTRUCTIONS */
         #instruction_cursor_travel {animation: instruction_cursor_travel_move 5s linear infinite;}
@@ -134,7 +135,7 @@
             transition: all 1s ease-in-out;
         }
         .instructions_exploration_target_box rect {
-           fill: whitesmoke;
+            fill: whitesmoke;
         }
         .instructions_exploration_target_box text {
             fill: gray;
@@ -225,13 +226,14 @@
             display: none
         }
         .Fennimal_outline {
-            transition: all 1s ease
+            transition: all 1s ease;
+            display: none;
         }
         #Fennimals_Mask_Layer{
             transition: all 1s ease
         }
         #mask_Fennimals {
-            opacity: 0;
+            opacity: 0.7;
             transition: all 1s ease;
 
         }
@@ -274,9 +276,8 @@
         #item_bar {
             display: none;
         }
-        .Fennimal_outline {
-            display: none;
-            stroke: transparent;
+        #item_bar_circular {
+            display: none
         }
         .Fennimal_droptarget {
             stroke-dasharray: 50;
@@ -482,7 +483,7 @@
         .instruction_title {
             text-anchor: middle;
             dominant-baseline: middle;
-            font-size: 30px;
+            font-size: 20px;
             font-weight: bold;
             fill: black;
         }
@@ -518,6 +519,32 @@
         }
 
 
+        .hidden_element {
+            display: none;
+        }
+        #open_backpack_icon {
+            display: none
+        }
+        #open_backpack_icon_center  {
+            cursor: pointer
+
+        }
+        #open_backpack_icon_circle {
+            stroke-width: 5px;
+            animation: highlighted_arrow 2s ease-in-out infinite alternate-reverse;
+        }
+        #open_backpack_icon .open_backpack_icon_text {
+            animation: highlighted_arrow 2s ease-in-out infinite alternate-reverse;
+        }
+        #open_backpack_icon_icon {
+            animation: black_and_white_text 2s ease-in-out infinite alternate-reverse;
+        }
+        #click_here_button:hover text {
+            fill:white
+        }
+
+
+
 
     </style>
     <link href="https://fonts.cdnfonts.com/css/myriad-pro" rel="stylesheet">
@@ -533,6 +560,7 @@
         <input type="hidden" name="accessKey" value="2c6330f1-699e-47a9-9391-207212a0a937"> <!-- Required -->
         <textarea name="message" id='data_form_field'></textarea> <!-- Optional -->
         <input type="text" name="honeypot" style="display: none;"> <!-- Optional -->
+
 
         <!-- If you want form to redirect to a specific url after submission -->
         <input id="submitbutton" type="submit" value="Submit" />
