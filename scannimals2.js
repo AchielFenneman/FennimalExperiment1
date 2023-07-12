@@ -1505,7 +1505,7 @@ PARAMETERS = function() {
     }
 
     //Set to TRUE if this experiment is hosted in Mturk (makes some changes to the instructions and submission page
-    this.ExperimentOnMturk = true
+    this.ExperimentOnMturk = false
 
     this.MturkPaymentSettings = {
         base_reward: 2.50,
@@ -1939,7 +1939,6 @@ LocationController = function(ExpCont){
 
     //Go to a specified location. Call with a string denoting the name of the location, and a zoom depth.
     function go_to_location(name, arriving_from_terminal_location){
-        console.log("Entering location " + name + ". From terminal location " + arriving_from_terminal_location )
         //While we are in transit, block the showing of location arrows
         available_to_show_location_arrows_flag = false
         currently_moving_to_location_flag = true
@@ -2017,7 +2016,7 @@ LocationController = function(ExpCont){
 
         //On the first location, show a hint on how to use the arrows
         if(IngameHintsGiven.location_arrow_first_click === false){
-            show_ingame_hint((508-298)/2,5,298,90,"You can travel within a region of Fenneland by clicking on the highlighted buttons. <br> The map icon at the bottom of the screen returns you to the main map.")
+            show_ingame_hint((508-298)/2,5,350,120,"You can travel within a region of Fenneland by clicking on the highlighted buttons. <br> The map icon at the bottom of the screen returns you to the main map.")
             IngameHintsGiven.location_arrow_first_click = true
         }
 
@@ -2047,7 +2046,6 @@ LocationController = function(ExpCont){
 
     //Animates the transfer across a location, ending at the last zoom level (11). Then shows all arrows in the provided array (should contain DOM element references)
     function animate_movement_through_location(LocationSVGObject, CurrentLocationData){
-        console.log("Moving through location")
         //Resetting location if needed
         LocationSVGObject.style.transition = ""
         LocationSVGObject.style.transform = "scale(1,1)"
@@ -2525,8 +2523,10 @@ Flashlight_Controller = function(FennimalObj,LocCont, ExpCont){
     let no_fennimal_hint_shown = false
 
     function try_first_use_hint(){
-        show_ingame_hint((508-400)/2,35,400,175,"A flashlight icon will automatically appear in some locations. These locations may contain a Fennimal. <br> <br> You can search for Fennimals by holding down the flashlight icon and dragging the light across the screen")
-        IngameHintsGiven.flashlight_first_use = true
+        if(!IngameHintsGiven.flashlight_first_use){
+            show_ingame_hint((508-400)/2,35,400,175,"A flashlight icon will automatically appear in some locations. These locations may contain a Fennimal. <br> <br> You can search for Fennimals by holding down the flashlight icon and dragging the light across the screen")
+            IngameHintsGiven.flashlight_first_use = true
+        }
     }
 
     if(!IngameHintsGiven.flashlight_first_use){
@@ -2607,7 +2607,6 @@ TrainingPhaseFennimalController = function(FennimalObj, ItemDetails, ItemAvailab
 //Displays all items as available. Assumes that the FennimalObj.item codes for the correct item and gives feedback accordingly
 QuizFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCont){
     let that = this
-    console.log(FennimalObj.item)
 
     //Remove any existing Fennimals on the screen
     document.getElementById("Fennimal_Container").innerHTML = ""
@@ -3717,12 +3716,12 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
         Text2.style.fontSize = "15px"
         Container.appendChild(Text2)
 
-        let Text3 = createTextField(30, 120, 508-2*30,250, "On windows you can exit (and re-enter) full-screen mode at any time by pressing [F11]. On Mac, you and ander and leave full-screen mode at any time by pressing [Command]+[Cntrl]+[F].")
+        let Text3 = createTextField(30, 120, 508-2*30,250, "On windows you can exit (and re-enter) full-screen mode at any time by pressing [F11]. On Mac, you can enter and leave full-screen mode at any time by pressing [Command]+[Cntrl]+[F].")
         Text3.style.textAlign = "center"
         Text3.style.fontSize = "15px"
         Container.appendChild(Text3)
 
-        let Text4 = createTextField(30, 180, 508-2*30,250, "<i>Important note: this experiment is only supported for Chrome. Using any other browsers may result in unforseen errors! </i>")
+        let Text4 = createTextField(30, 180, 508-2*30,250, "<i>Important note: this experiment is only supported for Chrome. Using any other browsers may result in unforeseen errors! </i>")
         Text4.style.textAlign = "center"
         Text4.style.fontSize = "15px"
         Container.appendChild(Text4)
@@ -3747,23 +3746,23 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
             Container.appendChild(createInstructionTitleElem("INSTRUCTIONS FOR THIS HIT"))
             Container.appendChild(createTextField(30, 35, 508-2*30,250, "In this HIT you will be a participant in an experiment conducted at the University of Vienna. At no point during this HIT will we provide deceiving of erroneous information to you. <br>" +
                 "<br>" +
-                "This HIT is expected to last around 30-40 minutes. For your particpation, you will earn a fixed fee of $" + Param.MturkPaymentSettings.base_reward.toFixed(2) + ". In addition, based on your decisions in the last part of the experiment you can earn of to five stars for your performance. You will earn a bonus of $" + Param.MturkPaymentSettings.bonus_per_star + " per star that you obtain. <br>" +
+                "This HIT is expected to last around 30-40 minutes. For your particpation, you will earn a fixed fee of $" + Param.MturkPaymentSettings.base_reward.toFixed(2) + ". In addition, based on your decisions in the last part of the experiment you can earn up to five stars for your performance. You will earn a bonus of $" + Param.MturkPaymentSettings.bonus_per_star + " per star that you obtain. <br>" +
                 "<br>" +
-                "All the answers and data that you provide are completely anonymous. You will only be known to use via your Mturk Worker ID. We will not store or record any personally identifiable information at any point during the experiment. Your anonymized data will be exclusively used for research-related goals. Your data will be archived and may be shared with other research in the future. <br>" +
+                "All the answers and data that you provide are completely anonymous. You will only be known to us via your Mturk Worker ID. We will not store or record any personally identifiable information at any point during the experiment. Your anonymized data will be exclusively used for research-related goals. Your data will be archived and may be shared with other researchers in the future. <br>" +
                 "<br>" +
-                "By clicking on the button below you state that you are about the ago of 18 and consent to the terms outlined above. <br>" +
+                "By clicking on the button below you state that you are above the age of 18 and consent to the terms outlined above. <br>" +
                 "<br>" +
-                "Note: this HIT is only supported for Chrome. It is not recommended that you use any other browsers when completing this HIT, as unforseen bugs may prevent you from completing the experiment. "))
+                "Note: this HIT is only supported for Chrome. It is not recommended that you use any other browsers when completing this HIT, as unforeseen bugs may prevent you from completing the experiment. "))
 
         }else{
             Container.appendChild(createInstructionTitleElem("INSTRUCTIONS FOR THIS EXPERIMENT"))
             Container.appendChild(createTextField(30, 35, 508-2*30,250, "In this experiment you will be a participant in an experiment conducted at the University of Vienna. At no point during this experiment will we provide deceiving of erroneous information to you. <br>" +
                 "<br>" +
-                "This experiment is expected to last around 30-40 minutes. All the answers and data that you provide are completely anonymous. We will not store or record any personally identifiable information at any point during the experiment. Your anonymized data will be exclusively used for research-related goals. Your data will be archived and may be shared with other research in the future. <br>" +
+                "This experiment is expected to last around 30-40 minutes. All the answers and data that you provide are completely anonymous. We will not store or record any personally identifiable information at any point during the experiment. Your anonymized data will be exclusively used for research-related goals. Your data will be archived and may be shared with other researchers in the future. <br>" +
                 "<br>" +
-                "By clicking on the button below you state that you are about the ago of 18 and consent to the terms outlined above. <br>" +
+                "By clicking on the button below you state that you are above the age of 18 and consent to the terms outlined above. <br>" +
                 "<br>" +
-                "Note: this experiment is only supported for Chrome. It is not recommended that you use any other browsers when completing this experiment, as unforseen bugs may prevent you from completing the experiment. "))
+                "Note: this experiment is only supported for Chrome. It is not recommended that you use any other browsers when completing this experiment, as unforeseen bugs may prevent you from completing the experiment. "))
 
         }
 
@@ -4021,7 +4020,6 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
 
     //Call to show the exploration instructions, assuming that the exploration phase has been started
     function showExplorationPage(){
-        console.log("exploration page")
         //Show only the correct page (and the layer)
         hide_all_instruction_pages()
         SVGObjects.Instructions.Layer.style.display = "inherit"
@@ -4070,7 +4068,6 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
 
     //Call when the exploration phase is completed to show the all the found locations and Fennimals. Assumes that the exploration phase has been started
     this.showExplorationCompletedPage = function(ContinueButtonFunc){
-        console.log("exploration page complete")
         //Show only the correct page (and the layer)
         hide_all_instruction_pages()
         SVGObjects.Instructions.Layer.style.display = "inherit"
@@ -4654,15 +4651,8 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
         let TextAreaObj = document.createElement('textarea');
         TextAreaObj.cols = 80;
         TextAreaObj.rows = 40;
-        TextAreaObj.style.width = "95%"
-        TextAreaObj.style.height = "95%"
-        TextAreaObj.style.pointerEvents = "auto"
-        TextAreaObj.style.fontSize = "13px"
-        TextAreaObj.style.resize = "none"
-        TextAreaObj.style.border = "1px solid black"
-        TextAreaObj.style.borderRadius = "5px"
-        TextAreaObj.style.fontFamily = "Myriad Pro"
-        TextAreaObj.style.padding = "1%"
+        TextAreaObj.id = "open_question_area"
+
         TextBoxContainer.appendChild(TextAreaObj)
 
         //The text area is not part of the hidden form, so to preserve the data we need to transfer it
@@ -4731,9 +4721,9 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
         Container.appendChild(createInstructionTitleElem("EXPERIMENT COMPLETED!"))
 
         if(Param.ExperimentOnMturk){
-            let MturkTokenField = createTextField(30, 60, 508-2*30,200, "You have now completed the HIT. <b>DO NOT LEAVE THIS PAGE YET </b>. <br><br>" +
-                "You earned $" + Param.MturkPaymentSettings.base_reward + " for completing the experiment, as well as a bonus of $" +
-                + Param.MturkPaymentSettings.bonus_per_star+" per star, leading to a total earnings of $ " + ScoreObject.USD_reward + " <br><br> Your participation Token is <b><u>" + ScoreObject.token + "</b></u> . " +
+            let MturkTokenField = createTextField(30, 60, 508-2*30,200, "You have now completed the HIT. Please press [ESC] or [F11] in Windows or [Command]+[Cntrl]+[F] in Mac to leave full-screen mode. <b>DO NOT LEAVE THIS PAGE YET</b>. <br><br>" +
+                "You earned $" + Param.MturkPaymentSettings.base_reward.toFixed(2) + " for completing the experiment, as well as a bonus of $" +
+                + Param.MturkPaymentSettings.bonus_per_star.toFixed(2)+" per star, leading to a total earnings of $" + ScoreObject.USD_reward.toFixed(2) + " <br><br> Your participation Token is <b><u>" + ScoreObject.token + "</b></u> . " +
                 "<br><br>" +
                 "Please go to the MTURK assignment page now and submit this Token. " +
                 "Then come back to this page and press the button below. <br><br><b> We can only pay you for your performance if you submitted the Token AND submitted this page! </b>")
@@ -4741,7 +4731,7 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
         }else{
             Container.appendChild(createTextField(30, 40, 508-2*30,30, "Congratulations! You are now an Expert Wildlife Ranger and your time in Fenneland has come to an end. "))
 
-            let DownloadTextField = createTextField(30, 70, 508-2*30,100, "<i><b>DO NOT YET LEAVE THIS PAGE </b>. In order to finish the experiment and submit your data, please press the button below. </i>")
+            let DownloadTextField = createTextField(30, 70, 508-2*30,100, "You have now completed the HIT. Please press [ESC] or [F11] in Windows or [Command]+[Cntrl]+[F] in Mac to leave full-screen mode. <i><b>DO NOT YET LEAVE THIS PAGE </b>. In order to finish the experiment and submit your data, please press the button below. </i>")
             DownloadTextField.style.textAlign = "center"
             Container.appendChild(DownloadTextField)
         }
@@ -4800,7 +4790,6 @@ TopLayerMaskController = function(_outputfunction, direction, text){
 
     let TextObj = document.getElementById("mask_text")
     let BackgroundObj = document.getElementById("mask_background")
-    console.log(BackgroundObj)
 
     //Show the top-level mask, but make sure all elements are hidden
     TextObj.childNodes[0].innerHTML = text
@@ -5048,19 +5037,17 @@ DataController = function(participant_number, Stimuli){
     let open_question_answer
     this.update_open_question_answer = function (text){
         open_question_answer = text
-        console.log(text)
     }
 
     let colorblindness
     this.update_color_blindness_answer = function(ans){
         colorblindness = ans
-        console.log(ans)
     }
 
     //Call to submit the hidden form with the subject's data
     this.submitDataForm = function(){
         //Downloading hard copy
-        downloadObjectAsJson(Data, "data participant "+ participant_number + ".json")
+        // downloadObjectAsJson(Data, "data participant "+ participant_number + ".json")
 
         console.log(Data)
         console.log(optimize_data())
@@ -5387,6 +5374,7 @@ ExperimentController = function(Stimuli, DataController){
                     HUDCont.update_HUD_delivery(current_item_in_inventory, Stimuli.getItemDetails()[current_item_in_inventory].backgroundColor)
                     break
                 }
+                case("targeted_search"): HUDCont.changeHUD(false); break;
             }
 
         }
@@ -5511,7 +5499,6 @@ ExperimentController = function(Stimuli, DataController){
         if(current_training_subphase !== "exploration"){
             current_training_subphase = "exploration"
             Exploration_Phase_Location_Visited_Sequence = []
-            console.log("starting exploration phase")
 
             //Resettting trackers and counters
             Fennimal_found_number = 0
@@ -5594,6 +5581,7 @@ ExperimentController = function(Stimuli, DataController){
     this.start_targeted_search_subphase = function(){
         //Reset the state of the world
         clearFennimalsFromMap()
+        HUDCont.changeHUD(false)
 
         //Close any open Fennimal interactions
         that.location_left()
@@ -5637,8 +5625,6 @@ ExperimentController = function(Stimuli, DataController){
 
             //Keep track of which locations are visited
             Search_Trial_Locations_Visited = []
-
-            console.log(CurrentSearchTrial.Fennimal.location)
 
         }else{
             search_subphase_completed()
@@ -5725,7 +5711,6 @@ ExperimentController = function(Stimuli, DataController){
 
             //Add or reset this Fennimal in the world
             FennimalsPresentOnMap[CurrentDeliveryTrial.Fennimal.location] = CurrentDeliveryTrial.Fennimal
-            console.log(CurrentDeliveryTrial.Fennimal.location, CurrentDeliveryTrial.Fennimal.item)
 
             //Show the instructions screen.
             InstrCont.showDeliveryInstructions(CurrentDeliveryTrial.Fennimal, CurrentDeliveryTrial.hint_type, Stimuli.getItemDetails())
@@ -5910,8 +5895,6 @@ ExperimentController = function(Stimuli, DataController){
         InstrCont.show_score_screen(DataCont.get_score(), DataCont.submitDataForm)
     }
 
-
-    // InstrCont.show_score_screen(DataCont.get_score(), DataCont.submitDataForm)
 }
 
 //Create this object to generate and store all the different Fennimals encountered for a participant number.
@@ -6250,11 +6233,11 @@ let Instructions = {
     Training_Phase: {
         Exploration: {
             title: "EXPLORING THE ISLAND",
-            text_top: "Hello Trainnee, and welcome to the start of your training. To get you started, let's first explore the island. " +
+            text_top: "Hello Trainee, and welcome to your training. To get you started, let's first explore the island. " +
                 "There are 16 locations for you to discover. " +
                 "While you're out there, there are a number of Fennimals you need to be introduced to. " +
                 "Please find and interact with all of the Fennimals on the list below. You can visit all locations and Fennimals in any order.",
-            text_bottom: "Click the continue button to start your training in Fenneland. You can always return to this screen by moving back to the center of the map by pressing on the Home (H) icon. "
+            text_bottom: "Click the continue button to start your training in Fenneland. You can always return to this screen by moving back to the center of the map through pressing on the Home (H) icon. "
         },
         Exploration_Completed: {
             title: "EXPLORATION COMPLETE",
@@ -6277,7 +6260,7 @@ let Instructions = {
                 "Your job is to give each Fennimal the toy that it previously liked. <br>" +
                 "<br>" +
                 "You pass the exam if you select all the correct toys. <br>" +
-                "However, if you make any mistakes during the exam then you will need to go through another round of instrcutions before you can take another shot at the exam. " +
+                "However, if you make any mistakes during the exam then you will visit all the Fennimals one more time before you can take another shot at the exam. " +
                 "Don't worry if that happens, you can try the exam as many times as needed. <br><br>" +
                 "Click on the button below to start the exam. "
         },
@@ -6445,5 +6428,10 @@ EC.showStartScreen()
 //let SS = new FennimalSlideShowGenerator(Stimuli)
 
 
+//Typoes
+// Font
+// Check alert
+// HUD
+// Console statements
 
 
