@@ -4529,8 +4529,7 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
 
         Container.appendChild(createBackgroundElem())
         Container.appendChild(createInstructionTitleElem(Instructions.Test_Phase.Direct.title))
-        let TextField = createTextField(30, 30, 508-2*30,200, Instructions.Test_Phase.Direct.text)
-        TextField.style.fontSize = "13px"
+        let TextField = createTextField(30, 20, 508-2*30,220, Instructions.Test_Phase.Direct.text)
         Container.appendChild(TextField)
 
         setTimeout(function(){
@@ -6419,12 +6418,12 @@ let SVGObjects = {
 let DataCont = new DataController(participant_number, Stimuli)
 
 let EC = new ExperimentController(Stimuli, DataCont)
-EC.showStartScreen()
+//EC.showStartScreen()
 //EC.show_starting_instructions()
 //EC.start_targeted_search_subphase()
 //EC.start_delivery_subphase()
 //EC.start_quiz()
-//EC.start_test_phase()
+EC.start_test_phase()
 //let SS = new FennimalSlideShowGenerator(Stimuli)
 
 
