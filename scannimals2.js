@@ -2775,7 +2775,7 @@ TestPhaseFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCon
 
         //ANIMATE NO FEEDBACK
         if(!FennimalObj.feedback){
-            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "The " + FennimalObj.name + " takes the toy to its home for further inspection"
+            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "The " + FennimalObj.name + " takes the toy to its home"
 
             //Animate the Fennimal and the item disappearing
             setTimeout(function(){
@@ -6418,19 +6418,13 @@ let SVGObjects = {
 let DataCont = new DataController(participant_number, Stimuli)
 
 let EC = new ExperimentController(Stimuli, DataCont)
-//EC.showStartScreen()
+EC.showStartScreen()
 //EC.show_starting_instructions()
 //EC.start_targeted_search_subphase()
 //EC.start_delivery_subphase()
 //EC.start_quiz()
-EC.start_test_phase()
+//EC.start_test_phase()
 //let SS = new FennimalSlideShowGenerator(Stimuli)
 
-
-//Typoes
-// Font
-// Check alert
-// HUD
-// Console statements
 
 
