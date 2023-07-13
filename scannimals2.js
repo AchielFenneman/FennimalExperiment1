@@ -685,7 +685,7 @@ STIMULUSDATA = function(participant_number){
         number: 1
     },{
         Trials: Block_2,
-        type: "direct",
+        type: "indirect",
         number: 2
     },{
         Trials: Block_3,
@@ -697,7 +697,7 @@ STIMULUSDATA = function(participant_number){
         number: 4
     },{
         Trials: Block_5,
-        type: "direct",
+        type: "indirect",
         number: 5
     }]
 
@@ -767,6 +767,8 @@ STIMULUSDATA = function(participant_number){
     this.getTestPhaseData = function(){
         return(JSON.parse(JSON.stringify(TestPhaseData)))
     }
+
+    console.log(TestPhaseData)
 
 
 }
@@ -4547,8 +4549,7 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
 
         Container.appendChild(createBackgroundElem())
         Container.appendChild(createInstructionTitleElem(Instructions.Test_Phase.Indirect.title))
-        let TextField = createTextField(30, 30, 508-2*30,200, Instructions.Test_Phase.Indirect.text)
-        TextField.style.fontSize = "13px"
+        let TextField = createTextField(30, 15, 508-2*30,220, Instructions.Test_Phase.Indirect.text)
         Container.appendChild(TextField)
 
         setTimeout(function(){
@@ -4689,15 +4690,15 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
         let Button_IDK = createSVGButtonElem((508-410)/2 + 300,200,120,30,"Don't know")
 
         Button_Yes.onclick = function(){
-            DataCont.update_open_question_answer("Y")
+            DataCont.update_color_blindness_answer("Y")
             that.show_submission_screen(ScoreObject, datasubmissionfunc)
         }
         Button_No.onclick = function(){
-            DataCont.update_open_question_answer("N")
+            DataCont.update_color_blindness_answer("N")
             that.show_submission_screen(ScoreObject, datasubmissionfunc)
         }
         Button_IDK.onclick = function(){
-            DataCont.update_open_question_answer("IDK")
+            DataCont.update_color_blindness_answer("IDK")
             that.show_submission_screen(ScoreObject, datasubmissionfunc)
         }
 
@@ -5894,6 +5895,8 @@ ExperimentController = function(Stimuli, DataController){
         InstrCont.show_score_screen(DataCont.get_score(), DataCont.submitDataForm)
     }
 
+    //experiment_complete()
+
 }
 
 //Create this object to generate and store all the different Fennimals encountered for a participant number.
@@ -6305,9 +6308,9 @@ let Instructions = {
         Indirect: {
             title: "NEW FENNIMALS HAVE BEEN SPOTTED!",
             text: "<br><br> The new group of Fennimals are back again! It seems that today they are a bit more shy than yesterday though. " +
-                "After you give them a toy, the Fennimals will return to their homes and inspect the toys there. You won't learn whether or not they liked the toys you gave them until the end of this experiment.  <br>" +
+                "After you give them a toy, the Fennimals will return to their homes and inspect the toys there. <u>You won't learn whether or not they liked the toys you gave them until the end of this experiment. </u>  <br>" +
                 "<br>" +
-                "Just as yesterday, <b> you can apply your previously learned knowledge to select a fitting toy for these Fennimals.</b> <br>" +
+                "Just as yesterday, <u> you can apply your previously learned knowledge to select a fitting toy for these Fennimals.</u> <br>" +
                 "<br>" +
                 "Unfortunately, your Junior Assistant is still learning to get the hang of things and has again forgotten to bring some of the toys in the car. You will have to make do with whatever toys are available.<br>" +
                 "<br>" +
