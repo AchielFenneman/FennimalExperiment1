@@ -6429,5 +6429,5 @@ EC.showStartScreen()
 //EC.start_test_phase()
 //let SS = new FennimalSlideShowGenerator(Stimuli)
 
-
+console.log("Version: 13.07.23")
 
