@@ -1507,10 +1507,10 @@ PARAMETERS = function() {
     }
 
     //Set to TRUE if this experiment is hosted in Mturk (makes some changes to the instructions and submission page
-    this.ExperimentOnMturk = false
+    this.ExperimentOnMturk = true
 
     this.MturkPaymentSettings = {
-        base_reward: 2.50,
+        base_reward: 4,
         bonus_per_star: 0.75
     }
 
@@ -4721,9 +4721,10 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
         Container.appendChild(createInstructionTitleElem("EXPERIMENT COMPLETED!"))
 
         if(Param.ExperimentOnMturk){
-            let MturkTokenField = createTextField(30, 60, 508-2*30,200, "You have now completed the HIT. Please press [ESC] or [F11] in Windows or [Command]+[Cntrl]+[F] in Mac to leave full-screen mode. <b>DO NOT LEAVE THIS PAGE YET</b>. <br><br>" +
+            console.log(ScoreObject)
+            let MturkTokenField = createTextField(30, 60, 508-2*30,200, "You have now completed the HIT. Please press [ESC] or [F11] in Windows or [Command]+[Cntrl]+[F] in Mac to leave full-screen mode. <b>DO NOT LEAVE THIS PAGE YET AND DO NOT CLICK THE BUTTON BELOW BEFORE SUBMITTING YOUR TOKEN TO MTURK!</b>. <br><br>" +
                 "You earned $" + Param.MturkPaymentSettings.base_reward.toFixed(2) + " for completing the experiment, as well as a bonus of $" +
-                + Param.MturkPaymentSettings.bonus_per_star.toFixed(2)+" per star, leading to a total earnings of $" + ScoreObject.USD_reward.toFixed(2) + " <br><br> Your participation Token is <b><u>" + ScoreObject.token + "</b></u> . " +
+                + Param.MturkPaymentSettings.bonus_per_star.toFixed(2)+" per star, leading to a total earnings of $" + ScoreObject.USD_reward + " <br><br> Your participation Token is <b><u>" + ScoreObject.token + "</b></u> . " +
                 "<br><br>" +
                 "Please go to the MTURK assignment page now and submit this Token. " +
                 "Then come back to this page and press the button below. <br><br><b> We can only pay you for your performance if you submitted the Token AND submitted this page! </b>")
@@ -6429,5 +6430,6 @@ EC.showStartScreen()
 //EC.start_test_phase()
 //let SS = new FennimalSlideShowGenerator(Stimuli)
 
-console.log("Version: 13.07.23")
 
+
+console.log("Version: 19.08.23")
