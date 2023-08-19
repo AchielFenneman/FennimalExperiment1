@@ -5023,6 +5023,7 @@ DataController = function(participant_number, Stimuli){
         if(percentage > .60){ star_rating = 5}
 
         //Calculating USD reward (if given)
+        let USDBonus =  (star_rating * Param.MturkPaymentSettings.bonus_per_star).toFixed(2)
         let USDReward = (Param.MturkPaymentSettings.base_reward + star_rating * Param.MturkPaymentSettings.bonus_per_star).toFixed(2)
 
         return({
@@ -5030,7 +5031,7 @@ DataController = function(participant_number, Stimuli){
             num_liked_item: liked,
             star_rating: star_rating,
             USD_reward: USDReward,
-            token: participant_number + "T" + USDReward
+            token: participant_number + "W"+ star_rating + "T" + USDBonus
         })
     }
 
@@ -6432,4 +6433,4 @@ EC.showStartScreen()
 
 
 
-console.log("Version: 19.08.23")
+console.log("Version: 19.08.23 B")
