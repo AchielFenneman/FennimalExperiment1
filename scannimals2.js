@@ -5070,10 +5070,10 @@ DataController = function(seed_number, Stimuli){
         let percentage = liked / total
 
         let star_rating = 1
-        if(percentage > .20){ star_rating = 2}
-        if(percentage > .40){ star_rating = 3}
-        if(percentage > .50){ star_rating = 4}
-        if(percentage > .60){ star_rating = 5}
+        if(percentage > .30){ star_rating = 2}
+        if(percentage > .50){ star_rating = 3}
+        if(percentage > .70){ star_rating = 4}
+        if(percentage > .90){ star_rating = 5}
 
         //Calculating USD reward (if given)
         let bonus =  (star_rating * Param.BonusEarnedPerStar.bonus_per_star).toFixed(2)
@@ -6499,4 +6499,4 @@ EC.showStartScreen()
 
 
 
-console.log("Version: 25.08.23")
+console.log("Version: 25.08.23 B")
