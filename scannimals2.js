@@ -782,7 +782,7 @@ PARAMETERS = function() {
     // MAP PARAMETERS //
     ////////////////////
     //Setting the walking speed in the map. Note that this is the number of ms per step, so a lower number corresponds to a higher walking speed
-    this.walking_interval_time = 1
+    this.walking_interval_time = .1
     this.total_zoom_time = 1500 //in ms
     this.location_movement_transition = ""
 
@@ -1506,12 +1506,13 @@ PARAMETERS = function() {
         return(false)
     }
 
-    //Set to TRUE if this experiment is hosted in Mturk (makes some changes to the instructions and submission page
-    this.ExperimentOnMturk = true
+    //Can be "false" (no mention of recruitment platform in instructions), "mturk" or "prolific"
+    this.ExperimentRecruitmentMethod = "prolific"
 
-    this.MturkPaymentSettings = {
-        base_reward: 4,
-        bonus_per_star: 0.75
+    //The bonus earned per star. If set to false, then no bonus is mentioned throughout the instructions
+    this.BonusEarnedPerStar = {
+        currency_symbol: "$",
+        bonus_per_star: "0.50"
     }
 
 }
@@ -1856,7 +1857,8 @@ LocationController = function(ExpCont){
 
     //Call when the Player Icon has reached the end of a point on the map. Call with string location
     function map_end_of_path_reached(location_string){
-        go_to_location("start_"+ location_string,false)
+        //go_to_location("start_"+ location_string,false)
+        go_to_location("intersection_"+ location_string,false)
 
         //To prevent double-clicks when moving away from the map, hold the currently_moving_to_location flag a bit longer before freeing it up again.
         setTimeout(function(){currently_moving_to_location_flag = false},200)
@@ -2040,8 +2042,8 @@ LocationController = function(ExpCont){
         FlashlightPrompt.getElementsByTagName("text")[0].childNodes[0].style.fill = color_dark
 
         let Feedback_Rect = document.getElementById("prompt_feedback").getElementsByTagName("rect")[0]
-        Feedback_Rect.style.fill = color_light + "AA"
-        Feedback_Rect.style.stroke = color_dark + "DD"
+        Feedback_Rect.style.fill = color_light + "CC"
+        Feedback_Rect.style.stroke = color_dark + "EE"
         document.getElementById("prompt_feedback").getElementsByTagName("text")[0].childNodes[0].style.fill = color_dark
 
     }
@@ -3744,28 +3746,44 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
         SVGObjects.Instructions.Layer.appendChild(Container)
         SVGObjects.Instructions.Layer.style.display = "inherit"
 
-        if(Param.ExperimentOnMturk){
-            Container.appendChild(createInstructionTitleElem("INSTRUCTIONS FOR THIS HIT"))
-            Container.appendChild(createTextField(30, 35, 508-2*30,250, "In this HIT you will be a participant in an experiment conducted at the University of Vienna. At no point during this HIT will we provide deceiving of erroneous information to you. <br>" +
-                "<br>" +
-                "This HIT is expected to last around 30-40 minutes. For your particpation, you will earn a fixed fee of $" + Param.MturkPaymentSettings.base_reward.toFixed(2) + ". In addition, based on your decisions in the last part of the experiment you can earn up to five stars for your performance. You will earn a bonus of $" + Param.MturkPaymentSettings.bonus_per_star + " per star that you obtain. <br>" +
-                "<br>" +
-                "All the answers and data that you provide are completely anonymous. You will only be known to us via your Mturk Worker ID. We will not store or record any personally identifiable information at any point during the experiment. Your anonymized data will be exclusively used for research-related goals. Your data will be archived and may be shared with other researchers in the future. <br>" +
-                "<br>" +
-                "By clicking on the button below you state that you are above the age of 18 and consent to the terms outlined above. <br>" +
-                "<br>" +
-                "Note: this HIT is only supported for Chrome. It is not recommended that you use any other browsers when completing this HIT, as unforeseen bugs may prevent you from completing the experiment. "))
+        switch(Param.ExperimentRecruitmentMethod){
+            case("mturk"):
+                Container.appendChild(createInstructionTitleElem("INSTRUCTIONS FOR THIS HIT"))
+                Container.appendChild(createTextField(30, 35, 508-2*30,250, "In this HIT you will be a participant in an experiment conducted at the University of Vienna. At no point during this HIT will we provide deceiving of erroneous information to you. <br>" +
+                    "<br>" +
+                    "This HIT is expected to last around 30-40 minutes. Based on your decisions in the last part of the experiment you can earn up to five stars for your performance. You will earn a bonus of " + Param.BonusEarnedPerStar.currency_symbol+ Param.BonusEarnedPerStar.bonus_per_star + " per star that you obtain.  <br>" +
+                    "<br>" +
+                    "All the answers and data that you provide are completely anonymous. You will only be known to us via your Mturk Worker ID. We will not store or record any personally identifiable information at any point during the experiment. Your anonymized data will be exclusively used for research-related goals. Your data will be archived and may be shared with other researchers in the future. <br>" +
+                    "<br>" +
+                    "By clicking on the button below you state that you are above the age of 18 and consent to the terms outlined above. <br>" +
+                    "<br>" +
+                    "Note: this HIT is only supported for Chrome. It is not recommended that you use any other browsers when completing this HIT, as unforeseen bugs may prevent you from completing the experiment. "))
 
-        }else{
-            Container.appendChild(createInstructionTitleElem("INSTRUCTIONS FOR THIS EXPERIMENT"))
-            Container.appendChild(createTextField(30, 35, 508-2*30,250, "In this experiment you will be a participant in an experiment conducted at the University of Vienna. At no point during this experiment will we provide deceiving of erroneous information to you. <br>" +
-                "<br>" +
-                "This experiment is expected to last around 30-40 minutes. All the answers and data that you provide are completely anonymous. We will not store or record any personally identifiable information at any point during the experiment. Your anonymized data will be exclusively used for research-related goals. Your data will be archived and may be shared with other researchers in the future. <br>" +
-                "<br>" +
-                "By clicking on the button below you state that you are above the age of 18 and consent to the terms outlined above. <br>" +
-                "<br>" +
-                "Note: this experiment is only supported for Chrome. It is not recommended that you use any other browsers when completing this experiment, as unforeseen bugs may prevent you from completing the experiment. "))
+                break
+            case("prolific"):
+                Container.appendChild(createInstructionTitleElem("INSTRUCTIONS FOR THIS EXPERIMENT"))
+                Container.appendChild(createTextField(30, 35, 508-2*30,250, "In this experiment you will be a participant in an experiment conducted at the University of Vienna. We will not provide any deceiving of erroneous information to you at any point throughout the experiment. <br>" +
+                    "<br>" +
+                    "This experiment is expected to last around 30-40 minutes. Based on your decisions in the last part of the experiment you can earn up to five stars for your performance. You will earn a bonus of " + Param.BonusEarnedPerStar.currency_symbol+ Param.BonusEarnedPerStar.bonus_per_star + " per star that you obtain. <br>" +
+                    "<br>" +
+                    "All the answers and data that you provide are completely anonymous. You will only be known to us via your Prolific ID. We will not store or record any personally identifiable information at any point during the experiment. Your anonymized data will be exclusively used for research-related goals. Your data will be archived and may be shared with other researchers in the future. <br>" +
+                    "<br>" +
+                    "By clicking on the button below you state that you are above the age of 18 and consent to the terms outlined above. <br>" +
+                    "<br>" +
+                    "Note: this experiment is only supported for Chrome. It is not recommended that you use any other browsers, as unforeseen bugs may prevent you from completing the experiment. "))
 
+                break
+            case(false):
+                Container.appendChild(createInstructionTitleElem("INSTRUCTIONS FOR THIS EXPERIMENT"))
+                Container.appendChild(createTextField(30, 35, 508-2*30,250, "In this experiment you will be a participant in an experiment conducted at the University of Vienna. At no point during this experiment will we provide deceiving of erroneous information to you. <br>" +
+                    "<br>" +
+                    "This experiment is expected to last around 30-40 minutes. All the answers and data that you provide are completely anonymous. We will not store or record any personally identifiable information at any point during the experiment. Your anonymized data will be exclusively used for research-related goals. Your data will be archived and may be shared with other researchers in the future. <br>" +
+                    "<br>" +
+                    "By clicking on the button below you state that you are above the age of 18 and consent to the terms outlined above. <br>" +
+                    "<br>" +
+                    "Note: this experiment is only supported for Chrome. It is not recommended that you use any other browsers, as unforeseen bugs may prevent you from completing the experiment. "))
+
+                break
         }
 
 
@@ -4427,9 +4445,10 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
         Container.appendChild(createInstructionTitleElem(Instructions.Test_Phase.Quiz_Passed.title))
 
         let text = Instructions.Test_Phase.Quiz_Passed.textTop
-        if(Param.ExperimentOnMturk){
-            text = text + " You will earn a bonus of $" + Param.MturkPaymentSettings.bonus_per_star + " for each star earned. "
+        if(Param.ExperimentRecruitmentMethod === "mturk" || Param.ExperimentRecruitmentMethod === "prolific"){
+            text = text + " You will earn a bonus of "  + Param.BonusEarnedPerStar.currency_symbol+ Param.BonusEarnedPerStar.bonus_per_star + " for each star earned. "
         }
+
         text = text + "<br><br>" +  Instructions.Test_Phase.Quiz_Passed.textBottom
         Container.appendChild(createTextField(10, 40, 508-2*10,250, text))
 
@@ -4720,21 +4739,38 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
 
         Container.appendChild(createInstructionTitleElem("EXPERIMENT COMPLETED!"))
 
-        if(Param.ExperimentOnMturk){
-            console.log(ScoreObject)
-            let MturkTokenField = createTextField(30, 60, 508-2*30,200, "You have now completed the HIT. Please press [ESC] or [F11] in Windows or [Command]+[Cntrl]+[F] in Mac to leave full-screen mode. <b>DO NOT LEAVE THIS PAGE YET AND DO NOT CLICK THE BUTTON BELOW BEFORE SUBMITTING YOUR TOKEN TO MTURK!</b>. <br><br>" +
-                "You earned $" + Param.MturkPaymentSettings.base_reward.toFixed(2) + " for completing the experiment, as well as a bonus of $" +
-                + Param.MturkPaymentSettings.bonus_per_star.toFixed(2)+" per star, leading to a total earnings of $" + ScoreObject.USD_reward + " <br><br> Your participation Token is <b><u>" + ScoreObject.token + "</b></u> . " +
-                "<br><br>" +
-                "Please go to the MTURK assignment page now and submit this Token. " +
-                "Then come back to this page and press the button below. <br><br><b> We can only pay you for your performance if you submitted the Token AND submitted this page! </b>")
-            Container.appendChild(MturkTokenField)
-        }else{
-            Container.appendChild(createTextField(30, 40, 508-2*30,30, "Congratulations! You are now an Expert Wildlife Ranger and your time in Fenneland has come to an end. "))
+        console.log(ScoreObject)
 
-            let DownloadTextField = createTextField(30, 70, 508-2*30,100, "You have now completed the HIT. Please press [ESC] or [F11] in Windows or [Command]+[Cntrl]+[F] in Mac to leave full-screen mode. <i><b>DO NOT YET LEAVE THIS PAGE </b>. In order to finish the experiment and submit your data, please press the button below. </i>")
-            DownloadTextField.style.textAlign = "center"
-            Container.appendChild(DownloadTextField)
+        switch(Param.ExperimentRecruitmentMethod){
+            case("mturk"):
+                let MturkTokenField = createTextField(30, 60, 508-2*30,200, "You have now completed the HIT. Please press [ESC] or [F11] in Windows or [Command]+[Cntrl]+[F] in Mac to leave full-screen mode. <br>" +
+                    "<br>" +
+                    "<b>DO NOT LEAVE THIS PAGE YET AND DO NOT CLICK THE BUTTON BELOW BEFORE SUBMITTING YOUR TOKEN TO MTURK!</b>. <br><br>" +
+                    "You earned as a bonus of "+  Param.BonusEarnedPerStar.currency_symbol +  Param.BonusEarnedPerStar.bonus_per_star + " per star, resulting in o a total earnings of " + Param.BonusEarnedPerStar.currency_symbol +  ScoreObject.bonus + " <br><br> Your participation Token is <b><u>" + ScoreObject.token + "</b></u> . " +
+                    "<br><br>" +
+                    "Please go to the MTURK assignment page now and submit this Token. " +
+                    "Then come back to this page and press the button below. <br><br><b> We can only pay you for your performance if you submitted both the Token AND submitted this page! </b>")
+                Container.appendChild(MturkTokenField)
+                break
+            case("prolific"):
+                let ProlificTokenField = createTextField(30, 60, 508-2*30,200, "You have now completed the experiment. Please press [ESC] or [F11] in Windows or [Command]+[Cntrl]+[F] in Mac to leave full-screen mode. <br> " +
+                    "<br>" +
+                    "<b>DO NOT LEAVE THIS PAGE YET AND DO NOT CLICK THE BUTTON BELOW BEFORE SUBMITTING YOUR COMPLETION CODE TO PROLIFIC!</b>. <br>" +
+                    "<br>" +
+                    "You earned as a bonus of "+  Param.BonusEarnedPerStar.currency_symbol +  Param.BonusEarnedPerStar.bonus_per_star + " per star, resulting in a total earnings of " + Param.BonusEarnedPerStar.currency_symbol +  ScoreObject.bonus + ". <br>" +
+                    "<br>" +
+                    "The completion code is <b><u>" + ScoreObject.token + "</b></u> . " +
+                    "<br><br>" +
+                    "Please go to the Prolific page now and submit this code. " +
+                    "Then come back to this page and press the button below. <br><br><b> We can only pay you for your performance if you submitted both the code AND submitted this page! </b>")
+                Container.appendChild(ProlificTokenField)
+                break
+            case(false):
+                Container.appendChild(createTextField(30, 40, 508-2*30,30, "Congratulations! You are now an Expert Wildlife Ranger and your time in Fenneland has come to an end. "))
+                let DownloadTextField = createTextField(30, 70, 508-2*30,100, "You have now completed the HIT. Please press [ESC] or [F11] in Windows or [Command]+[Cntrl]+[F] in Mac to leave full-screen mode. <i><b>DO NOT YET LEAVE THIS PAGE </b>. In order to finish the experiment and submit your data, please press the button below. </i>")
+                DownloadTextField.style.textAlign = "center"
+                Container.appendChild(DownloadTextField)
+                break
         }
 
         let DownloadButton = createSVGButtonElem((508-190)/2,245,190,30,"FINISH EXPERIMENT")
@@ -4917,11 +4953,11 @@ HUDController = function(){
 }
 
 // Manages all data that needs to be preserved. Call at the end of the experiment to download / store a JSON containing all subject-relevant data.
-DataController = function(participant_number, Stimuli){
+DataController = function(seed_number, Stimuli){
     let that = this
     //Always store data here as a deep copy!
     let Data = {
-        participant_number: participant_number,
+        seed: seed_number,
         Training_Data: JSON.parse(JSON.stringify(Stimuli.getTrainingSetFennimalsInArray())),
         Targeted_Search: [],
         Delivery: [],
@@ -4930,6 +4966,23 @@ DataController = function(participant_number, Stimuli){
         TestTrials: [],
     }
     let startTime = Date.now()
+
+    //Create a Token / completion code here
+    let cc_word_1 = shuffleArray(["Happy", "Bright", "Clean","Soft", "Funny", "Warm", "Sharp", "Small", "Kind", "Sweet", "Young", "White", "Tall"])[0]
+    let cc_word_2 = shuffleArray(["Cat", "Rabbit", "Owl","Fox","Koala", "Frog", "Shark", "Zebra", "Bat", "Flower", "Panda", "Rose", "Poppy", "Lily", "Tulip"  ])[0]
+    let completion_code = cc_word_1 + cc_word_2
+
+    //If participants are recruited via prolific, then add some additional data
+    if(Param.ExperimentRecruitmentMethod === "prolific"){
+        let url_string = window.location;
+        let url = new URL(url_string);
+        Data.Prolific = {
+            PID: url.searchParams.get("PROLIFIC_PID"),
+            STID: url.searchParams.get("STUDY_ID"),
+            SEID: url.searchParams.get("SESSION_ID"),
+        }
+        console.log(Data.Prolific)
+    }
 
     function downloadObjectAsJson(exportObj, exportName){
         var dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj));
@@ -4942,7 +4995,7 @@ DataController = function(participant_number, Stimuli){
     }
 
     this.force_download = function(){
-        downloadObjectAsJson(Data, "data participant "+ participant_number + ".json")
+        downloadObjectAsJson(Data, "data participant "+ seed_number + ".json")
     }
 
     this.getDataString = function(){
@@ -5007,7 +5060,7 @@ DataController = function(participant_number, Stimuli){
         Data.experiment_time =  Date.now() - startTime
     }
 
-    //Call after experiment is completed to return the subject's score. Score is an object containing "total_number_of_Fennimals_in_test_phase" (int), "test_phase_Fennimals_who_liked_item" (int) and "star rating" (int, out of 5) and a Token (for Mturk)
+    //Call after experiment is completed to return the subject's score. Also updates the completion code to include the star rating
     this.get_score = function(){
         let total = 0, liked = 0
         for(let i =0;i<Data.TestTrials.length;i++){
@@ -5023,15 +5076,17 @@ DataController = function(participant_number, Stimuli){
         if(percentage > .60){ star_rating = 5}
 
         //Calculating USD reward (if given)
-        let USDBonus =  (star_rating * Param.MturkPaymentSettings.bonus_per_star).toFixed(2)
-        let USDReward = (Param.MturkPaymentSettings.base_reward + star_rating * Param.MturkPaymentSettings.bonus_per_star).toFixed(2)
+        let bonus =  (star_rating * Param.BonusEarnedPerStar.bonus_per_star).toFixed(2)
+
+        //Updating the completion code
+        completion_code = cc_word_1 + cc_word_2 + star_rating
 
         return({
             num_total_Fennimals: total,
             num_liked_item: liked,
             star_rating: star_rating,
-            USD_reward: USDReward,
-            token: participant_number + "W"+ star_rating + "T" + USDBonus
+            token: completion_code,
+            bonus: bonus
         })
     }
 
@@ -5054,15 +5109,23 @@ DataController = function(participant_number, Stimuli){
         console.log(Data)
         console.log(optimize_data())
 
+
         //Populating the form
         document.getElementById("data_form_field").innerHTML = JSON.stringify(optimize_data())
 
         //Give some feedback to the participant
         let alertmessage
-        if(Param.ExperimentOnMturk){
-            alertmessage = "You are now submitting this page. After submitting you will not be able to go back. If you did not yet submit your token on MTURK, then please do so now! Your token is: " + that.get_score().token
-        }else {
-            alertmessage = "Experiment completed, thanks for participating!"
+        switch(Param.ExperimentRecruitmentMethod){
+            case("mturk"):
+                alertmessage = "You are now submitting this page. After submitting you will not be able to go back. If you did not yet submit your token on MTURK, then please do so now! Your token is: " + completion_code
+                break
+            case("prolific"):
+                alertmessage = "You are now submitting this page. After submitting you will not be able to go back. If you did not yet submit the completion code on Prolific, then please do so now! The completion code is: " + completion_code
+                break;
+            case(false):
+                alertmessage = "Experiment completed, thanks for participating!"
+                break
+
         }
         alert(alertmessage)
 
@@ -5211,9 +5274,10 @@ DataController = function(participant_number, Stimuli){
             })
         }
 
-        return({
+        let ReturnData = {
             Exptime: Data.experiment_time,
-            Part_ID: Data.participant_number,
+            Seed: Data.seed,
+            Token: completion_code,
             Train_Stim: Stimuli.getTrainingSetFennimalsInArray(),
             Test_Stim: Stimuli.getTestSetFennimalsInArray(),
             Expl: {
@@ -5226,8 +5290,10 @@ DataController = function(participant_number, Stimuli){
             Test: OptTestData,
             open: open_question_answer,
             c_blind: colorblindness
-        })
+        }
 
+        if(Param.ExperimentRecruitmentMethod === "prolific"){ ReturnData.Prlfc = Data.Prolific}
+        return(ReturnData)
     }
 
 }
@@ -6433,4 +6499,4 @@ EC.showStartScreen()
 
 
 
-console.log("Version: 19.08.23 B")
+console.log("Version: 25.08.23")
