@@ -373,7 +373,7 @@ function createFennimal(FennimalObj){
     HeadObj.style.transform = "scale(1.25)"
 
     BodyObj.style.transformOrigin = "50% 10%"
-    BodyObj.style.transform = "scale(0.9)"
+    BodyObj.style.transform = "scale(1.1)"
 
     // Returns SVG layer
     return(Container)
@@ -472,7 +472,7 @@ STIMULUSDATA = function(participant_number){
     for(let pair_num = 0; pair_num < Stimuli_Pairs.length; pair_num++){
         let pairtype = Stimuli_Pairs[pair_num]
         let region_A, region_B, location_A, location_B,
-            Colorscheme_A, Colorscheme_B,
+            Colorscheme_A_head, Colorscheme_B_head,Colorscheme_A_body, Colorscheme_B_body,
             head_A, head_B, body_A, body_B,
             name_A, name_B,
             item_A, item_B,
@@ -512,8 +512,15 @@ STIMULUSDATA = function(participant_number){
             body_B = Available_Bodies.splice(0,1)[0]
         }
 
-        Colorscheme_A = Param.RegionData[region_A].Fennimal_location_colors
-        Colorscheme_B = Param.RegionData[region_B].Fennimal_location_colors
+        Colorscheme_A_head = Param.RegionData[region_A].Fennimal_location_colors
+        Colorscheme_B_head = Param.RegionData[region_B].Fennimal_location_colors
+        Colorscheme_A_body= JSON.parse(JSON.stringify(Param.RegionData[region_A].Fennimal_location_colors))
+        Colorscheme_B_body =JSON.parse(JSON.stringify(Param.RegionData[region_B].Fennimal_location_colors))
+
+        if(pairtype === "matched"){
+            Colorscheme_A_body.tertiary_color = Param.RegionData[region_A].contrast_color
+            Colorscheme_B_body.tertiary_color = Param.RegionData[region_B].contrast_color
+        }
 
         // Setting items for both Fennimals
         item_A = Random_Items.splice(0,1)[0]
@@ -528,8 +535,8 @@ STIMULUSDATA = function(participant_number){
         id_B = pair_num + "_B"
 
         // Creating training Fennimal objects
-        let Fennimal_A = {name: name_A, region: region_A, location: location_A, head: head_A, body: body_A, head_color_scheme: Colorscheme_A, body_color_scheme: Colorscheme_A, item: item_A, ID: id_A}
-        let Fennimal_B = {name: name_B, region: region_B, location: location_B, head: head_B, body: body_B, head_color_scheme: Colorscheme_B, body_color_scheme: Colorscheme_B, item: item_B, ID: id_B}
+        let Fennimal_A = {name: name_A, region: region_A, location: location_A, head: head_A, body: body_A, head_color_scheme: Colorscheme_A_head, body_color_scheme: Colorscheme_A_body, item: item_A, ID: id_A}
+        let Fennimal_B = {name: name_B, region: region_B, location: location_B, head: head_B, body: body_B, head_color_scheme: Colorscheme_B_head, body_color_scheme: Colorscheme_B_body, item: item_B, ID: id_B}
         TrainingStimuli.push(Fennimal_A)
         TrainingStimuli.push(Fennimal_B)
 
@@ -1265,7 +1272,8 @@ PARAMETERS = function() {
                 primary_color: "#526785",
                 secondary_color: "#b0c9d4",
                 tertiary_color: "#1a46b8",
-            }
+            },
+            contrast_color: "#edc25e"
         },
         Jungle: {
             Locations : ["Bush", "Jungleforest"],
@@ -1278,7 +1286,8 @@ PARAMETERS = function() {
                 primary_color: "#566e44",
                 secondary_color: "#cfedbe",
                 tertiary_color: "#78ab09",
-            }
+            },
+            contrast_color: "#ac7dd7ff"
         },
         Desert: {
             Locations : ["Oasis", "Cactus"],
@@ -1291,7 +1300,8 @@ PARAMETERS = function() {
                 primary_color: "#8c8c15",
                 secondary_color: "#d1caa9",
                 tertiary_color: "#d2d911",
-            }
+            },
+            contrast_color: "#47395b"
         },
         Mountains: {
             Locations : ["Waterfall", "Mine"],
@@ -1304,7 +1314,8 @@ PARAMETERS = function() {
                 primary_color: "#d6bba9", //"#ded3d6",
                 secondary_color: "#b09a90",//"#dedcdc",
                 tertiary_color: "#502d16",
-            }
+            },
+            contrast_color: "#9fd8ee"
         },
         Beach: {
             Locations : ["Beachbar", "Port"],
@@ -1317,7 +1328,8 @@ PARAMETERS = function() {
                 primary_color: "#ded3d6",//"#665244",
                 secondary_color: "#ffe6d5",//"#dedcdc",//"#f7cdbc",
                 tertiary_color: "#ffd0b0"//"#f2e7df",
-            }
+            },
+            contrast_color: "#425f68"
         },
         Flowerfields: {
             Locations : ["Windmill", "Garden"],
@@ -1330,7 +1342,9 @@ PARAMETERS = function() {
                 primary_color:  "#4d2f49",
                 secondary_color: "#d3bfd9",
                 tertiary_color: "#890fbd",
-            }
+            },
+            contrast_color: "#799742"
+
         },
         Village: {
             Locations : ["Church", "Farm"],
@@ -1343,7 +1357,9 @@ PARAMETERS = function() {
                 primary_color: "#734b53",
                 secondary_color: "#ccb1b8",
                 tertiary_color: "#d10f0f",
-            }
+            },
+            contrast_color: "#80eeca"
+
         },
         Swamp: {
             Locations : ["Marsh", "Cottage"],
@@ -1356,7 +1372,8 @@ PARAMETERS = function() {
                 primary_color: "#5b7878",
                 secondary_color: "#c2f0ea",
                 tertiary_color:  "#00b3b3"
-            }
+            },
+            contrast_color: "#cb156b"
         },
         Home: {
             color: "#cccccc"
@@ -6326,4 +6343,4 @@ EC.showStartScreen()
 
 
 
-console.log("Version: 03.09.23")
+console.log("Version: 03.09.23 B")
