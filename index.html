@@ -31,10 +31,10 @@
         #instructions_Fennimal_icon {animation: instructions_search_outline 10s linear infinite; transform-origin: center}
 
         @keyframes instruction_cursor_travel_move {
-            5% {transform: translate(-2%, -2%);}
-            45% {transform: translate(-2%, -2%);}
-            55% {transform: translate(-2%, 15%);}
-            99% {transform: translate(-2%, 15%);}
+            5% {transform: translate(-2%, 2%);}
+            45% {transform: translate(-2%, 2%);}
+            55% {transform: translate(-2%, 19%);}
+            99% {transform: translate(-2%, 19%);}
         }
         @keyframes instruction_cursor_travel_color {
             0% {fill: white}
@@ -49,10 +49,10 @@
             99% {fill: white}
         }
         @keyframes instruction_player_icon {
-            10% {transform: translate(0%, 0%);}
-            42% {transform: translate(0%, -17%);}
-            57% {transform: translate(0%, -17%);}
-            95% {transform: translate(0%, 0%);}
+            10% {transform: translate(0%, 4%);}
+            42% {transform: translate(0%, -13%);}
+            57% {transform: translate(0%, -13%);}
+            95% {transform: translate(0%, 4%);}
 
         }
         @keyframes instructions_search_cursor_move {
@@ -438,6 +438,15 @@
             95% {translate: 0px 70px}
         }
 
+        .item_selected * {
+            animation: item_outline_selected 3000ms ease-in-out infinite;
+        }
+        @keyframes item_outline_selected {
+            0% {stroke: black}
+            50% {stroke:green; stroke-width: 2px}
+            100% {stroke:black}
+        }
+
         /* TEST PHASE */
         .day_box {
             stroke-width: 3px;
@@ -472,15 +481,15 @@
         }
         .ingame_button rect {
             animation: highlighted_arrow 3s ease-in-out infinite alternate-reverse;
-            opacity: 0.9;
+
             stroke-width: 3px;
         }
         .ingame_button text {
             text-anchor: middle;
             dominant-baseline: middle;
-            font-size: 25px;
+            font-size: 16px;
             font-weight: bold;
-            opacity: 0.5
+
         }
 
         .instruction_title {
@@ -519,6 +528,9 @@
         @keyframes score_star_achieved_animation {
             from {fill:  gold; stroke: goldenrod; }
             to { fill: #fcdd95; stroke: #f2c55a }
+        }
+        #feedback_smiley {
+            display: none
         }
 
 
