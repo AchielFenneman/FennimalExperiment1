@@ -4091,9 +4091,12 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
             }
 
             //Creating the icon. If the Fennimal has not been found, this should be an outline. Otherwise color the Fennimal
-            let IconObj = createFennimalIcon(Fennimal, Positions[i].x, Positions[i].y, 0.165, !fennimal_found)
+            let IconObj
             if(! fennimal_found){
+                IconObj = createFennimalIcon(Fennimal, Positions[i].x, Positions[i].y, 0.165, !fennimal_found)
                 IconObj.style.opacity = 0.4
+            }else{
+                IconObj = createFennimalIcon(Fennimal, Positions[i].x, Positions[i].y, 0.15, !fennimal_found)
             }
             IconsContainer.appendChild(IconObj)
 
@@ -6343,4 +6346,4 @@ EC.showStartScreen()
 
 
 
-console.log("Version: 03.09.23 B")
+console.log("Version: 03.09.23 C")
