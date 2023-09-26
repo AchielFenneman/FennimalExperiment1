@@ -11,13 +11,35 @@
         body{
             overflow: hidden;
             margin: 0 auto;
+            background-color: #EEEEEE;
             font-family:  "Myriad Pro", "Gill Sans",  "Archivo Narrow", "PT Sans Narrow","Arial Narrow","Calibri", "Arial","sans-serif";
         }
         svg{
             user-select: none;
             width: 100%;
             height: 100%;
-            background-color: dimgray;
+            max-width: 1920px;
+
+            text-align: left;
+
+
+        }
+        #exp_div{
+            text-align: center;
+            background-color: #EEEEEE;
+        }
+        #SVG_container{
+            margin: auto;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #top_frame{
+            display: inherit;
+        }
+        #top_frame * {
+            fill: #EEEEEE;
         }
         /* INSTRUCTIONS */
         #instruction_cursor_travel {animation: instruction_cursor_travel_move 5s linear infinite;}
@@ -529,6 +551,23 @@
             from {fill:  gold; stroke: goldenrod; }
             to { fill: #fcdd95; stroke: #f2c55a }
         }
+        .bonus_star {
+            fill: #dfeaed;
+            stroke: #92a1a6 ;
+            stroke-width: 3px;
+            transition: all 1s ease-in-out;
+        }
+        .bonus_star_achieved {
+            fill:#39b3db;
+            stroke: #1b5569;
+            transition: all 1s ease-in-out;
+            animation: bonus_star_achieved_animation 750ms ease-in-out alternate-reverse infinite;
+        }
+        @keyframes bonus_star_achieved_animation {
+            from {fill: #87d4ed; stroke: #2a8cad; }
+            to { fill: #39b3db; stroke: #1b5569}
+        }
+
         #feedback_smiley {
             display: none
         }
@@ -557,6 +596,71 @@
         #click_here_button:hover text {
             fill:white
         }
+
+        /* Category phase */
+        #Category_Layer{
+            display: none
+        }
+        #category_trial_title {
+            transition: all 50ms ease-out;
+        }
+        #category_space_top {
+            transition: all 50ms ease-out;
+        }
+        @keyframes highlighted_outline {
+            from { stroke: #58508d; }
+            to { stroke: #ffa600; }
+        }
+
+        .category_screen_top {
+            opacity: 0;
+            transition: all 500ms ease-in-out;
+        }
+        .category_screen_bottom{
+            opacity:0;
+            transition: all 500ms ease-in-out;
+        }
+
+        .category_box {
+            transition: all 500ms ease-out;
+            stroke: none
+        }
+        .category_box_active {
+            stroke: none
+            /*animation: highlighted_outline 2s ease-in-out infinite alternate-reverse;*/
+        }
+        .category_box_selected{
+            fill: #a9c4f5;
+
+        }
+        .category_box_error {
+            animation: category_box_error_blinking 750ms ease-in-out infinite;
+        }
+        @keyframes category_box_error_blinking {
+
+            0% {
+                border: gold;
+                fill: gold;
+            }
+            50% {border: firebrick;
+                fill: firebrick;}
+
+        }
+
+
+        @keyframes category_countdown_timer {
+            0% {width: 100%; fill:gray}
+            85% {width: 0; fill:gold}
+            85.5% {width: 100%}
+            86% {fill:darkred}
+            90%{ fill:gold}
+            94%{ fill:darkred}
+            98%{ fill:gold}
+
+
+        }
+
+
 
         /* Questionnaire */
         #open_question_area {
