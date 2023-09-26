@@ -639,6 +639,7 @@ STIMULUSDATA = function(participant_number){
         Fennimal.items_available = Item_Details.All_Items
         Fennimal.correct_item = Fennimal.item
         Fennimal.feedback = true
+        Fennimal.ID = key
         Repeat_Training_Block.push(Fennimal)
     }
 
@@ -663,6 +664,7 @@ STIMULUSDATA = function(participant_number){
             //Setting items available
             let Items = JSON.parse(JSON.stringify(Item_Details.All_Items))
             TestObj.item_direct = FenObj.item_direct
+            TestObj.item_indirect = FenObj.item_indirect
 
             // First we remove both the direct and indirect items, as well as a single distractor item at random
             Items.splice( Items.indexOf(FenObj.item_direct) , 1)
@@ -970,6 +972,8 @@ STIMULUSDATA = function(participant_number){
             number: 7
         }]
 
+    console.log(TestPhaseData)
+
     /*
     * let TestPhaseData = [{
         Trials: shuffleArray(TestBlocks[0]),
@@ -1080,7 +1084,7 @@ PARAMETERS = function() {
     //["Crab", "Snake", "Giraffe", "Mushroom", "Ant", "Beaver", "Spider","Flamingo","Grasshopper",
     // "Frog", "Dragon", "Bunny", "Bird", "Elephant", "Tiger", "Walrus", "Turtle", "Crocodile", "Gnome", "Plant", "Robot"]
     this.Available_Fennimal_Heads = ["A", "B", "C", "D", "E", "F","G","H", "I", "J"]
-    this.Available_Fennimal_Bodies = ["A", "B", "C", "D", "E", "F","G","H", "I","J","K"] //["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M","N"]
+    this.Available_Fennimal_Bodies = ["A", "B", "C", "D", "F","G","H", "I","J","K"] //["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M","N"]
 
     this.LocationTransitionData = {
         //This object holds all the location transitions.
@@ -4020,7 +4024,7 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
                 Container.appendChild(createInstructionTitleElem("INSTRUCTIONS FOR THIS HIT"))
                 Container.appendChild(createTextField(30, 35, 508-2*30,250, "In this HIT you will be a participant in an experiment conducted at the University of Vienna. At no point during this HIT will we provide deceiving of erroneous information to you. <br>" +
                     "<br>" +
-                    "This HIT is expected to last around 30-40 minutes. Based on your decisions in the last part of the experiment you can earn up to five stars for your performance. You will earn a bonus of " + Param.BonusEarnedPerStar.currency_symbol+ Param.BonusEarnedPerStar.bonus_per_star + " per star that you obtain.  <br>" +
+                    "This HIT is expected to last around 40-45 minutes. Based on your decisions in the last part of the experiment you can earn up to seven stars for your performance. You will earn a bonus of " + Param.BonusEarnedPerStar.currency_symbol+ Param.BonusEarnedPerStar.bonus_per_star + " per star that you obtain.  <br>" +
                     "<br>" +
                     "All the answers and data that you provide are completely anonymous. You will only be known to us via your Mturk Worker ID. We will not store or record any personally identifiable information at any point during the experiment. Your anonymized data will be exclusively used for research-related goals. Your data will be archived and may be shared with other researchers in the future. <br>" +
                     "<br>" +
@@ -4031,7 +4035,7 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
                 break
             case("prolific"):
                 Container.appendChild(createInstructionTitleElem("INSTRUCTIONS FOR THIS EXPERIMENT"))
-                Container.appendChild(createTextField(30, 35, 508-2*30,250, "In this experiment you will be a participant in an experiment conducted at the University of Vienna. We will not provide any deceiving of erroneous information to you at any point throughout the experiment. <br>" +
+                Container.appendChild(createTextField(30, 35, 508-2*30,250, "In this experiment you will be a participant in an experiment conducted at the University of Vienna. We will not provide any deceiving or erroneous information to you at any point throughout the experiment. <br>" +
                     "<br>" +
                     "This experiment is expected to last around 30-40 minutes. Based on your decisions in the last part of the experiment you can earn up to five stars for your performance. You will earn a bonus of " + Param.BonusEarnedPerStar.currency_symbol+ Param.BonusEarnedPerStar.bonus_per_star + " per star that you obtain. <br>" +
                     "<br>" +
@@ -4440,7 +4444,7 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
             let HintText = createTextField((508/2)-25, 130, 50,40, "<b> Hint: </b>")
             HintText.style.textAlign = "center"
             Page.appendChild(HintText)
-            let NameText = createTextField((508/2)-125, 150, 250,40, "This Fennimal is a " + Current_Search_Trial_Fennimal.name)
+            let NameText = createTextField((508/2)-125, 150, 250,55, "This Fennimal is a " + Current_Search_Trial_Fennimal.name)
             NameText.style.fontSize = "20px"
             NameText.style.textAlign = "center"
             Page.appendChild(NameText)
@@ -4832,7 +4836,7 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
 
         Container.appendChild(createBackgroundElem())
         Container.appendChild(createInstructionTitleElem(Instructions.Test_Phase.Final.title))
-        let TextField = createTextField(30, 30, 508-2*30,200, Instructions.Test_Phase.Final.text)
+        let TextField = createTextField(30, 30, 508-2*30,210, Instructions.Test_Phase.Final.text)
         TextField.style.fontSize = "13px"
         Container.appendChild(TextField)
 
@@ -4877,7 +4881,7 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
         TextTop.style.textAlign = "center"
         Container.appendChild(TextTop)
 
-        let LocationText = createTextField((508/2)-200, 150, 400,40, locationtext)
+        let LocationText = createTextField((508/2)-200, 150, 400,55, locationtext)
         LocationText.style.fontSize = "20px"
         LocationText.style.textAlign = "center"
         Container.appendChild(LocationText)
@@ -5044,7 +5048,7 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
             case("prolific"):
                 let ProlificTokenField = createTextField(30, 60, 508-2*30,200, "You have now completed the experiment. Please press [ESC] or [F11] in Windows or [Command]+[Cntrl]+[F] in Mac to leave full-screen mode. <br> " +
                     "<br>" +
-                    "<b>DO NOT LEAVE THIS PAGE YET AND DO NOT CLICK THE BUTTON BELOW BEFORE SUBMITTING YOUR COMPLETION CODE TO PROLIFIC!</b>. <br>" +
+                    "<b>DO NOT LEAVE THIS PAGE YET AND DO NOT CLICK THE BUTTON BELOW BEFORE SUBMITTING YOUR COMPLETION CODE TO PROLIFIC!</b> <br>" +
                     "<br>" +
                     "You earned a "+  Param.BonusEarnedPerStar.currency_symbol +  Param.BonusEarnedPerStar.bonus_per_star + " per star, resulting in a bonus of " + Param.BonusEarnedPerStar.currency_symbol +  ScoreObject.earned_bonus + ". <br>" +
                     "<br>" +
@@ -6178,7 +6182,6 @@ DataController = function(seed_number, Stimuli){
                     tpos: Data.CategoryPhase[i].training_pos
                 })
             }
-
         }
         if(Stimuli.getCategoryType() === "two_alternatives"){
             //TODO
@@ -6929,6 +6932,7 @@ ExperimentController = function(Stimuli, DataController){
     }
     this.test_trial_completed = function(FennimalObj){
         //Store data
+        console.log(FennimalObj)
         DataController.store_test_trial(FennimalObj)
 
         //Start next test trial
@@ -7192,4 +7196,4 @@ EC.showStartScreen()
 //  Reprase to days (Test phase: days 1-6, Category phase day 7, Final block day 8)
 //  Add day 8 stimuli
 
-console.log("Version: 26.09.23")
+console.log("Version: 26.09.23 B")
