@@ -422,7 +422,7 @@ function createConjunctiveNameRegionHead(region, head){
     return( Param.RegionData[region].prefix + " " + Param.Names_Head[head])
 }
 //Creates a name based on the letters of the head and body of a Fennimal. Note that the prefixes and suffixes are hardcoded based on the look of the parts
-function createConjunctiveNameHeadBody(head,body){
+function createConjunctiveNameHeadBody(body, head){
     return( Param.NamePrefixes_Body[body] + " " + Param.Names_Head[head])
 }
 
@@ -550,7 +550,7 @@ STIMULUSDATA = function(participant_number){
         }
 
         //Adding name and color scheme
-        FenObj.name = createConjunctiveNameRegionHead(region, head)
+        FenObj.name = Param.Names_Head[head]//createConjunctiveNameHeadBody(body,head)//createConjunctiveNameRegionHead(region, head)
         FenObj.head_color_scheme = JSON.parse(JSON.stringify(Param.RegionData[region].Fennimal_location_colors))
         FenObj.body_color_scheme = JSON.parse(JSON.stringify(Param.RegionData[region].Fennimal_location_colors))
         FenObj.body_color_scheme.tertiary_color = Param.RegionData[region].contrast_color
@@ -581,13 +581,21 @@ STIMULUSDATA = function(participant_number){
         DB: Available_Regions.splice(0,1)[0],
         C: TrainingFennimals.C.region,
     }
+    let TestPhaseAvailableLocations = {
+        IA: shuffleArray( Param.RegionData[TestPhaseRegions.IA].Locations ),
+        IB: shuffleArray( Param.RegionData[TestPhaseRegions.IB].Locations ),
+        DA: shuffleArray( Param.RegionData[TestPhaseRegions.DA].Locations ),
+        DB: shuffleArray( Param.RegionData[TestPhaseRegions.DB].Locations ),
+        C: shuffleArray( Param.RegionData[TestPhaseRegions.C].Locations ),
+    }
+    console.log(TestPhaseAvailableLocations)
 
     let TestStimTemplates = {
-        IA: {ID: "IA", head: TrainingFennimals.IA.head, body: Available_Bodies.splice(0,1)[0], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
-        IB: {ID: "IB", head: TrainingFennimals.IB.head, body: Available_Bodies.splice(0,1)[0], item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
-        DA: {ID: "DA", head: TrainingFennimals.DA.head, body: Available_Bodies.splice(0,1)[0], item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
-        DB: {ID: "DB", head: TrainingFennimals.DB.head, body: Available_Bodies.splice(0,1)[0], item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
-        C: {ID: "C", head: TrainingFennimals.C.head, body: Available_Bodies.splice(0,1)[0], item_direct: TrainingFennimals.C.item},
+        IA: {ID: "IA", head: TrainingFennimals.IA.head, body: Available_Bodies.splice(0,1)[0], region: TestPhaseRegions.IA, location: TestPhaseAvailableLocations.IA.splice(0,1)[0], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
+        IB: {ID: "IB", head: TrainingFennimals.IB.head, body: Available_Bodies.splice(0,1)[0], region: TestPhaseRegions.IB, location: TestPhaseAvailableLocations.IB.splice(0,1)[0],item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
+        DA: {ID: "DA", head: TrainingFennimals.DA.head, body: Available_Bodies.splice(0,1)[0], region: TestPhaseRegions.DA, location: TestPhaseAvailableLocations.DA.splice(0,1)[0],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
+        DB: {ID: "DB", head: TrainingFennimals.DB.head, body: Available_Bodies.splice(0,1)[0], region: TestPhaseRegions.DB, location: TestPhaseAvailableLocations.DB.splice(0,1)[0],item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
+        C: {ID: "C", head: TrainingFennimals.C.head, body: Available_Bodies.splice(0,1)[0], region: TestPhaseRegions.C, location: TestPhaseAvailableLocations.C.splice(0,1)[0], item_direct: TrainingFennimals.C.item, item_indirect: false},
     }
 
     let TestBlocks = []
@@ -596,33 +604,43 @@ STIMULUSDATA = function(participant_number){
         let Block = []
         for(let key in TrainingFennimals){
             let FenObj = TestStimTemplates[key]
-            let TestObj = createFennimalObj(TestPhaseRegions[key],shuffleArray(Param.RegionData[TestPhaseRegions[key]].Locations)[0], FenObj.head, FenObj.body, false)
+            let TestObj = createFennimalObj(FenObj.region,FenObj.location, FenObj.head, FenObj.body, false)
+            TestObj.name = createConjunctiveNameHeadBody(FenObj.body,FenObj.head)
             TestObj.feedback = false
 
-            //Setting items available
-            let Items = JSON.parse(JSON.stringify(Item_Details.All_Items))
+            //Setting items available.
+            // First we make sure that there are two distractors: the control item and one of the items belonging to the other pair.
             TestObj.item_direct = FenObj.item_direct
 
-            // First we remove both the direct item, as well as a single distractor item at random
-            Items.splice( Items.indexOf(FenObj.item_direct) , 1)
-            Items.splice( randomIntFromInterval(0, Items.length-1) , 1)
-
-            //If the Fennimal has an indirect item, remove this one. For the control Fennimal, remove a distractor at random
-            if("item_indirect" in FenObj){
-                Items.splice( Items.indexOf(FenObj.item_indirect) , 1)
-                TestObj.item_indirect = FenObj.item_indirect
-            }else{
-                Items.splice( randomIntFromInterval(0, Items.length-1) , 1)
+            let Items = [TrainingFennimals.C.item]
+            let OtherPairItems
+            switch(key){
+                case("IA"): OtherPairItems = [TrainingFennimals.DA.item, TrainingFennimals.DB.item]; break
+                case("IB"): OtherPairItems = [TrainingFennimals.DA.item, TrainingFennimals.DB.item]; break
+                case("DA"): OtherPairItems = [TrainingFennimals.IA.item, TrainingFennimals.IB.item]; break
+                case("DB"): OtherPairItems = [TrainingFennimals.IA.item, TrainingFennimals.IB.item]; break
+                case("C"):OtherPairItems = [TrainingFennimals.IA.item, TrainingFennimals.IB.item, TrainingFennimals.DA.item, TrainingFennimals.DB.item]; break;
             }
 
-            //Adding back the direct OR indirect item, depending on which pair type this is
-            if(key === "IA" || key === "IB"){
-                Items.push(FenObj.item_indirect)
-                TestObj.correct_item = FenObj.item_indirect
-            }else{
-                Items.push(FenObj.item_direct)
+            shuffleArray(OtherPairItems)
+            Items.push( OtherPairItems[0] )
+            if(key === "C"){
+                Items.push( OtherPairItems[1] )
                 TestObj.correct_item = FenObj.item_direct
+                TestObj.item_indirect = false
+            }else{
+                //Adding back the direct OR indirect item, depending on which pair type this is
+                if(key === "IA" || key === "IB"){
+                    Items.push(FenObj.item_indirect)
+                    TestObj.correct_item = FenObj.item_indirect
+                }else{
+                    Items.push(FenObj.item_direct)
+                    TestObj.correct_item = FenObj.item_direct
+                }
+                TestObj.item_indirect = FenObj.item_indirect
+
             }
+
             TestObj.items_available = Items
             TestObj.ID = FenObj.ID
 
@@ -638,7 +656,7 @@ STIMULUSDATA = function(participant_number){
         let Fennimal = JSON.parse(JSON.stringify( TrainingFennimals[key]  ))
         Fennimal.items_available = Item_Details.All_Items
         Fennimal.correct_item = Fennimal.item
-        Fennimal.feedback = true
+        Fennimal.feedback = false
         Fennimal.ID = key
         Repeat_Training_Block.push(Fennimal)
     }
@@ -646,30 +664,32 @@ STIMULUSDATA = function(participant_number){
     //Creating the final block. These have the body of the last two test phase blocks, but a new head.
     // Here the indirect item is available (but the direct is not)
     let FinalBlockStim =  {
-        IA: {ID: "IA", head: Available_Heads.splice(0,1)[0], body: TestStimTemplates.IA.body, item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
-        IB: {ID: "IB", head: Available_Heads.splice(0,1)[0], body: TestStimTemplates.IB.body, item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
-        DA: {ID: "DA", head: Available_Heads.splice(0,1)[0], body: TestStimTemplates.DA.body, item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
-        DB: {ID: "DB", head: Available_Heads.splice(0,1)[0], body: TestStimTemplates.DB.body, item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
-        //C: {ID: "C", head: Available_Heads.splice(0,1)[0], body: TestStimConsequetiveBlocks.IA.body, item_direct: TrainingFennimals.C.item},
+        IA: {ID: "IA", head: Available_Heads.splice(0,1)[0], body: TestStimTemplates.IA.body, region:TestPhaseRegions.IA, location: TestPhaseAvailableLocations.IA[0], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
+        IB: {ID: "IB", head: Available_Heads.splice(0,1)[0], body: TestStimTemplates.IB.body, region:TestPhaseRegions.IB, location: TestPhaseAvailableLocations.IB[0], item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
+        DA: {ID: "DA", head: Available_Heads.splice(0,1)[0], body: TestStimTemplates.DA.body, region:TestPhaseRegions.DA, location: TestPhaseAvailableLocations.DA[0], item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
+        DB: {ID: "DB", head: Available_Heads.splice(0,1)[0], body: TestStimTemplates.DB.body,region:TestPhaseRegions.DB, location: TestPhaseAvailableLocations.DB[0],  item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
     }
 
-    let final_block_region = Available_Regions.splice(0,1)[0]
     let FinalBlockTrials = []
     for(let key in FinalBlockStim ){
         for(let i=0;i<2;i++){
             let FenObj = FinalBlockStim[key]
-            let TestObj = createFennimalObj(final_block_region,shuffleArray(Param.RegionData[final_block_region].Locations)[0], FenObj.head, FenObj.body, false)
+            let TestObj = createFennimalObj(FenObj.region,FenObj.location, FenObj.head, FenObj.body, false)
+            TestObj.name = createConjunctiveNameHeadBody(FenObj.body,FenObj.head)
             TestObj.feedback = false
 
             //Setting items available
-            let Items = JSON.parse(JSON.stringify(Item_Details.All_Items))
             TestObj.item_direct = FenObj.item_direct
             TestObj.item_indirect = FenObj.item_indirect
 
-            // First we remove both the direct and indirect items, as well as a single distractor item at random
-            Items.splice( Items.indexOf(FenObj.item_direct) , 1)
-            Items.splice( Items.indexOf(FenObj.item_indirect) , 1)
-            Items.splice( randomIntFromInterval(0, Items.length-1) , 1)
+            let Items, OtherPairItems
+            switch(key){
+                case("IA"): Items = [FenObj.item_indirect, TrainingFennimals.C.item]; OtherPairItems = [TrainingFennimals.DA.item, TrainingFennimals.DB.item]; break
+                case("IB"): Items = [FenObj.item_indirect, TrainingFennimals.C.item]; OtherPairItems = [TrainingFennimals.DA.item, TrainingFennimals.DB.item]; break
+                case("DA"): Items = [FenObj.item_indirect, TrainingFennimals.C.item]; OtherPairItems = [TrainingFennimals.IA.item, TrainingFennimals.IB.item]; break
+                case("DB"): Items = [FenObj.item_indirect, TrainingFennimals.C.item]; OtherPairItems = [TrainingFennimals.IA.item, TrainingFennimals.IB.item]; break
+            }
+            Items.push( shuffleArray(OtherPairItems)[0] )
 
             //Adding back the  indirect item
             Items.push(FenObj.item_indirect)
@@ -775,225 +795,90 @@ STIMULUSDATA = function(participant_number){
     //  As the basis, we use both the templates for the first and the consequetive test blocks.
     //  4 (non-control training Fennimals) * (2 [possible correct stimuli] + 2 [inccorect: once the control, once from the other pair]) = 16 unique screens, presented twice
     if(grouping_phase_setup === "binary"){
-        let GroupA = []
-        let GroupB = []
+        let TrialTemplates = []
 
-        for(let key in TrainingFennimals){
-            if(key !== "C"){
-                //Storing the pair type (easier for analyses later)
-                let paircode
-                if(key === "IA" || key === "IB") {paircode = "I"} else {paircode = "D"}
+        //Adding all the templates where the two pairs are from the same family
+        TrialTemplates.push({left: "IA", right: "IB", paircode: "I", correct: true })
+        TrialTemplates.push({left: "IB", right: "IA", paircode: "I", correct: true })
+        TrialTemplates.push({left: "DA", right: "DB", paircode: "D", correct: true })
+        TrialTemplates.push({left: "DB", right: "DA", paircode: "D", correct: true })
 
-                //Finding the correct training Fennimal
-                let TrainingFennimal = TrainingFennimals[key]
-                let TargetFennimal = {
-                    head: TrainingFennimal.head,
-                    body: TrainingFennimal.body,
-                    name: Param.Names_Head[TrainingFennimal.head],
-                    head_color_scheme : Param.GrayColorScheme,
-                    body_color_scheme : Param.GrayColorScheme
-                }
+        //Adding them again (just copy-pasted)
+        TrialTemplates.push({left: "IA", right: "IB", paircode: "I", correct: true })
+        TrialTemplates.push({left: "IB", right: "IA", paircode: "I", correct: true })
+        TrialTemplates.push({left: "DA", right: "DB", paircode: "D", correct: true })
+        TrialTemplates.push({left: "DB", right: "DA", paircode: "D", correct: true })
 
-                //Now find the two correct pairs
-                let PairFromFirstBlock = {}
-                let PairFromSecondBlock = {}
+        //Adding some incorrect trials
+        TrialTemplates.push({left: "IA", right: "DA", paircode: false, correct: false })
+        TrialTemplates.push({left: "C", right: "IA", paircode: false, correct: false })
 
-                // Findin the correct pairs.
-                switch(key){
-                    case("IA"):
-                        PairFromFirstBlock.head = TestStimTemplates.IB.head
-                        PairFromFirstBlock.body = TestStimTemplates.IB.body
-                        PairFromSecondBlock.head = TestStimTemplates.IB.head
-                        PairFromSecondBlock.body = TestStimTemplates.IB.body
-                        break
-                    case("IB"):
-                        PairFromFirstBlock.head = TestStimTemplates.IA.head
-                        PairFromFirstBlock.body = TestStimTemplates.IA.body
-                        PairFromSecondBlock.head = TestStimTemplates.IA.head
-                        PairFromSecondBlock.body = TestStimTemplates.IA.body
-                        break
-                    case("DA"):
-                        PairFromFirstBlock.head = TestStimTemplates.DB.head
-                        PairFromFirstBlock.body = TestStimTemplates.DB.body
-                        PairFromSecondBlock.head = TestStimTemplates.DB.head
-                        PairFromSecondBlock.body = TestStimTemplates.DB.body
-                        break
-                    case("DB"):
-                        PairFromFirstBlock.head = TestStimTemplates.DA.head
-                        PairFromFirstBlock.body = TestStimTemplates.DA.body
-                        PairFromSecondBlock.head = TestStimTemplates.DA.head
-                        PairFromSecondBlock.body = TestStimTemplates.DA.body
-                        break
-                }
+        TrialTemplates.push({left: "DB", right: "IB", paircode: false, correct: false })
+        TrialTemplates.push({left: "IB", right: "C", paircode: false, correct: false })
 
-                //Adding the other parts of the Pairs
-                PairFromFirstBlock.name = Param.Names_Head[PairFromFirstBlock.head]
-                PairFromFirstBlock.head_color_scheme = Param.GrayColorScheme
-                PairFromFirstBlock.body_color_scheme = Param.GrayColorScheme
+        TrialTemplates.push({left: "IB", right: "DA", paircode: false, correct: false })
+        TrialTemplates.push({left: "DA", right: "C", paircode: false, correct: false })
 
-                PairFromSecondBlock.name = Param.Names_Head[PairFromSecondBlock.head]
-                PairFromSecondBlock.head_color_scheme = Param.GrayColorScheme
-                PairFromSecondBlock.body_color_scheme = Param.GrayColorScheme
+        TrialTemplates.push({left: "DB", right: "IA", paircode: false, correct: false })
+        TrialTemplates.push({left: "C", right: "DB", paircode: false, correct: false })
 
-
-                //Each correct pair is added to both group A and B (but with reverse orders)
-                if(RNG.rand() > 0.5){
-                    GroupA.push( JSON.parse(JSON.stringify({Left: TargetFennimal, Right:PairFromFirstBlock, training_pos: "left", correct: true, pair: paircode})) )
-                    GroupA.push( JSON.parse(JSON.stringify({Left: PairFromSecondBlock, Right:TargetFennimal, training_pos: "right", correct: true, pair: paircode})) )
-
-                    GroupB.push( JSON.parse(JSON.stringify({Left: PairFromFirstBlock, Right:TargetFennimal, training_pos: "right", correct: true, pair: paircode})) )
-                    GroupB.push( JSON.parse(JSON.stringify({Left: TargetFennimal, Right:PairFromSecondBlock, training_pos: "left", correct: true, pair: paircode})) )
-                }else{
-                    GroupA.push( JSON.parse(JSON.stringify({Left: PairFromFirstBlock, Right:TargetFennimal, training_pos: "right", correct: true, pair: paircode})) )
-                    GroupA.push( JSON.parse(JSON.stringify({Left: TargetFennimal, Right:PairFromSecondBlock, training_pos: "left", correct: true, pair: paircode})) )
-
-                    GroupB.push( JSON.parse(JSON.stringify({Left: TargetFennimal, Right:PairFromFirstBlock, training_pos: "left", correct: true, pair: paircode})) )
-                    GroupB.push( JSON.parse(JSON.stringify({Left: PairFromSecondBlock, Right:TargetFennimal, training_pos: "right", correct: true, pair: paircode})) )
-                }
-
-                //For each pair, now find two incorrect trials. One will be drawn from the other pair of training Fennimals and one will be drawn from the control
-                let Incorrect_FirstA = {}
-                let Incorrect_FirstB = {}
-                let Incorrect_SecondA = {}
-                let Incorrect_SecondB = {}
-
-                let Other_pair_keys
-                switch(key){
-                    case("IA"):
-                        Other_pair_keys = ["DA", "DB"]
-                        break
-                    case("IB"):
-                        Other_pair_keys = ["DA", "DB"]
-                        break
-                    case("DA"):
-                        Other_pair_keys = ["IA", "IB"]
-                        break
-                    case("DB"):
-                        Other_pair_keys = ["IA", "IB"]
-                        break
-                }
-
-                if(RNG.rand() > 0.5){
-                    //FirstA is from the other pair, FirstB is control. SecondA is from control, SecondB is from the other pair
-                    Incorrect_FirstA.head = TestStimTemplates[Other_pair_keys[0]].head
-                    Incorrect_FirstA.body = TestStimTemplates[Other_pair_keys[0]].body
-
-                    Incorrect_FirstB.head = TestStimTemplates.C.head
-                    Incorrect_FirstB.body = TestStimTemplates.C.body
-
-                    Incorrect_SecondA.head = TestStimTemplates.C.head
-                    Incorrect_SecondA.body = TestStimTemplates.C.body
-
-                    Incorrect_SecondB.head = TestStimTemplates[Other_pair_keys[1]].head
-                    Incorrect_SecondB.body = TestStimTemplates[Other_pair_keys[1]].body
-                }else{
-                    //FirstA is from control, FirstB is from the other pair. SecondA is from the other pair, SecondB is from control
-                    Incorrect_FirstA.head = TestStimTemplates.C.head
-                    Incorrect_FirstA.body = TestStimTemplates.C.body
-
-                    Incorrect_FirstB.head = TestStimTemplates[Other_pair_keys[1]].head
-                    Incorrect_FirstB.body = TestStimTemplates[Other_pair_keys[1]].body
-
-                    Incorrect_SecondA.head = TestStimTemplates[Other_pair_keys[0]].head
-                    Incorrect_SecondA.body = TestStimTemplates[Other_pair_keys[0]].body
-
-                    Incorrect_SecondB.head = TestStimTemplates.C.head
-                    Incorrect_SecondB.body = TestStimTemplates.C.body
-                }
-
-                //Finishing the FennimalObjects for all the incorrect altneratives
-                Incorrect_FirstA.name = Param.Names_Head[Incorrect_FirstA.head]
-                Incorrect_FirstA.head_color_scheme = Param.GrayColorScheme
-                Incorrect_FirstA.body_color_scheme = Param.GrayColorScheme
-
-                Incorrect_FirstB.name = Param.Names_Head[Incorrect_FirstB.head]
-                Incorrect_FirstB.head_color_scheme = Param.GrayColorScheme
-                Incorrect_FirstB.body_color_scheme = Param.GrayColorScheme
-
-                Incorrect_SecondA.name = Param.Names_Head[Incorrect_SecondA.head]
-                Incorrect_SecondA.head_color_scheme = Param.GrayColorScheme
-                Incorrect_SecondA.body_color_scheme = Param.GrayColorScheme
-
-                Incorrect_SecondB.name = Param.Names_Head[Incorrect_SecondB.head]
-                Incorrect_SecondB.head_color_scheme = Param.GrayColorScheme
-                Incorrect_SecondB.body_color_scheme = Param.GrayColorScheme
-
-                //Now we can assign trials to groups A and B. Again using a random element to counterbalance whether the training Fennimal is presented left or right
-                if(RNG.rand() > 0.5){
-                    GroupA.push( JSON.parse(JSON.stringify({Left: Incorrect_FirstA, Right:TargetFennimal, training_pos: "right", correct: false, pair: paircode})) )
-                    GroupA.push( JSON.parse(JSON.stringify({Left: TargetFennimal, Right:Incorrect_SecondA, training_pos: "left", correct: false, pair: paircode})) )
-
-                    GroupB.push( JSON.parse(JSON.stringify({Left: TargetFennimal, Right:Incorrect_FirstB, training_pos: "left", correct: false, pair: paircode})) )
-                    GroupB.push( JSON.parse(JSON.stringify({Left: Incorrect_SecondB, Right:TargetFennimal, training_pos: "right", correct: false, pair: paircode})) )
-
-                }else{
-                    GroupA.push( JSON.parse(JSON.stringify({Left: TargetFennimal, Right:Incorrect_FirstA, training_pos: "left", correct: false, pair: paircode})) )
-                    GroupA.push( JSON.parse(JSON.stringify({Left: Incorrect_SecondA, Right:TargetFennimal, training_pos: "right", correct: false, pair: paircode})) )
-
-                    GroupB.push( JSON.parse(JSON.stringify({Left: Incorrect_FirstB, Right:TargetFennimal, training_pos: "right", correct: false, pair: paircode})) )
-                    GroupB.push( JSON.parse(JSON.stringify({Left: TargetFennimal, Right:Incorrect_SecondB, training_pos: "left", correct: false, pair: paircode})) )
-
-
-                }
+        //Transforming the templates into trials
+        let Groups = []
+        let num_reps = 2
+        for(let g=0;g<num_reps;g++){
+            let Arr = []
+            for(let i=0;i<TrialTemplates.length;i++){
+                let keyleft = TrialTemplates[i].left
+                let keyright = TrialTemplates[i].right
+                Arr.push({
+                    Left: {
+                        head: TestStimTemplates[keyleft].head,
+                        body: TestStimTemplates[keyleft].body,
+                        name: createConjunctiveNameHeadBody(TestStimTemplates[keyleft].body,TestStimTemplates[keyleft].head) ,//createConjunctiveNameRegionHead(TestStimTemplates[keyleft].region, TestStimTemplates[keyleft].head),
+                        head_color_scheme: JSON.parse(JSON.stringify(Param.RegionData[TestStimTemplates[keyleft].region].Fennimal_location_colors)),
+                        body_color_scheme: JSON.parse(JSON.stringify(Param.RegionData[TestStimTemplates[keyleft].region].Fennimal_location_colors))
+                    },
+                    Right: {
+                        head: TestStimTemplates[keyright].head,
+                        body: TestStimTemplates[keyright].body,
+                        name:  createConjunctiveNameHeadBody(TestStimTemplates[keyright].body,TestStimTemplates[keyright].head), //createConjunctiveNameRegionHead(TestStimTemplates[keyright].region, TestStimTemplates[keyright].head),
+                        head_color_scheme: JSON.parse(JSON.stringify(Param.RegionData[TestStimTemplates[keyright].region].Fennimal_location_colors)),
+                        body_color_scheme: JSON.parse(JSON.stringify(Param.RegionData[TestStimTemplates[keyright].region].Fennimal_location_colors))
+                    },
+                    paircode: TrialTemplates[i].paircode,
+                    correct: TrialTemplates[i].correct
+                })
             }
+            Groups.push( shuffleArray(Arr) )
         }
-        GroupingTrials = shuffleArray(GroupA).concat(shuffleArray(GroupB))
+        GroupingTrials = Groups.flat()
     }
 
     //Combinining all trials into a single object. Here, each element is a day's worth of activities during the test phase.
-    let TestPhaseData = [
-        {
-            Trials: shuffleArray(TestBlocks[0]),
-            type: "indirect",
-            number: 1
-        },{
-            Trials: shuffleArray(TestBlocks[1]),
-            type: "indirect",
-            number: 2
-        },{
-            Trials: shuffleArray(Repeat_Training_Block),
-            type: "training",
-            number: 3
-        },{
-            Trials: shuffleArray(TestBlocks[2]),
-            type: "indirect",
-            number: 4
-        },{
-            Trials: shuffleArray(TestBlocks[3]),
-            type: "indirect",
-            number: 5
-        },{
-            Trials: GroupingTrials,
-            type: "category",
-            number: 6
-        },{
-            Trials: FinalBlockTrials,
-            type: "final_block",
-            number: 7
-        }]
-
-    console.log(TestPhaseData)
-
-    /*
-    * let TestPhaseData = [{
+    let TestPhaseData = [{
         Trials: shuffleArray(TestBlocks[0]),
         type: "indirect",
+        hint_type: "text",
         number: 1
     },{
         Trials: shuffleArray(TestBlocks[1]),
         type: "indirect",
+        hint_type: "text",
         number: 2
     },{
         Trials: shuffleArray(Repeat_Training_Block),
         type: "training",
+        hint_type: "text",
         number: 3
     },{
         Trials: shuffleArray(TestBlocks[2]),
         type: "indirect",
+        hint_type: "icon",
         number: 4
     },{
         Trials: shuffleArray(TestBlocks[3]),
         type: "indirect",
+        hint_type: "icon",
         number: 5
     },{
         Trials: GroupingTrials,
@@ -1002,8 +887,48 @@ STIMULUSDATA = function(participant_number){
     },{
         Trials: FinalBlockTrials,
         type: "final_block",
+        hint_type: "text",
         number: 7
-    }]*/
+    }]
+
+    console.log(TestPhaseData)
+    /*
+    * let TestPhaseData = [{
+        Trials: shuffleArray(TestBlocks[0]),
+        type: "indirect",
+        hint_type: "text",
+        number: 1
+    },{
+        Trials: shuffleArray(TestBlocks[1]),
+        type: "indirect",
+        hint_type: "text",
+        number: 2
+    },{
+        Trials: shuffleArray(Repeat_Training_Block),
+        type: "training",
+        hint_type: "text",
+        number: 3
+    },{
+        Trials: shuffleArray(TestBlocks[2]),
+        type: "indirect",
+        hint_type: "icon",
+        number: 4
+    },{
+        Trials: shuffleArray(TestBlocks[3]),
+        type: "indirect",
+        hint_type: "icon",
+        number: 5
+    },{
+        Trials: GroupingTrials,
+        type: "category",
+        number: 6
+    },{
+        Trials: FinalBlockTrials,
+        type: "final_block",
+        hint_type: "text",
+        number: 7
+    }]
+*/
 
     // CALL FUNCTIONS //
     ////////////////////
@@ -1697,6 +1622,11 @@ PARAMETERS = function() {
         G: "Six-legged",
         H: "Big-armed",
         I: "Scaled",
+        J: "Twiggy",
+        K: "Spiked",
+        L: "Chubby",
+        M: "Bearded",
+        N: "Long-necked"
     }
     // Description of the head
     this.Names_Head = {
@@ -4862,7 +4792,7 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
     }
 
     //Shows the target for a test phase round
-    this.show_test_phase_target_screen = function(locationtext){
+    this.show_test_phase_target_screen = function(Fennimal,block_type, hint_type){
         let Page = SVGObjects.Instructions.Pages.Test_Target
         deleteClassNamesFromElement(Page, "instruction_container")
         showNewInstructionsPage()
@@ -4876,15 +4806,31 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
         let Container = createInstructionContainer()
         Container.appendChild(createInstructionTitleElem("A new Fennimal has been spotted!"))
         Page.appendChild(Container)
+
         Container.classList.add("instruction_container")
         let TextTop = createTextField((508/2)-200, 50, 400,40, "<b> A Fennimal has been spotted! Please go visit it and give it a toy </b>")
         TextTop.style.textAlign = "center"
         Container.appendChild(TextTop)
 
-        let LocationText = createTextField((508/2)-200, 150, 400,55, locationtext)
-        LocationText.style.fontSize = "20px"
-        LocationText.style.textAlign = "center"
-        Container.appendChild(LocationText)
+        //Setting the hint
+        let text
+        if(hint_type === "text"){
+            if(block_type === "training"){
+                Container.appendChild(createFennimalIcon(Fennimal,150, 120,0.4,false, true))
+            }
+            if(block_type === "indirect" || block_type === "final_block"){
+                text = "A new Fennimal has been spotted at " + Param.SubjectFacingLocationNames[Fennimal.location]
+                let LocationText = createTextField((508/2)-200, 150, 400,55, text)
+                LocationText.style.fontSize = "20px"
+                LocationText.style.textAlign = "center"
+                Container.appendChild(LocationText)
+            }
+
+        }
+
+        if(hint_type === "icon"){
+            Container.appendChild(createFennimalIcon(Fennimal,150, 120,0.4,false, true))
+        }
 
         let ContinueButton = createSVGButtonElem((508-150)/2,245,150,30,"Go to the map")
         Container.appendChild(ContinueButton)
@@ -5636,6 +5582,7 @@ CategoryPhaseController_Binary = function(ExpCont, Stimuli, LocCont, DataCont){
         if(RemainingCategoryTrials.length > 0){
             //Check if the previous trial's worth of data needs to be stored.
             if(typeof CurrentCategoryTrial  !== "undefined"){
+                console.log(OutputArray)
                 OutputArray.push(JSON.parse(JSON.stringify(CurrentCategoryTrial)))
             }
 
@@ -5917,6 +5864,7 @@ DataController = function(seed_number, Stimuli){
     //////////////////
     this.store_category_data = function(CategoryTrials){
         Data.CategoryPhase = JSON.parse(JSON.stringify(CategoryTrials))
+        console.log(Data.CategoryPhase)
     }
 
     // CALL AT EXPERIMENT END TO STORE EXPERIMENT TIME.
@@ -6178,8 +6126,7 @@ DataController = function(seed_number, Stimuli){
                     rt: Data.CategoryPhase[i].rt,
                     cor: Data.CategoryPhase[i].correct,
                     c_ans: Data.CategoryPhase[i].correct_answer,
-                    p: Data.CategoryPhase[i].pair,
-                    tpos: Data.CategoryPhase[i].training_pos
+                    p: Data.CategoryPhase[i].paircode,
                 })
             }
         }
@@ -6458,12 +6405,7 @@ ExperimentController = function(Stimuli, DataController){
             }
         }
         if(current_phase_of_the_experiment === "test"){
-            if(CurrentBlockData.type === "direct" || CurrentBlockData.type === "indirect" || CurrentBlockData.type === "final_block"){
-                InstrCont.show_test_phase_target_screen("A new Fennimal has been spotted at " + Param.SubjectFacingLocationNames[CurrentTestTrial.location])
-            }
-            if(CurrentBlockData.type === "training"){
-                InstrCont.show_test_phase_target_screen("An old friend has been spotted at " + Param.SubjectFacingLocationNames[CurrentTestTrial.location])
-            }
+            InstrCont.show_test_phase_target_screen(CurrentTestTrial, CurrentBlockData.type, CurrentBlockData.hint_type)
 
         }
     }
@@ -6913,12 +6855,7 @@ ExperimentController = function(Stimuli, DataController){
         FennimalsPresentOnMap[CurrentTestTrial.location] = CurrentTestTrial
 
         //Show the instructions screen.
-        if(CurrentBlockData.type === "direct" || CurrentBlockData.type === "indirect" || CurrentBlockData.type === "final_block"){
-            InstrCont.show_test_phase_target_screen("A new Fennimal has been spotted at " + Param.SubjectFacingLocationNames[CurrentTestTrial.location])
-        }
-        if(CurrentBlockData.type === "training"){
-            InstrCont.show_test_phase_target_screen("An old friend has been spotted at " + Param.SubjectFacingLocationNames[CurrentTestTrial.location])
-        }
+        InstrCont.show_test_phase_target_screen(CurrentTestTrial, CurrentBlockData.type, CurrentBlockData.hint_type)
 
         //Keep track of which locations are visited
         Search_Trial_Locations_Visited = []
@@ -6932,7 +6869,7 @@ ExperimentController = function(Stimuli, DataController){
     }
     this.test_trial_completed = function(FennimalObj){
         //Store data
-        console.log(FennimalObj)
+
         DataController.store_test_trial(FennimalObj)
 
         //Start next test trial
@@ -6968,7 +6905,7 @@ ExperimentController = function(Stimuli, DataController){
 
 // ON PAGE START //
 // Generate the RNG here. This takes the participant number as a random seed. Request participant number with a prompt
-let participant_number = draw_random_participant_seed() //120// window.prompt("Please enter participant number")
+let participant_number = draw_random_participant_seed() //2000
 console.log(participant_number)
 let RNG = new RandomNumberGenerator(participant_number)
 
@@ -7189,11 +7126,12 @@ EC.showStartScreen()
 //EC.start_delivery_subphase()
 //EC.start_quiz()
 //EC.start_test_phase()
-//EC.start_category_phase()
 
 
-//TODO: regions differ per test phase day
-//  Reprase to days (Test phase: days 1-6, Category phase day 7, Final block day 8)
-//  Add day 8 stimuli
+//TODO: Cat trials store answer given
 
-console.log("Version: 26.09.23 B")
+console.log("Version: 28.09.23")
+//Repeat: hints based on location, change to icon
+// Final trials: make sure that the control item is always available
+// Delivery phase: remove reference to location
+// Name for final trials
