@@ -497,6 +497,13 @@ function createTextField(x,y,width,height,text){
     return(TextBoxContainer)
 }
 
+//Transforms a prolific ID to a seed (first 4 numerical digits)
+function ProlificIDToSeed(PID){
+    let id = JSON.parse(JSON.stringify(PID))
+    let number = id.replace(/\D/g, "")
+    return(number.substring(0,4))
+}
+
 STIMULUSDATA = function(participant_number){
     // RESETTING THE RNG SEED HERE //
     ////////////////////////////////
@@ -556,7 +563,21 @@ STIMULUSDATA = function(participant_number){
         FenObj.body_color_scheme.tertiary_color = Param.RegionData[region].contrast_color
 
         return(FenObj)
+    }
 
+    //Creates a FennimalObj from a template. Assumes that the template has a region, location, head and body. Does not use items!
+    function createFennimalObjFromTemplate(Template, useConjunctiveName, useGrayColorScheme){
+        let FenObj = createFennimalObj(Template.region, Template.location, Template.head, Template.body, false)
+
+        if(useConjunctiveName){
+            FenObj.name = createConjunctiveNameHeadBody(FenObj.body,FenObj.head)
+        }
+
+        if(useGrayColorScheme){
+            FenObj.head_color_scheme = JSON.parse(JSON.stringify(Param.GrayColorScheme))
+            FenObj.body_color_scheme = JSON.parse(JSON.stringify(Param.GrayColorScheme))
+        }
+        return(FenObj)
     }
 
     //Drawing regions
@@ -579,7 +600,7 @@ STIMULUSDATA = function(participant_number){
         IB: Available_Regions.splice(0,1)[0],
         DA: Available_Regions.splice(0,1)[0],
         DB: Available_Regions.splice(0,1)[0],
-        C: TrainingFennimals.C.region,
+        C: Available_Regions.splice(0,1)[0],
     }
     let TestPhaseAvailableLocations = {
         IA: shuffleArray( Param.RegionData[TestPhaseRegions.IA].Locations ),
@@ -588,7 +609,6 @@ STIMULUSDATA = function(participant_number){
         DB: shuffleArray( Param.RegionData[TestPhaseRegions.DB].Locations ),
         C: shuffleArray( Param.RegionData[TestPhaseRegions.C].Locations ),
     }
-    console.log(TestPhaseAvailableLocations)
 
     let TestStimTemplates = {
         IA: {ID: "IA", head: TrainingFennimals.IA.head, body: Available_Bodies.splice(0,1)[0], region: TestPhaseRegions.IA, location: TestPhaseAvailableLocations.IA.splice(0,1)[0], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
@@ -705,7 +725,7 @@ STIMULUSDATA = function(participant_number){
 
     // GROUPING PHASE STIMULI
     let GroupingTrials= []
-    let grouping_phase_setup = "binary"
+    let grouping_phase_setup = "three_alternatives"
 
     // CREATES THE TWO-ALTERNATIVE GROUPING STIMULI (One target, two alternatives)
     // As the basis, we use both the templates for the first and the consequetive test blocks.
@@ -715,78 +735,190 @@ STIMULUSDATA = function(participant_number){
     //      Hence, there are 3 possible distractors.
     //      We make an exception for the control stimulus, which will only be shown once per block
     if(grouping_phase_setup === "two_alternatives"){
-        let Templates_Used_For_GroupingTrials = [TestStimTemplates, TestStimConsequetiveBlocks]
 
         for(let key in TrainingFennimals){
-            //Finding the correct training Fennimal
-            let TrainingFennimal = TrainingFennimals[key]
-            let TargetFennimal = {
-                head: TrainingFennimal.head,
-                body: TrainingFennimal.body,
-                name: TrainingFennimal.name,
-                head_color_scheme : TrainingFennimal.head_color_scheme, //Param.GrayColorScheme,
-                body_color_scheme : TrainingFennimal.body_color_scheme //Param.GrayColorScheme
-            }
+            if(key !== "C"){
 
-            //Now loop over all the items in the Templates
-            for(let i =0;i<Templates_Used_For_GroupingTrials.length;i++){
-                let CorrectAlternative = {}
-                let Distractors_Available = []
+                let Target = createFennimalObjFromTemplate(TestStimTemplates[key],true, true)  //TrainingFennimals[key]
 
-                //Find which ID keys should be used as the correct Alternative, and which IDs are available for the distractors
+                //Determine the pair type
+                let paircode
                 switch(key){
-                    case("IA"):
-                        CorrectAlternative.head =  Templates_Used_For_GroupingTrials[i]["TIB"].head
-                        CorrectAlternative.body=  Templates_Used_For_GroupingTrials[i]["TIB"].body
-                        Distractors_Available = ["TDA","TDB","TC"]
-                        break
-                    case("IB"):
-                        CorrectAlternative.head =  Templates_Used_For_GroupingTrials[i]["TIA"].head
-                        CorrectAlternative.body=  Templates_Used_For_GroupingTrials[i]["TIA"].body
-                        Distractors_Available = ["TDA","TDB","TC"];
-                        break
-                    case("DA"):
-                        CorrectAlternative.head =  Templates_Used_For_GroupingTrials[i]["TDB"].head
-                        CorrectAlternative.body=  Templates_Used_For_GroupingTrials[i]["TDB"].body
-                        Distractors_Available = ["TIA","TIB","TC"];
-                        break
-                    case("DB"):
-                        CorrectAlternative.head =  Templates_Used_For_GroupingTrials[i]["TDA"].head
-                        CorrectAlternative.body=  Templates_Used_For_GroupingTrials[i]["TDA"].body
-                        Distractors_Available = ["TIA","TIB","TC"];
-                        break
-                    case("C"):
-                        CorrectAlternative.head =  Templates_Used_For_GroupingTrials[i]["TC"].head
-                        CorrectAlternative.body=  Templates_Used_For_GroupingTrials[i]["TC"].body
-                        Distractors_Available = ["TDA","TDB","TIA", "TIB"];
-                        break
+                    case("IA"): paircode = "I"; break
+                    case("IB"): paircode = "I"; break
+                    case("DA"): paircode = "D"; break
+                    case("DB"): paircode = "D"; break
+
                 }
-                CorrectAlternative.type = "correct"
-                CorrectAlternative.name = Param.Names_Head[CorrectAlternative.head]
-                CorrectAlternative.head_color_scheme = Param.GrayColorScheme
-                CorrectAlternative.body_color_scheme = Param.GrayColorScheme
 
-                //Finding all target, correct and distractor triplets, and adding it to the array. Here we make an exception for the control, which is only used once per set
-                if(key === "C"){ Distractors_Available = drawRandomElementsFromArray(Distractors_Available,1,false)}
-                for(let d = 0;d<Distractors_Available.length;d++){
-                    let DistractorAlternative = {}
-                    DistractorAlternative.head = Templates_Used_For_GroupingTrials[i][Distractors_Available[d]].head
-                    DistractorAlternative.body = Templates_Used_For_GroupingTrials[i][Distractors_Available[d]].body
-                    DistractorAlternative.type = "distractor"
-                    DistractorAlternative.name = Param.Names_Head[DistractorAlternative.head]
-                    DistractorAlternative.head_color_scheme = Param.GrayColorScheme
-                    DistractorAlternative.body_color_scheme = Param.GrayColorScheme
+                //Finding the correct associated Fennimal (the indirectly associated one)
+                let correct_alt_key
+                switch(key){
+                    case("IA"): correct_alt_key = "IB"; break
+                    case("IB"): correct_alt_key = "IA"; break
+                    case("DA"): correct_alt_key = "DB"; break
+                    case("DB"): correct_alt_key = "DA"; break
 
-                    //Now the new triplet is complete
-                    GroupingTrials.push({
-                        Target: TargetFennimal,
-                        Correct: CorrectAlternative,
-                        Distractor: DistractorAlternative
-                    })
+                }
+
+                //Finding all three other Fennimals to match with (never the direct one)
+                let Alternative_Keys = ["C"]
+                switch(key){
+                    case("IA"): Alternative_Keys.push("DA"); Alternative_Keys.push("DB"); break
+                    case("IB"): Alternative_Keys.push("DA"); Alternative_Keys.push("DB"); break
+                    case("DA"): Alternative_Keys.push("IA"); Alternative_Keys.push("IB"); break
+                    case("DB"): Alternative_Keys.push("IA"); Alternative_Keys.push("IB"); break
+                }
+
+                // Now we can create all the templates
+                let Templates = []
+                Templates.push({left_key: correct_alt_key, right_key: Alternative_Keys[0], correct_answer: "left"})
+                Templates.push({left_key: correct_alt_key, right_key: Alternative_Keys[1], correct_answer: "left"})
+                Templates.push({left_key: correct_alt_key, right_key: Alternative_Keys[2], correct_answer: "left"})
+
+                Templates.push({left_key: Alternative_Keys[0], right_key: correct_alt_key, correct_answer: "right"})
+                Templates.push({left_key: Alternative_Keys[1], right_key: correct_alt_key, correct_answer: "right"})
+                Templates.push({left_key: Alternative_Keys[2], right_key: correct_alt_key, correct_answer: "right"})
+
+                //Now we can loop through these to build the required objects for each trial
+                for(let i=0;i<Templates.length;i++){
+                    let LeftFennimal = createFennimalObjFromTemplate(TestStimTemplates[Templates[i].left_key], true,false)
+                    let RightFennimal = createFennimalObjFromTemplate(TestStimTemplates[Templates[i].right_key], true,false)
+
+                    let TrialObj = {
+                        Target: {
+                            name: Target.name,
+                            head: Target.head,
+                            body: Target.body,
+                            head_color_scheme: Target.head_color_scheme,
+                            body_color_scheme: Target.body_color_scheme
+                        },
+                        Left: {
+                            name: LeftFennimal.name,
+                            head: LeftFennimal.head,
+                            body: LeftFennimal.body,
+                            head_color_scheme: LeftFennimal.head_color_scheme,
+                            body_color_scheme: LeftFennimal.body_color_scheme
+                        },
+                        Right: {
+                            name: RightFennimal.name,
+                            head: RightFennimal.head,
+                            body: RightFennimal.body,
+                            head_color_scheme: RightFennimal.head_color_scheme,
+                            body_color_scheme: RightFennimal.body_color_scheme
+                        },
+                        paircode: paircode,
+                        correct_answer: Templates[i].correct_answer
+                    }
+                    GroupingTrials.push(TrialObj)
                 }
             }
         }
         shuffleArray(GroupingTrials)
+    }
+
+    // CREATES THE THREE-ALTERNATIVE GROUPING STIMULI (One target, three alternatives)
+    //      The target is always drawn from the test set.
+    //      There are three possible alternatives: the correct pairing, one from the other pair and the control
+    if(grouping_phase_setup === "three_alternatives"){
+        let Buffer = []
+
+        for(let key in TrainingFennimals){
+            if(key !== "C"){
+                let Target = createFennimalObjFromTemplate(TestStimTemplates[key],true, false)  //TrainingFennimals[key]
+                let Trials = []
+
+                //Determine the pair type
+                let paircode
+                switch(key){
+                    case("IA"): paircode = "I"; break
+                    case("IB"): paircode = "I"; break
+                    case("DA"): paircode = "D"; break
+                    case("DB"): paircode = "D"; break
+
+                }
+
+                //Finding the correct associated Fennimal (the indirectly associated one)
+                let correct_alt_key
+                switch(key){
+                    case("IA"): correct_alt_key = "IB"; break
+                    case("IB"): correct_alt_key = "IA"; break
+                    case("DA"): correct_alt_key = "DB"; break
+                    case("DB"): correct_alt_key = "DA"; break
+                }
+
+                let Other_pair_keys
+                switch(key){
+                    case("IA"): Other_pair_keys = ["DA", "DB"]; break
+                    case("IB"): Other_pair_keys = ["DA", "DB"]; break
+                    case("DA"): Other_pair_keys = ["IA", "IB"]; break
+                    case("DB"): Other_pair_keys = ["IA", "IB"]; break
+                }
+
+                //Creating the templates. There are three (position of the correct trial: left, middle, center) x 2 (other pair Fennimal).
+                let positions = ["Left", "Middle", "Right"]
+                for(let pos_key = 0;pos_key<positions.length;pos_key++){
+                    let pos = positions[pos_key]
+                    let other_positions = JSON.parse(JSON.stringify(positions))
+                    other_positions.splice(pos_key,1)
+
+                    for(let other_pair_index =0; other_pair_index<Other_pair_keys.length; other_pair_index++){
+                        //Finding the positions of the two incorrect guys. These can be randomized.
+                        let Other_Keys = shuffleArray(["C", Other_pair_keys[other_pair_index]])
+                        let FenCorObj = createFennimalObjFromTemplate(TestStimTemplates[correct_alt_key], true,false)
+                        let FenAObj =  createFennimalObjFromTemplate(TestStimTemplates[Other_Keys[0]], true,false)
+                        let FenBObj =  createFennimalObjFromTemplate(TestStimTemplates[Other_Keys[1]], true,false)
+
+                        let TrialObj = {}
+                        TrialObj.Target = {
+                            key: key,
+                            name: Target.name,
+                            head: Target.head,
+                            body: Target.body,
+                            head_color_scheme: Target.head_color_scheme,
+                            body_color_scheme: Target.body_color_scheme
+                        }
+                        TrialObj[pos] = {
+                            key: correct_alt_key,
+                            name: FenCorObj.name,
+                            head: FenCorObj.head,
+                            body: FenCorObj.body,
+                            head_color_scheme: FenCorObj.head_color_scheme,
+                            body_color_scheme: FenCorObj.body_color_scheme
+                        }
+                        TrialObj[other_positions[0]] = {
+                            key: Other_Keys[0],
+                            name: FenAObj.name,
+                            head: FenAObj.head,
+                            body: FenAObj.body,
+                            head_color_scheme: FenAObj.head_color_scheme,
+                            body_color_scheme: FenAObj.body_color_scheme
+                        }
+                        TrialObj[other_positions[1]] = {
+                            key: Other_Keys[0],
+                            name: FenBObj.name,
+                            head: FenBObj.head,
+                            body: FenBObj.body,
+                            head_color_scheme: FenBObj.head_color_scheme,
+                            body_color_scheme: FenBObj.body_color_scheme
+                        }
+                        TrialObj.correct_answer = pos.toLocaleLowerCase()
+                        TrialObj.paircode = paircode
+                        Trials.push(TrialObj)
+                    }
+                }
+                Buffer.push(shuffleArray(Trials))
+            }
+        }
+        //Now we have all the trials, seperated per type. Now we can weave them into the group trials.
+        for(let i = 0;i<Buffer[0].length;i++){
+            let Set = []
+            for(let k =0;k<Buffer.length;k++){
+                Set.push(Buffer[k][i])
+            }
+            GroupingTrials.push(shuffleArray(Set))
+        }
+        GroupingTrials = GroupingTrials.flat()
     }
 
     //CREATES THE BINARY GROUPING STIMULI (Two Fennimals, pick [yes] or [no] to indicate whether they're drawn from the same family
@@ -846,7 +978,7 @@ STIMULUSDATA = function(participant_number){
                         body_color_scheme: JSON.parse(JSON.stringify(Param.RegionData[TestStimTemplates[keyright].region].Fennimal_location_colors))
                     },
                     paircode: TrialTemplates[i].paircode,
-                    correct: TrialTemplates[i].correct
+                    correct_answer: TrialTemplates[i].correct
                 })
             }
             Groups.push( shuffleArray(Arr) )
@@ -5192,77 +5324,83 @@ HUDController = function(){
 }
 
 //Controls the category phase screens
-CategoryPhaseController_TwoAlts = function(ExpCont, Stimuli, LocCont, DataCont){
-    //NB: NOT FULLY IMPLEMENTED!
+CategoryPhaseController_ThreeAlts = function(ExpCont, Stimuli, LocCont, DataCont){
     //Maximum response time for each trial
-    let max_time_per_trial = 8000
+    let max_time_per_trial = 10000
     let trial_feedback_time = 1000
 
     //Deep copy all the category trials from the stimulus data. Now we have an array we can pop.
     let RemainingCategoryTrials = Stimuli.getCategoryTrials()
 
     //Determines whether or not to show names for the two alternatives
-    let show_names_for_options = false
+    let show_names_for_options = true
     if(!show_names_for_options){
-        document.getElementById("category_name_left").style.display = "none"
-        document.getElementById("category_name_right").style.display = "none"
+        document.getElementById("category_screen_three_alt_name_left").style.display = "none"
+        document.getElementById("category_screen_three_alt_name_middle").style.display = "none"
+        document.getElementById("category_screen_three_alt_name_right").style.display = "none"
+        document.getElementById("category_screen_three_alt_name_left").classList.remove("category_screen_two_alt")
+        document.getElementById("category_screen_three_alt_name_middle").classList.remove("category_screen_two_alt")
+        document.getElementById("category_screen_three_alt_name_right").classList.remove("category_screen_two_alt")
     }
 
     //Create an array to store completed trials. Here we add one element for each category trial
     let OutputArray = []
 
     // Keep track of the current category trial and the total number of trials to be completed
-    let CurrentCategoryTrial, CurrentCategoryData, CurrentTrialOutputData
+    let CurrentCategoryTrial
     let current_round_number = 0
     let total_number_of_trials_to_be_completed = Stimuli.getCategoryTrials().length
 
     //Some easy references to the main SVG layer objects
     let PhaseLayer = document.getElementById("Category_Layer")
     let ScreenLayer = document.getElementById("category_screen_layer")
+    let InstructionsLayer = document.getElementById("category_instructions")
 
     //Setting the sublayer elements to be visible where needed
+    document.getElementById("category_instructions").style.display = "inherit"
+    document.getElementById("category_screen_layer_binary").style.display = "none"
     document.getElementById("category_screen_layer_basic_elements").style.display = "inherit"
-    document.getElementById("category_screen_layer_two_alternatives").style.display = "inherit"
+    document.getElementById("Instructions_Category_Binary").style.display = "none"
+    document.getElementById("Instructions_Category_Two_Alt").style.display = "none"
+    document.getElementById("category_screen_two_alt").style.display = "none"
+    document.getElementById("Instructions_Category_Three_Alt").style.display = "inherit"
+    document.getElementById("category_screen_three_alt").style.display = "inherit"
 
     //References for the left and right icons
-    let IconLeft, IconRight
+    let IconTarget, IconLeft, IconMiddle, IconRight
 
     //Once the category phase is complete, this function relays back to the EC and the DataCont
     function category_phase_complete(){
-        console.log("Phase completed")
-    }
+        DataCont.store_category_data(OutputArray)
 
-    //Shows the instructions to the category phase
+        //Cleaning the screen
+        resetScreen()
+
+        PhaseLayer.style.display = "none"
+        ScreenLayer.style.display = "none"
+        InstructionsLayer.style.display = "none"
+
+        ExpCont.category_phase_finished()
+    }
 
     //Tries to show the next category trial. If none are left, then the phase is completed.
     function start_next_category_trial(){
         if(RemainingCategoryTrials.length > 0){
-            //Check if the previous trial's worth of data needs to be stored.
-            if(typeof CurrentTrialOutputData  !== "undefined"){
-                OutputArray.push(JSON.parse(JSON.stringify(CurrentTrialOutputData)))
-            }
-            CurrentTrialOutputData = {}
-
             CurrentCategoryTrial = RemainingCategoryTrials.splice(0,1)[0]
 
             resetScreen()
 
             //Show the title indicating that a new trial has started
-            document.getElementById("category_trial_title").childNodes[0].innerHTML = "Starting a new question"
+            document.getElementById("category_trial_title").childNodes[0].innerHTML = "Press [Space] to continue"
             document.getElementById("category_trial_title").style.opacity = 1
 
             //Update and show the round counter
             current_round_number++
-            document.getElementById("category_trial_counter").childNodes[0].innerHTML = "Question " + current_round_number + " out of " + total_number_of_trials_to_be_completed
-            document.getElementById("category_trial_counter").style.display = "inherit"
+            document.getElementById("category_screen_three_alt_counter").childNodes[0].innerHTML = "Question " + current_round_number + " out of " + total_number_of_trials_to_be_completed
+            document.getElementById("category_screen_three_alt_counter").style.display = "inherit"
+            document.getElementById("category_screen_three_alt_counter").style.opacity = 1
 
-            setTimeout(function(){
-                document.getElementById("category_trial_counter").style.display = "none"
-                document.getElementById("category_trial_title").style.opacity = 0
-
-                show_target();
-
-            },1000)
+            waiting_for_input = "start"
 
         }else{
             //Phase finished
@@ -5276,43 +5414,311 @@ CategoryPhaseController_TwoAlts = function(ExpCont, Stimuli, LocCont, DataCont){
         //Remove all Fennimal icons
         deleteClassNamesFromElement(ScreenLayer, "Fennimal_Icon")
 
-        //Set the alternative boxes to have the correct classes
-        document.getElementById("category_box_left").classList.add("category_box_active")
-        document.getElementById("category_box_right").classList.add("category_box_active")
-        document.getElementById("category_box_left").classList.remove("category_box_selected")
-        document.getElementById("category_box_right").classList.remove("category_box_selected")
-        document.getElementById("category_box_left").classList.remove("category_box_error")
-        document.getElementById("category_box_right").classList.remove("category_box_error")
-
-        //Hide all the top elements
-        let TopElem = ScreenLayer.getElementsByClassName("category_screen_top")
-        for(let i =0;i<TopElem.length;i++){
-            TopElem[i].style.opacity = 0
+        // Hide trial elements
+        let Elem = ScreenLayer.getElementsByClassName("category_screen_three_alt")
+        for(let i =0;i<Elem.length;i++){
+            Elem[i].style.opacity = 0
         }
-
-        let BottomElem = ScreenLayer.getElementsByClassName("category_screen_bottom")
-        for(let i =0; i< BottomElem.length;i++){
-            BottomElem[i].style.opacity = 0
-        }
+        document.getElementById("category_trial_title").style.opacity = 0
+        document.getElementById("category_timer_bar").style.display = "none"
 
         //Show the map as a background
         LocCont.show_passive_map()
-
-        //Make sure that the correct layers are set to visible
-        PhaseLayer.style.display = "inherit"
-        ScreenLayer.style.display = "inherit"
-        //TODO: hide instructions here
-
-
     }
 
     //Manages the keyboard inputs
     let waiting_for_input = false
     document.onkeydown = function(e){
-
         if(waiting_for_input !== false){
             switch(waiting_for_input){
-                case("second_space"): if(e.key === " ") {show_alternatives(); waiting_for_input = false } break
+                case("start"):
+                    if(e.key === " ") {waiting_for_input = false; show_trial(); } break
+                case("decision"):
+                    if(e.key === "j") { decision_made("left"); waiting_for_input = false}
+                    if(e.key === "k") { decision_made("middle"); waiting_for_input = false}
+                    if(e.key === "l") { decision_made("right"); waiting_for_input = false}
+            }
+        }
+    }
+
+    //Creates a Fennimal Icon of the given FennimalObject on either the left or right position.
+    function createFennimalIcon(FennimalObj, position){
+        //Position determines the x and y coordinates
+        let x,y
+        switch(position){
+            case("target"): x = 160; y = 20; break
+            case("left"): x = 10; y =140; break
+            case("middle"): x = 160; y = 140; break
+            case("right"): x = 310; y = 140; break
+        }
+
+        let scale = 0.375
+
+        //Create the outline object
+        let IconObj
+        IconObj = createFennimal(FennimalObj)
+        IconObj.style.transform = "scale(" + scale + ")"
+        let Container = document.createElementNS("http://www.w3.org/2000/svg", 'g')
+        Container.appendChild(IconObj)
+        Container.style.transform = "translate(" + x + "px," + y +"px)"
+        Container.classList.add("Fennimal_Icon")
+        Container.style.pointerEvents = "none"
+        ScreenLayer.appendChild(Container)
+
+        if(position === "left") {IconLeft = IconObj}
+        if(position === "middle") {IconMiddle = IconObj}
+        if(position === "right") {IconRight = IconObj}
+        if(position === "target") {IconTarget = IconObj}
+    }
+
+    // Call to show the target
+    function show_trial(){
+        document.getElementById("category_screen_three_alt_counter").style.display = "none"
+        document.getElementById("category_trial_title").style.opacity = 0
+
+        //Show the SVG elements at the top of the screen
+        let Elem = ScreenLayer.getElementsByClassName("category_screen_three_alt")
+        for(let i =0;i<Elem.length;i++){
+            Elem[i].style.opacity = 1
+        }
+
+        //Set the names
+        document.getElementById("category_screen_three_alt_target_name").childNodes[0].innerHTML = "This is a " + CurrentCategoryTrial.Target.name
+        document.getElementById("category_screen_three_alt_question").childNodes[0].innerHTML = "Which of these three Fennimals is most closely related to the " +CurrentCategoryTrial.Target.name + "?"
+
+        document.getElementById("category_screen_three_alt_name_left").childNodes[0].innerHTML = CurrentCategoryTrial.Left.name
+        document.getElementById("category_screen_three_alt_name_middle").childNodes[0].innerHTML = CurrentCategoryTrial.Middle.name
+        document.getElementById("category_screen_three_alt_name_right").childNodes[0].innerHTML = CurrentCategoryTrial.Right.name
+
+        //Create the Fennimal icons
+        createFennimalIcon(CurrentCategoryTrial.Target, "target")
+        createFennimalIcon(CurrentCategoryTrial.Left, "left")
+        createFennimalIcon(CurrentCategoryTrial.Middle, "middle")
+        createFennimalIcon(CurrentCategoryTrial.Right, "right")
+
+        //Start timer
+        start_trial_timer()
+
+    }
+
+    // Call to start the per-trial timer and rt measurements
+    let TimerCountdownTimeout, DecisionStartTime
+    function start_trial_timer(){
+        //Animate the timer bar decreasing
+        document.getElementById("category_timer_bar").style.display = "inherit"
+        document.getElementById("category_timer_bar").style.animation = "category_countdown_timer " + (max_time_per_trial) + "ms linear"
+
+        TimerCountdownTimeout = setTimeout(function(){trial_timed_out()}, max_time_per_trial)
+        DecisionStartTime = Date.now()
+        waiting_for_input = "decision"
+    }
+
+    //Call when the trial times out
+    function trial_timed_out(){
+        waiting_for_input = false
+        CurrentCategoryTrial.decision = "timed_out"
+        CurrentCategoryTrial.correct = false
+        document.getElementById("category_timer_bar").style.display = "none"
+
+        resetScreen()
+        document.getElementById("category_trial_title").childNodes[0].innerHTML = "PLEASE PICK BEFORE THE TIME RUNS OUT"
+        document.getElementById("category_trial_title").style.opacity = 1
+
+        store_trial()
+        setTimeout(function(){start_next_category_trial()}, 2*trial_feedback_time)
+
+
+    }
+
+    //Call when a decision has been made ("left" or "right")
+    function decision_made(decision){
+        //Cancel the trial timeout
+        clearTimeout(TimerCountdownTimeout)
+        document.getElementById("category_timer_bar").style.display = "none"
+
+        //Give feedback to the participant
+        switch(decision){
+            case("left"):
+                document.getElementById("category_screen_three_alt_press_K").style.opacity = 0.15
+                document.getElementById("category_screen_three_alt_name_middle").style.opacity = 0.15
+                IconMiddle.style.opacity = 0.15
+
+                document.getElementById("category_screen_three_alt_press_L").style.opacity = 0.15
+                document.getElementById("category_screen_three_alt_name_right").style.opacity = 0.15
+                IconRight.style.opacity = 0.15
+
+                break
+            case("middle"):
+                document.getElementById("category_screen_three_alt_press_J").style.opacity = 0.15
+                document.getElementById("category_screen_three_alt_name_left").style.opacity = 0.15
+                IconLeft.style.opacity = 0.15
+
+                document.getElementById("category_screen_three_alt_press_L").style.opacity = 0.15
+                document.getElementById("category_screen_three_alt_name_right").style.opacity = 0.15
+                IconRight.style.opacity = 0.15
+                break
+            case("right"):
+                document.getElementById("category_screen_three_alt_press_K").style.opacity = 0.15
+                document.getElementById("category_screen_three_alt_name_middle").style.opacity = 0.15
+                IconMiddle.style.opacity = 0.15
+
+                document.getElementById("category_screen_three_alt_press_J").style.opacity = 0.15
+                document.getElementById("category_screen_three_alt_name_left").style.opacity = 0.15
+                IconLeft.style.opacity = 0.15
+                break
+        }
+
+        //Store decision data
+        CurrentCategoryTrial.decision = decision
+        CurrentCategoryTrial.correct = decision === CurrentCategoryTrial.correct_answer
+        CurrentCategoryTrial.rt = Date.now() - DecisionStartTime
+
+        //After a brief feedback, go to the next trial
+        store_trial()
+        setTimeout(function(){start_next_category_trial()}, trial_feedback_time)
+    }
+
+    //Call to store the trial
+    function store_trial(){
+        OutputArray.push(JSON.parse(JSON.stringify(CurrentCategoryTrial)))
+    }
+
+    function instructions_completed(){
+        PhaseLayer.style.display = "inherit"
+        ScreenLayer.style.display = "inherit"
+        InstructionsLayer.style.display = "none"
+
+        start_next_category_trial()
+    }
+
+    //Call to start the category matching phase.
+    this.start_category_phase = function(){
+        //Make sure that the correct layers are set to visible
+        PhaseLayer.style.display = "inherit"
+        ScreenLayer.style.display = "none"
+        InstructionsLayer.style.display = "inherit"
+
+        //Show the map as a background
+        LocCont.show_passive_map()
+
+        // Create the instructions button
+        let Button = createSVGButtonElem((508-150)/2,255,160,25,"CONTINUE")
+        InstructionsLayer.appendChild(Button)
+        Button.onclick = instructions_completed
+
+
+        //start_next_category_trial()
+    }
+
+}
+
+CategoryPhaseController_TwoAlts = function(ExpCont, Stimuli, LocCont, DataCont){
+    //Maximum response time for each trial
+    let max_time_per_trial = 10000
+    let trial_feedback_time = 1000
+
+    //Deep copy all the category trials from the stimulus data. Now we have an array we can pop.
+    let RemainingCategoryTrials = Stimuli.getCategoryTrials()
+
+    //Determines whether or not to show names for the two alternatives
+    let show_names_for_options = true
+    if(!show_names_for_options){
+        document.getElementById("category_screen_two_alt_name_left").style.display = "none"
+        document.getElementById("category_screen_two_alt_name_right").style.display = "none"
+        document.getElementById("category_screen_two_alt_name_left").classList.remove("category_screen_two_alt")
+        document.getElementById("category_screen_two_alt_name_right").classList.remove("category_screen_two_alt")
+    }
+
+    //Create an array to store completed trials. Here we add one element for each category trial
+    let OutputArray = []
+
+    // Keep track of the current category trial and the total number of trials to be completed
+    let CurrentCategoryTrial
+    let current_round_number = 0
+    let total_number_of_trials_to_be_completed = Stimuli.getCategoryTrials().length
+
+    //Some easy references to the main SVG layer objects
+    let PhaseLayer = document.getElementById("Category_Layer")
+    let ScreenLayer = document.getElementById("category_screen_layer")
+    let InstructionsLayer = document.getElementById("category_instructions")
+
+    //Setting the sublayer elements to be visible where needed
+    document.getElementById("category_instructions").style.display = "inherit"
+    document.getElementById("category_screen_layer_binary").style.display = "none"
+    document.getElementById("category_screen_layer_basic_elements").style.display = "inherit"
+    document.getElementById("Instructions_Category_Binary").style.display = "none"
+    document.getElementById("Instructions_Category_Two_Alt").style.display = "inherit"
+    document.getElementById("category_screen_two_alt").style.display = "inherit"
+    document.getElementById("Instructions_Category_Three_Alt").style.display = "none"
+    document.getElementById("category_screen_three_alt").style.display = "none"
+
+    //References for the left and right icons
+    let IconTarget, IconLeft, IconRight
+
+    //Once the category phase is complete, this function relays back to the EC and the DataCont
+    function category_phase_complete(){
+        DataCont.store_category_data(OutputArray)
+
+        //Cleaning the screen
+        resetScreen()
+
+        PhaseLayer.style.display = "none"
+        ScreenLayer.style.display = "none"
+        InstructionsLayer.style.display = "none"
+
+        ExpCont.category_phase_finished()
+    }
+
+    //Tries to show the next category trial. If none are left, then the phase is completed.
+    function start_next_category_trial(){
+        if(RemainingCategoryTrials.length > 0){
+            CurrentCategoryTrial = RemainingCategoryTrials.splice(0,1)[0]
+
+            resetScreen()
+
+            //Show the title indicating that a new trial has started
+            document.getElementById("category_trial_title").childNodes[0].innerHTML = "Press [Space] to continue"
+            document.getElementById("category_trial_title").style.opacity = 1
+
+            //Update and show the round counter
+            current_round_number++
+            document.getElementById("category_screen_two_alt_counter").childNodes[0].innerHTML = "Question " + current_round_number + " out of " + total_number_of_trials_to_be_completed
+            document.getElementById("category_screen_two_alt_counter").style.display = "inherit"
+            document.getElementById("category_screen_two_alt_counter").style.opacity = 1
+
+            waiting_for_input = "start"
+
+        }else{
+            //Phase finished
+            category_phase_complete()
+        }
+    }
+
+    //STAGES
+    // Resets the screen
+    function resetScreen(){
+        //Remove all Fennimal icons
+        deleteClassNamesFromElement(ScreenLayer, "Fennimal_Icon")
+
+        // Hide trial elements
+        let Elem = ScreenLayer.getElementsByClassName("category_screen_two_alt")
+        for(let i =0;i<Elem.length;i++){
+            Elem[i].style.opacity = 0
+        }
+        document.getElementById("category_trial_title").style.opacity = 0
+        document.getElementById("category_timer_bar").style.display = "none"
+
+        //Show the map as a background
+        LocCont.show_passive_map()
+    }
+
+    //Manages the keyboard inputs
+    let waiting_for_input = false
+    document.onkeydown = function(e){
+        if(waiting_for_input !== false){
+            switch(waiting_for_input){
+                case("start"):
+                    if(e.key === " ") {waiting_for_input = false; show_trial(); } break
                 case("decision"):
                     if(e.key === "f") { decision_made("left"); waiting_for_input = false}
                     if(e.key === "j") { decision_made("right"); waiting_for_input = false} break
@@ -5320,14 +5726,14 @@ CategoryPhaseController_TwoAlts = function(ExpCont, Stimuli, LocCont, DataCont){
         }
     }
 
-    //Creates a Fennimal Icon of the given FennimalObject on either the target (top), left or right position.
+    //Creates a Fennimal Icon of the given FennimalObject on either the left or right position.
     function createFennimalIcon(FennimalObj, position){
         //Position determines the x and y coordinates
         let x,y
         switch(position){
-            case("target"): x = 125; y = 21; break //x = 254; y = 85;
-            case("left"): x = -25; y =115; break
-            case("right"): x = 290; y = 115; break
+            case("left"): x = -30; y =120; break
+            case("right"): x = 280; y = 120; break
+            case("target"): x = 130; y = 15; break
         }
 
         let scale = 0.5
@@ -5345,106 +5751,35 @@ CategoryPhaseController_TwoAlts = function(ExpCont, Stimuli, LocCont, DataCont){
 
         if(position === "left") {IconLeft = IconObj}
         if(position === "right") {IconRight = IconObj}
+        if(position === "right") {IconTarget = IconObj}
 
     }
 
     // Call to show the target
-    function show_target(){
+    function show_trial(){
+        document.getElementById("category_screen_two_alt_counter").style.display = "none"
+        document.getElementById("category_trial_title").style.opacity = 0
 
         //Show the SVG elements at the top of the screen
-        let TopElem = ScreenLayer.getElementsByClassName("category_screen_top")
-        for(let i =0;i<TopElem.length;i++){
-            TopElem[i].style.opacity = 1
+        let Elem = ScreenLayer.getElementsByClassName("category_screen_two_alt")
+        for(let i =0;i<Elem.length;i++){
+            Elem[i].style.opacity = 1
         }
 
-        //Set the name
-        document.getElementById("category_name_target").childNodes[0].innerHTML = "This is a " +  CurrentCategoryTrial.Target.name
+        //Set the names
+        document.getElementById("category_screen_two_alt_target_name").childNodes[0].innerHTML = "This is a " + CurrentCategoryTrial.Target.name
+        document.getElementById("category_screen_two_alt_target_name_question").childNodes[0].innerHTML = CurrentCategoryTrial.Target.name
 
-        //Create a Fennimal icon
+        document.getElementById("category_screen_two_alt_name_left").childNodes[0].innerHTML = CurrentCategoryTrial.Left.name
+        document.getElementById("category_screen_two_alt_name_right").childNodes[0].innerHTML = CurrentCategoryTrial.Right.name
+
+        //Create the Fennimal icons
         createFennimalIcon(CurrentCategoryTrial.Target, "target")
+        createFennimalIcon(CurrentCategoryTrial.Left, "left")
+        createFennimalIcon(CurrentCategoryTrial.Right, "right")
 
-
-        //Store the target
-        CurrentTrialOutputData.Target = JSON.parse(JSON.stringify( {head: CurrentCategoryTrial.Target.head, body: CurrentCategoryTrial.Target.body, name: CurrentCategoryTrial.Target.name}))
-
-        //After a brief delay, show the press space text and allow for new keyboard inputs
-        setTimeout(function(){
-            document.getElementById("category_space_bottom").style.opacity = 1
-            waiting_for_input = "second_space"
-        },1000)
-
-    }
-
-    // Event handler for the button at the bottom of the screen (shows the options)
-    function show_alternatives(){
-        document.getElementById("category_space_bottom").style.opacity = 0
-
-        setTimeout(function(){
-            //Show the SVG elements at the bottom of the screen
-            let BottomElem = ScreenLayer.getElementsByClassName("category_screen_bottom")
-            for(let i =0;i<BottomElem.length;i++){
-                BottomElem[i].style.opacity = 1
-            }
-            document.getElementById("category_space_bottom").style.opacity = 0
-
-
-            //Randomly determine the distractor and the correct option
-            if(RNG.rand() > 0.5){
-                //Left option is the distractor
-                CurrentTrialOutputData.correct_option = "right"
-
-                createFennimalIcon(CurrentCategoryTrial.Distractor, "left")
-                let OptionLeft = JSON.parse(JSON.stringify( {head: CurrentCategoryTrial.Distractor.head, body: CurrentCategoryTrial.Distractor.body}))
-
-                if(show_names_for_options){
-                    document.getElementById("category_name_left").childNodes[0].innerHTML = "This is a " +  CurrentCategoryTrial.Distractor.name
-                    OptionLeft.name = JSON.parse(JSON.stringify(CurrentCategoryTrial.Distractor.name))
-                }
-                CurrentTrialOutputData.OptionLeft = OptionLeft
-
-                //Right option is the correct alternative
-                createFennimalIcon(CurrentCategoryTrial.Correct, "right")
-                let OptionRight = JSON.parse(JSON.stringify( {head: CurrentCategoryTrial.Correct.head, body: CurrentCategoryTrial.Correct.body}))
-
-                if(show_names_for_options){
-                    document.getElementById("category_name_right").childNodes[0].innerHTML = "This is a " +  CurrentCategoryTrial.Correct.name
-                    OptionRight.name = JSON.parse(JSON.stringify(CurrentCategoryTrial.Correct.name))
-                }
-                CurrentTrialOutputData.OptionRight = OptionRight
-
-            }
-            else{
-                //Left option is correct
-                CurrentTrialOutputData.correct_option = "left"
-
-                createFennimalIcon(CurrentCategoryTrial.Correct, "left")
-                let OptionLeft = JSON.parse(JSON.stringify( {head: CurrentCategoryTrial.Correct.head, body: CurrentCategoryTrial.Correct.body}))
-
-                if(show_names_for_options){
-                    document.getElementById("category_name_left").childNodes[0].innerHTML = "This is a " +  CurrentCategoryTrial.Correct.name
-                    OptionLeft.name = JSON.parse(JSON.stringify(CurrentCategoryTrial.Correct.name))
-                }
-                CurrentTrialOutputData.OptionLeft = OptionLeft
-
-                //Right option is the distractor alternative
-                createFennimalIcon(CurrentCategoryTrial.Distractor, "right")
-                let OptionRight = JSON.parse(JSON.stringify( {head: CurrentCategoryTrial.Distractor.head, body: CurrentCategoryTrial.Distractor.body}))
-
-                if(show_names_for_options){
-                    document.getElementById("category_name_right").childNodes[0].innerHTML = "This is a " +  CurrentCategoryTrial.Distractor.name
-                    OptionRight.name = JSON.parse(JSON.stringify(CurrentCategoryTrial.Distractor.name))
-                }
-                CurrentTrialOutputData.OptionRight = OptionRight
-
-            }
-
-            //Set the name in the question text
-            document.getElementById("category_question_name").childNodes[0].innerHTML = CurrentCategoryTrial.Target.name + "?"
-
-            //Then start the timer and the rt measures
-            start_trial_timer()
-
-        },500)
+        //Start timer
+        start_trial_timer()
 
     }
 
@@ -5457,69 +5792,86 @@ CategoryPhaseController_TwoAlts = function(ExpCont, Stimuli, LocCont, DataCont){
 
         TimerCountdownTimeout = setTimeout(function(){trial_timed_out()}, max_time_per_trial)
         DecisionStartTime = Date.now()
-
         waiting_for_input = "decision"
-
     }
 
     //Call when the trial times out
     function trial_timed_out(){
         waiting_for_input = false
-        CurrentTrialOutputData.decision = "timed_out"
-        CurrentTrialOutputData.correct = false
+        CurrentCategoryTrial.decision = "timed_out"
+        CurrentCategoryTrial.correct = false
         document.getElementById("category_timer_bar").style.display = "none"
 
-        //Highlight the boxes as an error
-        document.getElementById("category_box_right").classList.remove("category_box_active")
-        document.getElementById("category_box_left").classList.remove("category_box_active")
-        document.getElementById("category_box_left").classList.add("category_box_error")
-        document.getElementById("category_box_right").classList.add("category_box_error")
+        resetScreen()
+        document.getElementById("category_trial_title").childNodes[0].innerHTML = "PLEASE PICK BEFORE THE TIME RUNS OUT"
+        document.getElementById("category_trial_title").style.opacity = 1
 
-        //After a brief feedback, go to the next trial
-        setTimeout(function(){
-            resetScreen()
-            document.getElementById("category_trial_title").childNodes[0].innerHTML = "PLEASE PICK BEFORE THE TIME RUNS OUT"
-            document.getElementById("category_trial_title").style.opacity = 1
-        }, 2*trial_feedback_time)
-        setTimeout(function(){start_next_category_trial()}, 4*trial_feedback_time)
+        store_trial()
+        setTimeout(function(){start_next_category_trial()}, 2*trial_feedback_time)
 
 
     }
 
     //Call when a decision has been made ("left" or "right")
-    function decision_made(alternative){
+    function decision_made(decision){
         //Cancel the trial timeout
         clearTimeout(TimerCountdownTimeout)
         document.getElementById("category_timer_bar").style.display = "none"
 
-        document.getElementById("category_box_right").classList.remove("category_box_active")
-        document.getElementById("category_box_left").classList.remove("category_box_active")
-
         //Give feedback to the participant
-        if(alternative === "left"){
-            setTimeout(function(){IconRight.style.opacity = 0.4},250)
-            document.getElementById("category_box_left").classList.add("category_box_selected")
-            document.getElementById("category_box_right").style.opacity = 0.25
-        }else{
-            setTimeout(function(){IconLeft.style.opacity = 0.4},250)
-            document.getElementById("category_box_right").classList.add("category_box_selected")
-            document.getElementById("category_box_left").style.opacity = 0.25
+        switch(decision){
+            case("left"):
+                document.getElementById("category_screen_two_alt_press_J").style.opacity = 0.15
+                document.getElementById("category_screen_two_alt_name_right").style.opacity = 0.15
+                IconRight.style.opacity = 0.15
+                break
+            case("right"):
+                document.getElementById("category_screen_two_alt_press_F").style.opacity = 0.15
+                document.getElementById("category_screen_two_alt_name_left").style.opacity = 0.15
+                IconLeft.style.opacity = 0.15
+                break
         }
 
         //Store decision data
-        CurrentTrialOutputData.decision = alternative
-        CurrentTrialOutputData.correct = (CurrentTrialOutputData.correct_option === alternative)
-        CurrentTrialOutputData.rt = Date.now() - DecisionStartTime
+        CurrentCategoryTrial.decision = decision
+        CurrentCategoryTrial.correct = decision === CurrentCategoryTrial.correct_answer
+        CurrentCategoryTrial.rt = Date.now() - DecisionStartTime
 
         //After a brief feedback, go to the next trial
+        store_trial()
         setTimeout(function(){start_next_category_trial()}, trial_feedback_time)
     }
 
+    //Call to store the trial
+    function store_trial(){
+        OutputArray.push(JSON.parse(JSON.stringify(CurrentCategoryTrial)))
+    }
 
+    function instructions_completed(){
+        PhaseLayer.style.display = "inherit"
+        ScreenLayer.style.display = "inherit"
+        InstructionsLayer.style.display = "none"
+
+        start_next_category_trial()
+    }
 
     //Call to start the category matching phase.
     this.start_category_phase = function(){
-        start_next_category_trial()
+        //Make sure that the correct layers are set to visible
+        PhaseLayer.style.display = "inherit"
+        ScreenLayer.style.display = "none"
+        InstructionsLayer.style.display = "inherit"
+
+        //Show the map as a background
+        LocCont.show_passive_map()
+
+        // Create the instructions button
+        let Button = createSVGButtonElem((508-150)/2,255,160,25,"CONTINUE")
+        InstructionsLayer.appendChild(Button)
+        Button.onclick = instructions_completed
+
+
+        //start_next_category_trial()
     }
 
 }
@@ -5553,9 +5905,14 @@ CategoryPhaseController_Binary = function(ExpCont, Stimuli, LocCont, DataCont){
     let InstructionsLayer = document.getElementById("category_instructions")
 
     //Setting the sublayer elements to be visible where needed
+    document.getElementById("category_instructions").style.display = "inherit"
     document.getElementById("category_screen_layer_binary").style.display = "inherit"
     document.getElementById("category_screen_layer_basic_elements").style.display = "inherit"
-    document.getElementById("category_screen_layer_two_alternatives").style.display = "none"
+    document.getElementById("Instructions_Category_Binary").style.display = "inherit"
+    document.getElementById("Instructions_Category_Two_Alt").style.display = "none"
+    document.getElementById("category_screen_two_alt").style.display = "none"
+    document.getElementById("Instructions_Category_Three_Alt").style.display = "none"
+    document.getElementById("category_screen_three_alt").style.display = "none"
 
     //References for the left and right icons
     let IconLeft, IconRight
@@ -5580,12 +5937,6 @@ CategoryPhaseController_Binary = function(ExpCont, Stimuli, LocCont, DataCont){
     //Tries to show the next category trial. If none are left, then the phase is completed.
     function start_next_category_trial(){
         if(RemainingCategoryTrials.length > 0){
-            //Check if the previous trial's worth of data needs to be stored.
-            if(typeof CurrentCategoryTrial  !== "undefined"){
-                console.log(OutputArray)
-                OutputArray.push(JSON.parse(JSON.stringify(CurrentCategoryTrial)))
-            }
-
             CurrentCategoryTrial = RemainingCategoryTrials.splice(0,1)[0]
 
             resetScreen()
@@ -5718,8 +6069,10 @@ CategoryPhaseController_Binary = function(ExpCont, Stimuli, LocCont, DataCont){
         document.getElementById("category_trial_title").childNodes[0].innerHTML = "PLEASE PICK BEFORE THE TIME RUNS OUT"
         document.getElementById("category_trial_title").style.opacity = 1
 
-        setTimeout(function(){start_next_category_trial()}, 2*trial_feedback_time)
+        //Store the data
+        store_trial()
 
+        setTimeout(function(){start_next_category_trial()}, 2*trial_feedback_time)
 
     }
 
@@ -5738,11 +6091,19 @@ CategoryPhaseController_Binary = function(ExpCont, Stimuli, LocCont, DataCont){
 
         //Store decision data
         CurrentCategoryTrial.decision = decision
-        CurrentCategoryTrial.correct_answer = (CurrentCategoryTrial.decision === "yes") === CurrentCategoryTrial.correct
+        CurrentCategoryTrial.correct = (CurrentCategoryTrial.decision === "yes") === CurrentCategoryTrial.correct_answer
         CurrentCategoryTrial.rt = Date.now() - DecisionStartTime
+
+        //Store the data
+        store_trial()
 
         //After a brief feedback, go to the next trial
         setTimeout(function(){start_next_category_trial()}, trial_feedback_time)
+    }
+
+    //Call to store the trial
+    function store_trial(){
+        OutputArray.push(JSON.parse(JSON.stringify(CurrentCategoryTrial)))
     }
 
     function instructions_completed(){
@@ -5874,7 +6235,6 @@ DataController = function(seed_number, Stimuli){
 
     //Call after experiment is completed to return the subject's score. Also updates the completion code to include the star rating
     this.get_score = function(){
-        console.log(Data)
         //Calculating base stars (from the test trials)
         let total = 0, liked = 0
         for(let i =0;i<Data.TestTrials.length;i++){
@@ -5894,7 +6254,7 @@ DataController = function(seed_number, Stimuli){
         if(Data.CategoryPhase.length > 0 ){
             total_category_trials = Data.CategoryPhase.length
             for(let i=0;i<Data.CategoryPhase.length;i++){
-                if(Data.CategoryPhase[i].correct_answer){
+                if(Data.CategoryPhase[i].correct){
                     correct_categories++
                 }
 
@@ -6131,7 +6491,35 @@ DataController = function(seed_number, Stimuli){
             }
         }
         if(Stimuli.getCategoryType() === "two_alternatives"){
-            //TODO
+            for(let i = 0;i<Data.CategoryPhase.length; i++){
+                OptCatData.push({
+                    num: i+1,
+                    T : {h: Data.CategoryPhase[i].Target.head, b: Data.CategoryPhase[i].Target.body },
+                    L : {h: Data.CategoryPhase[i].Left.head, b: Data.CategoryPhase[i].Left.body },
+                    R : {h: Data.CategoryPhase[i].Right.head, b: Data.CategoryPhase[i].Right.body },
+                    dec: Data.CategoryPhase[i].decision,
+                    rt: Data.CategoryPhase[i].rt,
+                    cor: Data.CategoryPhase[i].correct,
+                    c_ans: Data.CategoryPhase[i].correct_answer,
+                    p: Data.CategoryPhase[i].paircode,
+                })
+            }
+        }
+        if(Stimuli.getCategoryType() === "three_alternatives"){
+            for(let i = 0;i<Data.CategoryPhase.length; i++){
+                OptCatData.push({
+                    num: i+1,
+                    t : Data.CategoryPhase[i].Target.key,
+                    l : Data.CategoryPhase[i].Left.key,
+                    m : Data.CategoryPhase[i].Middle.key,
+                    r : Data.CategoryPhase[i].Right.key,
+                    dec: Data.CategoryPhase[i].decision,
+                    rt: Data.CategoryPhase[i].rt,
+                    cor: Data.CategoryPhase[i].correct,
+                    c_ans: Data.CategoryPhase[i].correct_answer,
+                    p: Data.CategoryPhase[i].paircode,
+                })
+            }
         }
 
         let ReturnData = {
@@ -6154,6 +6542,7 @@ DataController = function(seed_number, Stimuli){
 
         if(Param.ExperimentRecruitmentMethod === "prolific"){ ReturnData.Prlfc = Data.Prolific}
 
+        console.log(ReturnData)
         return(ReturnData)
     }
 
@@ -6884,7 +7273,11 @@ ExperimentController = function(Stimuli, DataController){
             CatCont.start_category_phase();
         }
         if(Stimuli.getCategoryType() === "two_alternatives"){
-            let CatCont = new CategoryPhaseController_TwoAlts(this, Stimuli, LocCont, DataController)
+            let CatCont = new CategoryPhaseController_TwoAlts(that, Stimuli, LocCont, DataController)
+            CatCont.start_category_phase();
+        }
+        if(Stimuli.getCategoryType() === "three_alternatives"){
+            let CatCont = new CategoryPhaseController_ThreeAlts(that, Stimuli, LocCont, DataController)
             CatCont.start_category_phase();
         }
     }
@@ -6905,11 +7298,28 @@ ExperimentController = function(Stimuli, DataController){
 
 // ON PAGE START //
 // Generate the RNG here. This takes the participant number as a random seed. Request participant number with a prompt
-let participant_number = draw_random_participant_seed() //2000
+let Param = new PARAMETERS()
+let participant_number
+
+if(Param.ExperimentRecruitmentMethod === "prolific"){
+    let url_string = window.location;
+    let url = new URL(url_string);
+    let PID =  url.searchParams.get("PROLIFIC_PID")
+    if(PID != null){
+        participant_number = ProlificIDToSeed(PID)
+        console.warn("SEEDED " + participant_number)
+    }else{
+        participant_number = draw_random_participant_seed() //2000
+        console.warn("NO PID FOUND. Defaulting to random seed " + participant_number)
+    }
+}
+else{
+    participant_number = draw_random_participant_seed()
+}
 console.log(participant_number)
 let RNG = new RandomNumberGenerator(participant_number)
 
-let Param = new PARAMETERS()
+
 let Stimuli = new STIMULUSDATA(participant_number);
 
 //Instructions shown to the participant
@@ -7128,10 +7538,13 @@ EC.showStartScreen()
 //EC.start_test_phase()
 
 
-//TODO: Cat trials store answer given
+//TODO: Control Test in different region
+//  Set seed based on PID
+// SVG Garbage collector?
 
-console.log("Version: 28.09.23")
+console.log("Version: 2.10.23")
 //Repeat: hints based on location, change to icon
 // Final trials: make sure that the control item is always available
 // Delivery phase: remove reference to location
 // Name for final trials
+

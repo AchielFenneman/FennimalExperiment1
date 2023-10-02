@@ -371,95 +371,6 @@
             pointer-events:none
         }
 
-        /*ITEMS */
-        #item_spinner .item_container_active {
-            animation: rotation 700ms ease-in-out infinite;
-            transform-origin: 35px 37px
-        }
-        #item_boomerang .spin_container_active {
-            transform-origin: 35px 35px;
-            animation: boomerang_rotation 3000ms linear infinite;
-        }
-        #item_boomerang .movement_container_active {
-            transform-origin: 35px 35px;
-            animation: boomerang_movement 3000ms ease-in-out infinite;
-        }
-        #item_balloon .movement_container_active {
-            transform-origin: 35px 35px;
-            animation: balloon_movement 3000ms linear infinite;
-        }
-        #item_trumpet .swing_container_active {
-            transform-origin: 75px 10px;
-            animation: trumpet_swing 3000ms linear infinite;
-        }
-        #item_shovel .movement_container_active {
-            transform-origin: 45px 45px;
-            animation: shovel_movement 2000ms linear infinite;
-        }
-        #item_car .movement_container_active{
-            transform-origin: 45px 42px;
-            animation: driving_car 3000ms linear infinite;
-        }
-        @keyframes rotation {
-            from {transform: rotate(0deg);}
-            to {transform: rotate(359deg); }
-        }
-        @keyframes boomerang_movement {
-            5% { translate: 0 -10px}
-            50% { translate: 200px -50px}
-            95% {translate: 0 0}
-        }
-        @keyframes boomerang_rotation {
-            5% { transform: rotate(0deg);}
-            50% { transform: rotate(350deg);}
-            52% { transform: rotate(360deg);}
-            95% { transform: rotate(720deg);}
-            95.1% { transform: rotate(0deg);}
-        }
-        @keyframes balloon_movement {
-            50% {translate: 0 -80px}
-            54% {translate: 0 -75px}
-            58% {translate: 0 -80px}
-            61% {translate: 0 -77px}
-            64% {translate: 0 -80px}
-            80% {translate: 0 -80px}
-            95% {translate: 0 10px}
-        }
-        @keyframes trumpet_swing {
-            10% { transform: rotate(20deg);}
-            20% { transform: rotate(0deg);}
-            28% { transform: rotate(25deg);}
-            45% { transform: rotate(0deg);}
-            55% { transform: rotate(-20deg);}
-            67% { transform: rotate(25deg);}
-            70% { transform: rotate(20deg);}
-            75% { transform: rotate(25deg);}
-            80% { transform: rotate(18deg);}
-            87% { transform: rotate(23deg);}
-        }
-        @keyframes shovel_movement {
-            10% { translate: -30px -20px; transform: rotate(20deg);}
-            30% { translate: -50px 20px; transform: rotate(30deg);}
-            40% { translate: -20px 20px; transform: rotate(-10deg);}
-            50% { translate: 20px 20px; transform: rotate(-30deg);}
-            60% { translate: 20px 20px; transform: rotate(-40deg);}
-            85% { translate: 40px -20px; transform: rotate(30deg);}
-            100% { translate: 0px 0px; transform: rotate(0deg);}
-        }
-        @keyframes driving_car {
-            10% {translate: 40px 70px}
-            25% {translate: -70px 70px}
-            30% {translate: -95px 70px}
-            45% {translate: 30px 70px}
-            50% {translate: 40px 70px}
-            55% {translate: 30px 70px}
-            65% {translate: -60px 70px}
-            70% {translate: -80px 70px}
-            75% {translate: -60px 70px}
-            85% {translate: 20px 70px}
-            95% {translate: 0px 70px}
-        }
-
         .item_selected * {
             animation: item_outline_selected 3000ms ease-in-out infinite;
         }
@@ -621,21 +532,6 @@
             transition: all 500ms ease-in-out;
         }
 
-        .category_box {
-            transition: all 500ms ease-out;
-            stroke: none
-        }
-        .category_box_active {
-            stroke: none
-            /*animation: highlighted_outline 2s ease-in-out infinite alternate-reverse;*/
-        }
-        .category_box_selected{
-            fill: #a9c4f5;
-
-        }
-        .category_box_error {
-            animation: category_box_error_blinking 750ms ease-in-out infinite;
-        }
         @keyframes category_box_error_blinking {
 
             0% {
@@ -647,6 +543,9 @@
 
         }
 
+        #category_timer_bar {
+            stroke-width: 0
+        }
 
         @keyframes category_countdown_timer {
             0% {width: 100%; fill:gray}
