@@ -18,7 +18,7 @@
             user-select: none;
             width: 100%;
             height: 100%;
-            max-width: 1920px;
+            max-width: 1400px;
 
             text-align: left;
 
@@ -194,14 +194,12 @@
             transform-origin: center;
 
         }
-
         .icon_path {
             display: none
         }
         .location_mask {
             cursor:pointer;
         }
-
         .location_arrow {
             animation: highlighted_arrow 3s ease-in-out infinite alternate-reverse;
             opacity: 0.9;
@@ -223,7 +221,6 @@
             from {fill: black}
             to { fill:white}
         }
-
         .return_arrow rect {
             animation: highlighted_arrow 3s ease-in-out infinite alternate-reverse;
             cursor: pointer;
@@ -380,34 +377,6 @@
             100% {stroke:black}
         }
 
-        /* TEST PHASE */
-        .day_box {
-            stroke-width: 3px;
-            transition: all 750ms ease-in-out;
-            fill: #444444;
-            stroke: #666666;
-        }
-        .day_box text {
-            fill: #666666;
-            stroke-width: 0;
-            text-anchor: middle;
-            dominant-baseline: middle;
-            transition: all 750ms linear;
-            font-size: 40px;
-            font-weight: bold;
-
-        }
-        .day_box_past {
-            fill: #144814;
-            stroke: #217821;
-        }
-        .day_box_past text { fill: #217821 }
-        .day_box_present {
-            fill: #2d4465;
-            stroke: #ffa600;
-        }
-        .day_box_present text { fill: #ffa600 }
-
         /* GENERAL OBJECTS */
         .ingame_button {
             cursor: pointer;
@@ -547,6 +516,7 @@
             stroke-width: 0
         }
 
+        /* Timed trial animations for the bars */
         @keyframes category_countdown_timer {
             0% {width: 100%; fill:gray}
             85% {width: 0; fill:gold}
@@ -555,9 +525,147 @@
             90%{ fill:gold}
             94%{ fill:darkred}
             98%{ fill:gold}
+        }
+        @keyframes timed_Fennimal_trial_countdown_timer_vertical {
+            0% {height: 100%; fill:gray}
+            85% {height: 0; fill:gold}
+            85.5% {height: 100%}
+            86% {fill:darkred}
+            90%{ fill:gold}
+            94%{ fill:darkred}
+            98%{ fill:gold}
+        }
 
+        /* Animations for the timed trial example page */
+        .instructions_timed_trial_example_bar {
+            transform-origin: center;
+            transform: rotate(180deg) translate(-60.9%, -35.5%) ;
+            fill: gray;
+            animation: timed_Fennimal_trial_countdown_timer_vertical_example 5500ms linear infinite;
 
         }
+        #instructions_timed_trial_example_bar_timeup {
+            opacity: 0;
+            animation: timed_Fennimal_trial_countdown_timer_vertical_example_text 5500ms linear infinite;
+
+        }
+
+        @keyframes timed_Fennimal_trial_countdown_timer_vertical_example {
+            0% {height: 77.5px; fill:gray; opacity: 1}
+            45% {height: 0; fill:gold}
+            45.5% {height: 77.5px}
+            46% {fill:darkred}
+            50%{ fill:gold}
+            54%{ fill:darkred}
+            58%{ fill:gold}
+            60%{display: none; opacity: 1}
+            61%{fill:red}
+            65%{fill:red; opacity: 0}
+            99%{fill:gray; opacity: 0}
+        }
+        @keyframes timed_Fennimal_trial_countdown_timer_vertical_example_text {
+            61%{opacity: 0}
+            70%{opacity: 1}
+            99%{opacity: 1}
+            99.5%{opacity: 0}
+        }
+
+
+        /* Custom Slider */
+        .CustomSliderContainer {
+            pointer-events: inherit;
+            height: 25px;
+            padding: 1%
+        }
+        .CustomSliderInput {
+            width: 100%;
+            padding: 0%;
+            margin: 0;
+            height: 90%;
+
+
+            -webkit-appearance: none;  /* Override default CSS styles */
+            appearance: none;
+
+            background: #d3d3d3; /* Grey background */
+            border: 1px solid darkgray;
+
+            -webkit-transition: .2s; /* 0.2 seconds transition on hover */
+            transition: opacity .2s;
+            border-radius: 20px;
+        }
+        .CustomSliderInput::-webkit-slider-thumb {
+            -webkit-appearance: none; /* Override default look */
+            appearance: none;
+            width: 20px; /* Set a specific slider handle width */
+            height: 20px; /* Slider handle height */
+            border: 2px solid #58508d;
+            background:  #ffa600; /* Green background */
+            cursor: pointer; /* Cursor on hover */
+            border-radius: 20%;
+        }
+        #category_binary_screen_slider_placeholder {
+            display: none
+        }
+
+        /* Binary slider instructions animation */
+        #slider_instructions_Fennimal_A_closer {
+            animation: slider_instructions_FennimalIcon_closer_A 4s linear infinite;
+        }
+        #slider_instructions_Fennimal_B_closer {
+            animation: slider_instructions_FennimalIcon_closer_B 4s linear infinite;
+        }
+        #slider_instructions_thumb_closer {
+            animation: slider_instructions_FennimalIcon_closer_thumb 4s linear infinite;
+        }
+
+        @keyframes slider_instructions_FennimalIcon_closer_A{
+            20% {transform: translate(4%, 0%);}
+            25% {transform: translate(4%, 0%);}
+            40% {transform: translate(0%, 0%);}
+        }
+        @keyframes slider_instructions_FennimalIcon_closer_B{
+            20% {transform: translate(-4%, 0%);}
+            25% {transform: translate(-4%, 0%);}
+            40% {transform: translate(0%, 0%);}
+        }
+        @keyframes slider_instructions_FennimalIcon_closer_thumb{
+            20% {transform: translate(12%, 0%);}
+            25% {transform: translate(12%, 0%);}
+            40% {transform: translate(0%, 0%);}
+        }
+
+        #slider_instructions_Fennimal_A_further {
+            animation: slider_instructions_FennimalIcon_further_A 4s linear infinite;
+        }
+        #slider_instructions_Fennimal_B_further {
+            animation: slider_instructions_FennimalIcon_further_B 4s linear infinite;
+        }
+        #slider_instructions_thumb_further {
+            animation: slider_instructions_FennimalIcon_further_thumb 4s linear infinite;
+        }
+
+        @keyframes slider_instructions_FennimalIcon_further_A{
+            50% {transform: translate(0%, 0%); }
+            70% {transform: translate(-4%, 0%);}
+            75% {transform: translate(-4%, 0%);}
+            90% {transform: translate(0%, 0%);}
+        }
+        @keyframes slider_instructions_FennimalIcon_further_B{
+            50% {transform: translate(0%, 0%); }
+            70% {transform: translate(4%, 0%);}
+            75% {transform: translate(4%, 0%);}
+            90% {transform: translate(0%, 0%);}
+        }
+        @keyframes slider_instructions_FennimalIcon_further_thumb{
+            50% {transform: translate(0%, 0%); }
+            70% {transform: translate(-12%, 0%);}
+            75% {transform: translate(-12%, 0%);}
+            90% {transform: translate(0%, 0%);}
+        }
+
+
+
 
 
 
