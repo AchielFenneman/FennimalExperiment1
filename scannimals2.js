@@ -1207,6 +1207,8 @@ STIMULUSDATA = function(participant_number){
         number: 8
     }]
 
+    console.log(TestPhaseData)
+
     /*
     let TestPhaseData = [{
         Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_A, "direct", true,true ),
