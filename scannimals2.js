@@ -689,6 +689,38 @@ STIMULUSDATA = function(participant_number){
 
     }
 
+    //Returns a block of the original training trials with all items available
+    function createBlockOfRepeatTrainingTrials(shuffle_trials){
+        let Block = []
+        for(let key in TrainingFennimals){
+            let NewFenObj = JSON.parse(JSON.stringify(TrainingFennimals[key]))
+            delete NewFenObj.item
+
+            NewFenObj.ID = key
+            NewFenObj.items_available = Random_Items
+
+            switch(key){
+                case("IA"): NewFenObj.item_direct = TrainingFennimals.IA.item; NewFenObj.item_indirect = TrainingFennimals.IB.item; break
+                case("IB"): NewFenObj.item_direct = TrainingFennimals.IB.item; NewFenObj.item_indirect = TrainingFennimals.IA.item; break
+                case("DA"): NewFenObj.item_direct = TrainingFennimals.DA.item; NewFenObj.item_indirect = TrainingFennimals.DB.item; break
+                case("DB"): NewFenObj.item_direct = TrainingFennimals.DB.item; NewFenObj.item_indirect = TrainingFennimals.DA.item; break
+                case("C1"): NewFenObj.item_direct = TrainingFennimals.C1.item; NewFenObj.item_indirect = false; break
+                case("C2"): NewFenObj.item_direct = TrainingFennimals.C2.item; NewFenObj.item_indirect = false; break
+            }
+
+            NewFenObj.correct_item = NewFenObj.item_direct
+            NewFenObj.feedback = false
+
+            Block.push(NewFenObj)
+        }
+
+        if(shuffle_trials){
+            return(shuffleArray(Block))
+        }else{
+            return(Block)
+        }
+    }
+
     /*
     let InferencePhase_TestBlocks = []
     let reps = 4
@@ -1168,39 +1200,44 @@ STIMULUSDATA = function(participant_number){
         type: "final_block",
         hint_type: "text",
         number: 7
+    },{
+        Trials: createBlockOfRepeatTrainingTrials(true),
+        type: "repeat_training",
+        hint_type: "text",
+        number: 8
     }]
 
     /*
     let TestPhaseData = [{
-            Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_A, "direct", true,true ),
-            type: "direct",
-            hint_type: "text",
-            number: 1
-        },{
-            Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C2"], InferencePhaseTemplates_B, "indirect", false,true ),
-            type: "indirect",
-            hint_type: "text",
-            number: 2
-        },{
-            Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_B, "indirect", false,true ),
-            type: "indirect",
-            hint_type: "text",
-            number: 3
-        },{
-            Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C2"], InferencePhaseTemplates_B, "indirect", false,true ),
-            type: "indirect",
-            hint_type: "text",
-            number: 4
-        },{
-            Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_B, "indirect", false,true ),
-            type: "indirect",
-            hint_type: "text",
-            number: 5
-        }, {
-            Trials: GroupingTrials,
-            type: "category",
-            number: 6
-        }, {
+        Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_A, "direct", true,true ),
+        type: "direct",
+        hint_type: "text",
+        number: 1
+    },{
+        Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C2"], InferencePhaseTemplates_B, "indirect", false,true ),
+        type: "indirect",
+        hint_type: "text",
+        number: 2
+    },{
+        Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_B, "indirect", false,true ),
+        type: "indirect",
+        hint_type: "text",
+        number: 3
+    },{
+        Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C2"], InferencePhaseTemplates_B, "indirect", false,true ),
+        type: "indirect",
+        hint_type: "text",
+        number: 4
+    },{
+        Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_B, "indirect", false,true ),
+        type: "indirect",
+        hint_type: "text",
+        number: 5
+    }, {
+        Trials: GroupingTrials,
+        type: "category",
+        number: 6
+    }, {
         Trials: [createFinalBlockTrials(["IA","IB","DA","DB","C1"],"Neutral", Final_Block_Bodies[0],5000, true),
             createFinalBlockTrials(["IA","IB","DA","DB","C2"],"Neutral", Final_Block_Bodies[1],4500, true),
             createFinalBlockTrials(["IA","IB","DA","DB","C1"],"Neutral", Final_Block_Bodies[0],4000, true),
@@ -1209,11 +1246,13 @@ STIMULUSDATA = function(participant_number){
         type: "final_block",
         hint_type: "text",
         number: 7
+    },{
+        Trials: createBlockOfRepeatTrainingTrials(true),
+        type: "repeat_training",
+        hint_type: "text",
+        number: 8
     }]
    */
-
-    console.log(TrainingFennimals)
-    console.log(TestPhaseData)
 
 
     // CALL FUNCTIONS //
@@ -4930,8 +4969,15 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
             if(block_type === "training"){
                 Container.appendChild(createFennimalIcon(Fennimal,150, 120,0.4,false, true))
             }
-            if(block_type === "direct" || block_type === "indirect" || block_type === "final_block"){
+            if(block_type === "direct" || block_type === "indirect" || block_type === "final_block" ){
                 text = "A new Fennimal has been spotted at " + Param.SubjectFacingLocationNames[Fennimal.location]
+                let LocationText = createTextField((508/2)-200, 150, 400,55, text)
+                LocationText.style.fontSize = "20px"
+                LocationText.style.textAlign = "center"
+                Container.appendChild(LocationText)
+            }
+            if(block_type === "repeat_training"){
+                text = "An old friend has been spotted at " + Param.SubjectFacingLocationNames[Fennimal.location]
                 let LocationText = createTextField((508/2)-200, 150, 400,55, text)
                 LocationText.style.fontSize = "20px"
                 LocationText.style.textAlign = "center"
@@ -6256,7 +6302,6 @@ CategoryPhaseController_Binary_Slider = function(ExpCont, Stimuli, LocCont, Data
     function category_phase_complete(){
         console.log("Category Phase completed")
         DataCont.store_category_data(OutputArray)
-        console.log(OutputArray)
 
         //Cleaning the screen
         resetScreen()
@@ -6583,7 +6628,6 @@ DataController = function(seed_number, Stimuli){
 
         console.log(Data)
         console.log(optimize_data())
-
 
         //Populating the form
         document.getElementById("data_form_field").innerHTML = JSON.stringify(optimize_data())
@@ -7176,8 +7220,6 @@ ExperimentController = function(Stimuli, DataController){
     }
     //Call to check if the exploration subphase has been completed
     function check_if_exploration_subphase_completed(){
-        console.log(number_of_locations_visited, Fennimal_found_number)
-        console.log(Param.location_Names.length, Stimuli.getTrainingSetFennimalsInArray().length)
         if(number_of_locations_visited === Param.location_Names.length && Fennimal_found_number === Stimuli.getTrainingSetFennimalsInArray().length){
             LocCont.prevent_subject_from_leaving_location(true)
             setTimeout(function(){
@@ -7483,7 +7525,7 @@ ExperimentController = function(Stimuli, DataController){
                     CurrentBlockTrials = CurrentBlockData.Trials
                     InstrCont.show_test_phase_instructions_indirect_block(CurrentBlockData.number, total_number_of_blocks,function(){that.start_next_test_trial()})
                     break
-                case("training"):
+                case("repeat_training"):
                     CurrentBlockTrials = CurrentBlockData.Trials
                     InstrCont.show_test_phase_instructions_repeat_block(CurrentBlockData.number, total_number_of_blocks,function(){that.start_next_test_trial()})
                     break
@@ -7537,8 +7579,6 @@ ExperimentController = function(Stimuli, DataController){
 
         //Close any open Fennimal interactions
         that.location_left()
-
-
 
         //In case of the final block, we need to teleport directly to the next Fennimal. Otherwise, show instructions and go to the map
         if(CurrentBlockData.type === "final_block"){
@@ -7691,7 +7731,7 @@ let Instructions = {
         Quiz_Passed: {
             title: "BECOMING AN EXPERT",
             textTop: "Congratulations! You have passed the exam and you're now a Novice Wildlife Ranger! All that stands " +
-                "between you and the title of 'Expert Wildlife Ranger' are seven days of practical experience in Fenneland. " +
+                "between you and the title of 'Expert Wildlife Ranger' are eight days of practical experience in Fenneland. " +
                 "During these days you will be sent across the island to interact with various Fennimals, " +
                 "where you can apply your previously learned knowledge to select toys for these Fennimals. <br> <br>" +
                 "There will <u> not </u> be another exam at the end of the experiment. " +
@@ -7727,7 +7767,7 @@ let Instructions = {
             text: "<br><br> The original Fennimals from your training period are starting to miss you. Time to pay a visit to your old friends again! <br><br>" +
                 "Do you still remember which toys these Fennimals liked? <br>" +
                 "<br>" +
-                "There is no time limit on your decision - you can take as long as you like. After you have selected an item, the Fennimal will return to its home and play with the provided toy. You will then automatically drive to the next Fennimal."
+                "There is no time limit on your decision - you can take as long as you like. The Fennimals have grown a bit shy since the last time you saw them. After you have selected an item, the Fennimal will return to its home and inspect the toy there."
         },
         Final:{
             title: "NEW FENNIMALS HAVE BEEN SPOTTED!",
@@ -7852,7 +7892,7 @@ EC.showStartScreen()
 //  Set seed based on PID
 // SVG Garbage collector?
 
-console.log("Version: 16.10.23")
+console.log("Version: 19.10.23")
 //TODO: RESET SUBMISSION
 //TODO: AT THE LAST DAY OF YOUR TRAINING YOU GOT LOST IN THE FOG
 
