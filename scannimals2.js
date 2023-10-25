@@ -515,7 +515,7 @@ STIMULUSDATA = function(participant_number){
         }
         return(ItemObj)
     }
-    let Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 5, false ))
+    let Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 6, false ))
 
     //Randomize Items
     let Random_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
@@ -561,7 +561,7 @@ STIMULUSDATA = function(participant_number){
     //Drawing features
     let Training_Regions = Available_Regions.splice(0,4)
     let Training_Bodies = Available_Bodies.splice(0,4)
-    let Training_Heads = Available_Heads.splice(0,5)
+    let Training_Heads = Available_Heads.splice(0,6)
 
     let Inference_Phase_Regions = Available_Regions.splice(0,4)
     let Inference_Phase_Bodies_A =  Available_Bodies.splice(0,4)
@@ -576,12 +576,12 @@ STIMULUSDATA = function(participant_number){
         DA: createFennimalObj(Training_Regions[1], Param.RegionData[Training_Regions[1]].Locations[0],Training_Heads[2],Training_Bodies[1], Random_Items[2] ),
         DB: createFennimalObj(Training_Regions[1], Param.RegionData[Training_Regions[1]].Locations[1],Training_Heads[3],Training_Bodies[1], Random_Items[3] ),
         C1: createFennimalObj(Training_Regions[2], shuffleArray(Param.RegionData[Training_Regions[2]].Locations)[0],Training_Heads[4],Training_Bodies[2], Random_Items[4] ),
-        C2: createFennimalObj(Training_Regions[3], shuffleArray(Param.RegionData[Training_Regions[3]].Locations)[1],Training_Heads[4],Training_Bodies[3], Random_Items[4] ),
+        C2: createFennimalObj(Training_Regions[3], shuffleArray(Param.RegionData[Training_Regions[3]].Locations)[1],Training_Heads[5],Training_Bodies[3], Random_Items[5] ),
     }
 
     //CREATING THE TEST STIMULI HERE
     // Assiging a region to each of the training pairs. This is the region where all of its associated test-phase Fennimals will appear
-    let TestPhaseRegions = {
+    let InferencePhaseRegions = {
         IA: Inference_Phase_Regions[0],
         IB: Inference_Phase_Regions[1],
         DA: Inference_Phase_Regions[2],
@@ -589,37 +589,36 @@ STIMULUSDATA = function(participant_number){
         C1: TrainingFennimals.C1.region,
         C2: TrainingFennimals.C2.region
     }
-    let TestPhaseAvailableLocations = {
-        IA: shuffleArray( Param.RegionData[TestPhaseRegions.IA].Locations ),
-        IB: shuffleArray( Param.RegionData[TestPhaseRegions.IB].Locations ),
-        DA: shuffleArray( Param.RegionData[TestPhaseRegions.DA].Locations ),
-        DB: shuffleArray( Param.RegionData[TestPhaseRegions.DB].Locations ),
+    let InferencePhaseAvailableLocations = {
+        IA: shuffleArray( Param.RegionData[InferencePhaseRegions.IA].Locations ),
+        IB: shuffleArray( Param.RegionData[InferencePhaseRegions.IB].Locations ),
+        DA: shuffleArray( Param.RegionData[InferencePhaseRegions.DA].Locations ),
+        DB: shuffleArray( Param.RegionData[InferencePhaseRegions.DB].Locations ),
         C1: shuffleArray( TrainingFennimals.C1.location),
         C2: shuffleArray( TrainingFennimals.C2.location ),
     }
 
     let InferencePhaseTemplates_A = {
-        IA: {ID: "IA", head: TrainingFennimals.IA.head, body: Inference_Phase_Bodies_A[0], region: TestPhaseRegions.IA, location: TestPhaseAvailableLocations.IA.splice(0,1)[0], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
-        IB: {ID: "IB", head: TrainingFennimals.IB.head, body: Inference_Phase_Bodies_A[1], region: TestPhaseRegions.IB, location: TestPhaseAvailableLocations.IB.splice(0,1)[0],item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
-        DA: {ID: "DA", head: TrainingFennimals.DA.head, body: Inference_Phase_Bodies_A[2], region: TestPhaseRegions.DA, location: TestPhaseAvailableLocations.DA.splice(0,1)[0],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
-        DB: {ID: "DB", head: TrainingFennimals.DB.head, body: Inference_Phase_Bodies_A[3], region: TestPhaseRegions.DB, location: TestPhaseAvailableLocations.DB.splice(0,1)[0],item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
-        C1: {ID: "C1", head: Inference_Phase_Heads[0], body: TrainingFennimals.C1.body, region: TestPhaseRegions.C1, location: TestPhaseAvailableLocations.C1, item_direct: TrainingFennimals.C1.item, item_indirect: false},
-        C2: {ID: "C2", head: Inference_Phase_Heads[1], body: TrainingFennimals.C1.body, region: TestPhaseRegions.C2, location: TestPhaseAvailableLocations.C2, item_direct: TrainingFennimals.C2.item, item_indirect: false},
+        IA: {ID: "IA", head: TrainingFennimals.IA.head, body: Inference_Phase_Bodies_A[0], region: InferencePhaseRegions.IA, location: InferencePhaseAvailableLocations.IA.splice(0,1)[0], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
+        IB: {ID: "IB", head: TrainingFennimals.IB.head, body: Inference_Phase_Bodies_A[1], region: InferencePhaseRegions.IB, location: InferencePhaseAvailableLocations.IB.splice(0,1)[0],item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
+        DA: {ID: "DA", head: TrainingFennimals.DA.head, body: Inference_Phase_Bodies_A[2], region: InferencePhaseRegions.DA, location: InferencePhaseAvailableLocations.DA.splice(0,1)[0],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
+        DB: {ID: "DB", head: TrainingFennimals.DB.head, body: Inference_Phase_Bodies_A[3], region: InferencePhaseRegions.DB, location: InferencePhaseAvailableLocations.DB.splice(0,1)[0],item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
+        C1: {ID: "C1", head: Inference_Phase_Heads[0], body: TrainingFennimals.C1.body, region: InferencePhaseRegions.C1, location: InferencePhaseAvailableLocations.C1, item_direct: TrainingFennimals.C1.item, item_indirect: false},
+        C2: {ID: "C2", head: Inference_Phase_Heads[1], body: TrainingFennimals.C2.body, region: InferencePhaseRegions.C2, location: InferencePhaseAvailableLocations.C2, item_direct: TrainingFennimals.C2.item, item_indirect: false},
     }
     let InferencePhaseTemplates_B = {
-        IA: {ID: "IA", head: TrainingFennimals.IA.head, body: Inference_Phase_Bodies_B[0], region: TestPhaseRegions.IA, location: TestPhaseAvailableLocations.IA.splice(0,1)[0], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
-        IB: {ID: "IB", head: TrainingFennimals.IB.head, body: Inference_Phase_Bodies_B[1], region: TestPhaseRegions.IB, location: TestPhaseAvailableLocations.IB.splice(0,1)[0],item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
-        DA: {ID: "DA", head: TrainingFennimals.DA.head, body: Inference_Phase_Bodies_B[2], region: TestPhaseRegions.DA, location: TestPhaseAvailableLocations.DA.splice(0,1)[0],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
-        DB: {ID: "DB", head: TrainingFennimals.DB.head, body: Inference_Phase_Bodies_B[3], region: TestPhaseRegions.DB, location: TestPhaseAvailableLocations.DB.splice(0,1)[0],item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
-        C1: {ID: "C1", head: Inference_Phase_Heads[0], body: TrainingFennimals.C1.body, region: TestPhaseRegions.C1, location: TestPhaseAvailableLocations.C1, item_direct: TrainingFennimals.C1.item, item_indirect: false},
-        C2: {ID: "C2", head: Inference_Phase_Heads[1], body: TrainingFennimals.C1.body, region: TestPhaseRegions.C2, location: TestPhaseAvailableLocations.C2, item_direct: TrainingFennimals.C2.item, item_indirect: false},
+        IA: {ID: "IA", head: TrainingFennimals.IA.head, body: Inference_Phase_Bodies_B[0], region: InferencePhaseRegions.IA, location: InferencePhaseAvailableLocations.IA.splice(0,1)[0], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
+        IB: {ID: "IB", head: TrainingFennimals.IB.head, body: Inference_Phase_Bodies_B[1], region: InferencePhaseRegions.IB, location: InferencePhaseAvailableLocations.IB.splice(0,1)[0],item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
+        DA: {ID: "DA", head: TrainingFennimals.DA.head, body: Inference_Phase_Bodies_B[2], region: InferencePhaseRegions.DA, location: InferencePhaseAvailableLocations.DA.splice(0,1)[0],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
+        DB: {ID: "DB", head: TrainingFennimals.DB.head, body: Inference_Phase_Bodies_B[3], region: InferencePhaseRegions.DB, location: InferencePhaseAvailableLocations.DB.splice(0,1)[0],item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
+        C1: {ID: "C1", head: Inference_Phase_Heads[0], body: TrainingFennimals.C1.body, region: InferencePhaseRegions.C1, location: InferencePhaseAvailableLocations.C1, item_direct: TrainingFennimals.C1.item, item_indirect: false},
+        C2: {ID: "C2", head: Inference_Phase_Heads[1], body: TrainingFennimals.C2.body, region: InferencePhaseRegions.C2, location: InferencePhaseAvailableLocations.C2, item_direct: TrainingFennimals.C2.item, item_indirect: false},
     }
 
     //Returns a block of inference-phase trials. items_allowed_... can be "direct" or "indirect.
     function createBlockOfInferenceTrials(Array_of_Keys_Of_Fennimal_IDs_used, Templates, items_allowed_for_indirect_pair, include_feedback, shuffle_trials){
         let Block = []
         for(let key_ind = 0; key_ind<Array_of_Keys_Of_Fennimal_IDs_used.length; key_ind++){
-            //NB: assumes that C1 and C2 have the same item assigned
             let key = Array_of_Keys_Of_Fennimal_IDs_used[key_ind]
 
             let FenObj = Templates[key]
@@ -645,12 +644,12 @@ STIMULUSDATA = function(participant_number){
             //We will select one element from each of the arrays. So arrays with one element will always be selected
             let OtherPairItems
             switch(key){
-                case("IA"): OtherPairItems = [TrainingFennimals.C1.item,[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("IB"): OtherPairItems = [TrainingFennimals.C1.item,[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("DA"): OtherPairItems =  [TrainingFennimals.C1.item,[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
-                case("DB"): OtherPairItems = [TrainingFennimals.C1.item,[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
-                case("C1"):OtherPairItems = [[TrainingFennimals.IA.item, TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
-                case("C2"):OtherPairItems =  [[TrainingFennimals.IA.item, TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
+                case("IA"): OtherPairItems = [ TrainingFennimals.C1.item,TrainingFennimals.C2.item,[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("IB"): OtherPairItems = [ TrainingFennimals.C1.item,TrainingFennimals.C2.item,[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("DA"): OtherPairItems =  [TrainingFennimals.C1.item,TrainingFennimals.C2.item,[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
+                case("DB"): OtherPairItems = [TrainingFennimals.C1.item,TrainingFennimals.C2.item,[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
+                case("C1"):OtherPairItems = [TrainingFennimals.C2.item, [TrainingFennimals.IA.item, TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
+                case("C2"):OtherPairItems =  [TrainingFennimals.C1.item,[TrainingFennimals.IA.item, TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
             }
 
             //Creating an array containing all the trial's available items
@@ -721,89 +720,9 @@ STIMULUSDATA = function(participant_number){
         }
     }
 
-    /*
-    let InferencePhase_TestBlocks = []
-    let reps = 4
-    for(let x =0;x<reps;x++){
-        let Block = []
-        for(let key in TrainingFennimals){
-            //To cut down on experiment time, we use C1 in the even blocks and C2 in the odd blocks
-            let include = true
-            if( (x % 2) === 0){
-                if(key === "C2") {include = false}
-            }else{
-                if(key=== "C1") { include = false}
-            }
-
-            if(include){
-                console.log(key)
-
-                let FenObj = InferencePhaseTemplates_A[key]
-                let TestObj = createFennimalObj(FenObj.region,FenObj.location, FenObj.head, FenObj.body, false)
-                TestObj.name = createConjunctiveNameHeadBody(FenObj.body,FenObj.head)
-                TestObj.feedback = false
-
-                //Setting items available.
-                // First we make sure that there are two distractors: the control item and one of the items belonging to the other pair.
-                TestObj.item_direct = FenObj.item_direct
-
-                let Items = [TrainingFennimals.C1.item]
-                let OtherPairItems
-                switch(key){
-                    case("IA"): OtherPairItems = [TrainingFennimals.DA.item, TrainingFennimals.DB.item]; break
-                    case("IB"): OtherPairItems = [TrainingFennimals.DA.item, TrainingFennimals.DB.item]; break
-                    case("DA"): OtherPairItems = [TrainingFennimals.IA.item, TrainingFennimals.IB.item]; break
-                    case("DB"): OtherPairItems = [TrainingFennimals.IA.item, TrainingFennimals.IB.item]; break
-                    case("C1"):OtherPairItems = [TrainingFennimals.IA.item, TrainingFennimals.IB.item, TrainingFennimals.DA.item, TrainingFennimals.DB.item]; break;
-                    case("C2"):OtherPairItems = [TrainingFennimals.IA.item, TrainingFennimals.IB.item, TrainingFennimals.DA.item, TrainingFennimals.DB.item]; break;
-                }
-
-                shuffleArray(OtherPairItems)
-                Items.push( OtherPairItems[0] )
-                if(key === "C1" || key === "C2"){
-                    Items.push( OtherPairItems[1] )
-                    TestObj.correct_item = FenObj.item_direct
-                    TestObj.item_indirect = false
-                }else{
-                    //Adding back the direct OR indirect item, depending on which pair type this is
-                    if(key === "IA" || key === "IB"){
-                        Items.push(FenObj.item_indirect)
-                        TestObj.correct_item = FenObj.item_indirect
-                    }else{
-                        Items.push(FenObj.item_direct)
-                        TestObj.correct_item = FenObj.item_direct
-                    }
-                    TestObj.item_indirect = FenObj.item_indirect
-                }
-
-                TestObj.items_available = Items
-                TestObj.ID = FenObj.ID
-
-                //Pushing to the DirectTestBlock
-                Block.push(TestObj)
-            }
-
-        }
-        InferencePhase_TestBlocks.push(shuffleArray(Block))
-    }
-
-    //Creating a block of trials for the repeat-training
-    let Repeat_Training_Block = []
-    for(let key in TrainingFennimals){
-        let Fennimal = JSON.parse(JSON.stringify( TrainingFennimals[key]  ))
-        Fennimal.items_available = Item_Details.All_Items
-        Fennimal.correct_item = Fennimal.item
-        Fennimal.feedback = false
-        Fennimal.ID = key
-        Repeat_Training_Block.push(Fennimal)
-    }
-
-     */
-
     //Creating the final block. These have the body of the last two test phase blocks, but a new head.
     // Here the indirect item is available (but the direct is not)
-    let Control_Regions = [TrainingFennimals.C1.region, TrainingFennimals.C2.region]
-    let FinalBlockTemplates =  {
+    let TimedBlockTemplates =  {
         IA: {ID: "IA", head: TrainingFennimals.IA.head, item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
         IB: {ID: "IB", head: TrainingFennimals.IB.head, item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
         DA: {ID: "DA", head: TrainingFennimals.DA.head, item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
@@ -813,7 +732,7 @@ STIMULUSDATA = function(participant_number){
     }
 
     //Set max_decision_time to have an unlimited duration trial
-    function createFinalBlockTrials(Array_keys_used, region, body, max_decision_time, shuffle_trials ){
+    function createTimedBlockTrials(Array_keys_used, region, body, max_decision_time, shuffle_trials, add_mixed_trials_A, add_mixed_trials_B ){
         let Block = []
 
         let Locations, Available_locations
@@ -824,7 +743,7 @@ STIMULUSDATA = function(participant_number){
 
         for(let k = 0;k<Array_keys_used.length; k++){
             let key = Array_keys_used[k]
-            let TemplateObj = FinalBlockTemplates[key]
+            let TemplateObj = TimedBlockTemplates[key]
             TemplateObj.body = body
             TemplateObj.region = region
 
@@ -858,12 +777,12 @@ STIMULUSDATA = function(participant_number){
             //We will select one element from each of the arrays. So arrays with one element will always be selected
             let OtherPairItems
             switch(key){
-                case("IA"): OtherPairItems = [[TrainingFennimals.C1.item, TrainingFennimals.C2.item], [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("IB"): OtherPairItems = [[TrainingFennimals.C1.item, TrainingFennimals.C2.item], [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("DA"): OtherPairItems = [[TrainingFennimals.C1.item, TrainingFennimals.C2.item], [TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
-                case("DB"): OtherPairItems = [[TrainingFennimals.C1.item, TrainingFennimals.C2.item], [TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
-                case("C1"): OtherPairItems = [[TrainingFennimals.IA.item, TrainingFennimals.IB.item], [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("C2"): OtherPairItems = [[TrainingFennimals.IA.item, TrainingFennimals.IB.item], [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("IA"): OtherPairItems = [TrainingFennimals.C1.item, TrainingFennimals.C2.item, [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("IB"): OtherPairItems = [TrainingFennimals.C1.item, TrainingFennimals.C2.item, [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("DA"): OtherPairItems = [TrainingFennimals.C1.item, TrainingFennimals.C2.item, [TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
+                case("DB"): OtherPairItems = [TrainingFennimals.C1.item, TrainingFennimals.C2.item, [TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
+                case("C1"): OtherPairItems = [TrainingFennimals.IA.item, TrainingFennimals.IB.item, [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("C2"): OtherPairItems = [TrainingFennimals.IA.item, TrainingFennimals.IB.item, [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
             }
 
             //Creating an array containing all the trial's available items
@@ -889,6 +808,101 @@ STIMULUSDATA = function(participant_number){
             //Pushing to the DirectTestBlock
             Block.push(TestObj)
         }
+
+        //If requested, add a number of mixed trials. These trials have the head of IA (IB) or DA (DB) and the body of C1 or C2.
+        // Any items associated to the head-pair are not available. Hence the correct item is C1 or C2.
+        if(add_mixed_trials_A){
+            //Adding a Fennimal with the head of IA and the body of C1. Available items: C1 (correct), C2, DA, DB, and
+            //Adding a Fennimal with the head of DA and the body of C2. Available items: C2 (correct), C1, IA, IB
+            let MixedTrialI = {}, MixedTrialD = {}
+
+            if(region === "Neutral" ){
+                MixedTrialI = createFennimalObj("Neutral","Neutral", TrainingFennimals.IA.head, TrainingFennimals.C1.body, false)
+                MixedTrialD = createFennimalObj("Neutral","Neutral", TrainingFennimals.DA.head, TrainingFennimals.C2.body, false)
+            }else{
+                let MixedTrialLocations = shuffleArray( JSON.parse(JSON.stringify( Param.RegionData[region].Locations )))
+                MixedTrialI = createFennimalObj(region, MixedTrialLocations.splice(0,1)[0], TrainingFennimals.IA.head, TrainingFennimals.C1.body, false)
+                MixedTrialD = createFennimalObj(region, MixedTrialLocations.splice(0,1)[0], TrainingFennimals.DA.head, TrainingFennimals.C2.body, false)
+            }
+
+            MixedTrialI.name = createConjunctiveNameHeadBody(MixedTrialI.body,MixedTrialI.head)
+            MixedTrialD.name = createConjunctiveNameHeadBody(MixedTrialD.body,MixedTrialD.head)
+            MixedTrialI.feedback = false
+            MixedTrialD.feedback = false
+
+            //Setting item references
+            MixedTrialI.item_direct = TrainingFennimals.C1.item
+            MixedTrialD.item_direct = TrainingFennimals.C2.item
+
+            MixedTrialI.item_indirect = false
+            MixedTrialD.item_indirect = false
+
+            MixedTrialI.correct_item = MixedTrialI.item_direct
+            MixedTrialD.correct_item = MixedTrialD.item_direct
+
+            MixedTrialI.items_available = [MixedTrialI.correct_item, TrainingFennimals.C2.item, TrainingFennimals.DA.item, TrainingFennimals.DB.item]
+            MixedTrialD.items_available = [MixedTrialD.correct_item, TrainingFennimals.C1.item, TrainingFennimals.IA.item, TrainingFennimals.IB.item]
+
+            //Adding ID for easy analysis
+            MixedTrialI.ID = "IA_mix"
+            MixedTrialI.ID = "DA_mix"
+
+            //Setting a max decision time
+            MixedTrialI.max_decision_time = max_decision_time
+            MixedTrialD.max_decision_time = max_decision_time
+
+            //Pushing to the DirectTestBlock
+            Block.push(MixedTrialI)
+            Block.push(MixedTrialD)
+
+        }
+
+        if(add_mixed_trials_B){
+            //Adding a Fennimal with the head of IB and the body of C2. Available items: C2 (correct), C1, DA, DB, and
+            //Adding a Fennimal with the head of DB and the body of C1. Available items: C1 (correct), C2, IA, IB
+            let MixedTrialI = {}, MixedTrialD = {}
+
+            if(region === "Neutral" ){
+                MixedTrialI = createFennimalObj("Neutral","Neutral", TrainingFennimals.IB.head, TrainingFennimals.C2.body, false)
+                MixedTrialD = createFennimalObj("Neutral","Neutral", TrainingFennimals.DB.head, TrainingFennimals.C1.body, false)
+            }else{
+                let MixedTrialLocations = shuffleArray( JSON.parse(JSON.stringify( Param.RegionData[region].Locations )))
+                MixedTrialI = createFennimalObj(region, MixedTrialLocations.splice(0,1)[0], TrainingFennimals.IB.head, TrainingFennimals.C2.body, false)
+                MixedTrialD = createFennimalObj(region, MixedTrialLocations.splice(0,1)[0], TrainingFennimals.DB.head, TrainingFennimals.C1.body, false)
+            }
+
+            MixedTrialI.name = createConjunctiveNameHeadBody(MixedTrialI.body,MixedTrialI.head)
+            MixedTrialD.name = createConjunctiveNameHeadBody(MixedTrialD.body,MixedTrialD.head)
+            MixedTrialI.feedback = false
+            MixedTrialD.feedback = false
+
+            //Setting item references
+            MixedTrialI.item_direct = TrainingFennimals.C2.item
+            MixedTrialD.item_direct = TrainingFennimals.C1.item
+
+            MixedTrialI.item_indirect = false
+            MixedTrialD.item_indirect = false
+
+            MixedTrialI.correct_item = MixedTrialI.item_direct
+            MixedTrialD.correct_item = MixedTrialD.item_direct
+
+            MixedTrialI.items_available = [MixedTrialI.correct_item, TrainingFennimals.C1.item, TrainingFennimals.DA.item, TrainingFennimals.DB.item]
+            MixedTrialD.items_available = [MixedTrialD.correct_item, TrainingFennimals.C2.item, TrainingFennimals.IA.item, TrainingFennimals.IB.item]
+
+            //Adding ID for easy analysis
+            MixedTrialI.ID = "IB_mix"
+            MixedTrialI.ID = "DB_mix"
+
+            //Setting a max decision time
+            MixedTrialI.max_decision_time = max_decision_time
+            MixedTrialD.max_decision_time = max_decision_time
+
+            //Pushing to the DirectTestBlock
+            Block.push(MixedTrialI)
+            Block.push(MixedTrialD)
+
+        }
+
         if(shuffle_trials){
             return(shuffleArray(Block))
         }else{
@@ -900,247 +914,52 @@ STIMULUSDATA = function(participant_number){
     let GroupingTrials= []
     let grouping_phase_setup =  "binary_slider"
 
-    // CREATES THE TWO-ALTERNATIVE GROUPING STIMULI (One target, two alternatives)
-    // As the basis, we use both the templates for the first and the consequetive test blocks.
-    // For each block, we can create up to 5 * 3 trials.
-    //  Each trial has one of original 5 training Fennimals
-    //  Next it has two options: one correct (the indirect one for the pairs - or a random one for the control) and one distractor (randomly selected, not the first or the direct).
-    //      Hence, there are 3 possible distractors.
-    //      We make an exception for the control stimulus, which will only be shown once per block
-    if(grouping_phase_setup === "two_alternatives"){
-
-        for(let key in TrainingFennimals){
-            if(key !== "C"){
-
-                let Target = createFennimalObjFromTemplate(InferencePhaseTemplates_A[key],true, true)  //TrainingFennimals[key]
-
-                //Determine the pair type
-                let paircode
-                switch(key){
-                    case("IA"): paircode = "I"; break
-                    case("IB"): paircode = "I"; break
-                    case("DA"): paircode = "D"; break
-                    case("DB"): paircode = "D"; break
-
-                }
-
-                //Finding the correct associated Fennimal (the indirectly associated one)
-                let correct_alt_key
-                switch(key){
-                    case("IA"): correct_alt_key = "IB"; break
-                    case("IB"): correct_alt_key = "IA"; break
-                    case("DA"): correct_alt_key = "DB"; break
-                    case("DB"): correct_alt_key = "DA"; break
-
-                }
-
-                //Finding all three other Fennimals to match with (never the direct one)
-                let Alternative_Keys = ["C"]
-                switch(key){
-                    case("IA"): Alternative_Keys.push("DA"); Alternative_Keys.push("DB"); break
-                    case("IB"): Alternative_Keys.push("DA"); Alternative_Keys.push("DB"); break
-                    case("DA"): Alternative_Keys.push("IA"); Alternative_Keys.push("IB"); break
-                    case("DB"): Alternative_Keys.push("IA"); Alternative_Keys.push("IB"); break
-                }
-
-                // Now we can create all the templates
-                let Templates = []
-                Templates.push({left_key: correct_alt_key, right_key: Alternative_Keys[0], correct_answer: "left"})
-                Templates.push({left_key: correct_alt_key, right_key: Alternative_Keys[1], correct_answer: "left"})
-                Templates.push({left_key: correct_alt_key, right_key: Alternative_Keys[2], correct_answer: "left"})
-
-                Templates.push({left_key: Alternative_Keys[0], right_key: correct_alt_key, correct_answer: "right"})
-                Templates.push({left_key: Alternative_Keys[1], right_key: correct_alt_key, correct_answer: "right"})
-                Templates.push({left_key: Alternative_Keys[2], right_key: correct_alt_key, correct_answer: "right"})
-
-                //Now we can loop through these to build the required objects for each trial
-                for(let i=0;i<Templates.length;i++){
-                    let LeftFennimal = createFennimalObjFromTemplate(InferencePhaseTemplates_A[Templates[i].left_key], true,false)
-                    let RightFennimal = createFennimalObjFromTemplate(InferencePhaseTemplates_A[Templates[i].right_key], true,false)
-
-                    let TrialObj = {
-                        Target: {
-                            name: Target.name,
-                            head: Target.head,
-                            body: Target.body,
-                            head_color_scheme: Target.head_color_scheme,
-                            body_color_scheme: Target.body_color_scheme
-                        },
-                        Left: {
-                            name: LeftFennimal.name,
-                            head: LeftFennimal.head,
-                            body: LeftFennimal.body,
-                            head_color_scheme: LeftFennimal.head_color_scheme,
-                            body_color_scheme: LeftFennimal.body_color_scheme
-                        },
-                        Right: {
-                            name: RightFennimal.name,
-                            head: RightFennimal.head,
-                            body: RightFennimal.body,
-                            head_color_scheme: RightFennimal.head_color_scheme,
-                            body_color_scheme: RightFennimal.body_color_scheme
-                        },
-                        paircode: paircode,
-                        correct_answer: Templates[i].correct_answer
-                    }
-                    GroupingTrials.push(TrialObj)
-                }
-            }
-        }
-        shuffleArray(GroupingTrials)
-    }
-
-    // CREATES THE THREE-ALTERNATIVE GROUPING STIMULI (One target, three alternatives)
-    //      The target is always drawn from the test set.
-    //      There are three possible alternatives: the correct pairing, one from the other pair and the control
-    if(grouping_phase_setup === "three_alternatives"){
-        let Buffer = []
-
-        for(let key in TrainingFennimals){
-            if(key !== "C"){
-                let Target = createFennimalObjFromTemplate(InferencePhaseTemplates_A[key],true, false)  //TrainingFennimals[key]
-                let Trials = []
-
-                //Determine the pair type
-                let paircode
-                switch(key){
-                    case("IA"): paircode = "I"; break
-                    case("IB"): paircode = "I"; break
-                    case("DA"): paircode = "D"; break
-                    case("DB"): paircode = "D"; break
-
-                }
-
-                //Finding the correct associated Fennimal (the indirectly associated one)
-                let correct_alt_key
-                switch(key){
-                    case("IA"): correct_alt_key = "IB"; break
-                    case("IB"): correct_alt_key = "IA"; break
-                    case("DA"): correct_alt_key = "DB"; break
-                    case("DB"): correct_alt_key = "DA"; break
-                }
-
-                let Other_pair_keys
-                switch(key){
-                    case("IA"): Other_pair_keys = ["DA", "DB"]; break
-                    case("IB"): Other_pair_keys = ["DA", "DB"]; break
-                    case("DA"): Other_pair_keys = ["IA", "IB"]; break
-                    case("DB"): Other_pair_keys = ["IA", "IB"]; break
-                }
-
-                //Creating the templates. There are three (position of the correct trial: left, middle, center) x 2 (other pair Fennimal).
-                let positions = ["Left", "Middle", "Right"]
-                for(let pos_key = 0;pos_key<positions.length;pos_key++){
-                    let pos = positions[pos_key]
-                    let other_positions = JSON.parse(JSON.stringify(positions))
-                    other_positions.splice(pos_key,1)
-
-                    for(let other_pair_index =0; other_pair_index<Other_pair_keys.length; other_pair_index++){
-                        //Finding the positions of the two incorrect guys. These can be randomized.
-                        let Other_Keys = shuffleArray(["C", Other_pair_keys[other_pair_index]])
-                        let FenCorObj = createFennimalObjFromTemplate(InferencePhaseTemplates_A[correct_alt_key], true,false)
-                        let FenAObj =  createFennimalObjFromTemplate(InferencePhaseTemplates_A[Other_Keys[0]], true,false)
-                        let FenBObj =  createFennimalObjFromTemplate(InferencePhaseTemplates_A[Other_Keys[1]], true,false)
-
-                        let TrialObj = {}
-                        TrialObj.Target = {
-                            key: key,
-                            name: Target.name,
-                            head: Target.head,
-                            body: Target.body,
-                            head_color_scheme: Target.head_color_scheme,
-                            body_color_scheme: Target.body_color_scheme
-                        }
-                        TrialObj[pos] = {
-                            key: correct_alt_key,
-                            name: FenCorObj.name,
-                            head: FenCorObj.head,
-                            body: FenCorObj.body,
-                            head_color_scheme: FenCorObj.head_color_scheme,
-                            body_color_scheme: FenCorObj.body_color_scheme
-                        }
-                        TrialObj[other_positions[0]] = {
-                            key: Other_Keys[0],
-                            name: FenAObj.name,
-                            head: FenAObj.head,
-                            body: FenAObj.body,
-                            head_color_scheme: FenAObj.head_color_scheme,
-                            body_color_scheme: FenAObj.body_color_scheme
-                        }
-                        TrialObj[other_positions[1]] = {
-                            key: Other_Keys[0],
-                            name: FenBObj.name,
-                            head: FenBObj.head,
-                            body: FenBObj.body,
-                            head_color_scheme: FenBObj.head_color_scheme,
-                            body_color_scheme: FenBObj.body_color_scheme
-                        }
-                        TrialObj.correct_answer = pos.toLocaleLowerCase()
-                        TrialObj.paircode = paircode
-                        Trials.push(TrialObj)
-                    }
-                }
-                Buffer.push(shuffleArray(Trials))
-            }
-        }
-        //Now we have all the trials, seperated per type. Now we can weave them into the group trials.
-        for(let i = 0;i<Buffer[0].length;i++){
-            let Set = []
-            for(let k =0;k<Buffer.length;k++){
-                Set.push(Buffer[k][i])
-            }
-            GroupingTrials.push(shuffleArray(Set))
-        }
-        GroupingTrials = GroupingTrials.flat()
-    }
-
     //CREATES THE BINARY GROUPING STIMULI (Two Fennimals, pick [yes] or [no] to indicate whether they're drawn from the same family
     //  Each trial has one of original 5 training Fennimals (but gray color scheme).
     //  Next it has one other Fennimal. In half the trials this should be a Fennimal indirectly related to the training Fennimal, while in half the trials it should be a different Fennimal (not allowing directly related Fennimals).
     //  As the basis, we use both the templates for the first and the consequetive test blocks.
     //  4 (non-control training Fennimals) * (2 [possible correct stimuli] + 2 [inccorect: once the control, once from the other pair]) = 16 unique screens, presented twice
+    //let Control_Regions = [TrainingFennimals.C1.region, TrainingFennimals.C2.region]
+
     if(grouping_phase_setup === "binary_slider"){
         let TrialTemplates = []
 
-        let BoRe = [{ body: Final_Block_Bodies[0], region: Control_Regions[0]}, { body: Final_Block_Bodies[1], region: Control_Regions[1]}]
+        //Making sure that there are not long chains of the same pairs in a row
+        let Group1 = []
+        let Group2 = []
+        let Group3 = []
 
         //Adding all the templates where the two pairs are from the same family
-        TrialTemplates.push({options: [{key: "IA", body: BoRe[0].body, region: BoRe[1].region},{key: "IB", body: BoRe[1].body, region: BoRe[0].region}], paircode: "I"})
-        TrialTemplates.push({options: [{key: "IB", body: BoRe[0].body, region: BoRe[1].region},{key: "IA", body: BoRe[1].body, region: BoRe[0].region}], paircode: "I"})
-        TrialTemplates.push({options: [{key: "DA", body: BoRe[0].body, region: BoRe[1].region},{key: "DB", body: BoRe[1].body, region: BoRe[0].region}], paircode: "D"})
-        TrialTemplates.push({options: [{key: "DB", body: BoRe[0].body, region: BoRe[1].region},{key: "DA", body: BoRe[1].body, region: BoRe[0].region}], paircode: "D"})
-        TrialTemplates.push({options: [{key: "C1", body: BoRe[0].body, region: BoRe[1].region},{key: "C2", body: BoRe[1].body, region: BoRe[0].region}], paircode: "C"})
+        Group1.push({options: [{key: "IA", body: Final_Block_Bodies[0], region: "Neutral"},{key: "IB", body: Final_Block_Bodies[1], region: "Neutral"}], paircode: "I"})
+        Group2.push({options: [{key: "IB", body: Final_Block_Bodies[0], region: "Neutral"},{key: "IA", body: Final_Block_Bodies[1], region: "Neutral"}], paircode: "I"})
+        Group1.push({options: [{key: "DA", body: Final_Block_Bodies[0], region: "Neutral"},{key: "DB", body: Final_Block_Bodies[1], region: "Neutral"}], paircode: "D"})
+        Group2.push({options: [{key: "DB", body: Final_Block_Bodies[0], region: "Neutral"},{key: "DA", body: Final_Block_Bodies[1], region: "Neutral"}], paircode: "D"})
 
         //Duplicate the direct and indirect pairs, but now with different bodies and orders on screen
-        TrialTemplates.push({options: [{key: "IA", body: BoRe[1].body, region: BoRe[0].region},{key: "IB", body: BoRe[0].body, region: BoRe[1].region}], paircode: "I"})
-        TrialTemplates.push({options: [{key: "IB", body: BoRe[1].body, region: BoRe[0].region},{key: "IA", body: BoRe[0].body, region: BoRe[1].region}], paircode: "I"})
-        TrialTemplates.push({options: [{key: "DA", body: BoRe[1].body, region: BoRe[0].region},{key: "DB", body: BoRe[0].body, region: BoRe[1].region}], paircode: "D"})
-        TrialTemplates.push({options: [{key: "DB", body: BoRe[1].body, region: BoRe[0].region},{key: "DA", body: BoRe[0].body, region: BoRe[1].region}], paircode: "D"})
-        TrialTemplates.push({options: [{key: "C2", body: BoRe[1].body, region: BoRe[0].region},{key: "C1", body: BoRe[0].body, region: BoRe[1].region}], paircode: "C"})
+        Group2.push({options: [{key: "IA", body: Final_Block_Bodies[1], region: "Neutral"},{key: "IB", body: Final_Block_Bodies[0], region: "Neutral"}], paircode: "I"})
+        Group1.push({options: [{key: "IB", body: Final_Block_Bodies[1], region: "Neutral"},{key: "IA", body: Final_Block_Bodies[0], region: "Neutral"}], paircode: "I"})
+        Group2.push({options: [{key: "DA", body: Final_Block_Bodies[1], region: "Neutral"},{key: "DB", body: Final_Block_Bodies[0], region: "Neutral"}], paircode: "D"})
+        Group1.push({options: [{key: "DB", body: Final_Block_Bodies[1], region: "Neutral"},{key: "DA", body: Final_Block_Bodies[0], region: "Neutral"}], paircode: "D"})
+
+        //Adding some duplicates for I and D to reduce noise
+        Group3.push({options: [{key: "IA", body: Final_Block_Bodies[0], region: "Neutral"},{key: "IB", body: Final_Block_Bodies[1], region: "Neutral"}], paircode: "I"})
+        Group3.push({options: [{key: "IB", body: Final_Block_Bodies[1], region: "Neutral"},{key: "IA", body: Final_Block_Bodies[0], region: "Neutral"}], paircode: "I"})
+        Group3.push({options: [{key: "DA", body: Final_Block_Bodies[0], region: "Neutral"},{key: "DB", body: Final_Block_Bodies[1], region: "Neutral"}], paircode: "D"})
+        Group3.push({options: [{key: "DB", body: Final_Block_Bodies[1], region: "Neutral"},{key: "DA", body: Final_Block_Bodies[0], region: "Neutral"}], paircode: "D"})
 
         //Adding the templates for non-matching trials (to create a baseline)
-        TrialTemplates.push({options: [{key: "IA", body: BoRe[0].body, region: BoRe[1].region},{key: "C1", body: BoRe[1].body, region: BoRe[0].region}], paircode: false})
-        TrialTemplates.push({options: [{key: "IA", body: BoRe[1].body, region: BoRe[0].region},{key: "DB", body: BoRe[0].body, region: BoRe[1].region}], paircode: false})
-        TrialTemplates.push({options: [{key: "IB", body: BoRe[0].body, region: BoRe[1].region},{key: "C2", body: BoRe[1].body, region: BoRe[0].region}], paircode: false})
-        TrialTemplates.push({options: [{key: "IB", body: BoRe[1].body, region: BoRe[0].region},{key: "DA", body: BoRe[0].body, region: BoRe[1].region}], paircode: false})
+        Group1.push({options: [{key: "IA", body: Final_Block_Bodies[0], region: "Neutral"},{key: "C1", body: Final_Block_Bodies[1], region: "Neutral"}], paircode: false})
+        Group1.push({options: [{key: "IA", body: Final_Block_Bodies[1], region: "Neutral"},{key: "DB", body: Final_Block_Bodies[0], region: "Neutral"}], paircode: false})
+        Group2.push({options: [{key: "IB", body: Final_Block_Bodies[0], region: "Neutral"},{key: "C2", body: Final_Block_Bodies[1], region: "Neutral"}], paircode: false})
+        Group2.push({options: [{key: "IB", body: Final_Block_Bodies[1], region: "Neutral"},{key: "DA", body: Final_Block_Bodies[0], region: "Neutral"}], paircode: false})
+        Group3.push({options: [{key: "C1", body: Final_Block_Bodies[0], region: "Neutral"},{key: "C2", body: Final_Block_Bodies[1], region: "Neutral"}], paircode: false})
+        Group3.push({options: [{key: "C2", body: Final_Block_Bodies[1], region: "Neutral"},{key: "C1", body: Final_Block_Bodies[0], region: "Neutral"}], paircode: false})
 
-        TrialTemplates.push({options: [{key: "DA", body: BoRe[1].body, region: BoRe[0].region},{key: "C2", body: BoRe[0].body, region: BoRe[1].region}], paircode: false})
-        TrialTemplates.push({options: [{key: "DA", body: BoRe[0].body, region: BoRe[1].region},{key: "IA", body: BoRe[1].body, region: BoRe[0].region}], paircode: false})
-        TrialTemplates.push({options: [{key: "DB", body: BoRe[1].body, region: BoRe[0].region},{key: "C1", body: BoRe[0].body, region: BoRe[1].region}], paircode: false})
-        TrialTemplates.push({options: [{key: "DB", body: BoRe[0].body, region: BoRe[1].region},{key: "IB", body: BoRe[1].body, region: BoRe[0].region}], paircode: false})
 
-        /*
-        TrialTemplates.push({options: ["IA", "C1"], body: BoRe[0].body, region: BoRe[0].region, paircode: false})
-        TrialTemplates.push({options: ["IA", "DB"], body: BoRe[1].body, region: BoRe[1].region, paircode: false})
-        TrialTemplates.push({options: ["IB", "C2"], body: BoRe[0].body, region: BoRe[0].region, paircode: false})
-        TrialTemplates.push({options: ["IB", "DA"], body: BoRe[1].body, region: BoRe[1].region, paircode: false})
 
-        TrialTemplates.push({options: ["DA", "C2"], body: BoRe[1].body, region: BoRe[1].region, paircode: false})
-        TrialTemplates.push({options: ["DA", "IA"], body: BoRe[0].body, region: BoRe[0].region, paircode: false})
-        TrialTemplates.push({options: ["DB", "C1"], body: BoRe[1].body, region: BoRe[1].region, paircode: false})
-        TrialTemplates.push({options: ["DB", "IB"], body: BoRe[0].body, region: BoRe[0].region, paircode: false})
+        TrialTemplates = [shuffleArray(Group1), shuffleArray(Group2), shuffleArray(Group3)].flat()
 
-         */
+
 
         //Transforming the templates into trials
         let Arr = []
@@ -1158,57 +977,65 @@ STIMULUSDATA = function(participant_number){
 
             Arr.push(NewTrial)
         }
-        GroupingTrials = shuffleArray(Arr)
+        GroupingTrials = Arr
+        console.log(Arr)
     }
 
+    let max_rt = 5000
+
+    //Defining trials for the timed blocks
+    let Timed_Trials = [
+        createTimedBlockTrials(["IA","IB","DA","DB"],"Neutral", Final_Block_Bodies[0],max_rt, true, true, false),
+        createTimedBlockTrials(["IA","IB","DA","DB"],"Neutral", Final_Block_Bodies[1],max_rt, true, false, true),
+        createTimedBlockTrials(["IA","IB","DA","DB"],"Neutral", Final_Block_Bodies[0],max_rt, true, true, false),
+        createTimedBlockTrials(["IA","IB","DA","DB"],"Neutral", Final_Block_Bodies[1],max_rt, true, true, true)
+    ].flat()
+
     //Combinining all trials into a single object. Here, each element is a day's worth of activities during the test phase.
-    let TestPhaseData = [{
-        Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_A, "direct", true,true ),
-        type: "direct",
-        hint_type: "text",
-        number: 1
-    },{
-        Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C2"], InferencePhaseTemplates_B, "indirect", false,true ),
-        type: "indirect",
-        hint_type: "text",
-        number: 2
-    },{
-        Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_B, "indirect", false,true ),
-        type: "indirect",
-        hint_type: "text",
-        number: 3
-    },{
-        Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C2"], InferencePhaseTemplates_B, "indirect", false,true ),
-        type: "indirect",
-        hint_type: "text",
-        number: 4
-    },{
-        Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_B, "indirect", false,true ),
-        type: "indirect",
-        hint_type: "text",
-        number: 5
-    }, {
-        Trials: GroupingTrials,
-        type: "category",
-        number: 6
-    }, {
-        Trials: [createFinalBlockTrials(["IA","IB","DA","DB","C1"],"Neutral", Final_Block_Bodies[0],5000, true),
-            createFinalBlockTrials(["IA","IB","DA","DB","C2"],"Neutral", Final_Block_Bodies[1],4500, true),
-            createFinalBlockTrials(["IA","IB","DA","DB","C1"],"Neutral", Final_Block_Bodies[0],4000, true),
-            createFinalBlockTrials(["IA","IB","DA","DB","C2"],"Neutral", Final_Block_Bodies[1],3500, true)
-        ].flat(),
-        type: "final_block",
-        hint_type: "text",
-        number: 7
-    },{
-        Trials: createBlockOfRepeatTrainingTrials(true),
-        type: "repeat_training",
-        hint_type: "text",
-        number: 8
-    }]
+    let TestPhaseData = [
+        {
+            Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_A, "direct", true,true ),
+            type: "direct",
+            hint_type: "text",
+            number: 1
+        },{
+            Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C2"], InferencePhaseTemplates_B, "indirect", false,true ),
+            type: "indirect",
+            hint_type: "text",
+            number: 2
+        },{
+            Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_B, "indirect", false,true ),
+            type: "indirect",
+            hint_type: "text",
+            number: 3
+        },{
+            Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C2"], InferencePhaseTemplates_B, "indirect", false,true ),
+            type: "indirect",
+            hint_type: "text",
+            number: 4
+        },{
+            Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_B, "indirect", false,true ),
+            type: "indirect",
+            hint_type: "text",
+            number: 5
+        }, {
+            Trials: GroupingTrials,
+            type: "category",
+            number: 6
+        }, {
+            Trials: Timed_Trials,
+            type: "final_block",
+            hint_type: "text",
+            number: 7
+        },{
+            Trials: createBlockOfRepeatTrainingTrials(true),
+            type: "repeat_training",
+            hint_type: "text",
+            number: 8
+        }]
 
     console.log(TestPhaseData)
-
+    console.log(Available_Heads)
     /*
     let TestPhaseData = [{
         Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_A, "direct", true,true ),
@@ -1240,10 +1067,10 @@ STIMULUSDATA = function(participant_number){
         type: "category",
         number: 6
     }, {
-        Trials: [createFinalBlockTrials(["IA","IB","DA","DB","C1"],"Neutral", Final_Block_Bodies[0],5000, true),
-            createFinalBlockTrials(["IA","IB","DA","DB","C2"],"Neutral", Final_Block_Bodies[1],4500, true),
-            createFinalBlockTrials(["IA","IB","DA","DB","C1"],"Neutral", Final_Block_Bodies[0],4000, true),
-            createFinalBlockTrials(["IA","IB","DA","DB","C2"],"Neutral", Final_Block_Bodies[1],3500, true)
+        Trials: [createTimedBlockTrials(["IA","IB","DA","DB","C1"],"Neutral", Final_Block_Bodies[0],5000, true),
+            createTimedBlockTrials(["IA","IB","DA","DB","C2"],"Neutral", Final_Block_Bodies[1],4500, true),
+            createTimedBlockTrials(["IA","IB","DA","DB","C1"],"Neutral", Final_Block_Bodies[0],4000, true),
+            createTimedBlockTrials(["IA","IB","DA","DB","C2"],"Neutral", Final_Block_Bodies[1],3500, true)
         ].flat(),
         type: "final_block",
         hint_type: "text",
@@ -1883,7 +1710,7 @@ PARAMETERS = function() {
         Jungleforest: "The Deep Jungle"
     }
 
-    this.Available_items = ["ball","bear","car","shovel","trumpet"] // ["car","spinner","boomerang","balloon","shovel","trumpet"]
+    this.Available_items = ["ball","bear","car","shovel","trumpet", "boomerang"] // ["car","spinner","boomerang","balloon","shovel","trumpet"]
 
     //Alternative colorscheme when the location should not be shown
     this.GrayColorScheme ={
@@ -1975,7 +1802,7 @@ PARAMETERS = function() {
         D: "Antler",
         E: "Chirpy",
         F: "Punk",
-        G: "Antenna",
+        G: "Snail",
         H: "Scout",
         I: "Unihorn",
         J: "Cheeks"
@@ -7882,8 +7709,8 @@ let SVGObjects = {
 let DataCont = new DataController(participant_number, Stimuli)
 
 let EC = new ExperimentController(Stimuli, DataCont)
-EC.showStartScreen()
-//EC.show_starting_instructions()
+//EC.showStartScreen()
+EC.show_starting_instructions()
 //EC.start_targeted_search_subphase()
 //EC.start_delivery_subphase()
 //EC.start_quiz()
@@ -7894,7 +7721,10 @@ EC.showStartScreen()
 //  Set seed based on PID
 // SVG Garbage collector?
 
-console.log("Version: 19.10.23")
+console.log("Version: 25.10.23")
 //TODO: RESET SUBMISSION
 //TODO: AT THE LAST DAY OF YOUR TRAINING YOU GOT LOST IN THE FOG
 
+// Trials: head of IA / IB, body of C1 / C2. Items available are DA,DB,C2/C1. Mixed in with timed trials.
+//Counterbalance order of category / timed trials
+// max rt 4000 or 5000 (random)
