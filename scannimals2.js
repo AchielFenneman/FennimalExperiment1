@@ -845,7 +845,7 @@ STIMULUSDATA = function(participant_number){
 
             //Adding ID for easy analysis
             MixedTrialI.ID = "IA_mix"
-            MixedTrialI.ID = "DA_mix"
+            MixedTrialD.ID = "DA_mix"
 
             //Setting a max decision time
             MixedTrialI.max_decision_time = max_decision_time
@@ -891,7 +891,7 @@ STIMULUSDATA = function(participant_number){
 
             //Adding ID for easy analysis
             MixedTrialI.ID = "IB_mix"
-            MixedTrialI.ID = "DB_mix"
+            MixedTrialD.ID = "DB_mix"
 
             //Setting a max decision time
             MixedTrialI.max_decision_time = max_decision_time
@@ -981,7 +981,7 @@ STIMULUSDATA = function(participant_number){
         console.log(Arr)
     }
 
-    let max_rt = 5000
+    let max_rt = shuffleArray([4000,4500])[0]
 
     //Defining trials for the timed blocks
     let Timed_Trials = [
@@ -1037,41 +1037,38 @@ STIMULUSDATA = function(participant_number){
     console.log(TestPhaseData)
     console.log(Available_Heads)
     /*
-    let TestPhaseData = [{
-        Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_A, "direct", true,true ),
-        type: "direct",
-        hint_type: "text",
-        number: 1
-    },{
-        Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C2"], InferencePhaseTemplates_B, "indirect", false,true ),
-        type: "indirect",
-        hint_type: "text",
-        number: 2
-    },{
-        Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_B, "indirect", false,true ),
-        type: "indirect",
-        hint_type: "text",
-        number: 3
-    },{
-        Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C2"], InferencePhaseTemplates_B, "indirect", false,true ),
-        type: "indirect",
-        hint_type: "text",
-        number: 4
-    },{
-        Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_B, "indirect", false,true ),
-        type: "indirect",
-        hint_type: "text",
-        number: 5
-    }, {
-        Trials: GroupingTrials,
-        type: "category",
-        number: 6
-    }, {
-        Trials: [createTimedBlockTrials(["IA","IB","DA","DB","C1"],"Neutral", Final_Block_Bodies[0],5000, true),
-            createTimedBlockTrials(["IA","IB","DA","DB","C2"],"Neutral", Final_Block_Bodies[1],4500, true),
-            createTimedBlockTrials(["IA","IB","DA","DB","C1"],"Neutral", Final_Block_Bodies[0],4000, true),
-            createTimedBlockTrials(["IA","IB","DA","DB","C2"],"Neutral", Final_Block_Bodies[1],3500, true)
-        ].flat(),
+    let TestPhaseData = [
+        {
+            Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_A, "direct", true,true ),
+            type: "direct",
+            hint_type: "text",
+            number: 1
+        },{
+            Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C2"], InferencePhaseTemplates_B, "indirect", false,true ),
+            type: "indirect",
+            hint_type: "text",
+            number: 2
+        },{
+            Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_B, "indirect", false,true ),
+            type: "indirect",
+            hint_type: "text",
+            number: 3
+        },{
+            Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C2"], InferencePhaseTemplates_B, "indirect", false,true ),
+            type: "indirect",
+            hint_type: "text",
+            number: 4
+        },{
+            Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_B, "indirect", false,true ),
+            type: "indirect",
+            hint_type: "text",
+            number: 5
+        }, {
+            Trials: GroupingTrials,
+            type: "category",
+            number: 6
+        }, {
+        Trials: Timed_Trials,
         type: "final_block",
         hint_type: "text",
         number: 7
@@ -1081,6 +1078,7 @@ STIMULUSDATA = function(participant_number){
         hint_type: "text",
         number: 8
     }]
+
    */
 
 
@@ -7709,8 +7707,8 @@ let SVGObjects = {
 let DataCont = new DataController(participant_number, Stimuli)
 
 let EC = new ExperimentController(Stimuli, DataCont)
-//EC.showStartScreen()
-EC.show_starting_instructions()
+EC.showStartScreen()
+//EC.show_starting_instructions()
 //EC.start_targeted_search_subphase()
 //EC.start_delivery_subphase()
 //EC.start_quiz()
@@ -7721,10 +7719,7 @@ EC.show_starting_instructions()
 //  Set seed based on PID
 // SVG Garbage collector?
 
-console.log("Version: 25.10.23")
+console.log("Version: 30.10.23")
 //TODO: RESET SUBMISSION
-//TODO: AT THE LAST DAY OF YOUR TRAINING YOU GOT LOST IN THE FOG
 
-// Trials: head of IA / IB, body of C1 / C2. Items available are DA,DB,C2/C1. Mixed in with timed trials.
-//Counterbalance order of category / timed trials
-// max rt 4000 or 5000 (random)
+
