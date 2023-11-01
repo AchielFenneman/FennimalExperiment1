@@ -490,7 +490,7 @@ STIMULUSDATA = function(participant_number){
 
     // DEFINING THE AVAILABLE FEATURES
     let Available_Heads = shuffleArray(Param.Available_Fennimal_Heads)
-    let Available_Bodies = shuffleArray(Param.Available_Fennimal_Bodies)
+    let Available_Bodies = shuffleArray(Param.Regionfree_Fennimal_Bodies)
     let Available_Regions = shuffleArray(["North","Desert","Village","Jungle","Flowerfields","Swamp", "Beach", "Mountains"])
 
     // SETTING THE ITEMS USED
@@ -560,23 +560,25 @@ STIMULUSDATA = function(participant_number){
 
     //Drawing features
     let Training_Regions = Available_Regions.splice(0,4)
-    let Training_Bodies = Available_Bodies.splice(0,4)
+    //let Training_Bodies = Available_Bodies.splice(0,4)
     let Training_Heads = Available_Heads.splice(0,6)
 
     let Inference_Phase_Regions = Available_Regions.splice(0,4)
-    let Inference_Phase_Bodies_A =  Available_Bodies.splice(0,4)
-    let Inference_Phase_Bodies_B =  Available_Bodies.splice(0,4)
+    //let Inference_Phase_Bodies_A =  Available_Bodies.splice(0,4)
+    //let Inference_Phase_Bodies_B =  Available_Bodies.splice(0,4)
     let Inference_Phase_Heads = Available_Heads.splice(0,2)
 
-    let Final_Block_Bodies = Available_Bodies.splice(0,2)
+    let Cat_and_Timed_Block_Bodies_A = Available_Bodies.splice(0,2)
+    let Cat_and_Timed_Block_Bodies_B = Available_Bodies.splice(0,2)
+    let Cat_and_Timed_Block_Bodies_C = Available_Bodies.splice(0,2)
 
     let TrainingFennimals = {
-        IA: createFennimalObj(Training_Regions[0], Param.RegionData[Training_Regions[0]].Locations[0],Training_Heads[0],Training_Bodies[0], Random_Items[0] ),
-        IB: createFennimalObj(Training_Regions[0], Param.RegionData[Training_Regions[0]].Locations[1],Training_Heads[1],Training_Bodies[0], Random_Items[1] ),
-        DA: createFennimalObj(Training_Regions[1], Param.RegionData[Training_Regions[1]].Locations[0],Training_Heads[2],Training_Bodies[1], Random_Items[2] ),
-        DB: createFennimalObj(Training_Regions[1], Param.RegionData[Training_Regions[1]].Locations[1],Training_Heads[3],Training_Bodies[1], Random_Items[3] ),
-        C1: createFennimalObj(Training_Regions[2], shuffleArray(Param.RegionData[Training_Regions[2]].Locations)[0],Training_Heads[4],Training_Bodies[2], Random_Items[4] ),
-        C2: createFennimalObj(Training_Regions[3], shuffleArray(Param.RegionData[Training_Regions[3]].Locations)[1],Training_Heads[5],Training_Bodies[3], Random_Items[4] ),
+        IA: createFennimalObj(Training_Regions[0], Param.RegionData[Training_Regions[0]].Locations[0],Training_Heads[0],Param.RegionData[Training_Regions[0]].preferredBodyType, Random_Items[0] ),
+        IB: createFennimalObj(Training_Regions[0], Param.RegionData[Training_Regions[0]].Locations[1],Training_Heads[1],Param.RegionData[Training_Regions[0]].preferredBodyType, Random_Items[1] ),
+        DA: createFennimalObj(Training_Regions[1], Param.RegionData[Training_Regions[1]].Locations[0],Training_Heads[2],Param.RegionData[Training_Regions[1]].preferredBodyType, Random_Items[2] ),
+        DB: createFennimalObj(Training_Regions[1], Param.RegionData[Training_Regions[1]].Locations[1],Training_Heads[3],Param.RegionData[Training_Regions[1]].preferredBodyType, Random_Items[3] ),
+        C1: createFennimalObj(Training_Regions[2], shuffleArray(Param.RegionData[Training_Regions[2]].Locations)[0],Training_Heads[4],Param.RegionData[Training_Regions[2]].preferredBodyType, Random_Items[4] ),
+        C2: createFennimalObj(Training_Regions[3], shuffleArray(Param.RegionData[Training_Regions[3]].Locations)[1],Training_Heads[5],Param.RegionData[Training_Regions[3]].preferredBodyType, Random_Items[4] ),
     }
 
     //CREATING THE TEST STIMULI HERE
@@ -597,22 +599,30 @@ STIMULUSDATA = function(participant_number){
         C1: shuffleArray( TrainingFennimals.C1.location),
         C2: shuffleArray( TrainingFennimals.C2.location ),
     }
+    let InferencePhaseBodies = {
+        IA: Param.RegionData[InferencePhaseRegions.IA].preferredBodyType,
+        IB: Param.RegionData[InferencePhaseRegions.IB].preferredBodyType,
+        DA: Param.RegionData[InferencePhaseRegions.DA].preferredBodyType,
+        DB: Param.RegionData[InferencePhaseRegions.DB].preferredBodyType,
+        C1: Param.RegionData[InferencePhaseRegions.C1].preferredBodyType,
+        C2: Param.RegionData[InferencePhaseRegions.C2].preferredBodyType,
+    }
 
     let InferencePhaseTemplates_A = {
-        IA: {ID: "IA", head: TrainingFennimals.IA.head, body: Inference_Phase_Bodies_A[0], region: InferencePhaseRegions.IA, location: InferencePhaseAvailableLocations.IA.splice(0,1)[0], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
-        IB: {ID: "IB", head: TrainingFennimals.IB.head, body: Inference_Phase_Bodies_A[1], region: InferencePhaseRegions.IB, location: InferencePhaseAvailableLocations.IB.splice(0,1)[0],item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
-        DA: {ID: "DA", head: TrainingFennimals.DA.head, body: Inference_Phase_Bodies_A[2], region: InferencePhaseRegions.DA, location: InferencePhaseAvailableLocations.DA.splice(0,1)[0],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
-        DB: {ID: "DB", head: TrainingFennimals.DB.head, body: Inference_Phase_Bodies_A[3], region: InferencePhaseRegions.DB, location: InferencePhaseAvailableLocations.DB.splice(0,1)[0],item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
-        C1: {ID: "C1", head: Inference_Phase_Heads[0], body: TrainingFennimals.C1.body, region: InferencePhaseRegions.C1, location: InferencePhaseAvailableLocations.C1, item_direct: TrainingFennimals.C1.item, item_indirect: false},
-        C2: {ID: "C2", head: Inference_Phase_Heads[1], body: TrainingFennimals.C2.body, region: InferencePhaseRegions.C2, location: InferencePhaseAvailableLocations.C2, item_direct: TrainingFennimals.C2.item, item_indirect: false},
+        IA: {ID: "IA", head: TrainingFennimals.IA.head, body: InferencePhaseBodies.IA, region: InferencePhaseRegions.IA, location: InferencePhaseAvailableLocations.IA.splice(0,1)[0], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
+        IB: {ID: "IB", head: TrainingFennimals.IB.head, body: InferencePhaseBodies.IB, region: InferencePhaseRegions.IB, location: InferencePhaseAvailableLocations.IB.splice(0,1)[0],item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
+        DA: {ID: "DA", head: TrainingFennimals.DA.head, body: InferencePhaseBodies.DA, region: InferencePhaseRegions.DA, location: InferencePhaseAvailableLocations.DA.splice(0,1)[0],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
+        DB: {ID: "DB", head: TrainingFennimals.DB.head, body: InferencePhaseBodies.DB, region: InferencePhaseRegions.DB, location: InferencePhaseAvailableLocations.DB.splice(0,1)[0],item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
+        C1: {ID: "C1", head: Inference_Phase_Heads[0], body: InferencePhaseBodies.C1, region: InferencePhaseRegions.C1, location: InferencePhaseAvailableLocations.C1, item_direct: TrainingFennimals.C1.item, item_indirect: false},
+        C2: {ID: "C2", head: Inference_Phase_Heads[1], body: InferencePhaseBodies.C2, region: InferencePhaseRegions.C2, location: InferencePhaseAvailableLocations.C2, item_direct: TrainingFennimals.C2.item, item_indirect: false},
     }
     let InferencePhaseTemplates_B = {
-        IA: {ID: "IA", head: TrainingFennimals.IA.head, body: Inference_Phase_Bodies_B[0], region: InferencePhaseRegions.IA, location: InferencePhaseAvailableLocations.IA.splice(0,1)[0], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
-        IB: {ID: "IB", head: TrainingFennimals.IB.head, body: Inference_Phase_Bodies_B[1], region: InferencePhaseRegions.IB, location: InferencePhaseAvailableLocations.IB.splice(0,1)[0],item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
-        DA: {ID: "DA", head: TrainingFennimals.DA.head, body: Inference_Phase_Bodies_B[2], region: InferencePhaseRegions.DA, location: InferencePhaseAvailableLocations.DA.splice(0,1)[0],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
-        DB: {ID: "DB", head: TrainingFennimals.DB.head, body: Inference_Phase_Bodies_B[3], region: InferencePhaseRegions.DB, location: InferencePhaseAvailableLocations.DB.splice(0,1)[0],item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
-        C1: {ID: "C1", head: Inference_Phase_Heads[0], body: TrainingFennimals.C1.body, region: InferencePhaseRegions.C1, location: InferencePhaseAvailableLocations.C1, item_direct: TrainingFennimals.C1.item, item_indirect: false},
-        C2: {ID: "C2", head: Inference_Phase_Heads[1], body: TrainingFennimals.C2.body, region: InferencePhaseRegions.C2, location: InferencePhaseAvailableLocations.C2, item_direct: TrainingFennimals.C2.item, item_indirect: false},
+        IA: {ID: "IA", head: TrainingFennimals.IA.head, body: InferencePhaseBodies.IA, region: InferencePhaseRegions.IA, location: InferencePhaseAvailableLocations.IA.splice(0,1)[0], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
+        IB: {ID: "IB", head: TrainingFennimals.IB.head, body: InferencePhaseBodies.IB, region: InferencePhaseRegions.IB, location: InferencePhaseAvailableLocations.IB.splice(0,1)[0],item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
+        DA: {ID: "DA", head: TrainingFennimals.DA.head, body: InferencePhaseBodies.DA, region: InferencePhaseRegions.DA, location: InferencePhaseAvailableLocations.DA.splice(0,1)[0],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
+        DB: {ID: "DB", head: TrainingFennimals.DB.head, body: InferencePhaseBodies.DB, region: InferencePhaseRegions.DB, location: InferencePhaseAvailableLocations.DB.splice(0,1)[0],item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
+        C1: {ID: "C1", head: Inference_Phase_Heads[0], body: InferencePhaseBodies.C1, region: InferencePhaseRegions.C1, location: InferencePhaseAvailableLocations.C1, item_direct: TrainingFennimals.C1.item, item_indirect: false},
+        C2: {ID: "C2", head: Inference_Phase_Heads[1], body: InferencePhaseBodies.C2, region: InferencePhaseRegions.C2, location: InferencePhaseAvailableLocations.C2, item_direct: TrainingFennimals.C2.item, item_indirect: false},
     }
 
     //Returns a block of inference-phase trials. items_allowed_... can be "direct" or "indirect.
@@ -930,36 +940,32 @@ STIMULUSDATA = function(participant_number){
         let Group3 = []
 
         //Adding all the templates where the two pairs are from the same family
-        Group1.push({options: [{key: "IA", body: Final_Block_Bodies[0], region: "Neutral"},{key: "IB", body: Final_Block_Bodies[1], region: "Neutral"}], paircode: "I"})
-        Group2.push({options: [{key: "IB", body: Final_Block_Bodies[0], region: "Neutral"},{key: "IA", body: Final_Block_Bodies[1], region: "Neutral"}], paircode: "I"})
-        Group1.push({options: [{key: "DA", body: Final_Block_Bodies[0], region: "Neutral"},{key: "DB", body: Final_Block_Bodies[1], region: "Neutral"}], paircode: "D"})
-        Group2.push({options: [{key: "DB", body: Final_Block_Bodies[0], region: "Neutral"},{key: "DA", body: Final_Block_Bodies[1], region: "Neutral"}], paircode: "D"})
+        Group1.push({options: [{key: "IA", body: Cat_and_Timed_Block_Bodies_A[0], region: "Neutral"},{key: "IB", body: Cat_and_Timed_Block_Bodies_A[1], region: "Neutral"}], paircode: "I"})
+        Group2.push({options: [{key: "IB", body: Cat_and_Timed_Block_Bodies_B[0], region: "Neutral"},{key: "IA", body: Cat_and_Timed_Block_Bodies_B[1], region: "Neutral"}], paircode: "I"})
+        Group1.push({options: [{key: "DA", body: Cat_and_Timed_Block_Bodies_A[0], region: "Neutral"},{key: "DB", body: Cat_and_Timed_Block_Bodies_A[1], region: "Neutral"}], paircode: "D"})
+        Group2.push({options: [{key: "DB", body: Cat_and_Timed_Block_Bodies_B[0], region: "Neutral"},{key: "DA", body: Cat_and_Timed_Block_Bodies_B[1], region: "Neutral"}], paircode: "D"})
 
         //Duplicate the direct and indirect pairs, but now with different bodies and orders on screen
-        Group2.push({options: [{key: "IA", body: Final_Block_Bodies[1], region: "Neutral"},{key: "IB", body: Final_Block_Bodies[0], region: "Neutral"}], paircode: "I"})
-        Group1.push({options: [{key: "IB", body: Final_Block_Bodies[1], region: "Neutral"},{key: "IA", body: Final_Block_Bodies[0], region: "Neutral"}], paircode: "I"})
-        Group2.push({options: [{key: "DA", body: Final_Block_Bodies[1], region: "Neutral"},{key: "DB", body: Final_Block_Bodies[0], region: "Neutral"}], paircode: "D"})
-        Group1.push({options: [{key: "DB", body: Final_Block_Bodies[1], region: "Neutral"},{key: "DA", body: Final_Block_Bodies[0], region: "Neutral"}], paircode: "D"})
+        Group2.push({options: [{key: "IA", body: Cat_and_Timed_Block_Bodies_B[1], region: "Neutral"},{key: "IB", body: Cat_and_Timed_Block_Bodies_B[0], region: "Neutral"}], paircode: "I"})
+        Group1.push({options: [{key: "IB", body: Cat_and_Timed_Block_Bodies_A[1], region: "Neutral"},{key: "IA", body: Cat_and_Timed_Block_Bodies_A[0], region: "Neutral"}], paircode: "I"})
+        Group2.push({options: [{key: "DA", body: Cat_and_Timed_Block_Bodies_B[1], region: "Neutral"},{key: "DB", body: Cat_and_Timed_Block_Bodies_B[0], region: "Neutral"}], paircode: "D"})
+        Group1.push({options: [{key: "DB", body: Cat_and_Timed_Block_Bodies_A[1], region: "Neutral"},{key: "DA", body: Cat_and_Timed_Block_Bodies_A[0], region: "Neutral"}], paircode: "D"})
 
         //Adding some duplicates for I and D to reduce noise
-        Group3.push({options: [{key: "IA", body: Final_Block_Bodies[0], region: "Neutral"},{key: "IB", body: Final_Block_Bodies[1], region: "Neutral"}], paircode: "I"})
-        Group3.push({options: [{key: "IB", body: Final_Block_Bodies[1], region: "Neutral"},{key: "IA", body: Final_Block_Bodies[0], region: "Neutral"}], paircode: "I"})
-        Group3.push({options: [{key: "DA", body: Final_Block_Bodies[0], region: "Neutral"},{key: "DB", body: Final_Block_Bodies[1], region: "Neutral"}], paircode: "D"})
-        Group3.push({options: [{key: "DB", body: Final_Block_Bodies[1], region: "Neutral"},{key: "DA", body: Final_Block_Bodies[0], region: "Neutral"}], paircode: "D"})
+        Group3.push({options: [{key: "IA", body: Cat_and_Timed_Block_Bodies_C[0], region: "Neutral"},{key: "IB", body: Cat_and_Timed_Block_Bodies_C[1], region: "Neutral"}], paircode: "I"})
+        Group3.push({options: [{key: "IB", body: Cat_and_Timed_Block_Bodies_C[1], region: "Neutral"},{key: "IA", body: Cat_and_Timed_Block_Bodies_C[0], region: "Neutral"}], paircode: "I"})
+        Group3.push({options: [{key: "DA", body: Cat_and_Timed_Block_Bodies_C[0], region: "Neutral"},{key: "DB", body: Cat_and_Timed_Block_Bodies_C[1], region: "Neutral"}], paircode: "D"})
+        Group3.push({options: [{key: "DB", body: Cat_and_Timed_Block_Bodies_C[1], region: "Neutral"},{key: "DA", body: Cat_and_Timed_Block_Bodies_C[0], region: "Neutral"}], paircode: "D"})
 
         //Adding the templates for non-matching trials (to create a baseline)
-        Group1.push({options: [{key: "IA", body: Final_Block_Bodies[0], region: "Neutral"},{key: "C1", body: Final_Block_Bodies[1], region: "Neutral"}], paircode: false})
-        Group1.push({options: [{key: "IA", body: Final_Block_Bodies[1], region: "Neutral"},{key: "DB", body: Final_Block_Bodies[0], region: "Neutral"}], paircode: false})
-        Group2.push({options: [{key: "IB", body: Final_Block_Bodies[0], region: "Neutral"},{key: "C2", body: Final_Block_Bodies[1], region: "Neutral"}], paircode: false})
-        Group2.push({options: [{key: "IB", body: Final_Block_Bodies[1], region: "Neutral"},{key: "DA", body: Final_Block_Bodies[0], region: "Neutral"}], paircode: false})
-        Group3.push({options: [{key: "C1", body: Final_Block_Bodies[0], region: "Neutral"},{key: "C2", body: Final_Block_Bodies[1], region: "Neutral"}], paircode: false})
-        Group3.push({options: [{key: "C2", body: Final_Block_Bodies[1], region: "Neutral"},{key: "C1", body: Final_Block_Bodies[0], region: "Neutral"}], paircode: false})
-
-
+        Group1.push({options: [{key: "IA", body: Cat_and_Timed_Block_Bodies_A[0], region: "Neutral"},{key: "C1", body: Cat_and_Timed_Block_Bodies_A[1], region: "Neutral"}], paircode: false})
+        Group1.push({options: [{key: "IA", body: Cat_and_Timed_Block_Bodies_A[1], region: "Neutral"},{key: "DB", body: Cat_and_Timed_Block_Bodies_A[0], region: "Neutral"}], paircode: false})
+        Group2.push({options: [{key: "IB", body: Cat_and_Timed_Block_Bodies_B[0], region: "Neutral"},{key: "C2", body: Cat_and_Timed_Block_Bodies_B[1], region: "Neutral"}], paircode: false})
+        Group2.push({options: [{key: "IB", body: Cat_and_Timed_Block_Bodies_B[1], region: "Neutral"},{key: "DA", body: Cat_and_Timed_Block_Bodies_B[0], region: "Neutral"}], paircode: false})
+        Group3.push({options: [{key: "C1", body: Cat_and_Timed_Block_Bodies_C[0], region: "Neutral"},{key: "C2", body: Cat_and_Timed_Block_Bodies_C[1], region: "Neutral"}], paircode: false})
+        Group3.push({options: [{key: "C2", body: Cat_and_Timed_Block_Bodies_C[1], region: "Neutral"},{key: "C1", body: Cat_and_Timed_Block_Bodies_C[0], region: "Neutral"}], paircode: false})
 
         TrialTemplates = [shuffleArray(Group1), shuffleArray(Group2), shuffleArray(Group3)].flat()
-
-
 
         //Transforming the templates into trials
         let Arr = []
@@ -985,10 +991,10 @@ STIMULUSDATA = function(participant_number){
 
     //Defining trials for the timed blocks
     let Timed_Trials = [
-        createTimedBlockTrials(["IA","IB","DA","DB"],"Neutral", Final_Block_Bodies[0],max_rt, true, true, false),
-        createTimedBlockTrials(["IA","IB","DA","DB"],"Neutral", Final_Block_Bodies[1],max_rt, true, false, true),
-        createTimedBlockTrials(["IA","IB","DA","DB"],"Neutral", Final_Block_Bodies[0],max_rt, true, true, false),
-        createTimedBlockTrials(["IA","IB","DA","DB"],"Neutral", Final_Block_Bodies[1],max_rt, true, false, true)
+        createTimedBlockTrials(["IA","IB","DA","DB"],"Neutral", Cat_and_Timed_Block_Bodies_A[0],max_rt, true, true, false),
+        createTimedBlockTrials(["IA","IB","DA","DB"],"Neutral", Cat_and_Timed_Block_Bodies_B[1],max_rt, true, false, true),
+        createTimedBlockTrials(["IA","IB","DA","DB"],"Neutral", Cat_and_Timed_Block_Bodies_C[0],max_rt, true, true, false),
+        createTimedBlockTrials(["IA","IB","DA","DB"],"Neutral", Cat_and_Timed_Block_Bodies_A[1],max_rt, true, false, true)
     ].flat()
 
     //Combinining all trials into a single object. Here, each element is a day's worth of activities during the test phase.
@@ -1036,6 +1042,7 @@ STIMULUSDATA = function(participant_number){
 
     console.log(TestPhaseData)
     console.log(Available_Heads)
+    console.log(Available_Bodies)
     /*
      let TestPhaseData = [
         {
@@ -1167,6 +1174,7 @@ PARAMETERS = function() {
     // "Frog", "Dragon", "Bunny", "Bird", "Elephant", "Tiger", "Walrus", "Turtle", "Crocodile", "Gnome", "Plant", "Robot"]
     this.Available_Fennimal_Heads = ["A", "B", "C", "D", "E", "F","G","H", "I", "J"]
     this.Available_Fennimal_Bodies = ["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M", "N"] // ["A", "B", "C", "D", "F","G","H", "I","J","K"] //["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M","N"]
+    this.Regionfree_Fennimal_Bodies = ["A", "E", "F","H","K","M"] // ["A", "B", "C", "D", "F","G","H", "I","J","K"] //["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M","N"]
 
     this.LocationTransitionData = {
         //This object holds all the location transitions.
@@ -1537,6 +1545,7 @@ PARAMETERS = function() {
                 tertiary_color: "#1a46b8",
             },
             contrast_color: "#edc25e",
+            preferredBodyType: "B",
         },
         Jungle: {
             Locations : ["Bush", "Jungleforest"],
@@ -1551,6 +1560,7 @@ PARAMETERS = function() {
                 tertiary_color: "#78ab09",
             },
             contrast_color: "#ac7dd7ff",
+            preferredBodyType: "N",
         },
         Desert: {
             Locations : ["Oasis", "Cactus"],
@@ -1564,7 +1574,8 @@ PARAMETERS = function() {
                 secondary_color: "#d1caa9",
                 tertiary_color: "#d2d911",
             },
-            contrast_color: "#47395b"
+            contrast_color: "#47395b",
+            preferredBodyType: "I",
         },
         Mountains: {
             Locations : ["Waterfall", "Mine"],
@@ -1578,7 +1589,8 @@ PARAMETERS = function() {
                 secondary_color: "#b09a90",//"#dedcdc",
                 tertiary_color: "#502d16",
             },
-            contrast_color: "#9fd8ee"
+            contrast_color: "#9fd8ee",
+            preferredBodyType: "J",
         },
         Beach: {
             Locations : ["Beachbar", "Port"],
@@ -1592,7 +1604,8 @@ PARAMETERS = function() {
                 secondary_color: "#ffe6d5",//"#dedcdc",//"#f7cdbc",
                 tertiary_color: "#ffd0b0"//"#f2e7df",
             },
-            contrast_color: "#c30b69"
+            contrast_color: "#c30b69",
+            preferredBodyType: "D",
         },
         Flowerfields: {
             Locations : ["Windmill", "Garden"],
@@ -1606,7 +1619,8 @@ PARAMETERS = function() {
                 secondary_color: "#d3bfd9",
                 tertiary_color: "#890fbd",
             },
-            contrast_color: "#799742"
+            contrast_color: "#799742",
+            preferredBodyType: "G",
 
         },
         Village: {
@@ -1621,7 +1635,8 @@ PARAMETERS = function() {
                 secondary_color: "#ccb1b8",
                 tertiary_color: "#d10f0f",
             },
-            contrast_color: "#80eeca"
+            contrast_color: "#80eeca",
+            preferredBodyType: "L",
 
         },
         Swamp: {
@@ -1636,7 +1651,8 @@ PARAMETERS = function() {
                 secondary_color: "#c2f0ea",
                 tertiary_color:  "#00b3b3"
             },
-            contrast_color: "#cb156b"
+            contrast_color: "#cb156b",
+            preferredBodyType: "C",
         },
         Home: {
             color: "#cccccc"
@@ -6901,7 +6917,7 @@ EC.showStartScreen()
 //  Set seed based on PID
 // SVG Garbage collector?
 
-console.log("Version: 1.11.23")
+console.log("Version: 1.11.23 B")
 //TODO: RESET SUBMISSION
 
 
