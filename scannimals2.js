@@ -6889,8 +6889,8 @@ let SVGObjects = {
 let DataCont = new DataController(participant_number, Stimuli)
 
 let EC = new ExperimentController(Stimuli, DataCont)
-//EC.showStartScreen()
-EC.show_starting_instructions()
+EC.showStartScreen()
+//EC.show_starting_instructions()
 //EC.start_targeted_search_subphase()
 //EC.start_delivery_subphase()
 //EC.start_quiz()
