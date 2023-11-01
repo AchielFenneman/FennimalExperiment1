@@ -515,7 +515,7 @@ STIMULUSDATA = function(participant_number){
         }
         return(ItemObj)
     }
-    let Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 6, false ))
+    let Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 5, false ))
 
     //Randomize Items
     let Random_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
@@ -576,7 +576,7 @@ STIMULUSDATA = function(participant_number){
         DA: createFennimalObj(Training_Regions[1], Param.RegionData[Training_Regions[1]].Locations[0],Training_Heads[2],Training_Bodies[1], Random_Items[2] ),
         DB: createFennimalObj(Training_Regions[1], Param.RegionData[Training_Regions[1]].Locations[1],Training_Heads[3],Training_Bodies[1], Random_Items[3] ),
         C1: createFennimalObj(Training_Regions[2], shuffleArray(Param.RegionData[Training_Regions[2]].Locations)[0],Training_Heads[4],Training_Bodies[2], Random_Items[4] ),
-        C2: createFennimalObj(Training_Regions[3], shuffleArray(Param.RegionData[Training_Regions[3]].Locations)[1],Training_Heads[5],Training_Bodies[3], Random_Items[5] ),
+        C2: createFennimalObj(Training_Regions[3], shuffleArray(Param.RegionData[Training_Regions[3]].Locations)[1],Training_Heads[5],Training_Bodies[3], Random_Items[4] ),
     }
 
     //CREATING THE TEST STIMULI HERE
@@ -644,12 +644,12 @@ STIMULUSDATA = function(participant_number){
             //We will select one element from each of the arrays. So arrays with one element will always be selected
             let OtherPairItems
             switch(key){
-                case("IA"): OtherPairItems = [ TrainingFennimals.C1.item,TrainingFennimals.C2.item,[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("IB"): OtherPairItems = [ TrainingFennimals.C1.item,TrainingFennimals.C2.item,[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("DA"): OtherPairItems =  [TrainingFennimals.C1.item,TrainingFennimals.C2.item,[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
-                case("DB"): OtherPairItems = [TrainingFennimals.C1.item,TrainingFennimals.C2.item,[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
-                case("C1"):OtherPairItems = [TrainingFennimals.C2.item, [TrainingFennimals.IA.item, TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
-                case("C2"):OtherPairItems =  [TrainingFennimals.C1.item,[TrainingFennimals.IA.item, TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
+                case("IA"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("IB"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("DA"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
+                case("DB"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
+                case("C1"): OtherPairItems = [ [TrainingFennimals.IA.item, TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
+                case("C2"): OtherPairItems = [ [TrainingFennimals.IA.item, TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
             }
 
             //Creating an array containing all the trial's available items
@@ -727,8 +727,8 @@ STIMULUSDATA = function(participant_number){
         IB: {ID: "IB", head: TrainingFennimals.IB.head, item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
         DA: {ID: "DA", head: TrainingFennimals.DA.head, item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
         DB: {ID: "DB", head: TrainingFennimals.DB.head, item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
-        C1: {ID: "C1", head: TrainingFennimals.C1.head, item_direct: TrainingFennimals.C1.item, item_indirect: TrainingFennimals.C2.item},
-        C2: {ID: "C2", head: TrainingFennimals.C2.head, item_direct: TrainingFennimals.C2.item, item_indirect: TrainingFennimals.C1.item},
+        C1: {ID: "C1", head: TrainingFennimals.C1.head, item_direct: TrainingFennimals.C1.item, item_indirect: false},
+        C2: {ID: "C2", head: TrainingFennimals.C2.head, item_direct: TrainingFennimals.C2.item, item_indirect: false},
     }
 
     //Set max_decision_time to have an unlimited duration trial
@@ -777,12 +777,12 @@ STIMULUSDATA = function(participant_number){
             //We will select one element from each of the arrays. So arrays with one element will always be selected
             let OtherPairItems
             switch(key){
-                case("IA"): OtherPairItems = [TrainingFennimals.C1.item, TrainingFennimals.C2.item, [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("IB"): OtherPairItems = [TrainingFennimals.C1.item, TrainingFennimals.C2.item, [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("DA"): OtherPairItems = [TrainingFennimals.C1.item, TrainingFennimals.C2.item, [TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
-                case("DB"): OtherPairItems = [TrainingFennimals.C1.item, TrainingFennimals.C2.item, [TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
-                case("C1"): OtherPairItems = [TrainingFennimals.IA.item, TrainingFennimals.IB.item, [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("C2"): OtherPairItems = [TrainingFennimals.IA.item, TrainingFennimals.IB.item, [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("IA"): OtherPairItems = [ [TrainingFennimals.C1.item, TrainingFennimals.C2.item], [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("IB"): OtherPairItems = [ [TrainingFennimals.C1.item, TrainingFennimals.C2.item], [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("DA"): OtherPairItems = [ [TrainingFennimals.C1.item, TrainingFennimals.C2.item], [TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
+                case("DB"): OtherPairItems = [ [TrainingFennimals.C1.item, TrainingFennimals.C2.item], [TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
+                case("C1"): OtherPairItems = [ [TrainingFennimals.C1.item, TrainingFennimals.C2.item], [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("C2"): OtherPairItems = [ [TrainingFennimals.C1.item, TrainingFennimals.C2.item], [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
             }
 
             //Creating an array containing all the trial's available items
@@ -981,14 +981,14 @@ STIMULUSDATA = function(participant_number){
         console.log(Arr)
     }
 
-    let max_rt = shuffleArray([4000,4500])[0]
+    let max_rt = shuffleArray([3500,4000])[0]
 
     //Defining trials for the timed blocks
     let Timed_Trials = [
         createTimedBlockTrials(["IA","IB","DA","DB"],"Neutral", Final_Block_Bodies[0],max_rt, true, true, false),
         createTimedBlockTrials(["IA","IB","DA","DB"],"Neutral", Final_Block_Bodies[1],max_rt, true, false, true),
         createTimedBlockTrials(["IA","IB","DA","DB"],"Neutral", Final_Block_Bodies[0],max_rt, true, true, false),
-        createTimedBlockTrials(["IA","IB","DA","DB"],"Neutral", Final_Block_Bodies[1],max_rt, true, true, true)
+        createTimedBlockTrials(["IA","IB","DA","DB"],"Neutral", Final_Block_Bodies[1],max_rt, true, false, true)
     ].flat()
 
     //Combinining all trials into a single object. Here, each element is a day's worth of activities during the test phase.
@@ -1037,7 +1037,7 @@ STIMULUSDATA = function(participant_number){
     console.log(TestPhaseData)
     console.log(Available_Heads)
     /*
-    let TestPhaseData = [
+     let TestPhaseData = [
         {
             Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_A, "direct", true,true ),
             type: "direct",
@@ -1068,16 +1068,16 @@ STIMULUSDATA = function(participant_number){
             type: "category",
             number: 6
         }, {
-        Trials: Timed_Trials,
-        type: "final_block",
-        hint_type: "text",
-        number: 7
-    },{
-        Trials: createBlockOfRepeatTrainingTrials(true),
-        type: "repeat_training",
-        hint_type: "text",
-        number: 8
-    }]
+            Trials: Timed_Trials,
+            type: "final_block",
+            hint_type: "text",
+            number: 7
+        },{
+            Trials: createBlockOfRepeatTrainingTrials(true),
+            type: "repeat_training",
+            hint_type: "text",
+            number: 8
+        }]
 
    */
 
@@ -1708,7 +1708,7 @@ PARAMETERS = function() {
         Jungleforest: "The Deep Jungle"
     }
 
-    this.Available_items = ["ball","bear","car","shovel","trumpet", "boomerang"] // ["car","spinner","boomerang","balloon","shovel","trumpet"]
+    this.Available_items = ["ball", "duck", "car", "trumpet", "kite"] // ["car","spinner","boomerang","balloon","shovel","trumpet"]
 
     //Alternative colorscheme when the location should not be shown
     this.GrayColorScheme ={
@@ -3376,14 +3376,6 @@ ItemController = function(FennimalObj, ItemAvailability, ItemDetails,LocCont, Fe
         SVGObjects.Prompts.Feedback.Prompt.style.opacity = 1
         SVGObjects.Prompts.Feedback.Prompt.style.display = "inherit"
     }
-
-
-
-
-
-
-
-
 }
 
 //Given an item name, generates the feedback hearts and movement until stopped. Includes the prompt on top of the screen
@@ -5191,817 +5183,6 @@ HUDController = function(){
 }
 
 //Controls the category phase screens
-CategoryPhaseController_ThreeAlts = function(ExpCont, Stimuli, LocCont, DataCont){
-    //Maximum response time for each trial
-    let max_time_per_trial = 10000
-    let trial_feedback_time = 1000
-
-    //Deep copy all the category trials from the stimulus data. Now we have an array we can pop.
-    let RemainingCategoryTrials = Stimuli.getCategoryTrials()
-
-    //Determines whether or not to show names for the two alternatives
-    let show_names_for_options = true
-    if(!show_names_for_options){
-        document.getElementById("category_screen_three_alt_name_left").style.display = "none"
-        document.getElementById("category_screen_three_alt_name_middle").style.display = "none"
-        document.getElementById("category_screen_three_alt_name_right").style.display = "none"
-        document.getElementById("category_screen_three_alt_name_left").classList.remove("category_screen_two_alt")
-        document.getElementById("category_screen_three_alt_name_middle").classList.remove("category_screen_two_alt")
-        document.getElementById("category_screen_three_alt_name_right").classList.remove("category_screen_two_alt")
-    }
-
-    //Create an array to store completed trials. Here we add one element for each category trial
-    let OutputArray = []
-
-    // Keep track of the current category trial and the total number of trials to be completed
-    let CurrentCategoryTrial
-    let current_round_number = 0
-    let total_number_of_trials_to_be_completed = Stimuli.getCategoryTrials().length
-
-    //Some easy references to the main SVG layer objects
-    let PhaseLayer = document.getElementById("Category_Layer")
-    let ScreenLayer = document.getElementById("category_screen_layer")
-    let InstructionsLayer = document.getElementById("category_instructions")
-
-    //Setting the sublayer elements to be visible where needed
-    document.getElementById("category_instructions").style.display = "inherit"
-    document.getElementById("category_screen_layer_binary").style.display = "none"
-    document.getElementById("category_screen_layer_basic_elements").style.display = "inherit"
-    document.getElementById("Instructions_Category_Binary").style.display = "none"
-    document.getElementById("Instructions_Category_Two_Alt").style.display = "none"
-    document.getElementById("category_screen_two_alt").style.display = "none"
-    document.getElementById("Instructions_Category_Three_Alt").style.display = "inherit"
-    document.getElementById("category_screen_three_alt").style.display = "inherit"
-
-    //References for the left and right icons
-    let IconTarget, IconLeft, IconMiddle, IconRight
-
-    //Once the category phase is complete, this function relays back to the EC and the DataCont
-    function category_phase_complete(){
-        DataCont.store_category_data(OutputArray)
-
-        //Cleaning the screen
-        resetScreen()
-
-        PhaseLayer.style.display = "none"
-        ScreenLayer.style.display = "none"
-        InstructionsLayer.style.display = "none"
-
-        ExpCont.category_phase_finished()
-    }
-
-    //Tries to show the next category trial. If none are left, then the phase is completed.
-    function start_next_category_trial(){
-        if(RemainingCategoryTrials.length > 0){
-            CurrentCategoryTrial = RemainingCategoryTrials.splice(0,1)[0]
-
-            resetScreen()
-
-            //Show the title indicating that a new trial has started
-            document.getElementById("category_trial_title").childNodes[0].innerHTML = "Press [Space] to continue"
-            document.getElementById("category_trial_title").style.opacity = 1
-
-            //Update and show the round counter
-            current_round_number++
-            document.getElementById("category_screen_three_alt_counter").childNodes[0].innerHTML = "Question " + current_round_number + " out of " + total_number_of_trials_to_be_completed
-            document.getElementById("category_screen_three_alt_counter").style.display = "inherit"
-            document.getElementById("category_screen_three_alt_counter").style.opacity = 1
-
-            waiting_for_input = "start"
-
-        }else{
-            //Phase finished
-            category_phase_complete()
-        }
-    }
-
-    //STAGES
-    // Resets the screen
-    function resetScreen(){
-        //Remove all Fennimal icons
-        deleteClassNamesFromElement(ScreenLayer, "Fennimal_Icon")
-
-        // Hide trial elements
-        let Elem = ScreenLayer.getElementsByClassName("category_screen_three_alt")
-        for(let i =0;i<Elem.length;i++){
-            Elem[i].style.opacity = 0
-        }
-        document.getElementById("category_trial_title").style.opacity = 0
-        document.getElementById("category_timer_bar").style.display = "none"
-
-        //Show the map as a background
-        LocCont.show_passive_map()
-    }
-
-    //Manages the keyboard inputs
-    let waiting_for_input = false
-    document.onkeydown = function(e){
-        if(waiting_for_input !== false){
-            switch(waiting_for_input){
-                case("start"):
-                    if(e.key === " ") {waiting_for_input = false; show_trial(); } break
-                case("decision"):
-                    if(e.key === "j") { decision_made("left"); waiting_for_input = false}
-                    if(e.key === "k") { decision_made("middle"); waiting_for_input = false}
-                    if(e.key === "l") { decision_made("right"); waiting_for_input = false}
-            }
-        }
-    }
-
-    //Creates a Fennimal Icon of the given FennimalObject on either the left or right position.
-    function createFennimalIcon(FennimalObj, position){
-        //Position determines the x and y coordinates
-        let x,y
-        switch(position){
-            case("target"): x = 160; y = 20; break
-            case("left"): x = 10; y =140; break
-            case("middle"): x = 160; y = 140; break
-            case("right"): x = 310; y = 140; break
-        }
-
-        let scale = 0.375
-
-        //Create the outline object
-        let IconObj
-        IconObj = createFennimal(FennimalObj)
-        IconObj.style.transform = "scale(" + scale + ")"
-        let Container = document.createElementNS("http://www.w3.org/2000/svg", 'g')
-        Container.appendChild(IconObj)
-        Container.style.transform = "translate(" + x + "px," + y +"px)"
-        Container.classList.add("Fennimal_Icon")
-        Container.style.pointerEvents = "none"
-        ScreenLayer.appendChild(Container)
-
-        if(position === "left") {IconLeft = IconObj}
-        if(position === "middle") {IconMiddle = IconObj}
-        if(position === "right") {IconRight = IconObj}
-        if(position === "target") {IconTarget = IconObj}
-    }
-
-    // Call to show the target
-    function show_trial(){
-        document.getElementById("category_screen_three_alt_counter").style.display = "none"
-        document.getElementById("category_trial_title").style.opacity = 0
-
-        //Show the SVG elements at the top of the screen
-        let Elem = ScreenLayer.getElementsByClassName("category_screen_three_alt")
-        for(let i =0;i<Elem.length;i++){
-            Elem[i].style.opacity = 1
-        }
-
-        //Set the names
-        document.getElementById("category_screen_three_alt_target_name").childNodes[0].innerHTML = "This is a " + CurrentCategoryTrial.Target.name
-        document.getElementById("category_screen_three_alt_question").childNodes[0].innerHTML = "Which of these three Fennimals is most closely related to the " +CurrentCategoryTrial.Target.name + "?"
-
-        document.getElementById("category_screen_three_alt_name_left").childNodes[0].innerHTML = CurrentCategoryTrial.Left.name
-        document.getElementById("category_screen_three_alt_name_middle").childNodes[0].innerHTML = CurrentCategoryTrial.Middle.name
-        document.getElementById("category_screen_three_alt_name_right").childNodes[0].innerHTML = CurrentCategoryTrial.Right.name
-
-        //Create the Fennimal icons
-        createFennimalIcon(CurrentCategoryTrial.Target, "target")
-        createFennimalIcon(CurrentCategoryTrial.Left, "left")
-        createFennimalIcon(CurrentCategoryTrial.Middle, "middle")
-        createFennimalIcon(CurrentCategoryTrial.Right, "right")
-
-        //Start timer
-        start_trial_timer()
-
-    }
-
-    // Call to start the per-trial timer and rt measurements
-    let TimerCountdownTimeout, DecisionStartTime
-    function start_trial_timer(){
-        //Animate the timer bar decreasing
-        document.getElementById("category_timer_bar").style.display = "inherit"
-        document.getElementById("category_timer_bar").style.animation = "category_countdown_timer " + (max_time_per_trial) + "ms linear"
-
-        TimerCountdownTimeout = setTimeout(function(){trial_timed_out()}, max_time_per_trial)
-        DecisionStartTime = Date.now()
-        waiting_for_input = "decision"
-    }
-
-    //Call when the trial times out
-    function trial_timed_out(){
-        waiting_for_input = false
-        CurrentCategoryTrial.decision = "timed_out"
-        CurrentCategoryTrial.correct = false
-        document.getElementById("category_timer_bar").style.display = "none"
-
-        resetScreen()
-        document.getElementById("category_trial_title").childNodes[0].innerHTML = "PLEASE PICK BEFORE THE TIME RUNS OUT"
-        document.getElementById("category_trial_title").style.opacity = 1
-
-        store_trial()
-        setTimeout(function(){start_next_category_trial()}, 2*trial_feedback_time)
-
-
-    }
-
-    //Call when a decision has been made ("left" or "right")
-    function decision_made(decision){
-        //Cancel the trial timeout
-        clearTimeout(TimerCountdownTimeout)
-        document.getElementById("category_timer_bar").style.display = "none"
-
-        //Give feedback to the participant
-        switch(decision){
-            case("left"):
-                document.getElementById("category_screen_three_alt_press_K").style.opacity = 0.15
-                document.getElementById("category_screen_three_alt_name_middle").style.opacity = 0.15
-                IconMiddle.style.opacity = 0.15
-
-                document.getElementById("category_screen_three_alt_press_L").style.opacity = 0.15
-                document.getElementById("category_screen_three_alt_name_right").style.opacity = 0.15
-                IconRight.style.opacity = 0.15
-
-                break
-            case("middle"):
-                document.getElementById("category_screen_three_alt_press_J").style.opacity = 0.15
-                document.getElementById("category_screen_three_alt_name_left").style.opacity = 0.15
-                IconLeft.style.opacity = 0.15
-
-                document.getElementById("category_screen_three_alt_press_L").style.opacity = 0.15
-                document.getElementById("category_screen_three_alt_name_right").style.opacity = 0.15
-                IconRight.style.opacity = 0.15
-                break
-            case("right"):
-                document.getElementById("category_screen_three_alt_press_K").style.opacity = 0.15
-                document.getElementById("category_screen_three_alt_name_middle").style.opacity = 0.15
-                IconMiddle.style.opacity = 0.15
-
-                document.getElementById("category_screen_three_alt_press_J").style.opacity = 0.15
-                document.getElementById("category_screen_three_alt_name_left").style.opacity = 0.15
-                IconLeft.style.opacity = 0.15
-                break
-        }
-
-        //Store decision data
-        CurrentCategoryTrial.decision = decision
-        CurrentCategoryTrial.correct = decision === CurrentCategoryTrial.correct_answer
-        CurrentCategoryTrial.rt = Date.now() - DecisionStartTime
-
-        //After a brief feedback, go to the next trial
-        store_trial()
-        setTimeout(function(){start_next_category_trial()}, trial_feedback_time)
-    }
-
-    //Call to store the trial
-    function store_trial(){
-        OutputArray.push(JSON.parse(JSON.stringify(CurrentCategoryTrial)))
-    }
-
-    function instructions_completed(){
-        PhaseLayer.style.display = "inherit"
-        ScreenLayer.style.display = "inherit"
-        InstructionsLayer.style.display = "none"
-
-        start_next_category_trial()
-    }
-
-    //Call to start the category matching phase.
-    this.start_category_phase = function(){
-        //Make sure that the correct layers are set to visible
-        PhaseLayer.style.display = "inherit"
-        ScreenLayer.style.display = "none"
-        InstructionsLayer.style.display = "inherit"
-
-        //Show the map as a background
-        LocCont.show_passive_map()
-
-        // Create the instructions button
-        let Button = createSVGButtonElem((508-150)/2,255,160,25,"CONTINUE")
-        InstructionsLayer.appendChild(Button)
-        Button.onclick = instructions_completed
-
-
-        //start_next_category_trial()
-    }
-
-}
-
-CategoryPhaseController_TwoAlts = function(ExpCont, Stimuli, LocCont, DataCont){
-    //Maximum response time for each trial
-    let max_time_per_trial = 10000
-    let trial_feedback_time = 1000
-
-    //Deep copy all the category trials from the stimulus data. Now we have an array we can pop.
-    let RemainingCategoryTrials = Stimuli.getCategoryTrials()
-
-    //Determines whether or not to show names for the two alternatives
-    let show_names_for_options = true
-    if(!show_names_for_options){
-        document.getElementById("category_screen_two_alt_name_left").style.display = "none"
-        document.getElementById("category_screen_two_alt_name_right").style.display = "none"
-        document.getElementById("category_screen_two_alt_name_left").classList.remove("category_screen_two_alt")
-        document.getElementById("category_screen_two_alt_name_right").classList.remove("category_screen_two_alt")
-    }
-
-    //Create an array to store completed trials. Here we add one element for each category trial
-    let OutputArray = []
-
-    // Keep track of the current category trial and the total number of trials to be completed
-    let CurrentCategoryTrial
-    let current_round_number = 0
-    let total_number_of_trials_to_be_completed = Stimuli.getCategoryTrials().length
-
-    //Some easy references to the main SVG layer objects
-    let PhaseLayer = document.getElementById("Category_Layer")
-    let ScreenLayer = document.getElementById("category_screen_layer")
-    let InstructionsLayer = document.getElementById("category_instructions")
-
-    //Setting the sublayer elements to be visible where needed
-    document.getElementById("category_instructions").style.display = "inherit"
-    document.getElementById("category_screen_layer_binary").style.display = "none"
-    document.getElementById("category_screen_layer_basic_elements").style.display = "inherit"
-    document.getElementById("Instructions_Category_Binary").style.display = "none"
-    document.getElementById("Instructions_Category_Two_Alt").style.display = "inherit"
-    document.getElementById("category_screen_two_alt").style.display = "inherit"
-    document.getElementById("Instructions_Category_Three_Alt").style.display = "none"
-    document.getElementById("category_screen_three_alt").style.display = "none"
-
-    //References for the left and right icons
-    let IconTarget, IconLeft, IconRight
-
-    //Once the category phase is complete, this function relays back to the EC and the DataCont
-    function category_phase_complete(){
-        DataCont.store_category_data(OutputArray)
-
-        //Cleaning the screen
-        resetScreen()
-
-        PhaseLayer.style.display = "none"
-        ScreenLayer.style.display = "none"
-        InstructionsLayer.style.display = "none"
-
-        ExpCont.category_phase_finished()
-    }
-
-    //Tries to show the next category trial. If none are left, then the phase is completed.
-    function start_next_category_trial(){
-        if(RemainingCategoryTrials.length > 0){
-            CurrentCategoryTrial = RemainingCategoryTrials.splice(0,1)[0]
-
-            resetScreen()
-
-            //Show the title indicating that a new trial has started
-            document.getElementById("category_trial_title").childNodes[0].innerHTML = "Press [Space] to continue"
-            document.getElementById("category_trial_title").style.opacity = 1
-
-            //Update and show the round counter
-            current_round_number++
-            document.getElementById("category_screen_two_alt_counter").childNodes[0].innerHTML = "Question " + current_round_number + " out of " + total_number_of_trials_to_be_completed
-            document.getElementById("category_screen_two_alt_counter").style.display = "inherit"
-            document.getElementById("category_screen_two_alt_counter").style.opacity = 1
-
-            waiting_for_input = "start"
-
-        }else{
-            //Phase finished
-            category_phase_complete()
-        }
-    }
-
-    //STAGES
-    // Resets the screen
-    function resetScreen(){
-        //Remove all Fennimal icons
-        deleteClassNamesFromElement(ScreenLayer, "Fennimal_Icon")
-
-        // Hide trial elements
-        let Elem = ScreenLayer.getElementsByClassName("category_screen_two_alt")
-        for(let i =0;i<Elem.length;i++){
-            Elem[i].style.opacity = 0
-        }
-        document.getElementById("category_trial_title").style.opacity = 0
-        document.getElementById("category_timer_bar").style.display = "none"
-
-        //Show the map as a background
-        LocCont.show_passive_map()
-    }
-
-    //Manages the keyboard inputs
-    let waiting_for_input = false
-    document.onkeydown = function(e){
-        if(waiting_for_input !== false){
-            switch(waiting_for_input){
-                case("start"):
-                    if(e.key === " ") {waiting_for_input = false; show_trial(); } break
-                case("decision"):
-                    if(e.key === "f") { decision_made("left"); waiting_for_input = false}
-                    if(e.key === "j") { decision_made("right"); waiting_for_input = false} break
-            }
-        }
-    }
-
-    //Creates a Fennimal Icon of the given FennimalObject on either the left or right position.
-    function createFennimalIcon(FennimalObj, position){
-        //Position determines the x and y coordinates
-        let x,y
-        switch(position){
-            case("left"): x = -30; y =120; break
-            case("right"): x = 280; y = 120; break
-            case("target"): x = 130; y = 15; break
-        }
-
-        let scale = 0.5
-
-        //Create the outline object
-        let IconObj
-        IconObj = createFennimal(FennimalObj)
-        IconObj.style.transform = "scale(" + scale + ")"
-        let Container = document.createElementNS("http://www.w3.org/2000/svg", 'g')
-        Container.appendChild(IconObj)
-        Container.style.transform = "translate(" + x + "px," + y +"px)"
-        Container.classList.add("Fennimal_Icon")
-        Container.style.pointerEvents = "none"
-        ScreenLayer.appendChild(Container)
-
-        if(position === "left") {IconLeft = IconObj}
-        if(position === "right") {IconRight = IconObj}
-        if(position === "right") {IconTarget = IconObj}
-
-    }
-
-    // Call to show the target
-    function show_trial(){
-        document.getElementById("category_screen_two_alt_counter").style.display = "none"
-        document.getElementById("category_trial_title").style.opacity = 0
-
-        //Show the SVG elements at the top of the screen
-        let Elem = ScreenLayer.getElementsByClassName("category_screen_two_alt")
-        for(let i =0;i<Elem.length;i++){
-            Elem[i].style.opacity = 1
-        }
-
-        //Set the names
-        document.getElementById("category_screen_two_alt_target_name").childNodes[0].innerHTML = "This is a " + CurrentCategoryTrial.Target.name
-        document.getElementById("category_screen_two_alt_target_name_question").childNodes[0].innerHTML = CurrentCategoryTrial.Target.name
-
-        document.getElementById("category_screen_two_alt_name_left").childNodes[0].innerHTML = CurrentCategoryTrial.Left.name
-        document.getElementById("category_screen_two_alt_name_right").childNodes[0].innerHTML = CurrentCategoryTrial.Right.name
-
-        //Create the Fennimal icons
-        createFennimalIcon(CurrentCategoryTrial.Target, "target")
-        createFennimalIcon(CurrentCategoryTrial.Left, "left")
-        createFennimalIcon(CurrentCategoryTrial.Right, "right")
-
-        //Start timer
-        start_trial_timer()
-
-    }
-
-    // Call to start the per-trial timer and rt measurements
-    let TimerCountdownTimeout, DecisionStartTime
-    function start_trial_timer(){
-        //Animate the timer bar decreasing
-        document.getElementById("category_timer_bar").style.display = "inherit"
-        document.getElementById("category_timer_bar").style.animation = "category_countdown_timer " + (max_time_per_trial) + "ms linear"
-
-        TimerCountdownTimeout = setTimeout(function(){trial_timed_out()}, max_time_per_trial)
-        DecisionStartTime = Date.now()
-        waiting_for_input = "decision"
-    }
-
-    //Call when the trial times out
-    function trial_timed_out(){
-        waiting_for_input = false
-        CurrentCategoryTrial.decision = "timed_out"
-        CurrentCategoryTrial.correct = false
-        document.getElementById("category_timer_bar").style.display = "none"
-
-        resetScreen()
-        document.getElementById("category_trial_title").childNodes[0].innerHTML = "PLEASE PICK BEFORE THE TIME RUNS OUT"
-        document.getElementById("category_trial_title").style.opacity = 1
-
-        store_trial()
-        setTimeout(function(){start_next_category_trial()}, 2*trial_feedback_time)
-
-
-    }
-
-    //Call when a decision has been made ("left" or "right")
-    function decision_made(decision){
-        //Cancel the trial timeout
-        clearTimeout(TimerCountdownTimeout)
-        document.getElementById("category_timer_bar").style.display = "none"
-
-        //Give feedback to the participant
-        switch(decision){
-            case("left"):
-                document.getElementById("category_screen_two_alt_press_J").style.opacity = 0.15
-                document.getElementById("category_screen_two_alt_name_right").style.opacity = 0.15
-                IconRight.style.opacity = 0.15
-                break
-            case("right"):
-                document.getElementById("category_screen_two_alt_press_F").style.opacity = 0.15
-                document.getElementById("category_screen_two_alt_name_left").style.opacity = 0.15
-                IconLeft.style.opacity = 0.15
-                break
-        }
-
-        //Store decision data
-        CurrentCategoryTrial.decision = decision
-        CurrentCategoryTrial.correct = decision === CurrentCategoryTrial.correct_answer
-        CurrentCategoryTrial.rt = Date.now() - DecisionStartTime
-
-        //After a brief feedback, go to the next trial
-        store_trial()
-        setTimeout(function(){start_next_category_trial()}, trial_feedback_time)
-    }
-
-    //Call to store the trial
-    function store_trial(){
-        OutputArray.push(JSON.parse(JSON.stringify(CurrentCategoryTrial)))
-    }
-
-    function instructions_completed(){
-        PhaseLayer.style.display = "inherit"
-        ScreenLayer.style.display = "inherit"
-        InstructionsLayer.style.display = "none"
-
-        start_next_category_trial()
-    }
-
-    //Call to start the category matching phase.
-    this.start_category_phase = function(){
-        //Make sure that the correct layers are set to visible
-        PhaseLayer.style.display = "inherit"
-        ScreenLayer.style.display = "none"
-        InstructionsLayer.style.display = "inherit"
-
-        //Show the map as a background
-        LocCont.show_passive_map()
-
-        // Create the instructions button
-        let Button = createSVGButtonElem((508-150)/2,255,160,25,"CONTINUE")
-        InstructionsLayer.appendChild(Button)
-        Button.onclick = instructions_completed
-
-
-        //start_next_category_trial()
-    }
-
-}
-
-CategoryPhaseController_Binary = function(ExpCont, Stimuli, LocCont, DataCont){
-    //Maximum response time for each trial
-    let max_time_per_trial = 10000
-    let trial_feedback_time = 1000
-
-    //Deep copy all the category trials from the stimulus data. Now we have an array we can pop.
-    let RemainingCategoryTrials = Stimuli.getCategoryTrials()
-
-    //Determines whether or not to show names for the two alternatives
-    let show_names_for_options = true
-    if(!show_names_for_options){
-        document.getElementById("category_binary_name_left").style.display = "none"
-        document.getElementById("category_binary_name_right").style.display = "none"
-    }
-
-    //Create an array to store completed trials. Here we add one element for each category trial
-    let OutputArray = []
-
-    // Keep track of the current category trial and the total number of trials to be completed
-    let CurrentCategoryTrial, CurrentTrialOutputData
-    let current_round_number = 0
-    let total_number_of_trials_to_be_completed = Stimuli.getCategoryTrials().length
-
-    //Some easy references to the main SVG layer objects
-    let PhaseLayer = document.getElementById("Category_Layer")
-    let ScreenLayer = document.getElementById("category_screen_layer")
-    let InstructionsLayer = document.getElementById("category_instructions")
-
-    //Setting the sublayer elements to be visible where needed
-    document.getElementById("category_instructions").style.display = "inherit"
-    document.getElementById("category_screen_layer_binary").style.display = "inherit"
-    document.getElementById("category_screen_layer_basic_elements").style.display = "inherit"
-    document.getElementById("Instructions_Category_Binary").style.display = "inherit"
-    document.getElementById("Instructions_Category_Two_Alt").style.display = "none"
-    document.getElementById("category_screen_two_alt").style.display = "none"
-    document.getElementById("Instructions_Category_Three_Alt").style.display = "none"
-    document.getElementById("category_screen_three_alt").style.display = "none"
-
-    //References for the left and right icons
-    let IconLeft, IconRight
-
-    //Once the category phase is complete, this function relays back to the EC and the DataCont
-    function category_phase_complete(){
-        console.log("Category Phase completed")
-        DataCont.store_category_data(OutputArray)
-
-        //Cleaning the screen
-        resetScreen()
-
-        PhaseLayer.style.display = "none"
-        ScreenLayer.style.display = "none"
-        InstructionsLayer.style.display = "none"
-
-        ExpCont.category_phase_finished()
-    }
-
-    //Shows the instructions to the category phase
-
-    //Tries to show the next category trial. If none are left, then the phase is completed.
-    function start_next_category_trial(){
-        if(RemainingCategoryTrials.length > 0){
-            CurrentCategoryTrial = RemainingCategoryTrials.splice(0,1)[0]
-
-            resetScreen()
-
-            //Show the title indicating that a new trial has started
-            document.getElementById("category_trial_title").childNodes[0].innerHTML = "Press [Space] to continue"
-            document.getElementById("category_trial_title").style.opacity = 1
-
-            //Update and show the round counter
-            current_round_number++
-            document.getElementById("category_binary_trial_counter").childNodes[0].innerHTML = "Question " + current_round_number + " out of " + total_number_of_trials_to_be_completed
-            document.getElementById("category_binary_trial_counter").style.display = "inherit"
-            document.getElementById("category_binary_trial_counter").style.opacity = 1
-
-            waiting_for_input = "start"
-
-        }else{
-            //Phase finished
-            category_phase_complete()
-        }
-    }
-
-    //STAGES
-    // Resets the screen
-    function resetScreen(){
-        //Remove all Fennimal icons
-        deleteClassNamesFromElement(ScreenLayer, "Fennimal_Icon")
-
-        // Hide trial elements
-        let Elem = ScreenLayer.getElementsByClassName("category_binary_screen")
-        for(let i =0;i<Elem.length;i++){
-            Elem[i].style.opacity = 0
-        }
-        document.getElementById("category_trial_title").style.opacity = 0
-        document.getElementById("category_timer_bar").style.display = "none"
-
-        //Show the map as a background
-        LocCont.show_passive_map()
-
-
-
-    }
-
-    //Manages the keyboard inputs
-    let waiting_for_input = false
-    document.onkeydown = function(e){
-        if(waiting_for_input !== false){
-            switch(waiting_for_input){
-                case("start"):
-                    if(e.key === " ") {waiting_for_input = false; show_trial(); } break
-                case("decision"):
-                    if(e.key === "f") { decision_made("yes"); waiting_for_input = false}
-                    if(e.key === "j") { decision_made("no"); waiting_for_input = false} break
-            }
-        }
-    }
-
-    //Creates a Fennimal Icon of the given FennimalObject on either the left or right position.
-    function createFennimalIcon(FennimalObj, position){
-        //Position determines the x and y coordinates
-        let x,y
-        switch(position){
-            case("left"): x = -10; y =10; break
-            case("right"): x = 190; y = 10; break
-        }
-
-        let scale = 0.65
-
-        //Create the outline object
-        let IconObj
-        IconObj = createFennimal(FennimalObj)
-        IconObj.style.transform = "scale(" + scale + ")"
-        let Container = document.createElementNS("http://www.w3.org/2000/svg", 'g')
-        Container.appendChild(IconObj)
-        Container.style.transform = "translate(" + x + "px," + y +"px)"
-        Container.classList.add("Fennimal_Icon")
-        Container.style.pointerEvents = "none"
-        ScreenLayer.appendChild(Container)
-
-        if(position === "left") {IconLeft = IconObj}
-        if(position === "right") {IconRight = IconObj}
-
-    }
-
-    // Call to show the target
-    function show_trial(){
-        document.getElementById("category_binary_trial_counter").style.display = "none"
-        document.getElementById("category_binary_title").style.opacity = 1
-        document.getElementById("category_trial_title").style.opacity = 0
-
-        //Show the SVG elements at the top of the screen
-        let Elem = ScreenLayer.getElementsByClassName("category_binary_screen")
-        for(let i =0;i<Elem.length;i++){
-            Elem[i].style.opacity = 1
-        }
-
-        //Set the names
-        document.getElementById("category_binary_name_left").childNodes[0].innerHTML = CurrentCategoryTrial.Left.name
-        document.getElementById("category_binary_name_right").childNodes[0].innerHTML = CurrentCategoryTrial.Right.name
-
-        //Create the Fennimal icons
-        createFennimalIcon(CurrentCategoryTrial.Left, "left")
-        createFennimalIcon(CurrentCategoryTrial.Right, "right")
-
-        //Start timer
-        start_trial_timer()
-
-    }
-
-    // Call to start the per-trial timer and rt measurements
-    let TimerCountdownTimeout, DecisionStartTime
-    function start_trial_timer(){
-        //Animate the timer bar decreasing
-        document.getElementById("category_timer_bar").style.display = "inherit"
-        document.getElementById("category_timer_bar").style.animation = "category_countdown_timer " + (max_time_per_trial) + "ms linear"
-
-        TimerCountdownTimeout = setTimeout(function(){trial_timed_out()}, max_time_per_trial)
-        DecisionStartTime = Date.now()
-        waiting_for_input = "decision"
-    }
-
-    //Call when the trial times out
-    function trial_timed_out(){
-        waiting_for_input = false
-        CurrentCategoryTrial.decision = "timed_out"
-        CurrentCategoryTrial.correct_answer = false
-        document.getElementById("category_timer_bar").style.display = "none"
-
-        resetScreen()
-        document.getElementById("category_trial_title").childNodes[0].innerHTML = "PLEASE PICK BEFORE THE TIME RUNS OUT"
-        document.getElementById("category_trial_title").style.opacity = 1
-
-        //Store the data
-        store_trial()
-
-        setTimeout(function(){start_next_category_trial()}, 2*trial_feedback_time)
-
-    }
-
-    //Call when a decision has been made ("left" or "right")
-    function decision_made(decision){
-        //Cancel the trial timeout
-        clearTimeout(TimerCountdownTimeout)
-        document.getElementById("category_timer_bar").style.display = "none"
-
-        //Give feedback to the participant
-        if(decision === "yes"){
-            document.getElementById("category_binary_text_no").style.opacity = 0.15
-        }else{
-            document.getElementById("category_binary_text_yes").style.opacity = 0.15
-        }
-
-        //Store decision data
-        CurrentCategoryTrial.decision = decision
-        CurrentCategoryTrial.correct = (CurrentCategoryTrial.decision === "yes") === CurrentCategoryTrial.correct_answer
-        CurrentCategoryTrial.rt = Date.now() - DecisionStartTime
-
-        //Store the data
-        store_trial()
-
-        //After a brief feedback, go to the next trial
-        setTimeout(function(){start_next_category_trial()}, trial_feedback_time)
-    }
-
-    //Call to store the trial
-    function store_trial(){
-        OutputArray.push(JSON.parse(JSON.stringify(CurrentCategoryTrial)))
-    }
-
-    function instructions_completed(){
-        PhaseLayer.style.display = "inherit"
-        ScreenLayer.style.display = "inherit"
-        InstructionsLayer.style.display = "none"
-
-        start_next_category_trial()
-    }
-
-    //Call to start the category matching phase.
-    this.start_category_phase = function(){
-        //Make sure that the correct layers are set to visible
-        PhaseLayer.style.display = "inherit"
-        ScreenLayer.style.display = "none"
-        InstructionsLayer.style.display = "inherit"
-
-        //Show the map as a background
-        LocCont.show_passive_map()
-
-        // Create the instructions button
-        let Button = createSVGButtonElem((508-150)/2,255,160,25,"CONTINUE")
-        InstructionsLayer.appendChild(Button)
-        Button.onclick = instructions_completed
-
-
-        //start_next_category_trial()
-    }
-
-}
-
 CategoryPhaseController_Binary_Slider = function(ExpCont, Stimuli, LocCont, DataCont){
     //Deep copy all the category trials from the stimulus data. Now we have an array we can pop.
     let RemainingCategoryTrials = Stimuli.getCategoryTrials()
@@ -6033,13 +5214,13 @@ CategoryPhaseController_Binary_Slider = function(ExpCont, Stimuli, LocCont, Data
 
     //Setting the sublayer elements to be visible where needed
     document.getElementById("category_instructions").style.display = "inherit"
-    document.getElementById("category_screen_layer_binary").style.display = "none"
+    //document.getElementById("category_screen_layer_binary").style.display = "none"
     document.getElementById("category_screen_layer_basic_elements").style.display = "inherit"
-    document.getElementById("Instructions_Category_Binary").style.display = "none"
-    document.getElementById("Instructions_Category_Two_Alt").style.display = "none"
-    document.getElementById("category_screen_two_alt").style.display = "none"
-    document.getElementById("Instructions_Category_Three_Alt").style.display = "none"
-    document.getElementById("category_screen_three_alt").style.display = "none"
+    //document.getElementById("Instructions_Category_Binary").style.display = "none"
+    //document.getElementById("Instructions_Category_Two_Alt").style.display = "none"
+    //document.getElementById("category_screen_two_alt").style.display = "none"
+    //document.getElementById("Instructions_Category_Three_Alt").style.display = "none"
+    //document.getElementById("category_screen_three_alt").style.display = "none"
 
     document.getElementById("category_screen_layer_binary_slider").style.display = "inherit"
     document.getElementById("Instructions_Category_Binary_Slider").style.display = "inherit"
@@ -7696,6 +6877,7 @@ let SVGObjects = {
         delivery_item_trumpet: document.getElementById("HUD_item_icon_trumpet"),
         delivery_item_spinner: document.getElementById("HUD_item_icon_spinner"),
         delivery_item_shovel: document.getElementById("HUD_item_icon_shovel"),
+        delivery_item_kite: document.getElementById("HUD_item_icon_kite"),
 
     },
     Home_button: document.getElementById("home_button"),
@@ -7707,8 +6889,8 @@ let SVGObjects = {
 let DataCont = new DataController(participant_number, Stimuli)
 
 let EC = new ExperimentController(Stimuli, DataCont)
-EC.showStartScreen()
-//EC.show_starting_instructions()
+//EC.showStartScreen()
+EC.show_starting_instructions()
 //EC.start_targeted_search_subphase()
 //EC.start_delivery_subphase()
 //EC.start_quiz()
@@ -7719,7 +6901,8 @@ EC.showStartScreen()
 //  Set seed based on PID
 // SVG Garbage collector?
 
-console.log("Version: 30.10.23")
+console.log("Version: 1.11.23")
 //TODO: RESET SUBMISSION
 
 
+// Reduce number of category trials
