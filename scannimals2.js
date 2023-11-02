@@ -937,7 +937,7 @@ STIMULUSDATA = function(participant_number){
         //Making sure that there are not long chains of the same pairs in a row
         let Group1 = []
         let Group2 = []
-        let Group3 = []
+        //let Group3 = []
 
         //Adding all the templates where the two pairs are from the same family
         Group1.push({options: [{key: "IA", body: Cat_and_Timed_Block_Bodies_A[0], region: "Neutral"},{key: "IB", body: Cat_and_Timed_Block_Bodies_A[1], region: "Neutral"}], paircode: "I"})
@@ -952,20 +952,20 @@ STIMULUSDATA = function(participant_number){
         Group1.push({options: [{key: "DB", body: Cat_and_Timed_Block_Bodies_A[1], region: "Neutral"},{key: "DA", body: Cat_and_Timed_Block_Bodies_A[0], region: "Neutral"}], paircode: "D"})
 
         //Adding some duplicates for I and D to reduce noise
-        Group3.push({options: [{key: "IA", body: Cat_and_Timed_Block_Bodies_C[0], region: "Neutral"},{key: "IB", body: Cat_and_Timed_Block_Bodies_C[1], region: "Neutral"}], paircode: "I"})
-        Group3.push({options: [{key: "IB", body: Cat_and_Timed_Block_Bodies_C[1], region: "Neutral"},{key: "IA", body: Cat_and_Timed_Block_Bodies_C[0], region: "Neutral"}], paircode: "I"})
-        Group3.push({options: [{key: "DA", body: Cat_and_Timed_Block_Bodies_C[0], region: "Neutral"},{key: "DB", body: Cat_and_Timed_Block_Bodies_C[1], region: "Neutral"}], paircode: "D"})
-        Group3.push({options: [{key: "DB", body: Cat_and_Timed_Block_Bodies_C[1], region: "Neutral"},{key: "DA", body: Cat_and_Timed_Block_Bodies_C[0], region: "Neutral"}], paircode: "D"})
+        //Group3.push({options: [{key: "IA", body: Cat_and_Timed_Block_Bodies_C[0], region: "Neutral"},{key: "IB", body: Cat_and_Timed_Block_Bodies_C[1], region: "Neutral"}], paircode: "I"})
+        //Group3.push({options: [{key: "IB", body: Cat_and_Timed_Block_Bodies_C[1], region: "Neutral"},{key: "IA", body: Cat_and_Timed_Block_Bodies_C[0], region: "Neutral"}], paircode: "I"})
+        //Group3.push({options: [{key: "DA", body: Cat_and_Timed_Block_Bodies_C[0], region: "Neutral"},{key: "DB", body: Cat_and_Timed_Block_Bodies_C[1], region: "Neutral"}], paircode: "D"})
+        //Group3.push({options: [{key: "DB", body: Cat_and_Timed_Block_Bodies_C[1], region: "Neutral"},{key: "DA", body: Cat_and_Timed_Block_Bodies_C[0], region: "Neutral"}], paircode: "D"})
 
         //Adding the templates for non-matching trials (to create a baseline)
         Group1.push({options: [{key: "IA", body: Cat_and_Timed_Block_Bodies_A[0], region: "Neutral"},{key: "C1", body: Cat_and_Timed_Block_Bodies_A[1], region: "Neutral"}], paircode: false})
         Group1.push({options: [{key: "IA", body: Cat_and_Timed_Block_Bodies_A[1], region: "Neutral"},{key: "DB", body: Cat_and_Timed_Block_Bodies_A[0], region: "Neutral"}], paircode: false})
         Group2.push({options: [{key: "IB", body: Cat_and_Timed_Block_Bodies_B[0], region: "Neutral"},{key: "C2", body: Cat_and_Timed_Block_Bodies_B[1], region: "Neutral"}], paircode: false})
         Group2.push({options: [{key: "IB", body: Cat_and_Timed_Block_Bodies_B[1], region: "Neutral"},{key: "DA", body: Cat_and_Timed_Block_Bodies_B[0], region: "Neutral"}], paircode: false})
-        Group3.push({options: [{key: "C1", body: Cat_and_Timed_Block_Bodies_C[0], region: "Neutral"},{key: "C2", body: Cat_and_Timed_Block_Bodies_C[1], region: "Neutral"}], paircode: false})
-        Group3.push({options: [{key: "C2", body: Cat_and_Timed_Block_Bodies_C[1], region: "Neutral"},{key: "C1", body: Cat_and_Timed_Block_Bodies_C[0], region: "Neutral"}], paircode: false})
+        //Group3.push({options: [{key: "C1", body: Cat_and_Timed_Block_Bodies_C[0], region: "Neutral"},{key: "C2", body: Cat_and_Timed_Block_Bodies_C[1], region: "Neutral"}], paircode: false})
+        //Group3.push({options: [{key: "C2", body: Cat_and_Timed_Block_Bodies_C[1], region: "Neutral"},{key: "C1", body: Cat_and_Timed_Block_Bodies_C[0], region: "Neutral"}], paircode: false})
 
-        TrialTemplates = [shuffleArray(Group1), shuffleArray(Group2), shuffleArray(Group3)].flat()
+        TrialTemplates = [shuffleArray(Group1), shuffleArray(Group2)].flat()
 
         //Transforming the templates into trials
         let Arr = []
@@ -1044,7 +1044,7 @@ STIMULUSDATA = function(participant_number){
     console.log(Available_Heads)
     console.log(Available_Bodies)
     /*
-     let TestPhaseData = [
+    let TestPhaseData = [
         {
             Trials:  createBlockOfInferenceTrials(["IA","IB","DA","DB","C1"], InferencePhaseTemplates_A, "direct", true,true ),
             type: "direct",
@@ -6917,7 +6917,7 @@ EC.showStartScreen()
 //  Set seed based on PID
 // SVG Garbage collector?
 
-console.log("Version: 1.11.23 B")
+console.log("Version: 2.11.23")
 //TODO: RESET SUBMISSION
 
 
