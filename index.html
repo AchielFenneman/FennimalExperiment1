@@ -607,6 +607,9 @@
         #category_binary_screen_slider_placeholder {
             display: none
         }
+        #category_two_alt_slider_placeholder{
+            display: none
+        }
 
         /* Binary slider instructions animation */
         #slider_instructions_Fennimal_A_closer {
@@ -663,6 +666,117 @@
             75% {transform: translate(-12%, 0%);}
             90% {transform: translate(0%, 0%);}
         }
+
+        /* Instructions for the two-alt slider task */
+        #slider_instructions_two_alt_M_left {
+            animation: slider_two_alt_instructions_left 15s linear infinite;
+        }
+        #slider_instructions_two_alt_thumb_left{
+            animation: slider_two_alt_instructions_left 15s linear infinite;
+        }
+
+        #slider_instructions_two_alt_text_left {
+            fill: #BBBBBB;
+            animation: slider_two_alt_instructions_text_left 15s linear infinite;
+        }
+
+        #slider_instructions_two_alt_mask_left {
+            animation: slider_two_alt_instructions_mask_left 15s linear infinite;
+        }
+        @keyframes slider_two_alt_instructions_left {
+            0% {transform: translate(0%, 0%);}
+            20% {transform: translate(-8.5%, 0%);}
+            25% {transform: translate(-8.5%, 0%);}
+            30% {transform: translate(0%, 0%);}
+        }
+        @keyframes slider_two_alt_instructions_text_left {
+            0% {fill: #BBBBBB}
+            1% {fill: black}
+            25% {fill: black}
+            30% {fill: #BBBBBB}
+            99% {fill: #BBBBBB}
+        }
+        @keyframes slider_two_alt_instructions_mask_left {
+            0% {opacity:.8}
+            1% {opacity: 0}
+            25% {opacity: 0}
+            30% {opacity: 0.8}
+            99% {opacity: 0.8}
+        }
+
+        #slider_instructions_two_alt_M_right {
+            animation: slider_two_alt_instructions_right 15s linear infinite;
+        }
+        #slider_instructions_two_alt_thumb_right{
+            animation: slider_two_alt_instructions_right 15s linear infinite;
+        }
+        #slider_instructions_two_alt_text_right {
+            animation: slider_two_alt_instructions_text_right 15s linear infinite;
+            fill: #BBBBBB
+        }
+        #slider_instructions_two_alt_mask_right {
+            animation: slider_two_alt_instructions_mask_right 15s linear infinite;
+        }
+        @keyframes slider_two_alt_instructions_right {
+            33% {transform: translate(0%, 0%);}
+            53% {transform: translate(8.5%, 0%);}
+            58% {transform: translate(8.5%, 0%);}
+            63% {transform: translate(0%, 0%);}
+        }
+        @keyframes slider_two_alt_instructions_text_right {
+            0% {fill: #BBBBBB}
+            33% {fill: #BBBBBB}
+            34% {fill: black}
+            58% {fill: black}
+            63% {fill: #BBBBBB}
+            100% {fill: #BBBBBB}
+        }
+        @keyframes slider_two_alt_instructions_mask_right {
+            0% {opacity: 0.8}
+            33% {opacity: 0.8}
+            34% {opacity: 0}
+            58% {opacity: 0}
+            63% {opacity: 0.8}
+            100% {opacity: 0.8}
+        }
+
+
+        #slider_instructions_two_alt_M_middle {
+            animation: slider_two_alt_instructions_middle 15s linear infinite;
+        }
+        #slider_instructions_two_alt_thumb_middle{
+            animation: slider_two_alt_instructions_middle 15s linear infinite;
+        }
+        #slider_instructions_two_alt_text_middle {
+            animation: slider_two_alt_instructions_text_middle 15s linear infinite;
+            fill: #BBBBBB
+        }
+        #slider_instructions_two_alt_mask_middle {
+            animation: slider_two_alt_instructions_mask_middle 15s linear infinite;
+        }
+        @keyframes slider_two_alt_instructions_middle {
+            66% {transform: translate(0%, 0%);}
+            78% {transform: translate(-1%, 0%);}
+            86% {transform: translate(1%, 0%);}
+            96% {transform: translate(0%, 0%);}
+        }
+        @keyframes slider_two_alt_instructions_text_middle {
+            0% {fill: #BBBBBB}
+            66% {fill: #BBBBBB}
+            67% {fill: black}
+            86% {fill: black}
+            96% {fill: #BBBBBB}
+            100% {fill: #BBBBBB}
+        }
+        @keyframes slider_two_alt_instructions_mask_middle {
+            0% {opacity: 0.8}
+            66% {opacity: 0.8}
+            67% {opacity: 0}
+            86% {opacity: 0}
+            96% {opacity: 0.8}
+            100% {opacity: 0.8}
+        }
+
 
 
 
