@@ -667,27 +667,69 @@
             90% {transform: translate(0%, 0%);}
         }
 
+        /*Alternative input: arrows only*/
+        .category_two_alt_slider_screen_arrow {
+            animation: highlighted_arrow 3s ease-in-out infinite alternate-reverse;
+            opacity: 0.9;
+            cursor: pointer;
+            stroke-width: 3px;
+        }
+        .category_two_alt_slider_screen_arrow_not_selected {
+            opacity: 0.5;
+            stroke-width: 3px;
+            stroke: gray;
+            fill: lightgray
+        }
+        .category_two_alt_slider_screen_arrow_selected {
+            opacity: 1;
+            stroke-width: 3px;
+            fill: lightskyblue;
+            stroke: navy;
+        }
+
         /* Instructions for the two-alt slider task */
+        .category_two_alt_instruction_arrow{
+            fill: lightgrey;
+        }
         #slider_instructions_two_alt_M_left {
             animation: slider_two_alt_instructions_left 15s linear infinite;
         }
         #slider_instructions_two_alt_thumb_left{
             animation: slider_two_alt_instructions_left 15s linear infinite;
         }
-
+        #slider_instructions_two_alt_cursor_left{
+            animation: slider_two_alt_instructions_cursor_left 15s linear infinite;
+        }
+        #category_two_alt_slider_arrow_left_left {
+            animation: slider_two_alt_instructions_arrow_left_left 15s linear infinite;
+        }
         #slider_instructions_two_alt_text_left {
             fill: #BBBBBB;
             animation: slider_two_alt_instructions_text_left 15s linear infinite;
         }
-
         #slider_instructions_two_alt_mask_left {
             animation: slider_two_alt_instructions_mask_left 15s linear infinite;
         }
+
         @keyframes slider_two_alt_instructions_left {
             0% {transform: translate(0%, 0%);}
-            20% {transform: translate(-8.5%, 0%);}
-            25% {transform: translate(-8.5%, 0%);}
+            3.5% {transform: translate(0%, 0%);}
+            20% {transform: translate(-8%, 0%);}
+            25% {transform: translate(-8%, 0%);}
             30% {transform: translate(0%, 0%);}
+        }
+        @keyframes slider_two_alt_instructions_cursor_left {
+            0% {transform: translate(0%, 0%);}
+            2.5% {transform: translate(-11%, -.75%);}
+            25% {transform: translate(-11%, -0.75%);}
+            30% {transform: translate(0%, 0%);}
+        }
+        @keyframes slider_two_alt_instructions_arrow_left_left {
+            0% {fill: lightgrey;}
+            2.5% {fill: lightgrey;}
+            3.5%{ fill: deepskyblue;}
+            25% {fill: deepskyblue;}
+            26% {fill: lightgrey;}
         }
         @keyframes slider_two_alt_instructions_text_left {
             0% {fill: #BBBBBB}
@@ -710,6 +752,12 @@
         #slider_instructions_two_alt_thumb_right{
             animation: slider_two_alt_instructions_right 15s linear infinite;
         }
+        #slider_instructions_two_alt_cursor_right{
+            animation: slider_two_alt_instructions_cursor_right 15s linear infinite;
+        }
+        #category_two_alt_slider_arrow_right_right {
+            animation: slider_two_alt_instructions_arrow_right_right 15s linear infinite;
+        }
         #slider_instructions_two_alt_text_right {
             animation: slider_two_alt_instructions_text_right 15s linear infinite;
             fill: #BBBBBB
@@ -718,10 +766,23 @@
             animation: slider_two_alt_instructions_mask_right 15s linear infinite;
         }
         @keyframes slider_two_alt_instructions_right {
-            33% {transform: translate(0%, 0%);}
+            36.5% {transform: translate(0%, 0%);}
             53% {transform: translate(8.5%, 0%);}
             58% {transform: translate(8.5%, 0%);}
             63% {transform: translate(0%, 0%);}
+        }
+        @keyframes slider_two_alt_instructions_cursor_right {
+            33% {transform: translate(0%, 0%);}
+            36.5% {transform: translate(11%, -0.75%);}
+            58% {transform: translate(11%, -.075%);}
+            63% {transform: translate(0%, 0%);}
+        }
+        @keyframes slider_two_alt_instructions_arrow_right_right {
+            0% {fill: lightgrey;}
+            36.5% {fill: lightgrey;}
+            37.5%{ fill: deepskyblue;}
+            58% {fill: deepskyblue;}
+            59% {fill: lightgrey;}
         }
         @keyframes slider_two_alt_instructions_text_right {
             0% {fill: #BBBBBB}
@@ -747,6 +808,15 @@
         #slider_instructions_two_alt_thumb_middle{
             animation: slider_two_alt_instructions_middle 15s linear infinite;
         }
+        #slider_instructions_two_alt_cursor_middle{
+            animation: slider_two_alt_instructions_cursor_middle 15s linear infinite;
+        }
+        #category_two_alt_slider_arrow_middle_left {
+            animation: slider_two_alt_instructions_arrow_middle_left 15s linear infinite;
+        }
+        #category_two_alt_slider_arrow_middle_right {
+            animation: slider_two_alt_instructions_arrow_middle_right 15s linear infinite;
+        }
         #slider_instructions_two_alt_text_middle {
             animation: slider_two_alt_instructions_text_middle 15s linear infinite;
             fill: #BBBBBB
@@ -755,10 +825,33 @@
             animation: slider_two_alt_instructions_mask_middle 15s linear infinite;
         }
         @keyframes slider_two_alt_instructions_middle {
+            69.5% {transform: translate(0%, 0%);}
+            79% {transform: translate(-1%, 0%);}
+            82.5% {transform: translate(-1%, 0%);}
+            95% {transform: translate(1%, 0%);}
+            97% {transform: translate(0%, 0%);}
+        }
+        @keyframes slider_two_alt_instructions_cursor_middle {
             66% {transform: translate(0%, 0%);}
-            78% {transform: translate(-1%, 0%);}
-            86% {transform: translate(1%, 0%);}
-            96% {transform: translate(0%, 0%);}
+            69% {transform: translate(-11%, -0.75%);}
+            79% {transform: translate(-11%, -0.75%);}
+            82% {transform: translate(11%, -.75%);}
+            95% {transform: translate(11%, -.75%);}
+            97% {transform: translate(0%, 0%);}
+        }
+        @keyframes slider_two_alt_instructions_arrow_middle_left{
+            0% {fill: lightgrey;}
+            69.5% {fill: lightgrey;}
+            70%{ fill: deepskyblue;}
+            79% {fill: deepskyblue;}
+            80% {fill: lightgrey;}
+        }
+        @keyframes slider_two_alt_instructions_arrow_middle_right{
+            0% {fill: lightgrey;}
+            83% {fill: lightgrey;}
+            83.5%{ fill: deepskyblue;}
+            95% {fill: deepskyblue;}
+            95.5% {fill: lightgrey;}
         }
         @keyframes slider_two_alt_instructions_text_middle {
             0% {fill: #BBBBBB}

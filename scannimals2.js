@@ -565,9 +565,11 @@ STIMULUSDATA = function(participant_number){
             //Finding the correct item
             let correct_item
             switch(key){
-                case("IA"): if(items_allowed_for_indirect_pair === "direct"){correct_item = TrainingFennimals.IA.item} else {correct_item = TrainingFennimals.IB.item} break
+                case("IA1"): if(items_allowed_for_indirect_pair === "direct"){correct_item = TrainingFennimals.IA.item} else {correct_item = TrainingFennimals.IB.item} break
+                case("IA2"): if(items_allowed_for_indirect_pair === "direct"){correct_item = TrainingFennimals.IA.item} else {correct_item = TrainingFennimals.IB.item} break
                 case("IB"): if(items_allowed_for_indirect_pair === "direct"){correct_item = TrainingFennimals.IB.item} else {correct_item = TrainingFennimals.IA.item} break
-                case("DA"): correct_item = TrainingFennimals.DA.item; break
+                case("DA1"): correct_item = TrainingFennimals.DA.item; break
+                case("DA2"): correct_item = TrainingFennimals.DA.item; break
                 case("DB"): correct_item = TrainingFennimals.DB.item; break
                 case("C1"): correct_item = TrainingFennimals.C1.item; break;
                 case("C2"): correct_item = TrainingFennimals.C2.item; break;
@@ -576,9 +578,11 @@ STIMULUSDATA = function(participant_number){
             //We will select one element from each of the arrays. So arrays with one element will always be selected
             let OtherPairItems
             switch(key){
-                case("IA"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("IA1"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("IA2"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
                 case("IB"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("DA"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
+                case("DA1"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
+                case("DA2"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
                 case("DB"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
                 case("C1"): OtherPairItems = [ [TrainingFennimals.IA.item, TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
                 case("C2"): OtherPairItems = [ [TrainingFennimals.IA.item, TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
@@ -599,9 +603,11 @@ STIMULUSDATA = function(participant_number){
             TestObj.correct_item = correct_item
 
             switch(key){
-                case("IA"): TestObj.item_direct = TrainingFennimals.IA.item; TestObj.item_indirect = TrainingFennimals.IB.item; break
+                case("IA1"): TestObj.item_direct = TrainingFennimals.IA.item; TestObj.item_indirect = TrainingFennimals.IB.item; break
+                case("IA2"): TestObj.item_direct = TrainingFennimals.IA.item; TestObj.item_indirect = TrainingFennimals.IB.item; break
                 case("IB"): TestObj.item_direct = TrainingFennimals.IB.item; TestObj.item_indirect = TrainingFennimals.IA.item; break
-                case("DA"): TestObj.item_direct = TrainingFennimals.DA.item; TestObj.item_indirect = TrainingFennimals.DB.item; break
+                case("DA1"): TestObj.item_direct = TrainingFennimals.DA.item; TestObj.item_indirect = TrainingFennimals.DB.item; break
+                case("DA2"): TestObj.item_direct = TrainingFennimals.DA.item; TestObj.item_indirect = TrainingFennimals.DB.item; break
                 case("DB"): TestObj.item_direct = TrainingFennimals.DB.item; TestObj.item_indirect = TrainingFennimals.DA.item; break
                 case("C1"): TestObj.item_direct = TrainingFennimals.C1.item; TestObj.item_indirect = false; break
                 case("C2"): TestObj.item_direct = TrainingFennimals.C2.item; TestObj.item_indirect = false; break
@@ -897,26 +903,26 @@ STIMULUSDATA = function(participant_number){
     }
 
     let BindingPhaseRegions = {
-        IA: Binding_Phase_Regions[0],
-        IB: Binding_Phase_Regions[1],
-        DA: Binding_Phase_Regions[2],
-        DB: Binding_Phase_Regions[3],
+        IA1: Binding_Phase_Regions[0],
+        IA2: Binding_Phase_Regions[1],
+        DA1: Binding_Phase_Regions[2],
+        DA2: Binding_Phase_Regions[3],
         C1: TrainingFennimals.C1.region,
         C2: TrainingFennimals.C2.region
     }
     let BindingPhaseLocations = {
-        IA: shuffleArray( Param.RegionData[BindingPhaseRegions.IA].Locations ),
-        IB: shuffleArray( Param.RegionData[BindingPhaseRegions.IB].Locations ),
-        DA: shuffleArray( Param.RegionData[BindingPhaseRegions.DA].Locations ),
-        DB: shuffleArray( Param.RegionData[BindingPhaseRegions.DB].Locations ),
+        IA1: shuffleArray( Param.RegionData[BindingPhaseRegions.IA1].Locations ),
+        IA2: shuffleArray( Param.RegionData[BindingPhaseRegions.IA2].Locations ),
+        DA1: shuffleArray( Param.RegionData[BindingPhaseRegions.DA1].Locations ),
+        DA2: shuffleArray( Param.RegionData[BindingPhaseRegions.DA2].Locations ),
         C1: shuffleArray( TrainingFennimals.C1.location),
         C2: shuffleArray( TrainingFennimals.C2.location ),
     }
     let BindingPhaseTemplates= {
-        IA: {ID: "IA", head: TrainingFennimals.IA.head, body: Param.RegionData[BindingPhaseRegions.IA].preferredBodyType, region: BindingPhaseRegions.IA, location: BindingPhaseLocations.IA[0], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
-        IB: {ID: "IB", head: TrainingFennimals.IB.head, body: Param.RegionData[BindingPhaseRegions.IB].preferredBodyType, region: BindingPhaseRegions.IB, location: BindingPhaseLocations.IB[0],item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
-        DA: {ID: "DA", head: TrainingFennimals.DA.head, body: Param.RegionData[BindingPhaseRegions.DA].preferredBodyType, region: BindingPhaseRegions.DA, location: BindingPhaseLocations.DA[0],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
-        DB: {ID: "DB", head: TrainingFennimals.DB.head, body: Param.RegionData[BindingPhaseRegions.DB].preferredBodyType, region: BindingPhaseRegions.DB, location: BindingPhaseLocations.DB[0],item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
+        IA1: {ID: "IA", head: TrainingFennimals.IA.head, body: Param.RegionData[BindingPhaseRegions.IA1].preferredBodyType, region: BindingPhaseRegions.IA1, location: BindingPhaseLocations.IA1[0], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
+        IA2: {ID: "IA", head: TrainingFennimals.IA.head, body: Param.RegionData[BindingPhaseRegions.IA2].preferredBodyType, region: BindingPhaseRegions.IA2, location: BindingPhaseLocations.IA2[0],item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item},
+        DA1: {ID: "DA", head: TrainingFennimals.DA.head, body: Param.RegionData[BindingPhaseRegions.DA1].preferredBodyType, region: BindingPhaseRegions.DA1, location: BindingPhaseLocations.DA1[0],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
+        DA2: {ID: "DA", head: TrainingFennimals.DA.head, body: Param.RegionData[BindingPhaseRegions.DA2].preferredBodyType, region: BindingPhaseRegions.DA2, location: BindingPhaseLocations.DA2[0],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
         C1: {ID: "C1", head: Bindng_Phase_Heads[0], body: Param.RegionData[BindingPhaseRegions.C1].preferredBodyType, region: BindingPhaseRegions.C1, location: BindingPhaseLocations.C1, item_direct: TrainingFennimals.C1.item, item_indirect: false},
         C2: {ID: "C2", head: Bindng_Phase_Heads[1], body: Param.RegionData[BindingPhaseRegions.C2].preferredBodyType, region: BindingPhaseRegions.C2, location: BindingPhaseLocations.C2, item_direct: TrainingFennimals.C2.item, item_indirect: false},
     }
@@ -947,27 +953,27 @@ STIMULUSDATA = function(participant_number){
     // Combinining all trials into a single object. Here, each element is a day's worth of activities during the test phase.
     let TestPhaseData = [
         {
-            Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C1"], "direct", true,true ),
+            Trials:  createBlockOfBindingTrials(["IA1","IA2","DA1","DA2","C1"], "direct", true,true ),
             type: "direct",
             hint_type: "text",
             number: 1
         },{
-            Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C2"],  "indirect", false,true ),
+            Trials:  createBlockOfBindingTrials(["IA1","IA2","DA1","DA2","C2"],  "indirect", false,true ),
             type: "indirect",
             hint_type: "text",
             number: 2
         },{
-            Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C1"],  "indirect", false,true ),
+            Trials:  createBlockOfBindingTrials(["IA1","IA2","DA1","DA2","C1"],  "indirect", false,true ),
             type: "indirect",
             hint_type: "text",
             number: 3
         },{
-            Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C2"], "indirect", false,true ),
+            Trials:  createBlockOfBindingTrials(["IA1","IA2","DA1","DA2","C2"], "indirect", false,true ),
             type: "indirect",
             hint_type: "text",
             number: 4
         },{
-            Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C1"],  "indirect", false,true ),
+            Trials:  createBlockOfBindingTrials(["IA1","IA2","DA1","DA2","C1"],  "indirect", false,true ),
             type: "indirect",
             hint_type: "text",
             number: 5
@@ -986,7 +992,6 @@ STIMULUSDATA = function(participant_number){
             hint_type: "text",
             number: 8
         }]
-
     console.log(TestPhaseData)
     console.log(Available_Heads)
     console.log(Available_Bodies)
@@ -1032,7 +1037,6 @@ STIMULUSDATA = function(participant_number){
             hint_type: "text",
             number: 8
         }]
-
 
    */
 
@@ -5418,6 +5422,9 @@ CategoryPhaseController_Binary_Slider = function(ExpCont, Stimuli, LocCont, Data
 }
 
 CategoryPhaseController_Two_Alt_Slider = function(ExpCont, Stimuli, LocCont, DataCont){
+    //Set to true if only the arrows and keyboard keys are allowed to move the slider
+    let restrict_slider_to_arrows = true
+
     //Deep copy all the category trials from the stimulus data. Now we have an array we can pop.
     let RemainingCategoryTrials = Stimuli.getCategoryTrials()
 
@@ -5450,6 +5457,9 @@ CategoryPhaseController_Two_Alt_Slider = function(ExpCont, Stimuli, LocCont, Dat
 
     //References for the left and right icons, as well as their x-coordinates and range
     let IconLeft, IconRight, IconMovable, IconLeftContainer, IconRightContainer, IconMovableContainer, Slider
+
+    // References for the start time of each trial. Needs to be updated for each trial!
+    let trialStartDate = false
 
     //Some easy references to the main SVG layer objects
     let PhaseLayer = document.getElementById("Category_Layer")
@@ -5496,7 +5506,7 @@ CategoryPhaseController_Two_Alt_Slider = function(ExpCont, Stimuli, LocCont, Dat
         FObj.appendChild(SliderObj)
         ParentNode.appendChild(FObj)
 
-        function slider_moved(val){
+        function slider_moving_to_new_value(val){
             move_Icon_to_relative_pos(get_relative_position_on_slider(val))
 
             //Check if this is the first time that the slider has been moved. If yes, create the continue button
@@ -5512,7 +5522,109 @@ CategoryPhaseController_Two_Alt_Slider = function(ExpCont, Stimuli, LocCont, Dat
             }
         }
 
-        SliderObj.oninput = function(){slider_moved( SliderObj.value)}
+        SliderObj.oninput = function(){slider_moving_to_new_value( SliderObj.value)}
+
+        //If only the arrows are allowed to move the slider, then block direct cursor events
+        if(restrict_slider_to_arrows){
+            SliderObj.style.pointerEvents = "none"
+        }
+
+        //Defining the on-screen arrow buttons
+        let ArrowLeft = document.getElementById("category_two_alt_slider_arrow_left")
+        let ArrowRight = document.getElementById("category_two_alt_slider_arrow_right")
+
+        //Call when the slider has been moved left or right with the arrow keys
+        function slider_moved_by_arrows(direction){
+            let currentvalue =  parseFloat( SliderObj.value )
+            if(direction === "left" ){
+                if( (currentvalue - Slider_range_values.step) >  Slider_range_values.min){
+                    SliderObj.value = currentvalue - Slider_range_values.step
+                }else{
+                    SliderObj.value = Slider_range_values.min
+                    key_released()
+                }
+                slider_moving_to_new_value(SliderObj.value)
+            }
+
+            if(direction === "right"){
+                if((currentvalue + Slider_range_values.step) <  Slider_range_values.max){
+                    SliderObj.value = currentvalue + Slider_range_values.step
+                }else{
+                    SliderObj.value = Slider_range_values.max
+                    key_released()
+                }
+                slider_moving_to_new_value(SliderObj.value)
+            }
+        }
+
+        ArrowLeft.onmousedown = function(){key_pressed("left")}
+        ArrowRight.onmousedown = function(){key_pressed("right")}
+
+        //Allows the arrow keys to be pressed down for faster movement
+        let key_active = false
+        let key_active_interval = false
+
+        //Call when the arrows have been pressed to initiate an interval
+        function key_pressed(direction){
+            slider_moved_by_arrows(direction)
+            key_active = direction
+
+            setTimeout(function(){
+                if(key_active !== false){
+                    key_active_interval = setInterval(function(){
+                        if(key_active!== false){
+                            slider_moved_by_arrows(direction)
+                        }else{
+                            clearInterval(this)
+                        }
+                    },25)
+                }
+            },50)
+
+            //Changing the key appearances
+            if(direction === "left"){
+                ArrowLeft.classList.add("category_two_alt_slider_screen_arrow_selected")
+                ArrowLeft.classList.remove("category_two_alt_slider_screen_arrow")
+                ArrowRight.classList.remove("category_two_alt_slider_screen_arrow")
+                ArrowRight.classList.add("category_two_alt_slider_screen_arrow_not_selected")
+            }
+            if(direction === 'right'){
+                ArrowRight.classList.add("category_two_alt_slider_screen_arrow_selected")
+                ArrowRight.classList.remove("category_two_alt_slider_screen_arrow")
+                ArrowLeft.classList.remove("category_two_alt_slider_screen_arrow")
+                ArrowLeft.classList.add("category_two_alt_slider_screen_arrow_not_selected")
+            }
+        }
+
+        //Call when the arrows have been released or the curser moved out of the screen
+        function key_released(){
+            console.log("released", key_active)
+            key_active = false
+            clearInterval(key_active_interval)
+
+            //Returning the visibility both arrows
+            ArrowRight.classList.add("category_two_alt_slider_screen_arrow")
+            ArrowRight.classList.remove("category_two_alt_slider_screen_arrow_not_selected")
+            ArrowRight.classList.remove("category_two_alt_slider_screen_arrow_selected")
+            ArrowLeft.classList.add("category_two_alt_slider_screen_arrow")
+            ArrowLeft.classList.remove("category_two_alt_slider_screen_arrow_not_selected")
+            ArrowLeft.classList.remove("category_two_alt_slider_screen_arrow_selected")
+
+        }
+
+        document.onmouseup = function(){
+            if(key_active !== false){
+                key_released()
+            }
+        }
+        document.onmouseleave = function(){
+            if(key_active!== false){
+                key_released()
+            }
+        }
+
+
+
     }
 
     //Call with a slider percentage to get the x values for the movable object
@@ -5570,6 +5682,9 @@ CategoryPhaseController_Two_Alt_Slider = function(ExpCont, Stimuli, LocCont, Dat
 
             //Create the slider
             Slider = new SVGSlider()
+
+            //Start the Rt measurement
+            trialStartDate = Date.now()
 
         }else{
             //Phase finished
@@ -5636,6 +5751,7 @@ CategoryPhaseController_Two_Alt_Slider = function(ExpCont, Stimuli, LocCont, Dat
     function continue_button_pressed(value){
         //Update and store the trial
         CurrentCategoryTrial.rating = value
+        CurrentCategoryTrial.rt = Date.now() - trialStartDate
         OutputArray.push(JSON.parse(JSON.stringify(CurrentCategoryTrial)))
 
         //Go to the next trial
@@ -6090,7 +6206,8 @@ DataController = function(seed_number, Stimuli){
                     M : {ID: Data.CategoryPhase[i].Mov.ID, h: Data.CategoryPhase[i].Mov.head, b: Data.CategoryPhase[i].Mov.body, },
                     pc: Data.CategoryPhase[i].pc,
                     dir: Data.CategoryPhase[i].dir,
-                    rat: Data.CategoryPhase[i].rating
+                    rat: Data.CategoryPhase[i].rating,
+                    rt: Data.CategoryPhase[i].rt
                 })
             }
         }
@@ -7131,7 +7248,7 @@ EC.showStartScreen()
 //  Set seed based on PID
 // SVG Garbage collector?
 
-console.log("Version: 16.11.23")
+console.log("Version: 21.11.23")
 //TODO: RESET SUBMISSION
 
 
