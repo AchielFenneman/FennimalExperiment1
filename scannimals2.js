@@ -903,26 +903,33 @@ STIMULUSDATA = function(participant_number){
     }
 
     let BindingPhaseRegions = {
-        IA1: Binding_Phase_Regions[0],
-        IA2: Binding_Phase_Regions[1],
-        DA1: Binding_Phase_Regions[2],
-        DA2: Binding_Phase_Regions[3],
+        IA: Binding_Phase_Regions[0],
+        IB: Binding_Phase_Regions[1],
+        DA: Binding_Phase_Regions[2],
+        DB: Binding_Phase_Regions[3],
         C1: TrainingFennimals.C1.region,
         C2: TrainingFennimals.C2.region
     }
+
     let BindingPhaseLocations = {
-        IA1: shuffleArray( Param.RegionData[BindingPhaseRegions.IA1].Locations ),
-        IA2: shuffleArray( Param.RegionData[BindingPhaseRegions.IA2].Locations ),
-        DA1: shuffleArray( Param.RegionData[BindingPhaseRegions.DA1].Locations ),
-        DA2: shuffleArray( Param.RegionData[BindingPhaseRegions.DA2].Locations ),
+        IA: shuffleArray( Param.RegionData[BindingPhaseRegions.IA].Locations ),
+        IB: shuffleArray( Param.RegionData[BindingPhaseRegions.IB].Locations ),
+        DA: shuffleArray( Param.RegionData[BindingPhaseRegions.DA].Locations ),
+        DB: shuffleArray( Param.RegionData[BindingPhaseRegions.DB].Locations ),
         C1: shuffleArray( TrainingFennimals.C1.location),
         C2: shuffleArray( TrainingFennimals.C2.location ),
     }
     let BindingPhaseTemplates= {
-        IA1: {ID: "IA", head: TrainingFennimals.IA.head, body: Param.RegionData[BindingPhaseRegions.IA1].preferredBodyType, region: BindingPhaseRegions.IA1, location: BindingPhaseLocations.IA1[0], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
-        IA2: {ID: "IA", head: TrainingFennimals.IA.head, body: Param.RegionData[BindingPhaseRegions.IA2].preferredBodyType, region: BindingPhaseRegions.IA2, location: BindingPhaseLocations.IA2[0],item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item},
-        DA1: {ID: "DA", head: TrainingFennimals.DA.head, body: Param.RegionData[BindingPhaseRegions.DA1].preferredBodyType, region: BindingPhaseRegions.DA1, location: BindingPhaseLocations.DA1[0],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
-        DA2: {ID: "DA", head: TrainingFennimals.DA.head, body: Param.RegionData[BindingPhaseRegions.DA2].preferredBodyType, region: BindingPhaseRegions.DA2, location: BindingPhaseLocations.DA2[0],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
+        IA1: {ID: "IA", head: TrainingFennimals.IA.head, body: Param.RegionData[BindingPhaseRegions.IA].preferredBodyType, region: BindingPhaseRegions.IA, location: BindingPhaseLocations.IA[0], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
+        IA2: {ID: "IA", head: TrainingFennimals.IA.head, body: Param.RegionData[BindingPhaseRegions.IA].preferredBodyType, region: BindingPhaseRegions.IA, location: BindingPhaseLocations.IA[1], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item},
+
+        IB: {ID: "IB", head: TrainingFennimals.IB.head, body: Param.RegionData[BindingPhaseRegions.IB].preferredBodyType, region: BindingPhaseRegions.IB, location: BindingPhaseLocations.IB[0],item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
+
+        DA1: {ID: "DA", head: TrainingFennimals.DA.head, body: Param.RegionData[BindingPhaseRegions.DA].preferredBodyType, region: BindingPhaseRegions.DA, location: BindingPhaseLocations.DA[0],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
+        DA2: {ID: "DA", head: TrainingFennimals.DA.head, body: Param.RegionData[BindingPhaseRegions.DA].preferredBodyType, region: BindingPhaseRegions.DA, location: BindingPhaseLocations.DA[1],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
+
+        DB: {ID: "DB", head: TrainingFennimals.DB.head, body: Param.RegionData[BindingPhaseRegions.DB].preferredBodyType, region: BindingPhaseRegions.DB, location: BindingPhaseLocations.DB[0],item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
+
         C1: {ID: "C1", head: Bindng_Phase_Heads[0], body: Param.RegionData[BindingPhaseRegions.C1].preferredBodyType, region: BindingPhaseRegions.C1, location: BindingPhaseLocations.C1, item_direct: TrainingFennimals.C1.item, item_indirect: false},
         C2: {ID: "C2", head: Bindng_Phase_Heads[1], body: Param.RegionData[BindingPhaseRegions.C2].preferredBodyType, region: BindingPhaseRegions.C2, location: BindingPhaseLocations.C2, item_direct: TrainingFennimals.C2.item, item_indirect: false},
     }
@@ -953,7 +960,7 @@ STIMULUSDATA = function(participant_number){
     // Combinining all trials into a single object. Here, each element is a day's worth of activities during the test phase.
     let TestPhaseData = [
         {
-            Trials:  createBlockOfBindingTrials(["IA1","IA2","DA1","DA2","C1"], "direct", true,true ),
+            Trials:  createBlockOfBindingTrials(["IA1","IB","DA1","DB","C1"], "direct", true,true ),
             type: "direct",
             hint_type: "text",
             number: 1
@@ -7248,8 +7255,5 @@ EC.showStartScreen()
 //  Set seed based on PID
 // SVG Garbage collector?
 
-console.log("Version: 21.11.23")
-//TODO: RESET SUBMISSION
+console.log("Version: 21.11.23 B")
 
-
-// Add two more mix trials
