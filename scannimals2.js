@@ -4075,7 +4075,7 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
                 Container.appendChild(createInstructionTitleElem("INSTRUCTIONS FOR THIS EXPERIMENT"))
                 Container.appendChild(createTextField(30, 35, 508-2*30,250, "In this experiment you will be a participant in an experiment conducted at the University of Vienna. We will not provide any deceiving or erroneous information to you at any point throughout the experiment. <br>" +
                     "<br>" +
-                    "This experiment is expected to last around 30-40 minutes. Based on your decisions in the last part of the experiment you can earn up to five stars for your performance. You will earn a bonus of " + Param.BonusEarnedPerStar.currency_symbol+ Param.BonusEarnedPerStar.bonus_per_star + " per star that you obtain. <br>" +
+                    "This experiment is expected to last around 45 minutes. Based on your decisions in the last part of the experiment you can earn up to five stars for your performance. You will earn a bonus of " + Param.BonusEarnedPerStar.currency_symbol+ Param.BonusEarnedPerStar.bonus_per_star + " per star that you obtain. <br>" +
                     "<br>" +
                     "All the answers and data that you provide are completely anonymous. You will only be known to us via your Prolific ID. We will not store or record any personally identifiable information at any point during the experiment. Your anonymized data will be exclusively used for research-related goals. Your data will be archived and may be shared with other researchers in the future. <br>" +
                     "<br>" +
@@ -7198,4 +7198,4 @@ EC.showStartScreen()
 //EC.start_test_phase()
 
 
-console.log("Version: 27.11.23 B")
+console.log("Version: 27.11.23 C")
