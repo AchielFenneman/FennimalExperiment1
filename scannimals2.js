@@ -3959,7 +3959,10 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
 
 
         let Button = createSVGButtonElem((508-150)/2,245,160,30,"CONTINUE")
-        Button.onclick = function(){that.gotoWelcomeScreen()}
+        Button.onclick = function(){
+            hide_all_instruction_pages()
+            EC.start_first_similarity_task()
+        }
         Container.appendChild(Button)
     }
 
@@ -7046,8 +7049,8 @@ let SVGObjects = {
 let DataCont = new DataController(participant_number, Stimuli)
 
 let EC = new ExperimentController(Stimuli, DataCont)
-EC.start_first_similarity_task()
-//EC.showStartScreen()
+//EC.start_first_similarity_task()
+EC.showStartScreen()
 //EC.show_starting_instructions()
 //EC.start_targeted_search_subphase()
 //EC.start_delivery_subphase()
