@@ -594,14 +594,14 @@ STIMULUSDATA = function(participant_number){
     let Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 5, false ))
     let Random_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
 
-    let Drawn_Training_Regions = Available_Regions.splice(0,4)
+    let Drawn_Training_Regions = Available_Regions.splice(0,3)
     let TrainingRegions = {
         IA: Drawn_Training_Regions[0],
         IB: Drawn_Training_Regions[0],
         DA: Drawn_Training_Regions[1],
         DB: Drawn_Training_Regions[1],
-        C1: Drawn_Training_Regions[2],
-        C2: Drawn_Training_Regions[3],
+        C: Drawn_Training_Regions[2],
+        //C2: Drawn_Training_Regions[3],
     }
     let I_Locations = shuffleArray( Param.RegionData[TrainingRegions.IA].Locations )
     let D_Locations = shuffleArray( Param.RegionData[TrainingRegions.DA].Locations )
@@ -610,8 +610,8 @@ STIMULUSDATA = function(participant_number){
         IB: I_Locations[1],
         DA: D_Locations[0],
         DB: D_Locations[1],
-        C1: shuffleArray( Param.RegionData[TrainingRegions.C1].Locations )[0],
-        C2: shuffleArray( Param.RegionData[TrainingRegions.C2].Locations )[0],
+        C: shuffleArray( Param.RegionData[TrainingRegions.C].Locations )[0],
+        //C2: shuffleArray( Param.RegionData[TrainingRegions.C2].Locations )[0],
     }
 
     let Drawn_Binding_Phase_Regions = Available_Regions.splice(0,4)
@@ -620,16 +620,16 @@ STIMULUSDATA = function(participant_number){
         IB: Drawn_Binding_Phase_Regions[1],
         DA: Drawn_Binding_Phase_Regions[2],
         DB: Drawn_Binding_Phase_Regions[3],
-        C1: TrainingRegions.C1,
-        C2: TrainingRegions.C2
+        C: TrainingRegions.C,
+        //C2: TrainingRegions.C2
     }
     let BindingPhaseLocations = {
         IA: shuffleArray( Param.RegionData[BindingPhaseRegions.IA].Locations ),
         IB: shuffleArray( Param.RegionData[BindingPhaseRegions.IB].Locations ),
         DA: shuffleArray( Param.RegionData[BindingPhaseRegions.DA].Locations ),
         DB: shuffleArray( Param.RegionData[BindingPhaseRegions.DB].Locations ),
-        C1: shuffleArray( TrainingLocations.C1),
-        C2: shuffleArray( TrainingLocations.C2),
+        C: shuffleArray( TrainingLocations.C),
+        //C2: shuffleArray( TrainingLocations.C2),
     }
 
     //These will only be filled after the first similarity task
@@ -654,16 +654,11 @@ STIMULUSDATA = function(participant_number){
         let I_Pair = Main_Pairs[0]
         let D_Pair = Main_Pairs[1]
 
-        let Control_Pairs = shuffleArray([Pairs.ControlPair1, Pairs.ControlPair2])
-        let C1_Pair = Control_Pairs[0]
-        let C2_Pair = Control_Pairs[1]
-
         //Storing as  seperate object (easier for analyses down the line)
         Selected_Pairs = {
             I: I_Pair,
             D: D_Pair,
-            C1: C1_Pair,
-            C2: C2_Pair
+            C: Pairs.ControlPair
         }
 
         //Now we can create all the Fennimals
@@ -673,8 +668,8 @@ STIMULUSDATA = function(participant_number){
             IB: createFennimalObj(TrainingRegions.IB, TrainingLocations.IB, Selected_Pairs.I.IDs[1],Param.RegionData[TrainingRegions.IB].preferredBodyType, Random_Items[1] ),
             DA: createFennimalObj(TrainingRegions.DA, TrainingLocations.DA, Selected_Pairs.D.IDs[0],Param.RegionData[TrainingRegions.DA].preferredBodyType, Random_Items[2] ),
             DB: createFennimalObj(TrainingRegions.DB, TrainingLocations.DB, Selected_Pairs.D.IDs[1],Param.RegionData[TrainingRegions.DB].preferredBodyType, Random_Items[3] ),
-            C1: createFennimalObj(TrainingRegions.C1, TrainingLocations.C1, Selected_Pairs.C1.IDs[0],Param.RegionData[TrainingRegions.C1].preferredBodyType, Random_Items[4] ),
-            C2: createFennimalObj(TrainingRegions.C2, TrainingLocations.C2, Selected_Pairs.C2.IDs[0],Param.RegionData[TrainingRegions.C2].preferredBodyType, Random_Items[4] ),
+            C: createFennimalObj(TrainingRegions.C, TrainingLocations.C, Selected_Pairs.C.IDs[0],Param.RegionData[TrainingRegions.C].preferredBodyType, Random_Items[4] ),
+            //C2: createFennimalObj(TrainingRegions.C2, TrainingLocations.C2, Selected_Pairs.C2.IDs[0],Param.RegionData[TrainingRegions.C2].preferredBodyType, Random_Items[4] ),
         }
 
         BindingPhaseTemplates= {
@@ -682,34 +677,34 @@ STIMULUSDATA = function(participant_number){
             IB: {ID: "IB", head: TrainingFennimals.IB.head, body: Param.RegionData[BindingPhaseRegions.IB].preferredBodyType, region: BindingPhaseRegions.IB, location: BindingPhaseLocations.IB[0],item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
             DA: {ID: "DA", head: TrainingFennimals.DA.head, body: Param.RegionData[BindingPhaseRegions.DA].preferredBodyType, region: BindingPhaseRegions.DA, location: BindingPhaseLocations.DA[0],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
             DB: {ID: "DB", head: TrainingFennimals.DB.head, body: Param.RegionData[BindingPhaseRegions.DB].preferredBodyType, region: BindingPhaseRegions.DB, location: BindingPhaseLocations.DB[0],item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
-            C1: {ID: "C1", head: Selected_Pairs.C1.IDs[1], body: Param.RegionData[BindingPhaseRegions.C1].preferredBodyType, region: BindingPhaseRegions.C1, location: BindingPhaseLocations.C1, item_direct: TrainingFennimals.C1.item, item_indirect: false},
-            C2: {ID: "C2", head: Selected_Pairs.C2.IDs[1], body: Param.RegionData[BindingPhaseRegions.C2].preferredBodyType, region: BindingPhaseRegions.C2, location: BindingPhaseLocations.C2, item_direct: TrainingFennimals.C2.item, item_indirect: false},
+            C: {ID: "C", head: Selected_Pairs.C.IDs[1], body: Param.RegionData[BindingPhaseRegions.C].preferredBodyType, region: BindingPhaseRegions.C, location: BindingPhaseLocations.C, item_direct: TrainingFennimals.C.item, item_indirect: false},
+            //C2: {ID: "C2", head: Selected_Pairs.C2.IDs[1], body: Param.RegionData[BindingPhaseRegions.C2].preferredBodyType, region: BindingPhaseRegions.C2, location: BindingPhaseLocations.C2, item_direct: TrainingFennimals.C2.item, item_indirect: false},
         }
 
         //Setting all the trials for the Binding phase
         BindingPhaseSetup = [
             {
-                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C1"], "direct", true,true ),
+                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C"], "direct", true,true ),
                 type: "direct",
                 hint_type: "text",
                 number: 1
             },{
-                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C2"],  "indirect", false,true ),
+                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C"],  "indirect", false,true ),
                 type: "indirect",
                 hint_type: "text",
                 number: 2
             },{
-                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C1"],  "indirect", false,true ),
+                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C"],  "indirect", false,true ),
                 type: "indirect",
                 hint_type: "text",
                 number: 3
             },{
-                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C2"], "indirect", false,true ),
+                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C"], "indirect", false,true ),
                 type: "indirect",
                 hint_type: "text",
                 number: 4
             },{
-                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C1"],  "indirect", false,true ),
+                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C"],  "indirect", false,true ),
                 type: "indirect",
                 hint_type: "text",
                 number: 5
@@ -770,6 +765,151 @@ STIMULUSDATA = function(participant_number){
 
     //Given a similarity setup, returns two pairs of maximally dis-similar IDs
     function find_training_phase_heads_max_distinct(SimsArr){
+        //First transform the arry of Sims into an object where each property only has points
+        let SimPoints = {}
+        for(let i =0; i<SimsArr.length; i++){
+            SimPoints[SimsArr[i].ID] = {x : SimsArr[i].x, y: SimsArr[i].y}
+        }
+
+        //Create an array of all different IDs.
+        let IDs = Object.getOwnPropertyNames(SimPoints)
+
+        //Now we need to figure out all groups that we can make with 4 different Fennimals.
+        let Combos = combinations(IDs,4)
+
+        //For each group, calculate the distance between all of the elements. For each group, store the shortest distance in an array
+        let GroupDistances = []
+        let Shortest_Distances = []
+        for(let i = 0; i<Combos.length;i++){
+            let AllPairs = combinations(Combos[i], 2)
+            let AllDistances = []
+            let GroupInfo = {
+                IDs: Combos[i],
+                distances: []
+            }
+            for(let p=0; p<AllPairs.length;p++){
+                //Calculating EU-distance between these pairs
+                let point1 = SimPoints[AllPairs[p][0]]
+                let point2 = SimPoints[AllPairs[p][1]]
+                let dist = EUDist(point1.x,point1.y,point2.x,point2.y)
+
+                AllDistances.push(dist)
+
+                GroupInfo.distances.push( {
+                    pair: AllPairs[p],
+                    p1: point1,
+                    p2: point2,
+                    dist: dist
+                }  )
+            }
+
+            GroupInfo.min = Math.min(... AllDistances)
+            Shortest_Distances.push(Math.min(... AllDistances))
+            GroupDistances.push(GroupInfo)
+        }
+
+        //We now need to find the group with the longest shortest distance. (That is, the group for which the closest two Fennimals are maximally apart).
+        let longest_sortest_distance = Math.max(...Shortest_Distances)
+        let PotentialGroups = []
+        for(let i = 0; i<GroupDistances.length;i++){
+            if(GroupDistances[i].min === longest_sortest_distance){
+                PotentialGroups.push(GroupDistances[i])
+            }
+        }
+
+        //Note: there may be multiple groups with this shortest distance (if some elements are perfectly overlapping). If so, pick one at random
+        let SelectedGroup
+        if(PotentialGroups.length > 1){
+            SelectedGroup = drawRandomElementsFromArray(PotentialGroups,1,false)[0].IDs
+        }else{
+            SelectedGroup = PotentialGroups[0].IDs
+        }
+
+        //Now we have our winning group.
+        //First, lets store these elements in a backup, so we can call onthese later (while still using splice)
+        let SelectedGroupIds = JSON.parse(JSON.stringify(SelectedGroup))
+
+        // To create pairs, we search for the combination of heads which results in the mis similar distance between the pairs
+        let SelectedGroup_Permutations = all_permutations(SelectedGroupIds)
+        let SelectedGroup_Diff_Between_Distances = []
+        for(let i =0; i<SelectedGroup_Permutations.length;i++){
+            let p1 = SimPoints[SelectedGroup_Permutations[i][0]]
+            let p2 = SimPoints[SelectedGroup_Permutations[i][1]]
+            let dist1 = EUDist(p1.x,p1.y,p2.x,p2.y)
+
+            let p3 = SimPoints[SelectedGroup_Permutations[i][2]]
+            let p4 = SimPoints[SelectedGroup_Permutations[i][3]]
+            let dist2 = EUDist(p3.x,p3.y,p4.x,p4.y)
+
+            SelectedGroup_Diff_Between_Distances.push( Math.abs(dist1 - dist2) )
+        }
+
+        //Findings pairs with the highest min difference
+        let perm_least_diff = Math.min(...SelectedGroup_Diff_Between_Distances)
+        let Potential_Pairs = []
+        for(let i = 0; i<SelectedGroup_Permutations.length;i++){
+            if(SelectedGroup_Diff_Between_Distances[i] === perm_least_diff){
+                Potential_Pairs.push(SelectedGroup_Permutations[i])
+            }
+        }
+        //These are massively over-counted (above we didnt take ordering into proper account). Randomly pick one here.
+        let Sampled_Pair = shuffleArray(Potential_Pairs)[0]
+
+        //Creating the selected pairs
+        let Pair1 = [Sampled_Pair[0], Sampled_Pair[1]].flat()
+        let Pair2 = [Sampled_Pair[2], Sampled_Pair[3]].flat()
+
+        //Now finally we want to keep track of the distance between these pairs (round to two numbers)
+        let dist_pair1 = Math.round(EUDist(SimPoints[Pair1[0]].x, SimPoints[Pair1[0]].y, SimPoints[Pair1[1]].x, SimPoints[Pair1[1]].y) * 100)/100
+        let dist_pair2 = Math.round(EUDist(SimPoints[Pair2[0]].x, SimPoints[Pair2[0]].y, SimPoints[Pair2[1]].x, SimPoints[Pair2[1]].y) * 100)/100
+
+        let Selected_Pairs = [{IDs: Pair1, dist_t1: dist_pair1}, {IDs: Pair2, dist_t1: dist_pair2}]
+
+        //Now we also need to find two IDs for the control Fennimals (one for training, one for binding).
+        // Here we first calculate the minimum distance between each remaining ID and the four selected IDs.
+        let Remaining_IDs = IDs.filter(x => !SelectedGroupIds.includes(x))
+        let Remaining_Min_Distances = []
+        for(let i=0; i<Remaining_IDs.length;i++){
+            let p1 = SimPoints[Remaining_IDs[i]]
+
+            let min_distance = 999999
+            //Calculate all distances to the selected
+            for(let k =0 ; k<SelectedGroupIds.length; k++){
+                let p2 = SimPoints[SelectedGroupIds[k]]
+                let dist = EUDist(p1.x, p1.y, p2.x, p2.y)
+                if(dist < min_distance){
+                    min_distance = dist
+                }
+            }
+            Remaining_Min_Distances.push(min_distance)
+        }
+
+        //Now we select the two IDs with the largest minimum distance to the pairs
+        let Control_IDs_indexes = getIndexesOfNLargestElementsInArray(Remaining_Min_Distances,2)
+        let Control_IDs = []
+        for(let i =0;i<Control_IDs_indexes.length; i++){
+            Control_IDs.push(Remaining_IDs[Control_IDs_indexes[i]])
+        }
+
+        //Creating objects containing both control pairs and their distances
+        let ControlPair= {
+            IDs: [Control_IDs[0], Control_IDs[1]].flat(),
+            dist_t1: Math.round( EUDist( SimPoints[Control_IDs[0]].x , SimPoints[Control_IDs[0]].y,  SimPoints[Control_IDs[1]].x , SimPoints[Control_IDs[1]].y, ) * 100) / 100
+        }
+
+        console.log(Control_IDs)
+        console.log(ControlPair)
+
+        //Creating the return object
+        let Output = {
+            Pair1: Selected_Pairs[0],
+            Pair2: Selected_Pairs[1],
+            ControlPair: ControlPair,
+        }
+        return(Output)
+    }
+
+    function find_training_phase_heads_max_distinctOLD(SimsArr){
         //First transform the arry of Sims into an object where each property only has points
         let SimPoints = {}
         for(let i =0; i<SimsArr.length; i++){
@@ -992,19 +1132,19 @@ STIMULUSDATA = function(participant_number){
                 case("IB"): if(items_allowed_for_indirect_pair === "direct"){correct_item = TrainingFennimals.IB.item} else {correct_item = TrainingFennimals.IA.item} break
                 case("DA"): correct_item = TrainingFennimals.DA.item; break
                 case("DB"): correct_item = TrainingFennimals.DB.item; break
-                case("C1"): correct_item = TrainingFennimals.C1.item; break;
-                case("C2"): correct_item = TrainingFennimals.C2.item; break;
+                case("C"): correct_item = TrainingFennimals.C.item; break;
+                //case("C2"): correct_item = TrainingFennimals.C2.item; break;
             }
 
             //We will select one element from each of the arrays. So arrays with one element will always be selected
             let OtherPairItems
             switch(key){
-                case("IA"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("IB"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("DA"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
-                case("DB"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
-                case("C1"): OtherPairItems = [ [TrainingFennimals.IA.item, TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
-                case("C2"): OtherPairItems = [ [TrainingFennimals.IA.item, TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
+                case("IA"): OtherPairItems = [ [TrainingFennimals.C.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("IB"): OtherPairItems = [ [TrainingFennimals.C.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("DA"): OtherPairItems = [ [TrainingFennimals.C.item],[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
+                case("DB"): OtherPairItems = [ [TrainingFennimals.C.item],[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
+                case("C"): OtherPairItems = [ [TrainingFennimals.IA.item, TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
+                //case("C2"): OtherPairItems = [ [TrainingFennimals.IA.item, TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
             }
 
             //Creating an array containing all the trial's available items
@@ -1026,8 +1166,8 @@ STIMULUSDATA = function(participant_number){
                 case("IB"): TestObj.item_direct = TrainingFennimals.IB.item; TestObj.item_indirect = TrainingFennimals.IA.item; break
                 case("DA"): TestObj.item_direct = TrainingFennimals.DA.item; TestObj.item_indirect = TrainingFennimals.DB.item; break
                 case("DB"): TestObj.item_direct = TrainingFennimals.DB.item; TestObj.item_indirect = TrainingFennimals.DA.item; break
-                case("C1"): TestObj.item_direct = TrainingFennimals.C1.item; TestObj.item_indirect = false; break
-                case("C2"): TestObj.item_direct = TrainingFennimals.C2.item; TestObj.item_indirect = false; break
+                case("C"): TestObj.item_direct = TrainingFennimals.C.item; TestObj.item_indirect = false; break
+                //case("C2"): TestObj.item_direct = TrainingFennimals.C2.item; TestObj.item_indirect = false; break
             }
 
             TestObj.ID = FenObj.ID
@@ -1058,8 +1198,8 @@ STIMULUSDATA = function(participant_number){
                 case("IB"): NewFenObj.item_direct = TrainingFennimals.IB.item; NewFenObj.item_indirect = TrainingFennimals.IA.item; break
                 case("DA"): NewFenObj.item_direct = TrainingFennimals.DA.item; NewFenObj.item_indirect = TrainingFennimals.DB.item; break
                 case("DB"): NewFenObj.item_direct = TrainingFennimals.DB.item; NewFenObj.item_indirect = TrainingFennimals.DA.item; break
-                case("C1"): NewFenObj.item_direct = TrainingFennimals.C1.item; NewFenObj.item_indirect = false; break
-                case("C2"): NewFenObj.item_direct = TrainingFennimals.C2.item; NewFenObj.item_indirect = false; break
+                case("C"): NewFenObj.item_direct = TrainingFennimals.C.item; NewFenObj.item_indirect = false; break
+                //case("C2"): NewFenObj.item_direct = TrainingFennimals.C2.item; NewFenObj.item_indirect = false; break
             }
 
             NewFenObj.correct_item = NewFenObj.item_direct
@@ -5380,7 +5520,7 @@ CategoryPhaseController_Arena = function(ExpCont, CardStimData, LocCont, instruc
 
     //Creates the completion button and sets its events handler
     function create_completion_button(){
-        CompletionButton = createSVGButtonElem((508-150)/2,255,160,25,"CONTINUE")
+        CompletionButton = createSVGButtonElem(300,262,160,20,"CONTINUE")
         ArenaGroup.appendChild(CompletionButton)
 
         //Show the text on the bottom of the arena
@@ -5468,10 +5608,10 @@ CategoryPhaseController_Arena = function(ExpCont, CardStimData, LocCont, instruc
                 //Finding the correct card sizes for the heads. A few heads need slightly different proportions
                 //dx and dy are small shims to translate the heads to the center of the card
                 switch(Head){
-                    case("B"): CardDims = {w:80,h:31, scale: 0.37, dx:0, dy: -3}; break //Widehead
-                    case("D"): CardDims = {w:55,h:45, scale: 0.33, dx:0, dy: 4}; break //Antler
-                    case("I"): CardDims = {w:42,h:60, scale: 0.45, dx:0, dy: 3}; break //Unihorn
-                    case("E"): CardDims = {w:45,h:55, scale: 0.45, dx:3, dy: -3}; break //Chirpy
+                    case("B"): CardDims = {w:50,h:50, scale: 0.25, dx:0, dy: 0}; break //Widehead
+                    case("D"): CardDims = {w:50,h:50, scale: 0.3, dx:0, dy: 4}; break //Antler
+                    case("I"): CardDims = {w:50,h:50, scale: 0.42, dx:0, dy: 3}; break //Unihorn
+                    case("E"): CardDims = {w:50,h:50, scale: 0.43, dx:3, dy: -3}; break //Chirpy
                     case("F"): CardDims = {w:50,h:50, scale: 0.5, dx:0, dy: 5}; break //Punk
                     case("H"): CardDims = {w:50,h:50, scale: 0.5, dx:0, dy: 0}; break //Scout
                     default: CardDims = {w:50,h:50, scale: 0.45, dx:0, dy: 0}; break
@@ -5565,7 +5705,7 @@ CategoryPhaseController_Arena = function(ExpCont, CardStimData, LocCont, instruc
         this.get_card_data = function(standardize_coords){
             let out_x, out_y
             if(standardize_coords){
-                let Box = document.getElementById("arena_surface").getBBox()
+                let Box = document.getElementById("similarity_surface").getBBox()
                 out_x = Math.round(LastLocation.x - Box.x)
                 out_y = Math.round(LastLocation.y - Box.y)
 
@@ -7058,11 +7198,4 @@ EC.showStartScreen()
 //EC.start_test_phase()
 
 
-//TODO: Control Test in different region
-//  Set seed based on PID
-// SVG Garbage collector?
-
-console.log("Version: 27.11.23")
-
-//TODO: shuffle card order
-// Place all the heads on the blue area
+console.log("Version: 27.11.23 B")
