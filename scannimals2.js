@@ -137,6 +137,44 @@ function getIndexesOfNSmallestElementsInArray(arr,n){
     return(ReturnArr)
 }
 
+function getIndexesOfNLargestElementsInArray(arr,n){
+    //Sort a deep-copy of the array.
+    let Sorted_arr = JSON.parse(JSON.stringify(arr)).sort()
+
+    //Since we want the largest elements, reverse this array
+    Sorted_arr.reverse()
+
+    Sorted_arr = [...new Set(Sorted_arr)];
+
+    //Now we can start building a return array.
+    // Since there may be ties, we will start filling this array until we get n elements.
+    // If some values put us over n (ties), then randomly sample the tied indexes until n is reached
+    let ReturnArr = []
+    while(ReturnArr.length < n){
+        //Splice the first index from the Sorted_arr
+        let val = Sorted_arr.splice(0,1)[0]
+
+        //Find all elements in arr that contain this value
+        let Indices = getAllIndexes(arr,val)
+
+        //Check if adding these indices to the return array would overshoot our number n.
+        if(ReturnArr.length + Indices.length > n){
+            // Now we need to randomly sample a few incides until we max out at n
+            let sampledIndices = drawRandomElementsFromArray(Indices, n - ReturnArr.length, false)
+            for(let i = 0;i<sampledIndices.length;i++){
+                ReturnArr.push(sampledIndices[i])
+            }
+        }else{
+            //Nope, were good. Add all the indices
+            for(let i = 0;i<Indices.length;i++){
+                ReturnArr.push(Indices[i])
+            }
+        }
+    }
+    return(ReturnArr)
+}
+
+
 //Returns EU distance between two two-dimensional points
 function EUDist(x1,y1,x2,y2){
     let a = x1 - x2
@@ -482,27 +520,412 @@ function ProlificIDToSeed(PID){
     return(number.substring(0,4))
 }
 
+// Given an array, returns a group containing all unique groups of size k. Thanks chatGPT!
+function combinations(arr, k) {
+    const result = [];
+
+    function combine(startIndex, currentCombination) {
+        if (currentCombination.length === k) {
+            result.push([...currentCombination]);
+            return;
+        }
+
+        for (let i = startIndex; i < arr.length; i++) {
+            currentCombination.push(arr[i]);
+            combine(i + 1, currentCombination);
+            currentCombination.pop();
+        }
+    }
+
+    combine(0, []);
+
+    return result;
+}
+
+//Given an array, get all permutations of elements
+function all_permutations(array) {
+    function p(array, temp) {
+        var i, x;
+        if (!array.length) {
+            result.push(temp);
+        }
+        for (i = 0; i < array.length; i++) {
+            x = array.splice(i, 1)[0];
+            p(array, temp.concat(x));
+            array.splice(i, 0, x);
+        }
+    }
+
+    var result = [];
+    p(array, []);
+    return result;
+}
+
 STIMULUSDATA = function(participant_number){
     // RESETTING THE RNG SEED HERE //
     ////////////////////////////////
     // NO CALLS TO RANDOMIZATION SHOULD BE MADE ABOVE THIS LINE //
     RNG = new RandomNumberGenerator(participant_number)
 
+    // SETTING THE CONTENTS OF THE FIRST SIMILARITY TASK (the rest of the Fennimals will be created according to these results)
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    let Head_Available_For_First_Sim_Task = shuffleArray(JSON.parse(JSON.stringify(Param.Available_Fennimal_Heads)))
+    let FirstSimTaskStim = []
+    for(let i = 0; i< Head_Available_For_First_Sim_Task.length; i++){
+        FirstSimTaskStim.push({
+            ID: Head_Available_For_First_Sim_Task[i],
+            head: Head_Available_For_First_Sim_Task[i]
+        })
+    }
+
+    //The results from the first sim task (and associated selected pairs) will be set here.
+    let FirstSimResults, Selected_Pairs
+
+    this.get_stim_for_first_sim_task = function(){
+        return  {
+            features: "heads",
+            Stim: FirstSimTaskStim
+        }}
+
     // DEFINING THE AVAILABLE FEATURES FROM THE PARAM OBJECT
     ///////////////////////////////////////////////////////////
-    let Available_Heads = shuffleArray(Param.Available_Fennimal_Heads)
-    let Available_Bodies = shuffleArray(Param.Regionfree_Fennimal_Bodies)
     let Available_Regions = shuffleArray(["North","Desert","Village","Jungle","Flowerfields","Swamp", "Beach", "Mountains"])
+
     let Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 5, false ))
+    let Random_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
 
-    // SETTING ADDITIONAL PARAMETERS
-    ////////////////////////////////////
-    //Setting max rt in the timed trials here
-    let max_rt_tt = 4000
-    let max_rt_tt_dist = shuffleArray([3500,4000])[0]
+    let Drawn_Training_Regions = Available_Regions.splice(0,4)
+    let TrainingRegions = {
+        IA: Drawn_Training_Regions[0],
+        IB: Drawn_Training_Regions[0],
+        DA: Drawn_Training_Regions[1],
+        DB: Drawn_Training_Regions[1],
+        C1: Drawn_Training_Regions[2],
+        C2: Drawn_Training_Regions[3],
+    }
+    let I_Locations = shuffleArray( Param.RegionData[TrainingRegions.IA].Locations )
+    let D_Locations = shuffleArray( Param.RegionData[TrainingRegions.DA].Locations )
+    let TrainingLocations = {
+        IA: I_Locations[0],
+        IB: I_Locations[1],
+        DA: D_Locations[0],
+        DB: D_Locations[1],
+        C1: shuffleArray( Param.RegionData[TrainingRegions.C1].Locations )[0],
+        C2: shuffleArray( Param.RegionData[TrainingRegions.C2].Locations )[0],
+    }
 
-    //Setting the type of similarity task
-    let similarity_phase_setup =  "two_alt_slider"
+    let Drawn_Binding_Phase_Regions = Available_Regions.splice(0,4)
+    let BindingPhaseRegions = {
+        IA: Drawn_Binding_Phase_Regions[0],
+        IB: Drawn_Binding_Phase_Regions[1],
+        DA: Drawn_Binding_Phase_Regions[2],
+        DB: Drawn_Binding_Phase_Regions[3],
+        C1: TrainingRegions.C1,
+        C2: TrainingRegions.C2
+    }
+    let BindingPhaseLocations = {
+        IA: shuffleArray( Param.RegionData[BindingPhaseRegions.IA].Locations ),
+        IB: shuffleArray( Param.RegionData[BindingPhaseRegions.IB].Locations ),
+        DA: shuffleArray( Param.RegionData[BindingPhaseRegions.DA].Locations ),
+        DB: shuffleArray( Param.RegionData[BindingPhaseRegions.DB].Locations ),
+        C1: shuffleArray( TrainingLocations.C1),
+        C2: shuffleArray( TrainingLocations.C2),
+    }
+
+    //These will only be filled after the first similarity task
+    let TrainingFennimals, BindingPhaseTemplates, BindingPhaseSetup
+
+    this.create_Fennimals_from_sim_task_results = function(FirstSimData){
+        //Storing the results from the first similarity task.
+        FirstSimResults = JSON.parse(JSON.stringify(FirstSimData))
+
+        //Now we can update the stimuli accordingly
+        set_all_Fennimals(FirstSimResults.Data)
+    }
+
+    function set_all_Fennimals (SimsArr){
+        // First we need to find four heads.
+        // Here we want the four most distinct Fennimals, in two maximally distinct pairs.
+        // In addition, we want 2 pairs for the control stimuli. These should not be too similar to the previous pars, nor too similar within a pair.
+        let Pairs = find_training_phase_heads_max_distinct(SimsArr)
+
+        //Randomly pick one pair to be the indirect pair, one to be the direct pair. In addition, controls should be randomly selected to be C1 and C2
+        let Main_Pairs = shuffleArray([Pairs.Pair1, Pairs.Pair2])
+        let I_Pair = Main_Pairs[0]
+        let D_Pair = Main_Pairs[1]
+
+        let Control_Pairs = shuffleArray([Pairs.ControlPair1, Pairs.ControlPair2])
+        let C1_Pair = Control_Pairs[0]
+        let C2_Pair = Control_Pairs[1]
+
+        //Storing as  seperate object (easier for analyses down the line)
+        Selected_Pairs = {
+            I: I_Pair,
+            D: D_Pair,
+            C1: C1_Pair,
+            C2: C2_Pair
+        }
+
+        //Now we can create all the Fennimals
+
+        TrainingFennimals = {
+            IA: createFennimalObj(TrainingRegions.IA, TrainingLocations.IA, Selected_Pairs.I.IDs[0],Param.RegionData[TrainingRegions.IA].preferredBodyType, Random_Items[0] ),
+            IB: createFennimalObj(TrainingRegions.IB, TrainingLocations.IB, Selected_Pairs.I.IDs[1],Param.RegionData[TrainingRegions.IB].preferredBodyType, Random_Items[1] ),
+            DA: createFennimalObj(TrainingRegions.DA, TrainingLocations.DA, Selected_Pairs.D.IDs[0],Param.RegionData[TrainingRegions.DA].preferredBodyType, Random_Items[2] ),
+            DB: createFennimalObj(TrainingRegions.DB, TrainingLocations.DB, Selected_Pairs.D.IDs[1],Param.RegionData[TrainingRegions.DB].preferredBodyType, Random_Items[3] ),
+            C1: createFennimalObj(TrainingRegions.C1, TrainingLocations.C1, Selected_Pairs.C1.IDs[0],Param.RegionData[TrainingRegions.C1].preferredBodyType, Random_Items[4] ),
+            C2: createFennimalObj(TrainingRegions.C2, TrainingLocations.C2, Selected_Pairs.C2.IDs[0],Param.RegionData[TrainingRegions.C2].preferredBodyType, Random_Items[4] ),
+        }
+
+        BindingPhaseTemplates= {
+            IA: {ID: "IA", head: TrainingFennimals.IA.head, body: Param.RegionData[BindingPhaseRegions.IA].preferredBodyType, region: BindingPhaseRegions.IA, location: BindingPhaseLocations.IA[0], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
+            IB: {ID: "IB", head: TrainingFennimals.IB.head, body: Param.RegionData[BindingPhaseRegions.IB].preferredBodyType, region: BindingPhaseRegions.IB, location: BindingPhaseLocations.IB[0],item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
+            DA: {ID: "DA", head: TrainingFennimals.DA.head, body: Param.RegionData[BindingPhaseRegions.DA].preferredBodyType, region: BindingPhaseRegions.DA, location: BindingPhaseLocations.DA[0],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
+            DB: {ID: "DB", head: TrainingFennimals.DB.head, body: Param.RegionData[BindingPhaseRegions.DB].preferredBodyType, region: BindingPhaseRegions.DB, location: BindingPhaseLocations.DB[0],item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
+            C1: {ID: "C1", head: Selected_Pairs.C1.IDs[1], body: Param.RegionData[BindingPhaseRegions.C1].preferredBodyType, region: BindingPhaseRegions.C1, location: BindingPhaseLocations.C1, item_direct: TrainingFennimals.C1.item, item_indirect: false},
+            C2: {ID: "C2", head: Selected_Pairs.C2.IDs[1], body: Param.RegionData[BindingPhaseRegions.C2].preferredBodyType, region: BindingPhaseRegions.C2, location: BindingPhaseLocations.C2, item_direct: TrainingFennimals.C2.item, item_indirect: false},
+        }
+
+        //Setting all the trials for the Binding phase
+        BindingPhaseSetup = [
+            {
+                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C1"], "direct", true,true ),
+                type: "direct",
+                hint_type: "text",
+                number: 1
+            },{
+                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C2"],  "indirect", false,true ),
+                type: "indirect",
+                hint_type: "text",
+                number: 2
+            },{
+                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C1"],  "indirect", false,true ),
+                type: "indirect",
+                hint_type: "text",
+                number: 3
+            },{
+                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C2"], "indirect", false,true ),
+                type: "indirect",
+                hint_type: "text",
+                number: 4
+            },{
+                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C1"],  "indirect", false,true ),
+                type: "indirect",
+                hint_type: "text",
+                number: 5
+            }, {
+                type: "additional_similarity",
+                number: 6
+            },{
+                Trials: createBlockOfRepeatTrainingTrials(true),
+                type: "repeat_training",
+                hint_type: "text",
+                number: 7
+            }]
+        console.log(Selected_Pairs)
+        console.log(TrainingFennimals)
+        console.log(BindingPhaseTemplates)
+        console.log(BindingPhaseSetup)
+
+        /*
+         BindingPhaseSetup = [
+            {
+                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C1"], "direct", true,true ),
+                type: "direct",
+                hint_type: "text",
+                number: 1
+            },{
+                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C2"],  "indirect", false,true ),
+                type: "indirect",
+                hint_type: "text",
+                number: 2
+            },{
+                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C1"],  "indirect", false,true ),
+                type: "indirect",
+                hint_type: "text",
+                number: 3
+            },{
+                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C2"], "indirect", false,true ),
+                type: "indirect",
+                hint_type: "text",
+                number: 4
+            },{
+                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C1"],  "indirect", false,true ),
+                type: "indirect",
+                hint_type: "text",
+                number: 5
+            }, {
+                type: "additional_similarity",
+                number: 6
+            },{
+                Trials: createBlockOfRepeatTrainingTrials(true),
+                type: "repeat_training",
+                hint_type: "text",
+                number: 8
+            }]
+*/
+
+
+    }
+
+    //Given a similarity setup, returns two pairs of maximally dis-similar IDs
+    function find_training_phase_heads_max_distinct(SimsArr){
+        //First transform the arry of Sims into an object where each property only has points
+        let SimPoints = {}
+        for(let i =0; i<SimsArr.length; i++){
+            SimPoints[SimsArr[i].ID] = {x : SimsArr[i].x, y: SimsArr[i].y}
+        }
+
+        //Create an array of all different IDs.
+        let IDs = Object.getOwnPropertyNames(SimPoints)
+
+        //Now we need to figure out all groups that we can make with 4 different Fennimals.
+        let Combos = combinations(IDs,4)
+
+        //For each group, calculate the distance between all of the elements. For each group, store the shortest distance in an array
+        let GroupDistances = []
+        let Shortest_Distances = []
+        for(let i = 0; i<Combos.length;i++){
+            let AllPairs = combinations(Combos[i], 2)
+            let AllDistances = []
+            let GroupInfo = {
+                IDs: Combos[i],
+                distances: []
+            }
+            for(let p=0; p<AllPairs.length;p++){
+                //Calculating EU-distance between these pairs
+                let point1 = SimPoints[AllPairs[p][0]]
+                let point2 = SimPoints[AllPairs[p][1]]
+                let dist = EUDist(point1.x,point1.y,point2.x,point2.y)
+
+                AllDistances.push(dist)
+
+                GroupInfo.distances.push( {
+                    pair: AllPairs[p],
+                    p1: point1,
+                    p2: point2,
+                    dist: dist
+                }  )
+            }
+
+            GroupInfo.min = Math.min(... AllDistances)
+            Shortest_Distances.push(Math.min(... AllDistances))
+            GroupDistances.push(GroupInfo)
+        }
+
+        //We now need to find the group with the longest shortest distance. (That is, the group for which the closest two Fennimals are maximally apart).
+        let longest_sortest_distance = Math.max(...Shortest_Distances)
+        let PotentialGroups = []
+        for(let i = 0; i<GroupDistances.length;i++){
+            if(GroupDistances[i].min === longest_sortest_distance){
+                PotentialGroups.push(GroupDistances[i])
+            }
+        }
+
+        //Note: there may be multiple groups with this shortest distance (if some elements are perfectly overlapping). If so, pick one at random
+        let SelectedGroup
+        if(PotentialGroups.length > 1){
+            SelectedGroup = drawRandomElementsFromArray(PotentialGroups,1,false)[0].IDs
+        }else{
+            SelectedGroup = PotentialGroups[0].IDs
+        }
+
+        //Now we have our winning group.
+        //First, lets store these elements in a backup, so we can call onthese later (while still using splice)
+        let SelectedGroupIds = JSON.parse(JSON.stringify(SelectedGroup))
+
+        // To create pairs, we first select one ID at random and re-calculate all differences between this point and the other IDs in the group
+        let random_ID = shuffleArray(SelectedGroup).splice(0,1)
+
+        let Distances_To_Others = []
+        let p1 = SimPoints[random_ID]
+        for(let i = 0; i<SelectedGroup.length;i++){
+            let p2 = SimPoints[SelectedGroup[i]]
+            Distances_To_Others.push(EUDist(p1.x,p1.y,p2.x,p2.y))
+        }
+
+        //The min and maximum values determine the other pair
+        let Indexes_Pair_2 = [Distances_To_Others.indexOf(Math.min(...Distances_To_Others)),Distances_To_Others.indexOf(Math.max(...Distances_To_Others))]
+        let Pair2 = [SelectedGroup[Indexes_Pair_2[0]], SelectedGroup[Indexes_Pair_2[1]]].flat()
+        let Pair1 = [random_ID,SelectedGroup.filter(x => !Pair2.includes(x)) ].flat()
+
+        //Now finally we want to keep track of the distance between these pairs (round to two numbers)
+        let dist_pair1 = Math.round(EUDist(SimPoints[Pair1[0]].x, SimPoints[Pair1[0]].y, SimPoints[Pair1[1]].x, SimPoints[Pair1[1]].y) * 100)/100
+        let dist_pair2 = Math.round(EUDist(SimPoints[Pair2[0]].x, SimPoints[Pair2[0]].y, SimPoints[Pair2[1]].x, SimPoints[Pair2[1]].y) * 100)/100
+
+        let Selected_Pairs = [{IDs: Pair1, dist_t1: dist_pair1}, {IDs: Pair2, dist_t1: dist_pair2}]
+
+        //Now we also need to find four IDs for the control Fennimals (two for training, two for binding).
+        // Here we first calculate the minimum distance between each remaining ID and the four selected IDs.
+        let Remaining_IDs = IDs.filter(x => !SelectedGroupIds.includes(x))
+        let Remaining_Min_Distances = []
+        for(let i=0; i<Remaining_IDs.length;i++){
+            let p1 = SimPoints[Remaining_IDs[i]]
+
+            let min_distance = 999999
+            //Calculate all distances to the selected
+            for(let k =0 ; k<SelectedGroupIds.length; k++){
+                let p2 = SimPoints[SelectedGroupIds[k]]
+                let dist = EUDist(p1.x, p1.y, p2.x, p2.y)
+                if(dist < min_distance){
+                    min_distance = dist
+                }
+            }
+            Remaining_Min_Distances.push(min_distance)
+        }
+
+        //Now we select the four IDs with the largest minimum distance to the pairs
+        let Control_IDs_indexes = getIndexesOfNLargestElementsInArray(Remaining_Min_Distances,4)
+        let Control_IDs = []
+        for(let i =0;i<Control_IDs_indexes.length; i++){
+            Control_IDs.push(Remaining_IDs[Control_IDs_indexes[i]])
+        }
+
+        //Finally, we try to make the control pairs also a bit more different.
+        // Here we use the same trick as before: look at all combinations of pairs, and choose the two with the highest min difference
+        let Control_Permutations = all_permutations(Control_IDs)
+        let Control_Permutations_Min_Distances = []
+        for(let i =0;i<Control_Permutations.length;i++){
+            let p1 = SimPoints[Control_Permutations[i][0]]
+            let p2 = SimPoints[Control_Permutations[i][1]]
+            let dist1 = EUDist(p1.x,p1.y,p2.x,p2.y)
+
+            let p3 = SimPoints[Control_Permutations[i][2]]
+            let p4 = SimPoints[Control_Permutations[i][3]]
+            let dist2 = EUDist(p3.x,p3.y,p4.x,p4.y)
+
+            Control_Permutations_Min_Distances.push(Math.min(dist1,dist2))
+        }
+        //Findings pairs with the highest min difference
+        let perm_max_min = Math.max(...Control_Permutations_Min_Distances)
+        let Potential_Control_Pairs = []
+        for(let i = 0; i<Control_Permutations.length;i++){
+            if(Control_Permutations_Min_Distances[i] === perm_max_min){
+                Potential_Control_Pairs.push(Control_Permutations[i])
+            }
+        }
+        //These are massively over-counted (above we didnt take ordering into proper account). Randomly pick one here.
+        let Control_Pairs = shuffleArray(Potential_Control_Pairs)[0]
+
+        //Creating objects containing both control pairs and their distances
+        let ControlPair1= {
+            IDs: [Control_Pairs[0], Control_Pairs[1]].flat(),
+            dist_t1: Math.round( EUDist( SimPoints[Control_Pairs[0]].x , SimPoints[Control_Pairs[0]].y,  SimPoints[Control_Pairs[1]].x , SimPoints[Control_Pairs[1]].y, ) * 100) / 100
+        }
+        let ControlPair2= {
+            IDs: [Control_Pairs[2], Control_Pairs[3]].flat(),
+            dist_t1: Math.round( EUDist( SimPoints[Control_Pairs[2]].x , SimPoints[Control_Pairs[2]].y,  SimPoints[Control_Pairs[3]].x , SimPoints[Control_Pairs[3]].y, ) * 100)/100
+        }
+
+        //Creating the return object
+        let Output = {
+            Pair1: Selected_Pairs[0],
+            Pair2: Selected_Pairs[1],
+            ControlPair1: ControlPair1,
+            ControlPair2: ControlPair2
+        }
+        return(Output)
+    }
 
     // SUPPORTING FUNCTIONS
     ////////////////////////
@@ -565,11 +988,9 @@ STIMULUSDATA = function(participant_number){
             //Finding the correct item
             let correct_item
             switch(key){
-                case("IA1"): if(items_allowed_for_indirect_pair === "direct"){correct_item = TrainingFennimals.IA.item} else {correct_item = TrainingFennimals.IB.item} break
-                case("IA2"): if(items_allowed_for_indirect_pair === "direct"){correct_item = TrainingFennimals.IA.item} else {correct_item = TrainingFennimals.IB.item} break
+                case("IA"): if(items_allowed_for_indirect_pair === "direct"){correct_item = TrainingFennimals.IA.item} else {correct_item = TrainingFennimals.IB.item} break
                 case("IB"): if(items_allowed_for_indirect_pair === "direct"){correct_item = TrainingFennimals.IB.item} else {correct_item = TrainingFennimals.IA.item} break
-                case("DA1"): correct_item = TrainingFennimals.DA.item; break
-                case("DA2"): correct_item = TrainingFennimals.DA.item; break
+                case("DA"): correct_item = TrainingFennimals.DA.item; break
                 case("DB"): correct_item = TrainingFennimals.DB.item; break
                 case("C1"): correct_item = TrainingFennimals.C1.item; break;
                 case("C2"): correct_item = TrainingFennimals.C2.item; break;
@@ -578,11 +999,9 @@ STIMULUSDATA = function(participant_number){
             //We will select one element from each of the arrays. So arrays with one element will always be selected
             let OtherPairItems
             switch(key){
-                case("IA1"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("IA2"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("IA"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
                 case("IB"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("DA1"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
-                case("DA2"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
+                case("DA"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
                 case("DB"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
                 case("C1"): OtherPairItems = [ [TrainingFennimals.IA.item, TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
                 case("C2"): OtherPairItems = [ [TrainingFennimals.IA.item, TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
@@ -603,11 +1022,9 @@ STIMULUSDATA = function(participant_number){
             TestObj.correct_item = correct_item
 
             switch(key){
-                case("IA1"): TestObj.item_direct = TrainingFennimals.IA.item; TestObj.item_indirect = TrainingFennimals.IB.item; break
-                case("IA2"): TestObj.item_direct = TrainingFennimals.IA.item; TestObj.item_indirect = TrainingFennimals.IB.item; break
+                case("IA"): TestObj.item_direct = TrainingFennimals.IA.item; TestObj.item_indirect = TrainingFennimals.IB.item; break
                 case("IB"): TestObj.item_direct = TrainingFennimals.IB.item; TestObj.item_indirect = TrainingFennimals.IA.item; break
-                case("DA1"): TestObj.item_direct = TrainingFennimals.DA.item; TestObj.item_indirect = TrainingFennimals.DB.item; break
-                case("DA2"): TestObj.item_direct = TrainingFennimals.DA.item; TestObj.item_indirect = TrainingFennimals.DB.item; break
+                case("DA"): TestObj.item_direct = TrainingFennimals.DA.item; TestObj.item_indirect = TrainingFennimals.DB.item; break
                 case("DB"): TestObj.item_direct = TrainingFennimals.DB.item; TestObj.item_indirect = TrainingFennimals.DA.item; break
                 case("C1"): TestObj.item_direct = TrainingFennimals.C1.item; TestObj.item_indirect = false; break
                 case("C2"): TestObj.item_direct = TrainingFennimals.C2.item; TestObj.item_indirect = false; break
@@ -658,395 +1075,6 @@ STIMULUSDATA = function(participant_number){
         }
     }
 
-    function createTimedBlockTrials(bodies_index, shuffle_trials, add_mixed_trials_A, add_mixed_trials_B ){
-        let Block = []
-        let Keys_Used = ["IA","IB","DA","DB"]
-
-        for(let k = 0;k<Keys_Used.length; k++){
-            let key = Keys_Used[k]
-            let TemplateObj = TimedBlockTemplates[key]
-            TemplateObj.body = SimTimedBodies[key][bodies_index]
-            TemplateObj.region = "Neutral"
-            TemplateObj.location =  "Neutral"
-
-            let TestObj = createFennimalObj("Neutral","Neutral", TemplateObj.head, TemplateObj.body, false)
-            TestObj.name = createConjunctiveNameHeadBody(TemplateObj.body,TemplateObj.head)
-            TestObj.feedback = false
-
-            //Setting item references
-            TestObj.item_direct = TemplateObj.item_direct
-            TestObj.item_indirect = TemplateObj.item_indirect
-
-            //Finding the correct item
-            let correct_item
-            switch(key){
-                case("IA"): correct_item = TrainingFennimals.IB.item; break
-                case("IB"): correct_item = TrainingFennimals.IA.item; break
-                case("DA"): correct_item = TrainingFennimals.DB.item; break
-                case("DB"): correct_item = TrainingFennimals.DA.item; break
-                case("C1"): correct_item = TrainingFennimals.C1.item; break
-                case("C2"): correct_item = TrainingFennimals.C2.item; break
-            }
-
-            //We will select one element from each of the arrays. So arrays with one element will always be selected
-            let OtherPairItems
-            switch(key){
-                case("IA"): OtherPairItems = [ [TrainingFennimals.C1.item, TrainingFennimals.C2.item], [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("IB"): OtherPairItems = [ [TrainingFennimals.C1.item, TrainingFennimals.C2.item], [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("DA"): OtherPairItems = [ [TrainingFennimals.C1.item, TrainingFennimals.C2.item], [TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
-                case("DB"): OtherPairItems = [ [TrainingFennimals.C1.item, TrainingFennimals.C2.item], [TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
-                case("C1"): OtherPairItems = [ [TrainingFennimals.C1.item, TrainingFennimals.C2.item], [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("C2"): OtherPairItems = [ [TrainingFennimals.C1.item, TrainingFennimals.C2.item], [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-            }
-
-            //Creating an array containing all the trial's available items
-            let Available_Items = [correct_item]
-            for(let i=0;i<OtherPairItems.length;i++){
-                if(typeof OtherPairItems[i] === "string"){
-                    Available_Items.push(OtherPairItems[i])
-                }else{
-                    Available_Items.push(shuffleArray(OtherPairItems[i])[0] )
-                }
-            }
-
-            //Assigning the properties to the TestObject.
-            TestObj.items_available = Available_Items
-            TestObj.correct_item = correct_item
-
-            //Adding ID for easy analysis
-            TestObj.ID = TemplateObj.ID
-
-            //Setting a max decision time
-            TestObj.max_decision_time = max_rt_tt
-
-            //Pushing to the DirectTestBlock
-            Block.push(TestObj)
-        }
-
-        //If requested, add a number of mixed trials. These trials have the head of IA (IB) or DA (DB) and the body of C1 or C2.
-        // Any items associated to the head-pair are not available. Hence the correct item is C1 or C2.
-        if(add_mixed_trials_A){
-            //Adding a Fennimal with the head of IA and the body of C1. Available items: C1 (correct), C2, DA, DB, and
-            //Adding a Fennimal with the head of DA and the body of C2. Available items: C2 (correct), C1, IA, IB
-            let MixedTrialI = {}, MixedTrialD = {}
-
-            MixedTrialI = createFennimalObj("Neutral","Neutral", TrainingFennimals.IA.head, TrainingFennimals.C1.body, false)
-            MixedTrialD = createFennimalObj("Neutral","Neutral", TrainingFennimals.DA.head, TrainingFennimals.C2.body, false)
-
-            MixedTrialI.name = createConjunctiveNameHeadBody(MixedTrialI.body,MixedTrialI.head)
-            MixedTrialD.name = createConjunctiveNameHeadBody(MixedTrialD.body,MixedTrialD.head)
-            MixedTrialI.feedback = false
-            MixedTrialD.feedback = false
-
-            //Setting item references
-            MixedTrialI.item_direct = TrainingFennimals.C1.item
-            MixedTrialD.item_direct = TrainingFennimals.C2.item
-
-            MixedTrialI.item_indirect = false
-            MixedTrialD.item_indirect = false
-
-            MixedTrialI.correct_item = MixedTrialI.item_direct
-            MixedTrialD.correct_item = MixedTrialD.item_direct
-
-            MixedTrialI.items_available = [MixedTrialI.correct_item, TrainingFennimals.C2.item, TrainingFennimals.DA.item, TrainingFennimals.DB.item]
-            MixedTrialD.items_available = [MixedTrialD.correct_item, TrainingFennimals.C1.item, TrainingFennimals.IA.item, TrainingFennimals.IB.item]
-
-            //Adding ID for easy analysis
-            MixedTrialI.ID = "IA_mix"
-            MixedTrialD.ID = "DA_mix"
-
-            //Setting a max decision time
-            MixedTrialI.max_decision_time = max_rt_tt_dist
-            MixedTrialD.max_decision_time = max_rt_tt_dist
-
-            //Pushing to the DirectTestBlock
-            Block.push(MixedTrialI)
-            Block.push(MixedTrialD)
-
-        }
-
-        if(add_mixed_trials_B){
-            //Adding a Fennimal with the head of IB and the body of C2. Available items: C2 (correct), C1, DA, DB, and
-            //Adding a Fennimal with the head of DB and the body of C1. Available items: C1 (correct), C2, IA, IB
-            let MixedTrialI = {}, MixedTrialD = {}
-
-            MixedTrialI = createFennimalObj("Neutral","Neutral", TrainingFennimals.IB.head, TrainingFennimals.C2.body, false)
-            MixedTrialD = createFennimalObj("Neutral","Neutral", TrainingFennimals.DB.head, TrainingFennimals.C1.body, false)
-
-            MixedTrialI.name = createConjunctiveNameHeadBody(MixedTrialI.body,MixedTrialI.head)
-            MixedTrialD.name = createConjunctiveNameHeadBody(MixedTrialD.body,MixedTrialD.head)
-            MixedTrialI.feedback = false
-            MixedTrialD.feedback = false
-
-            //Setting item references
-            MixedTrialI.item_direct = TrainingFennimals.C2.item
-            MixedTrialD.item_direct = TrainingFennimals.C1.item
-
-            MixedTrialI.item_indirect = false
-            MixedTrialD.item_indirect = false
-
-            MixedTrialI.correct_item = MixedTrialI.item_direct
-            MixedTrialD.correct_item = MixedTrialD.item_direct
-
-            MixedTrialI.items_available = [MixedTrialI.correct_item, TrainingFennimals.C1.item, TrainingFennimals.DA.item, TrainingFennimals.DB.item]
-            MixedTrialD.items_available = [MixedTrialD.correct_item, TrainingFennimals.C2.item, TrainingFennimals.IA.item, TrainingFennimals.IB.item]
-
-            //Adding ID for easy analysis
-            MixedTrialI.ID = "IB_mix"
-            MixedTrialD.ID = "DB_mix"
-
-            //Setting a max decision time
-            MixedTrialI.max_decision_time = max_rt_tt_dist
-            MixedTrialD.max_decision_time = max_rt_tt_dist
-
-            //Pushing to the DirectTestBlock
-            Block.push(MixedTrialI)
-            Block.push(MixedTrialD)
-
-        }
-
-        if(shuffle_trials){
-            return(shuffleArray(Block))
-        }else{
-            return(Block)
-        }
-    }
-
-    function createTwoAltSliderSimilarityTrials(){
-        //Here each trial requires 3 Fennimals:
-        //  Targets: the two Fennimals on either end of the slider
-        //  Moveable: the moving Fennimal
-
-        // Here we can create a single trial with each of the training-phase Fennimals as the Movable Fennimal
-        //      The Targets are variable depending on the key of the target:
-        //          IA: IB versus {C1, C2, DA, DB}
-        //          IB: IA versus {C1, C2, DA, DB}
-        //          DA: IB versus {C1, C2, IA, IB}
-        //          DB: IA versus {C1, C2, IA, IB}
-        //          C1: IB versus {IA, IB, DA, DB}
-        //          C2: IA versus {IA, IB, DA, DB}
-        let Group1 = []
-        let Group2 = []
-
-        Group1.push({ key_movable: "IA", key_left: "IB", key_right: "C1", trialbody: SimTimedBodies["IA"][0], paircode: "I", dir: "l"  })
-        Group1.push({ key_movable: "IB", key_left: "C2", key_right: "IA", trialbody: SimTimedBodies["IB"][0], paircode: "I", dir: "r"  })
-        Group1.push({ key_movable: "DA", key_left: "C1", key_right: "DB", trialbody: SimTimedBodies["DA"][0], paircode: "D", dir: "r"  })
-        Group1.push({ key_movable: "DB", key_left: "DA", key_right: "C2", trialbody: SimTimedBodies["DB"][0], paircode: "D", dir: "l"  })
-        Group1.push({ key_movable: "C1", key_left: "DA", key_right: "IA", trialbody: SimTimedBodies["C1"][0], paircode: "C", dir: "NA" })
-        Group1.push({ key_movable: "C2", key_left: "DB", key_right: "IB", trialbody: SimTimedBodies["C2"][0], paircode: "C", dir: "NA"  })
-
-        Group2.push({ key_movable: "IA", key_left: "C2", key_right: "IB", trialbody: SimTimedBodies["IA"][1], paircode: "I", dir: "r"  })
-        Group2.push({ key_movable: "IB", key_left: "IA", key_right: "C1", trialbody: SimTimedBodies["IB"][1], paircode: "I", dir: "l"  })
-        Group2.push({ key_movable: "DA", key_left: "DB", key_right: "C2", trialbody: SimTimedBodies["DA"][1], paircode: "D", dir: "l" })
-        Group2.push({ key_movable: "DB", key_left: "C1", key_right: "DA", trialbody: SimTimedBodies["DB"][1], paircode: "D", dir: "r"  })
-        Group2.push({ key_movable: "C1", key_left: "IA", key_right: "DA", trialbody: SimTimedBodies["C1"][1], paircode: "C", dir: "NA"  })
-        Group2.push({ key_movable: "C2", key_left: "DB", key_right: "IB", trialbody: SimTimedBodies["C2"][1], paircode: "C", dir: "NA"  })
-
-        let TrialTemplates = [shuffleArray(Group1), shuffleArray(Group2)].flat()
-
-        //Transforming the templates into trials
-        let Arr = []
-        for(let i=0;i<TrialTemplates.length;i++){
-            let body = TrialTemplates[i].trialbody
-            let head_movable = TrainingFennimals[TrialTemplates[i].key_movable].head
-            let head_left= TrainingFennimals[TrialTemplates[i].key_left].head
-            let head_right = TrainingFennimals[TrialTemplates[i].key_right].head
-
-            let NewTrial = {
-                Left: createFennimalObj("Neutral", false, head_left, body,false ),
-                Right: createFennimalObj("Neutral", false, head_right, body,false ),
-                Mov: createFennimalObj("Neutral", false, head_movable, body,false ),
-                pc: TrialTemplates[i].paircode,
-                dir: TrialTemplates[i].dir,
-            }
-            NewTrial.Left.ID = TrialTemplates[i].key_left
-            NewTrial.Right.ID = TrialTemplates[i].key_right
-            NewTrial.Mov.ID = TrialTemplates[i].key_movable
-
-            Arr.push(NewTrial)
-        }
-        return(Arr)
-
-    }
-
-    // DRAWING (RESERVING) ALL FEATURES HERE
-    /////////////////////////////////////////////
-    //Randomize Items
-    let Random_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
-
-    let Training_Regions = Available_Regions.splice(0,4)
-    let Training_Heads = Available_Heads.splice(0,6)
-
-    let Binding_Phase_Regions = Available_Regions.splice(0,4)
-    let Bindng_Phase_Heads = Available_Heads.splice(0,2)
-
-    let ST_Bodies = Available_Bodies.splice(0,6)
-
-    let SimTimedBodies = {
-        IA: [ST_Bodies[0],ST_Bodies[5]],
-        IB: [ST_Bodies[1],ST_Bodies[4]],
-        DA: [ST_Bodies[2],ST_Bodies[3]],
-        DB: [ST_Bodies[3],ST_Bodies[2]],
-        C1: [ST_Bodies[4],ST_Bodies[1]],
-        C2: [ST_Bodies[5],ST_Bodies[0]],
-    }
-
-    // DEFINING THE TRAINING PHASE FENNIMALS
-    /////////////////////////////////////////
-    let TrainingFennimals = {
-        IA: createFennimalObj(Training_Regions[0], Param.RegionData[Training_Regions[0]].Locations[0],Training_Heads[0],Param.RegionData[Training_Regions[0]].preferredBodyType, Random_Items[0] ),
-        IB: createFennimalObj(Training_Regions[0], Param.RegionData[Training_Regions[0]].Locations[1],Training_Heads[1],Param.RegionData[Training_Regions[0]].preferredBodyType, Random_Items[1] ),
-        DA: createFennimalObj(Training_Regions[1], Param.RegionData[Training_Regions[1]].Locations[0],Training_Heads[2],Param.RegionData[Training_Regions[1]].preferredBodyType, Random_Items[2] ),
-        DB: createFennimalObj(Training_Regions[1], Param.RegionData[Training_Regions[1]].Locations[1],Training_Heads[3],Param.RegionData[Training_Regions[1]].preferredBodyType, Random_Items[3] ),
-        C1: createFennimalObj(Training_Regions[2], shuffleArray(Param.RegionData[Training_Regions[2]].Locations)[0],Training_Heads[4],Param.RegionData[Training_Regions[2]].preferredBodyType, Random_Items[4] ),
-        C2: createFennimalObj(Training_Regions[3], shuffleArray(Param.RegionData[Training_Regions[3]].Locations)[1],Training_Heads[5],Param.RegionData[Training_Regions[3]].preferredBodyType, Random_Items[4] ),
-    }
-
-    let BindingPhaseRegions = {
-        IA: Binding_Phase_Regions[0],
-        IB: Binding_Phase_Regions[1],
-        DA: Binding_Phase_Regions[2],
-        DB: Binding_Phase_Regions[3],
-        C1: TrainingFennimals.C1.region,
-        C2: TrainingFennimals.C2.region
-    }
-
-    let BindingPhaseLocations = {
-        IA: shuffleArray( Param.RegionData[BindingPhaseRegions.IA].Locations ),
-        IB: shuffleArray( Param.RegionData[BindingPhaseRegions.IB].Locations ),
-        DA: shuffleArray( Param.RegionData[BindingPhaseRegions.DA].Locations ),
-        DB: shuffleArray( Param.RegionData[BindingPhaseRegions.DB].Locations ),
-        C1: shuffleArray( TrainingFennimals.C1.location),
-        C2: shuffleArray( TrainingFennimals.C2.location ),
-    }
-    let BindingPhaseTemplates= {
-        IA1: {ID: "IA", head: TrainingFennimals.IA.head, body: Param.RegionData[BindingPhaseRegions.IA].preferredBodyType, region: BindingPhaseRegions.IA, location: BindingPhaseLocations.IA[0], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
-        IA2: {ID: "IA", head: TrainingFennimals.IA.head, body: Param.RegionData[BindingPhaseRegions.IA].preferredBodyType, region: BindingPhaseRegions.IA, location: BindingPhaseLocations.IA[1], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item},
-
-        IB: {ID: "IB", head: TrainingFennimals.IB.head, body: Param.RegionData[BindingPhaseRegions.IB].preferredBodyType, region: BindingPhaseRegions.IB, location: BindingPhaseLocations.IB[0],item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
-
-        DA1: {ID: "DA", head: TrainingFennimals.DA.head, body: Param.RegionData[BindingPhaseRegions.DA].preferredBodyType, region: BindingPhaseRegions.DA, location: BindingPhaseLocations.DA[0],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
-        DA2: {ID: "DA", head: TrainingFennimals.DA.head, body: Param.RegionData[BindingPhaseRegions.DA].preferredBodyType, region: BindingPhaseRegions.DA, location: BindingPhaseLocations.DA[1],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
-
-        DB: {ID: "DB", head: TrainingFennimals.DB.head, body: Param.RegionData[BindingPhaseRegions.DB].preferredBodyType, region: BindingPhaseRegions.DB, location: BindingPhaseLocations.DB[0],item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
-
-        C1: {ID: "C1", head: Bindng_Phase_Heads[0], body: Param.RegionData[BindingPhaseRegions.C1].preferredBodyType, region: BindingPhaseRegions.C1, location: BindingPhaseLocations.C1, item_direct: TrainingFennimals.C1.item, item_indirect: false},
-        C2: {ID: "C2", head: Bindng_Phase_Heads[1], body: Param.RegionData[BindingPhaseRegions.C2].preferredBodyType, region: BindingPhaseRegions.C2, location: BindingPhaseLocations.C2, item_direct: TrainingFennimals.C2.item, item_indirect: false},
-    }
-
-    let TimedBlockTemplates =  {
-        IA: {ID: "IA", head: TrainingFennimals.IA.head, item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
-        IB: {ID: "IB", head: TrainingFennimals.IB.head, item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
-        DA: {ID: "DA", head: TrainingFennimals.DA.head, item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
-        DB: {ID: "DB", head: TrainingFennimals.DB.head, item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
-        C1: {ID: "C1", head: TrainingFennimals.C1.head, item_direct: TrainingFennimals.C1.item, item_indirect: false},
-        C2: {ID: "C2", head: TrainingFennimals.C2.head, item_direct: TrainingFennimals.C2.item, item_indirect: false},
-    }
-
-    let GroupingTrials = []
-    switch(similarity_phase_setup){
-        case("two_alt_slider"):
-            GroupingTrials = createTwoAltSliderSimilarityTrials()
-            break
-    }
-
-    //Defining trials for the timed blocks
-    let Timed_Trials = [
-        createTimedBlockTrials(0, true, true, false),
-        createTimedBlockTrials(1, true, true, true),
-    ].flat()
-
-    // COMBINING ALL TESTPHASE TRIALS HERE
-    // Combinining all trials into a single object. Here, each element is a day's worth of activities during the test phase.
-    let TestPhaseData = [
-        {
-            Trials:  createBlockOfBindingTrials(["IA1","IB","DA1","DB","C1"], "direct", true,true ),
-            type: "direct",
-            hint_type: "text",
-            number: 1
-        },{
-            Trials:  createBlockOfBindingTrials(["IA1","IA2","DA1","DA2","C2"],  "indirect", false,true ),
-            type: "indirect",
-            hint_type: "text",
-            number: 2
-        },{
-            Trials:  createBlockOfBindingTrials(["IA1","IA2","DA1","DA2","C1"],  "indirect", false,true ),
-            type: "indirect",
-            hint_type: "text",
-            number: 3
-        },{
-            Trials:  createBlockOfBindingTrials(["IA1","IA2","DA1","DA2","C2"], "indirect", false,true ),
-            type: "indirect",
-            hint_type: "text",
-            number: 4
-        },{
-            Trials:  createBlockOfBindingTrials(["IA1","IA2","DA1","DA2","C1"],  "indirect", false,true ),
-            type: "indirect",
-            hint_type: "text",
-            number: 5
-        }, {
-            Trials: GroupingTrials,
-            type: "category",
-            number: 6
-        }, {
-            Trials: Timed_Trials,
-            type: "final_block",
-            hint_type: "text",
-            number: 7
-        },{
-            Trials: createBlockOfRepeatTrainingTrials(true),
-            type: "repeat_training",
-            hint_type: "text",
-            number: 8
-        }]
-    console.log(TestPhaseData)
-    console.log(Available_Heads)
-    console.log(Available_Bodies)
-    /*
-     let TestPhaseData = [
-        {
-            Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C1"], "direct", true,true ),
-            type: "direct",
-            hint_type: "text",
-            number: 1
-        },{
-            Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C2"],  "indirect", false,true ),
-            type: "indirect",
-            hint_type: "text",
-            number: 2
-        },{
-            Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C1"],  "indirect", false,true ),
-            type: "indirect",
-            hint_type: "text",
-            number: 3
-        },{
-            Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C2"], "indirect", false,true ),
-            type: "indirect",
-            hint_type: "text",
-            number: 4
-        },{
-            Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C1"],  "indirect", false,true ),
-            type: "indirect",
-            hint_type: "text",
-            number: 5
-        }, {
-            Trials: GroupingTrials,
-            type: "category",
-            number: 6
-        }, {
-            Trials: Timed_Trials,
-            type: "final_block",
-            hint_type: "text",
-            number: 7
-        },{
-            Trials: createBlockOfRepeatTrainingTrials(true),
-            type: "repeat_training",
-            hint_type: "text",
-            number: 8
-        }]
-
-   */
-
 
     // CALL FUNCTIONS //
     ////////////////////
@@ -1091,6 +1119,29 @@ STIMULUSDATA = function(participant_number){
         return(JSON.parse(JSON.stringify(Arr)))
     }
 
+    //Call to get the Training templates
+    this.getTrainingTemplates = function(){
+        return(JSON.parse(JSON.stringify(TrainingFennimals)))
+    }
+
+    //Call to get the Binding Templates
+    this.getBindingTemplates = function(){
+        return(JSON.parse(JSON.stringify(BindingPhaseTemplates)))
+    }
+    this.getBindingTemplatesInArray = function(){
+        let Arr = []
+        for (let key in BindingPhaseTemplates){
+            Arr.push(BindingPhaseTemplates[key])
+        }
+
+        return(JSON.parse(JSON.stringify(Arr)))
+    }
+
+    //Call to get the features sampled after the first similarity task
+    this.getFeaturesSampledAfterFirstSimilarityTask = function(){
+        return(JSON.parse(JSON.stringify(Selected_Pairs)))
+    }
+
     //Call to get a deep copy of the ItemDetails object (keyed on item)
     this.getItemDetails = function(){
         return(JSON.parse(JSON.stringify(Item_Details)))
@@ -1098,12 +1149,7 @@ STIMULUSDATA = function(participant_number){
 
     //Returns an array containing all the blocks of the test phase
     this.getTestPhaseData = function(){
-        return(JSON.parse(JSON.stringify(TestPhaseData)))
-    }
-
-    //Returns a deep copy of the category-grouping trials
-    this.getCategoryTrials = function(){
-        return(JSON.parse(JSON.stringify(GroupingTrials)))
+        return(JSON.parse(JSON.stringify(BindingPhaseSetup)))
     }
 
     //Returns which category task is specified above
@@ -5157,261 +5203,49 @@ HUDController = function(){
 
 }
 
-//Controls the category phase screens
-CategoryPhaseController_Binary_Slider = function(ExpCont, Stimuli, LocCont, DataCont){
-    //Deep copy all the category trials from the stimulus data. Now we have an array we can pop.
-    let RemainingCategoryTrials = Stimuli.getCategoryTrials()
-
-    //Determines whether or not to show names for the two alternatives
-    let show_names_for_options = true
-    if(!show_names_for_options){
-        document.getElementById("category_binary_screen_slider_name_left").style.display = "none"
-        document.getElementById("category_binary_screen_slider_name_right").style.display = "none"
+CategoryPhaseController_Arena = function(ExpCont, CardStimData, LocCont, instructions_type){
+    let that = this
+    // General parameters
+    let ArenaParam = {
+        centerx: 254,
+        centery: 142.875,
     }
 
-    //Create an array to store completed trials. Here we add one element for each category trial
-    let OutputArray = []
+    let CardStimArray = shuffleArray(JSON.parse(JSON.stringify(CardStimData.Stim)))
 
-    // Keep track of the current category trial and the total number of trials to be completed
-    let CurrentCategoryTrial
-    let current_round_number = 0
-    let total_number_of_trials_to_be_completed = Stimuli.getCategoryTrials().length
-
-    //Scale of the icons
-    let icon_scale = 0.75
-    let slider_start_position = 50
-    let step_size = 5
+    //Keeping track of which instruction step is currently shown
+    let current_instruction_step = 1
 
     //Some easy references to the main SVG layer objects
     let PhaseLayer = document.getElementById("Category_Layer")
-    let ScreenLayer = document.getElementById("category_screen_layer")
-    let InstructionsLayer = document.getElementById("category_instructions")
-
-    //Setting the sublayer elements to be visible where needed
-    document.getElementById("category_instructions").style.display = "inherit"
-    //document.getElementById("category_screen_layer_binary").style.display = "none"
-    document.getElementById("category_screen_layer_basic_elements").style.display = "inherit"
-    //document.getElementById("Instructions_Category_Binary").style.display = "none"
-    //document.getElementById("Instructions_Category_Two_Alt").style.display = "none"
-    //document.getElementById("category_screen_two_alt").style.display = "none"
-    //document.getElementById("Instructions_Category_Three_Alt").style.display = "none"
-    //document.getElementById("category_screen_three_alt").style.display = "none"
-
-    document.getElementById("category_screen_layer_binary_slider").style.display = "inherit"
-    document.getElementById("Instructions_Category_Binary_Slider").style.display = "inherit"
-
-    document.getElementById("category_timer_bar").style.display = "none"
-    document.getElementById("category_trial_title").style.opacity = 0
-
-    //Creates and manages an SVG slider. Direction can be horizontal or vertical (string)
-    SVGSlider = function(){
-        let ParentNode = ScreenLayer // document.getElementById("category_screen_layer_binary_slider")
-        let slider_direction = "horizontal"
-        let slider_has_been_moved = false
-
-        //Get the format from a placeholder in the SVG
-        let Placeholder = document.getElementById("category_binary_screen_slider_placeholder")
-
-        //Creating a ForeignObject to hold the range input
-        let FObj = document.createElementNS('http://www.w3.org/2000/svg',"foreignObject");
-        FObj.setAttribute("x", Placeholder.getAttribute("x"))
-        FObj.setAttribute("y", Placeholder.getAttribute("y"))
-        FObj.setAttribute("width", Placeholder.getAttribute("width"))
-        // FObj.setAttribute("height", Placeholder.getAttribute("height"))
-        FObj.classList.add("CustomSliderContainer")
-
-        //Creating the input object
-        let SliderObj =  document.createElement("input");
-        SliderObj.setAttribute('type', 'range');
-        SliderObj.classList.add("CustomSliderInput")
-        SliderObj.min = 0
-        SliderObj.max = 100
-        SliderObj.step = step_size
-        SliderObj.value = slider_start_position
-
-        if(slider_direction === "v" || slider_direction === "V" || slider_direction === "vertical"){
-            SliderObj.style.appearance = "slider-vertical"
-        }
-
-        FObj.appendChild(SliderObj)
-        ParentNode.appendChild(FObj)
-
-        SliderObj.oninput = function(){
-            let value = SliderObj.value
-
-            //Calculate the positions of the two Fennimals (note that the calculations are mirrored)
-            let new_x_left = get_icon_x_positions(value).left
-            let new_x_right = get_icon_x_positions(value).right
-
-            //Moving the Icon objects
-            IconLeftContainer.style.transform = "translate(" + new_x_left + "px," +"0px)"
-            IconRightContainer.style.transform = "translate(" + new_x_right + "px," + "0px)"
-
-            //Check if this is the first time that the slider has been moved. If yes, create the continue button
-            if(!slider_has_been_moved){
-                slider_has_been_moved = true
-                ContinueButton = createSVGButtonElem((508-150)/2,245,150,25,"Continue")
-                ContinueButton.classList.add("Slider_ContinueButton")
-                ParentNode.appendChild(ContinueButton)
-
-                ContinueButton.onclick = function(){
-                    continue_button_pressed(SliderObj.value)
-                }
-            }
-        }
+    let ArenaLayer = document.getElementById("category_screen_layer")
+    let InstructionsLayer
+    if(instructions_type === "additional"){
+        document.getElementById("category_instructions_first_time").style.display = "none"
+        document.getElementById("category_instructions_additional").style.dislplay = "inherit"
+        InstructionsLayer = document.getElementById("category_instructions_additional")
+    }else{
+        document.getElementById("category_instructions_additional").style.display = "none"
+        document.getElementById("category_instructions_first_time").style.dislplay = "inherit"
+        InstructionsLayer = document.getElementById("category_instructions_first_time")
     }
 
-    //References for the left and right icons, as well as their x-coordinates and range
-    let IconLeft, IconRight, IconLeftContainer, IconRightContainer, Slider
-    let IconLeftPosition = {
-        min: -130,
-        max: 160,
-    }
-    let IconRightPosition = {
-        min: 100,
-        max: 170,
-    }
-    let y_bottom_target = 210
+    // Arena functions
+    let ArenaGroup = document.getElementById("similarity_arena")
+    let AllCards = {}
+    let CurrentSelectedCard = false
 
-    //Call with a slider percentage to get the x values for both the left and right icons
-    function get_icon_x_positions(slider_value){
-        return({
-            left: IconLeftPosition.min + (slider_value/100)*IconLeftPosition.max,
-            right: IconRightPosition.min + (1 - slider_value/100)*IconRightPosition.max
-        })
-    }
+    let all_cards_have_been_touched = false
+    let CompletionButton
+    let ArenaStartTime
 
-    //Once the category phase is complete, this function relays back to the EC and the DataCont
-    function category_phase_complete(){
-        console.log("Category Phase completed")
-        DataCont.store_category_data(OutputArray)
-
-        //Cleaning the screen
-        resetScreen()
-
-        PhaseLayer.style.display = "none"
-        ScreenLayer.style.display = "none"
-        InstructionsLayer.style.display = "none"
-
-        ExpCont.category_phase_finished()
-    }
-
-    //Tries to show the next category trial. If none are left, then the phase is completed.
-    function start_next_category_trial(){
-        if(RemainingCategoryTrials.length > 0){
-            CurrentCategoryTrial = RemainingCategoryTrials.splice(0,1)[0]
-
-            resetScreen()
-            //Show the title indicating that a new trial has started
-
-            //Update and show the round counter
-            current_round_number++
-            document.getElementById("category_binary_screen_slider_counter").childNodes[0].innerHTML = "Question " + current_round_number + " out of " + total_number_of_trials_to_be_completed
-            document.getElementById("category_binary_screen_slider_counter").style.display = "inherit"
-            document.getElementById("category_binary_screen_slider_counter").style.opacity = 1
-
-            //Show the SVG elements at the top of the screen
-            let Elem = ScreenLayer.getElementsByClassName("category_binary_screen_slider")
-            for(let i =0;i<Elem.length;i++){
-                Elem[i].style.opacity = 1
-            }
-
-            //Set the names
-            document.getElementById("category_binary_screen_slider_name_left").childNodes[0].innerHTML = CurrentCategoryTrial.Left.name
-            document.getElementById("category_binary_screen_slider_name_right").childNodes[0].innerHTML = CurrentCategoryTrial.Right.name
-
-            //Create the Fennimal icons
-            createFennimalIcon(CurrentCategoryTrial.Left, "left")
-            createFennimalIcon(CurrentCategoryTrial.Right, "right")
-
-            //Create the slider
-            Slider = new SVGSlider()
-
-
-        }else{
-            //Phase finished
-            category_phase_complete()
-        }
-    }
-
-    //STAGES
-    // Resets the screen
-    function resetScreen(){
-        //Remove all Fennimal icons
-        deleteClassNamesFromElement(ScreenLayer, "Fennimal_Icon")
-        deleteClassNamesFromElement(ScreenLayer, "CustomSliderContainer")
-        deleteClassNamesFromElement(ScreenLayer, "Slider_ContinueButton")
-
-        // Hide trial elements
-        let Elem = ScreenLayer.getElementsByClassName("category_binary_screen_slider")
-        for(let i =0;i<Elem.length;i++){
-            Elem[i].style.opacity = 0
-        }
-        //document.getElementById("category_trial_title").style.opacity = 0
-
-        //Show the map as a background
-        LocCont.show_passive_map()
-
-    }
-
-    //Creates a Fennimal Icon of the given FennimalObject on either the left or right position.
-    function createFennimalIcon(FennimalObj, position){
-        //Position determines the x and y coordinates
-        let x
-        switch(position){
-            case("left"): x = get_icon_x_positions(slider_start_position).left; break
-            case("right"): x = get_icon_x_positions(slider_start_position).right; break
-        }
-
-        //Create the outline object
-        let IconObj
-        IconObj = createFennimal(FennimalObj)
-        IconObj.style.transform = "scale(" + icon_scale + ")"
-
-        let YAdjustmentBox = document.createElementNS("http://www.w3.org/2000/svg", 'g')
-        YAdjustmentBox.appendChild(IconObj)
-
-        let Container = document.createElementNS("http://www.w3.org/2000/svg", 'g')
-        Container.appendChild(YAdjustmentBox)
-        Container.style.transform = "translate(" + x + "px," + "0px)"
-        Container.classList.add("Fennimal_Icon")
-        Container.style.pointerEvents = "none"
-        Container.style.transition = "all 250ms ease-in-out"
-        ScreenLayer.appendChild(Container)
-
-        //Making sure the Fennimals are aligned on the bottom
-        let current_y_bottom = IconObj.getBBox().y + IconObj.getBBox().height
-        let y_diff =  icon_scale * ( y_bottom_target - current_y_bottom)
-        YAdjustmentBox.style.transform = "translate(0px," +  y_diff +"px)"
-
-        if(position === "left") {IconLeft = IconObj; IconLeftContainer = Container}
-        if(position === "right") {IconRight = IconObj; IconRightContainer = Container}
-
-    }
-
-    //Call when the continue button is pressed during a trial
-    function continue_button_pressed(value){
-        //Update and store the trial
-        CurrentCategoryTrial.rating = value
-        OutputArray.push(JSON.parse(JSON.stringify(CurrentCategoryTrial)))
-
-        //Go to the next trial
-        start_next_category_trial()
-    }
-
-    function instructions_completed(){
-        PhaseLayer.style.display = "inherit"
-        ScreenLayer.style.display = "inherit"
-        InstructionsLayer.style.display = "none"
-
-        start_next_category_trial()
-    }
-
+    // FUNCTIONS
+    //Functions to start the instructions and to continue to the arena screen
     //Call to start the category matching phase.
     this.start_category_phase = function(){
         //Make sure that the correct layers are set to visible
         PhaseLayer.style.display = "inherit"
-        ScreenLayer.style.display = "none"
+        ArenaLayer.style.display = "none"
         InstructionsLayer.style.display = "inherit"
 
         //Show the map as a background
@@ -5420,375 +5254,389 @@ CategoryPhaseController_Binary_Slider = function(ExpCont, Stimuli, LocCont, Data
         // Create the instructions button
         let Button = createSVGButtonElem((508-150)/2,255,160,25,"CONTINUE")
         InstructionsLayer.appendChild(Button)
-        Button.onclick = instructions_completed
-
-
-        //start_next_category_trial()
+        Button.onclick = go_to_next_instruction_step
     }
-
-}
-
-CategoryPhaseController_Two_Alt_Slider = function(ExpCont, Stimuli, LocCont, DataCont){
-    //Set to true if only the arrows and keyboard keys are allowed to move the slider
-    let restrict_slider_to_arrows = true
-
-    //Deep copy all the category trials from the stimulus data. Now we have an array we can pop.
-    let RemainingCategoryTrials = Stimuli.getCategoryTrials()
-
-    //Create an array to store completed trials. Here we add one element for each category trial
-    let OutputArray = []
-
-    // Keep track of the current category trial and the total number of trials to be completed
-    let CurrentCategoryTrial
-    let current_round_number = 0
-    let total_number_of_trials_to_be_completed = Stimuli.getCategoryTrials().length
-
-    //Scale and location of the icons
-    let target_icon_scale = 0.45
-    let movable_icon_scale = 0.6
-    let slider_start_position = 0
-    let Slider_range_values = {
-        min: -100,
-        max: 100,
-        start: 0,
-        step: 1
-    }
-    Slider_range_values.range = Slider_range_values.max - Slider_range_values.min
-
-    let range_icon_left_x = 42
-    let range_icon_right_x = 466
-    let icons_y_middle = 124
-    let bounds_around_targets = 30
-
-    let MovableIconRange = {min: 80 + bounds_around_targets, max: 428 - bounds_around_targets}
-
-    //References for the left and right icons, as well as their x-coordinates and range
-    let IconLeft, IconRight, IconMovable, IconLeftContainer, IconRightContainer, IconMovableContainer, Slider
-
-    // References for the start time of each trial. Needs to be updated for each trial!
-    let trialStartDate = false
-
-    //Some easy references to the main SVG layer objects
-    let PhaseLayer = document.getElementById("Category_Layer")
-    let ScreenLayer = document.getElementById("category_screen_layer")
-    let InstructionsLayer = document.getElementById("category_instructions")
-
-    //Setting the sublayer elements to be visible where needed
-    document.getElementById("category_instructions").style.display = "inherit"
-    document.getElementById("category_screen_layer_basic_elements").style.display = "inherit"
-
-    document.getElementById("category_screen_layer_binary_slider").style.display = "none"
-    document.getElementById("Instructions_Category_Binary_Slider").style.display = "none"
-
-    document.getElementById("category_screen_layer_two_alt_slider").style.display = "inherit"
-    document.getElementById("Instructions_Category_Two_Alt_Slider").style.display = "inherit"
-
-    document.getElementById("category_timer_bar").style.display = "none"
-    document.getElementById("category_trial_title").style.opacity = 0
-
-    //Creates and manages an SVG slider. Direction can be horizontal or vertical (string)
-    SVGSlider = function(){
-        let ParentNode = ScreenLayer
-        let slider_has_been_moved = false
-
-        //Get the format from a placeholder in the SVG
-        let Placeholder = document.getElementById("category_two_alt_slider_placeholder")
-
-        //Creating a ForeignObject to hold the range input
-        let FObj = document.createElementNS('http://www.w3.org/2000/svg',"foreignObject");
-        FObj.setAttribute("x", Placeholder.getAttribute("x"))
-        FObj.setAttribute("y", Placeholder.getAttribute("y"))
-        FObj.setAttribute("width", Placeholder.getAttribute("width"))
-        FObj.classList.add("CustomSliderContainer")
-
-        //Creating the input object
-        let SliderObj =  document.createElement("input");
-        SliderObj.setAttribute('type', 'range');
-        SliderObj.classList.add("CustomSliderInput")
-        SliderObj.min = Slider_range_values.min
-        SliderObj.max = Slider_range_values.max
-        SliderObj.step = Slider_range_values.step
-        SliderObj.value = Slider_range_values.start
-
-        FObj.appendChild(SliderObj)
-        ParentNode.appendChild(FObj)
-
-        function slider_moving_to_new_value(val){
-            move_Icon_to_relative_pos(get_relative_position_on_slider(val))
-
-            //Check if this is the first time that the slider has been moved. If yes, create the continue button
-            if(!slider_has_been_moved){
-                slider_has_been_moved = true
-                ContinueButton = createSVGButtonElem((508-150)/2,245,150,25,"Continue")
-                ContinueButton.classList.add("Slider_ContinueButton")
-                ParentNode.appendChild(ContinueButton)
-
-                ContinueButton.onclick = function(){
-                    continue_button_pressed(SliderObj.value)
+    function go_to_next_instruction_step(){
+        if(instructions_type === "first"){
+            switch(current_instruction_step){
+                case(1): {
+                    document.getElementById("sim_instructions_groupA").style.opacity = 1
+                    break
                 }
-            }
-        }
-
-        SliderObj.oninput = function(){slider_moving_to_new_value( SliderObj.value)}
-
-        //If only the arrows are allowed to move the slider, then block direct cursor events
-        if(restrict_slider_to_arrows){
-            SliderObj.style.pointerEvents = "none"
-        }
-
-        //Defining the on-screen arrow buttons
-        let ArrowLeft = document.getElementById("category_two_alt_slider_arrow_left")
-        let ArrowRight = document.getElementById("category_two_alt_slider_arrow_right")
-
-        //Call when the slider has been moved left or right with the arrow keys
-        function slider_moved_by_arrows(direction){
-            let currentvalue =  parseFloat( SliderObj.value )
-            if(direction === "left" ){
-                if( (currentvalue - Slider_range_values.step) >  Slider_range_values.min){
-                    SliderObj.value = currentvalue - Slider_range_values.step
-                }else{
-                    SliderObj.value = Slider_range_values.min
-                    key_released()
-                }
-                slider_moving_to_new_value(SliderObj.value)
+                case(2):
+                    document.getElementById("sim_instructions_groupA").style.opacity = 0.5
+                    document.getElementById("sim_instructions_groupB").style.opacity = 1
+                    break
+                case(3):
+                    document.getElementById("sim_instructions_groupB").style.opacity = 0.5
+                    document.getElementById("sim_instructions_groupC").style.opacity = 1
+                    break
+                case(4):
+                    document.getElementById("sim_instructions_groupC").style.opacity = 0.5
+                    document.getElementById("sim_instructions_groupD").style.opacity = 1
+                    break
+                case(5):
+                    document.getElementById("sim_instructions_groupD").style.opacity = 0.5
+                    document.getElementById("sim_instructions_groupE").style.opacity = 1
+                    break
+                case(6):
+                    document.getElementById("sim_instructions_groupE").style.opacity = 0.5
+                    document.getElementById("sim_instructions_groupF").style.opacity = 1
+                    break
+                case(7):
+                    instructions_completed()
+                    break
             }
 
-            if(direction === "right"){
-                if((currentvalue + Slider_range_values.step) <  Slider_range_values.max){
-                    SliderObj.value = currentvalue + Slider_range_values.step
-                }else{
-                    SliderObj.value = Slider_range_values.max
-                    key_released()
-                }
-                slider_moving_to_new_value(SliderObj.value)
-            }
-        }
-
-        ArrowLeft.onmousedown = function(){key_pressed("left")}
-        ArrowRight.onmousedown = function(){key_pressed("right")}
-
-        //Allows the arrow keys to be pressed down for faster movement
-        let key_active = false
-        let key_active_interval = false
-
-        //Call when the arrows have been pressed to initiate an interval
-        function key_pressed(direction){
-            slider_moved_by_arrows(direction)
-            key_active = direction
-
-            setTimeout(function(){
-                if(key_active !== false){
-                    key_active_interval = setInterval(function(){
-                        if(key_active!== false){
-                            slider_moved_by_arrows(direction)
-                        }else{
-                            clearInterval(this)
-                        }
-                    },25)
-                }
-            },50)
-
-            //Changing the key appearances
-            if(direction === "left"){
-                ArrowLeft.classList.add("category_two_alt_slider_screen_arrow_selected")
-                ArrowLeft.classList.remove("category_two_alt_slider_screen_arrow")
-                ArrowRight.classList.remove("category_two_alt_slider_screen_arrow")
-                ArrowRight.classList.add("category_two_alt_slider_screen_arrow_not_selected")
-            }
-            if(direction === 'right'){
-                ArrowRight.classList.add("category_two_alt_slider_screen_arrow_selected")
-                ArrowRight.classList.remove("category_two_alt_slider_screen_arrow")
-                ArrowLeft.classList.remove("category_two_alt_slider_screen_arrow")
-                ArrowLeft.classList.add("category_two_alt_slider_screen_arrow_not_selected")
-            }
-        }
-
-        //Call when the arrows have been released or the curser moved out of the screen
-        function key_released(){
-            console.log("released", key_active)
-            key_active = false
-            clearInterval(key_active_interval)
-
-            //Returning the visibility both arrows
-            ArrowRight.classList.add("category_two_alt_slider_screen_arrow")
-            ArrowRight.classList.remove("category_two_alt_slider_screen_arrow_not_selected")
-            ArrowRight.classList.remove("category_two_alt_slider_screen_arrow_selected")
-            ArrowLeft.classList.add("category_two_alt_slider_screen_arrow")
-            ArrowLeft.classList.remove("category_two_alt_slider_screen_arrow_not_selected")
-            ArrowLeft.classList.remove("category_two_alt_slider_screen_arrow_selected")
-
-        }
-
-        document.onmouseup = function(){
-            if(key_active !== false){
-                key_released()
-            }
-        }
-        document.onmouseleave = function(){
-            if(key_active!== false){
-                key_released()
-            }
-        }
-
-
-
-    }
-
-    //Call with a slider percentage to get the x values for the movable object
-    function get_relative_position_on_slider(val){
-        let v= parseFloat(val)
-        let rel_pos_on_slider = (v + Math.abs(Slider_range_values.min)) / (Slider_range_values.max + Math.abs(Slider_range_values.min))
-        return(rel_pos_on_slider)
-    }
-
-    //Moves the movable icon. Assumes that this icon has already been created
-    function move_Icon_to_relative_pos(pos){
-        let x = Math.round(MovableIconRange.min + pos *(MovableIconRange.max - MovableIconRange.min))
-        MoveElemToCoords(IconMovableContainer,x, icons_y_middle)
-    }
-
-    //Once the category phase is complete, this function relays back to the EC and the DataCont
-    function category_phase_complete(){
-        console.log("Category Phase completed")
-        DataCont.store_category_data(OutputArray)
-
-        //Cleaning the screen
-        resetScreen()
-
-        PhaseLayer.style.display = "none"
-        ScreenLayer.style.display = "none"
-        InstructionsLayer.style.display = "none"
-
-        ExpCont.category_phase_finished()
-    }
-
-    //Tries to show the next category trial. If none are left, then the phase is completed.
-    function start_next_category_trial(){
-        if(RemainingCategoryTrials.length > 0){
-            CurrentCategoryTrial = RemainingCategoryTrials.splice(0,1)[0]
-
-            resetScreen()
-            //Show the title indicating that a new trial has started
-
-            //Update and show the round counter
-            current_round_number++
-            document.getElementById("category_two_alt_slider_screen_counter").childNodes[0].innerHTML = "Question " + current_round_number + " out of " + total_number_of_trials_to_be_completed
-            document.getElementById("category_two_alt_slider_screen_counter").style.display = "inherit"
-            document.getElementById("category_two_alt_slider_screen_counter").style.opacity = 1
-
-            //Show the SVG elements at the top of the screen
-            let Elem = ScreenLayer.getElementsByClassName("category_two_alt_slider_screen")
-            for(let i =0;i<Elem.length;i++){
-                Elem[i].style.opacity = 1
-            }
-
-            //Create the Fennimal icons
-            createFennimalIcon(CurrentCategoryTrial.Left, "left")
-            createFennimalIcon(CurrentCategoryTrial.Right, "right")
-            createFennimalIcon(CurrentCategoryTrial.Mov, "movable")
-
-            //Create the slider
-            Slider = new SVGSlider()
-
-            //Start the Rt measurement
-            trialStartDate = Date.now()
-
+            current_instruction_step++
         }else{
-            //Phase finished
-            category_phase_complete()
+            instructions_completed()
         }
-    }
-
-    //STAGES
-    // Resets the screen
-    function resetScreen(){
-        //Remove all Fennimal icons
-        deleteClassNamesFromElement(ScreenLayer, "Fennimal_Icon")
-        deleteClassNamesFromElement(ScreenLayer, "CustomSliderContainer")
-        deleteClassNamesFromElement(ScreenLayer, "Slider_ContinueButton")
-
-        // Hide trial elements
-        let Elem = ScreenLayer.getElementsByClassName("category_two_alt_slider_screen")
-        for(let i =0;i<Elem.length;i++){
-            Elem[i].style.opacity = 0
-        }
-        //document.getElementById("category_trial_title").style.opacity = 0
-
-        //Show the map as a background
-        LocCont.show_passive_map()
-
-    }
-
-    //Creates a Fennimal Icon of the given FennimalObject on either the left or right position.
-    function createFennimalIcon(FennimalObj, position){
-        //Position determines the x and y coordinates
-        let x, scale
-        switch(position){
-            case("left"): x = range_icon_left_x; scale = target_icon_scale; break
-            case("right"): x = range_icon_right_x;scale = target_icon_scale; break
-            case("movable"): scale = movable_icon_scale; break
-        }
-
-        //Create the outline object
-        let IconObj
-
-        IconObj = createFennimal(FennimalObj)
-        IconObj.style.transform = "scale(" + scale + ")"
-
-        let YAdjustmentBox = document.createElementNS("http://www.w3.org/2000/svg", 'g')
-        YAdjustmentBox.appendChild(IconObj)
-
-        let Container = document.createElementNS("http://www.w3.org/2000/svg", 'g')
-        Container.appendChild(YAdjustmentBox)
-        Container.classList.add("Fennimal_Icon")
-        Container.style.pointerEvents = "none"
-        ScreenLayer.appendChild(Container)
-
-        //Making sure the Fennimals are aligned on the bottom
-        let current_y_bottom = IconObj.getBBox().y + IconObj.getBBox().height
-        let y_diff =  -1 * (scale * ( icons_y_middle - current_y_bottom))
-        YAdjustmentBox.style.transform = "translate(0px," +  y_diff +"px)"
-
-        if(position === "left") { IconLeft = IconObj; IconLeftContainer = Container; MoveElemToCoords(IconLeftContainer,range_icon_left_x,icons_y_middle)}
-        if(position === "right") {IconRight = IconObj; IconRightContainer = Container; MoveElemToCoords(IconRightContainer,range_icon_right_x,icons_y_middle)}
-        if(position === "movable") {IconMovable = IconObj; IconMovableContainer = Container; move_Icon_to_relative_pos(0.5) }
-    }
-
-    //Call when the continue button is pressed during a trial
-    function continue_button_pressed(value){
-        //Update and store the trial
-        CurrentCategoryTrial.rating = value
-        CurrentCategoryTrial.rt = Date.now() - trialStartDate
-        OutputArray.push(JSON.parse(JSON.stringify(CurrentCategoryTrial)))
-
-        //Go to the next trial
-        start_next_category_trial()
     }
 
     function instructions_completed(){
         PhaseLayer.style.display = "inherit"
-        ScreenLayer.style.display = "inherit"
+        ArenaLayer.style.display = "inherit"
         InstructionsLayer.style.display = "none"
 
-        start_next_category_trial()
+        //Start the arena phase
+        initialize_arena()
     }
 
-    //Call to start the category matching phase.
-    this.start_category_phase = function(){
-        //Make sure that the correct layers are set to visible
-        PhaseLayer.style.display = "inherit"
-        ScreenLayer.style.display = "none"
-        InstructionsLayer.style.display = "inherit"
+    function initialize_arena(){
+        //Adding all the cards
+        for(let i=0; i<CardStimArray.length;i++){
+            let Stim = CardStimArray[i]
 
-        //Show the map as a background
-        LocCont.show_passive_map()
+            //Check if the card contains a head and body. If not, add as false
+            if(! Object.hasOwn(Stim, "head") ){ Stim.head = false}
+            if(! Object.hasOwn(Stim, "body") ){ Stim.body = false}
 
-        // Create the instructions button
-        let Button = createSVGButtonElem((508-150)/2,255,160,25,"CONTINUE")
-        InstructionsLayer.appendChild(Button)
-        Button.onclick = instructions_completed
+            let NewCard = new Card(Stim.ID, Stim.head, Stim.body, ArenaGroup, ArenaParam.centerx + 2*i - CardStimArray.length, ArenaParam.centery + 2*i - CardStimArray.length, that)
+            AllCards[Stim.ID] = NewCard
+        }
+
+        //Appending the Arena to the main layer
+        ArenaLayer.appendChild(ArenaGroup)
+
+        //Setting all the event listeners
+        ArenaGroup.onmouseup = function(event){
+            if(CurrentSelectedCard !== false){
+                let mouse_pos = getMousePosition(event)
+                CurrentSelectedCard.dropped_on_new_location(mouse_pos.x,mouse_pos.y)
+                CurrentSelectedCard = false
+                reclear_all_cards()
+            }
+        }
+        ArenaGroup.onmouseleave = function(event){
+            if(CurrentSelectedCard !== false){
+                return_all_cards_to_last_valid_location()
+
+                //Reclear all cards
+                reclear_all_cards()
+            }
+        }
+        ArenaGroup.onmousemove = function(event){
+            if(CurrentSelectedCard !==false ){
+                //Get the correct mouse position in the SVG coordinates
+                let mouse_pos = getMousePosition(event)
+                CurrentSelectedCard.drag_card_to_new_location(mouse_pos.x,mouse_pos.y)
+            }
+        }
+
+        //Recording the starting time
+        ArenaStartTime = Date.now()
     }
 
+    //Call when a new card has been selected
+    this.new_card_selected = function(ID){
+        //Make all cards transparant
+        let CardIDs = Object.getOwnPropertyNames(AllCards)
+        for(CardIDs in AllCards){
+            AllCards[CardIDs].set_pointer_events_to_none()
+        }
+        CurrentSelectedCard = AllCards[ID]
+
+        //Now check if all cards have been touched at least once. If yes, then show the completion button
+        if(check_if_all_cards_touched()){
+            create_completion_button()
+        }
+
+    }
+
+    //Returns true if all cards have been touched at least once
+    function check_if_all_cards_touched(){
+        let CardIDs = Object.getOwnPropertyNames(AllCards)
+        for(CardIDs in AllCards){
+            if(AllCards[CardIDs].check_if_card_has_been_touched() === false){
+                return false
+            }
+        }
+        return true
+    }
+
+    //Creates the completion button and sets its events handler
+    function create_completion_button(){
+        CompletionButton = createSVGButtonElem((508-150)/2,255,160,25,"CONTINUE")
+        ArenaGroup.appendChild(CompletionButton)
+
+        //Show the text on the bottom of the arena
+        document.getElementById("similarity_arena_bottom_text").style.opacity = 0.75
+        document.getElementById("similarity_arena_bottom_text").style.fill = "darkred"
+        CompletionButton.onclick = task_completed
+    }
+
+    //Call when the task has been completed (when the completion button has been pressed)
+    function task_completed(){
+        CompletionButton.style.display = "none"
+
+        //Get the output
+        let Output = JSON.parse(JSON.stringify(get_output_object()))
+
+        //Delete all the cards
+        let CardIDs = Object.getOwnPropertyNames(AllCards)
+        for(CardIDs in AllCards){
+            AllCards[CardIDs].remove_card()
+        }
+
+        //Tell the experiment controller that this part of the experiment is finished
+        if(instructions_type === "first"){
+            ExpCont.first_similarity_task_completed(Output)
+        }
+        if(instructions_type === "additional"){
+            ExpCont.additional_similarity_phase_finished(Output)
+        }
+    }
+
+    //When called, returns with an object containing all the positions of the cards and total time spend
+    function get_output_object(){
+        let CardData = []
+        let CardIDs = Object.getOwnPropertyNames(AllCards)
+        for(CardIDs in AllCards){
+            CardData.push(AllCards[CardIDs].get_card_data(true))
+        }
+
+        let Out = {
+            time: Date.now() - ArenaStartTime,
+            Data: CardData
+        }
+        return(JSON.parse(JSON.stringify(Out)))
+    }
+
+    function return_all_cards_to_last_valid_location(){
+        let CardIDs = Object.getOwnPropertyNames(AllCards)
+        for(CardIDs in AllCards){
+            AllCards[CardIDs].return_card_to_last_valid_location()
+        }
+        CurrentSelectedCard = false
+    }
+
+    //Sometimes cards get stuck in a pointer-events = none position. Whenever a card is released, call this to re-clear all the cards
+    function reclear_all_cards(){
+        let CardIDs = Object.getOwnPropertyNames(AllCards)
+        for(CardIDs in AllCards){
+            AllCards[CardIDs].set_pointer_events_to_auto()
+        }
+    }
+
+    //Creates a movable card. Input "false" for features not shown. Size of the card depends on the non-false features and the properties defined above
+    Card = function(ID, Head, Body, ParentNode, start_center_x, start_center_y, Controller){
+        //Keep track of whether the card has moved from its original location
+        let card_has_been_touched = false
+
+        //Find the correct dimensions for the card. This depends on its contents
+        let card_type
+        if(Head !== false){
+            if(Body === false){
+                card_type = "only_head"
+            }else{
+                card_type = "head_and_body"
+            }
+        }else{
+            if(Body === false){
+                card_type = "only_body"
+            }else{
+                card_type = "empty"
+            }
+        }
+        let CardDims
+        switch(card_type){
+            case("only_head"):
+                //Finding the correct card sizes for the heads. A few heads need slightly different proportions
+                //dx and dy are small shims to translate the heads to the center of the card
+                switch(Head){
+                    case("B"): CardDims = {w:80,h:31, scale: 0.37, dx:0, dy: -3}; break //Widehead
+                    case("D"): CardDims = {w:55,h:45, scale: 0.33, dx:0, dy: 4}; break //Antler
+                    case("I"): CardDims = {w:42,h:60, scale: 0.45, dx:0, dy: 3}; break //Unihorn
+                    case("E"): CardDims = {w:45,h:55, scale: 0.45, dx:3, dy: -3}; break //Chirpy
+                    case("F"): CardDims = {w:50,h:50, scale: 0.5, dx:0, dy: 5}; break //Punk
+                    case("H"): CardDims = {w:50,h:50, scale: 0.5, dx:0, dy: 0}; break //Scout
+                    default: CardDims = {w:50,h:50, scale: 0.45, dx:0, dy: 0}; break
+                }
+
+
+        }
+
+        //Create the container element
+        let CardContainer = document.createElementNS("http://www.w3.org/2000/svg", 'g')
+        CardContainer.style.cursor = "pointer"
+
+        //Create the card background.
+        let Background = document.createElementNS("http://www.w3.org/2000/svg", 'rect')
+        Background.setAttribute("x", start_center_x - 0.5 * CardDims.w)
+        Background.setAttribute("y", start_center_y - 0.5 * CardDims.h)
+        Background.setAttribute("width", CardDims.w)
+        Background.setAttribute("height", CardDims.h)
+        Background.setAttribute("ry", 5)
+        Background.classList.add("similarity_card_background")
+        CardContainer.appendChild(Background)
+
+        //Creating the card contents
+        let CardContents
+        if(card_type !== "empty"){
+            switch(card_type){
+                case("only_head"):
+                    let scale = 0.4
+                    CardContents = createFennimalHead(Head, CardDims.scale, start_center_x + CardDims.dx, start_center_y + CardDims.dy)
+                    CardContainer.appendChild(CardContents)
+
+                    break;
+                case("only_body"):
+                    console.warn("Body cards not yet supported")
+                    break
+                case("head_and_body"):
+                    console.warn("Full Fennimal cards not yet supported")
+                    break;
+            }
+        }
+
+        //Add the DOM element to the container
+        ParentNode.appendChild(CardContainer)
+
+        //Movement interaction functions
+        let LastLocation = {x: start_center_x, y: start_center_y}
+
+        //Set an event listener for when the card is clicked on
+        CardContainer.onmousedown = function(event){
+            LastLocation = getViewBoxCenterPoint(CardContainer)
+            card_has_been_touched = true
+
+            move_card_to_top()
+            Controller.new_card_selected(ID)
+        }
+
+        //INTERACTION FUNCTIONS
+        //Call to move the card to the top of the stack by re-adding it to its parent node
+        function move_card_to_top(){
+            ParentNode.removeChild(CardContainer)
+            ParentNode.appendChild(CardContainer)
+        }
+
+        //If the Card is dragged out of bounds, call this to reset it to its last known (valid) position
+        this.return_card_to_last_valid_location = function(){
+            MoveElemToCoords(CardContainer, LastLocation.x, LastLocation.y)
+        }
+
+        this.set_pointer_events_to_none = function(){
+            CardContainer.style.pointerEvents = "none"
+        }
+
+        this.set_pointer_events_to_auto = function(){
+            CardContainer.style.pointerEvents = "auto"
+        }
+
+        this.dropped_on_new_location = function(x,y){
+            LastLocation = {x:x,y:y}
+        }
+
+        this.drag_card_to_new_location = function(x,y){
+            MoveElemToCoords(CardContainer, x,y)
+        }
+
+        //Call to determine whether or not the card has been moved from its original location
+        this.check_if_card_has_been_touched = function(){
+            return(card_has_been_touched)
+        }
+
+        //Call to get an object containing the card id, its features and its x and y position
+        this.get_card_data = function(standardize_coords){
+            let out_x, out_y
+            if(standardize_coords){
+                let Box = document.getElementById("arena_surface").getBBox()
+                out_x = Math.round(LastLocation.x - Box.x)
+                out_y = Math.round(LastLocation.y - Box.y)
+
+            }else{
+                out_x = LastLocation.x
+                out_y = LastLocation.y
+            }
+
+            return({
+                ID: ID,
+                head: Head,
+                //body: Body,
+                x: out_x,
+                y: out_y,
+            })
+        }
+
+        //Removes the card from the arena
+        this.remove_card = function(){
+            ParentNode.removeChild(CardContainer)
+        }
+
+    }
+    //Returns a Fennimal head SVG object.
+    function createFennimalHead(head, scale, cx, cy){
+        //Create a new group to hold the Fennimal
+        let HeadContainer = document.createElementNS("http://www.w3.org/2000/svg", 'g')
+
+        //Setting color schenme
+        let ColorScheme = Param.GrayColorScheme
+
+        //Copy and color the head
+        let HeadObj = document.getElementById("head_" + head).cloneNode(true)
+        HeadContainer.appendChild(HeadObj)
+        HeadObj.style.display = "inherit"
+
+        //Color the HEAD
+        //Set primary color regions
+        let Primary_regions = HeadObj.getElementsByClassName("Fennimal_primary_color")
+        for(let i = 0; i< Primary_regions.length; i++){
+            Primary_regions[i].style.fill = ColorScheme.primary_color
+        }
+
+        //Set secondary colors
+        let Secondary_regions =  HeadObj.getElementsByClassName("Fennimal_secondary_color")
+        for(let i = 0; i< Secondary_regions.length; i++){
+            Secondary_regions[i].style.fill = ColorScheme.secondary_color
+        }
+
+        //Set tertiary colors
+        let Tertiary_regions =  HeadObj.getElementsByClassName("Fennimal_tertiary_color")
+        for(let i = 0; i< Tertiary_regions.length; i++){
+            Tertiary_regions[i].style.fill = ColorScheme.tertiary_color
+        }
+
+        //Create a group to move the center of the head to 0,0 (this is somewhat approximately and hacky, needs to be changed at some point in the future)
+        let TranslateOriginContainer = document.createElementNS("http://www.w3.org/2000/svg", 'g')
+        TranslateOriginContainer.appendChild(HeadContainer)
+        TranslateOriginContainer.style.transform = "translate(-254px,-75px)"
+
+        //Rescale the head in a new group
+        let ScaleContainer = document.createElementNS("http://www.w3.org/2000/svg", 'g')
+        ScaleContainer.appendChild(TranslateOriginContainer)
+        ScaleContainer.style.transform = "scale(" + scale + ")"
+
+        //Now we have a head with the right proportions centered on 0,0. All we have to do now is to translate this group (with yet another group) to the right coords.
+        //Technically this could be done with the last group already, but this is easier to work with for me...
+        let TranslateDestinationContainer = document.createElementNS("http://www.w3.org/2000/svg", 'g')
+        TranslateDestinationContainer.appendChild(ScaleContainer)
+        TranslateDestinationContainer.style.transform = "translate(" + cx + "px, " + Math.floor( cy ) + "px)"
+
+        // Returns SVG layer
+        return(TranslateDestinationContainer)
+    }
 }
 
 // Manages all data that needs to be preserved. Call at the end of the experiment to download / store a JSON containing all subject-relevant data.
@@ -5797,7 +5645,11 @@ DataController = function(seed_number, Stimuli){
     //Always store data here as a deep copy!
     let Data = {
         seed: seed_number,
-        Training_Data: JSON.parse(JSON.stringify(Stimuli.getTrainingSetFennimalsInArray())),
+        FirstSimTask: {},
+        Training_Templates : [],
+        Binding_Templates: [],
+        Selected_Pairs: [],
+        AdditionalSimTask: {},
         Targeted_Search: [],
         Delivery: [],
         Quiz: [],
@@ -5822,6 +5674,29 @@ DataController = function(seed_number, Stimuli){
             SEID: url.searchParams.get("SESSION_ID"),
         }
         console.log(Data.Prolific)
+    }
+
+    //Stores the results from the first similarity task
+    this.store_first_similarity_task_output = function(Output){
+        Data.FirstSimTask = JSON.parse(JSON.stringify(Output))
+    }
+
+    //Stores the results from additional similarity tasks
+    this.store_additional_similarity_task_output = function(Output){
+        Data.AdditionalSimTask = JSON.parse(JSON.stringify(Output))
+    }
+
+    this.store_training_phase_templates = function(TemplatesArr){
+        Data.Training_Templates = JSON.parse(JSON.stringify(TemplatesArr))
+    }
+
+    this.store_binding_phase_templates = function(TemplatesArr){
+        Data.Binding_Templates = JSON.parse(JSON.stringify(TemplatesArr))
+    }
+
+    //Stores the features selected for both pairs
+    this.store_selected_pairs = function(SelectedPairs){
+        Data.Selected_Pairs = JSON.parse(JSON.stringify(SelectedPairs))
     }
 
     //Stores the data collected at the end of the exploration phase
@@ -5881,7 +5756,6 @@ DataController = function(seed_number, Stimuli){
     //////////////////
     this.store_category_data = function(CategoryTrials){
         Data.CategoryPhase = JSON.parse(JSON.stringify(CategoryTrials))
-        console.log(Data.CategoryPhase)
     }
 
     // CALL AT EXPERIMENT END TO STORE EXPERIMENT TIME.
@@ -5907,53 +5781,20 @@ DataController = function(seed_number, Stimuli){
 
         //Calculating bonus start (from the category task)
         let total_category_trials, correct_categories, percentage_category, bonus
-        let bonus_stars = 0
-        if(Stimuli.getCategoryType() !== "binary_slider"){
-            total_category_trials = 0
-            correct_categories = 0
-            if(Data.CategoryPhase.length > 0 ){
-                total_category_trials = Data.CategoryPhase.length
-                for(let i=0;i<Data.CategoryPhase.length;i++){
-                    if(Data.CategoryPhase[i].correct){
-                        correct_categories++
-                    }
-
-                }
-            }
-
-            percentage_category = correct_categories / total_category_trials
-            bonus_stars = 0
-            if(percentage_category > .10) { bonus_stars = 1}
-            if(percentage_category > .75) { bonus_stars = 2}
-
-        }
 
         //Calculating USD reward (if given)
-        bonus =  ( (star_rating + bonus_stars ) * Param.BonusEarnedPerStar.bonus_per_star).toFixed(2)
+        bonus =  ( (star_rating ) * Param.BonusEarnedPerStar.bonus_per_star).toFixed(2)
 
         //Updating the completion code
-        completion_code = cc_word_1 + cc_word_2 + (star_rating + bonus_stars)
+        completion_code = cc_word_1 + cc_word_2 + (star_rating )
 
-        if(Stimuli.getCategoryType() === "binary_slider"){
-            return({
-                num_total_Fennimals: total,
-                num_liked_item: liked,
-                star_rating: star_rating,
-                token: completion_code,
-                earned_bonus: bonus
-            })
-        }else{
-            return({
-                num_total_Fennimals: total,
-                num_liked_item: liked,
-                star_rating: star_rating,
-                total_category_trials: total_category_trials,
-                correct_category_trials: correct_categories,
-                num_bonus_stars: bonus_stars,
-                token: completion_code,
-                earned_bonus: bonus
-            })
-        }
+        return({
+            num_total_Fennimals: total,
+            num_liked_item: liked,
+            star_rating: star_rating,
+            token: completion_code,
+            earned_bonus: bonus
+        })
     }
 
     //Call to record the open question answer
@@ -6046,7 +5887,6 @@ DataController = function(seed_number, Stimuli){
         }
 
         // Instead of copying all the Fennimal properties for each trial, we can simply store the ID codes
-
         // Optimizing the Exploration phase
         // Here we only want to preserve the order in which Fennimals have been found and the location sequence (the location visitation order can be extracted from this later)
         let FennimalsFoundOrder = {}
@@ -6145,85 +5985,41 @@ DataController = function(seed_number, Stimuli){
             OptTestData.push(TrialData)
         }
 
-        //Optimizing the CATEGORY PHASE data
-        let OptCatData = []
-        if(Stimuli.getCategoryType() === "binary"){
-            for(let i = 0;i<Data.CategoryPhase.length; i++){
-                OptCatData.push({
-                    num: i+1,
-                    L : {h: Data.CategoryPhase[i].Left.head, b: Data.CategoryPhase[i].Left.body },
-                    R : {h: Data.CategoryPhase[i].Right.head, b: Data.CategoryPhase[i].Right.body },
-                    dec: Data.CategoryPhase[i].decision,
-                    rt: Data.CategoryPhase[i].rt,
-                    cor: Data.CategoryPhase[i].correct,
-                    c_ans: Data.CategoryPhase[i].correct_answer,
-                    p: Data.CategoryPhase[i].paircode,
-                })
-            }
-        }
-        if(Stimuli.getCategoryType() === "binary_slider"){
-            for(let i = 0;i<Data.CategoryPhase.length; i++){
-                OptCatData.push({
-                    num: i+1,
-                    L : {ID: Data.CategoryPhase[i].Left.ID , h: Data.CategoryPhase[i].Left.head, b: Data.CategoryPhase[i].Left.body, r: Param.AbbreviatedRegionNames[Data.CategoryPhase[i].Left.region] },
-                    R : {ID: Data.CategoryPhase[i].Right.ID, h: Data.CategoryPhase[i].Right.head, b: Data.CategoryPhase[i].Right.body, r: Param.AbbreviatedRegionNames[Data.CategoryPhase[i].Right.region] },
-                    pair: Data.CategoryPhase[i].paircode,
-                    rat: Data.CategoryPhase[i].rating
-                })
-            }
+        //SIMILARITY DATA
+        // We want to store the heads selected for all of the pairs.
+        //Transforming the results of the second similarity task into an object where each property only has points
+        let SimPoints_S2 = {}
+        for(let i =0; i<Data.AdditionalSimTask.Data.length; i++){
+            SimPoints_S2[Data.AdditionalSimTask.Data[i].ID] = {x : Data.AdditionalSimTask.Data[i].x, y: Data.AdditionalSimTask.Data[i].y}
         }
 
-        if(Stimuli.getCategoryType() === "two_alternatives"){
-            for(let i = 0;i<Data.CategoryPhase.length; i++){
-                OptCatData.push({
-                    num: i+1,
-                    T : {h: Data.CategoryPhase[i].Target.head, b: Data.CategoryPhase[i].Target.body },
-                    L : {h: Data.CategoryPhase[i].Left.head, b: Data.CategoryPhase[i].Left.body },
-                    R : {h: Data.CategoryPhase[i].Right.head, b: Data.CategoryPhase[i].Right.body },
-                    dec: Data.CategoryPhase[i].decision,
-                    rt: Data.CategoryPhase[i].rt,
-                    cor: Data.CategoryPhase[i].correct,
-                    c_ans: Data.CategoryPhase[i].correct_answer,
-                    p: Data.CategoryPhase[i].paircode,
-                })
-            }
-        }
-        if(Stimuli.getCategoryType() === "three_alternatives"){
-            for(let i = 0;i<Data.CategoryPhase.length; i++){
-                OptCatData.push({
-                    num: i+1,
-                    t : Data.CategoryPhase[i].Target.key,
-                    l : Data.CategoryPhase[i].Left.key,
-                    m : Data.CategoryPhase[i].Middle.key,
-                    r : Data.CategoryPhase[i].Right.key,
-                    dec: Data.CategoryPhase[i].decision,
-                    rt: Data.CategoryPhase[i].rt,
-                    cor: Data.CategoryPhase[i].correct,
-                    c_ans: Data.CategoryPhase[i].correct_answer,
-                    p: Data.CategoryPhase[i].paircode,
-                })
-            }
-        }
-        if(Stimuli.getCategoryType() === "two_alt_slider"){
-            for(let i = 0;i<Data.CategoryPhase.length; i++){
-                OptCatData.push({
-                    num: i+1,
-                    L : {ID: Data.CategoryPhase[i].Left.ID , h: Data.CategoryPhase[i].Left.head, b: Data.CategoryPhase[i].Left.body},
-                    R : {ID: Data.CategoryPhase[i].Right.ID, h: Data.CategoryPhase[i].Right.head, b: Data.CategoryPhase[i].Right.body, },
-                    M : {ID: Data.CategoryPhase[i].Mov.ID, h: Data.CategoryPhase[i].Mov.head, b: Data.CategoryPhase[i].Mov.body, },
-                    pc: Data.CategoryPhase[i].pc,
-                    dir: Data.CategoryPhase[i].dir,
-                    rat: Data.CategoryPhase[i].rating,
-                    rt: Data.CategoryPhase[i].rt
-                })
-            }
+        let Pairs = Object.getOwnPropertyNames(Data.Selected_Pairs)
+        for(let i =0;i< Pairs.length;i++){
+            //Finding Ids
+            let ID1 = Data.Selected_Pairs[Pairs[i]].IDs[0]
+            let ID2 = Data.Selected_Pairs[Pairs[i]].IDs[1]
+
+            //Finding points on the second task
+            let p1 = SimPoints_S2[ID1]
+            let p2 = SimPoints_S2[ID2]
+
+            //Calculating distance
+            let dist = EUDist(p1.x,p1.y, p2.x,p2.y)
+
+            //Adding to the Selected Pairs object
+            Data.Selected_Pairs[Pairs[i]].dist_t2 = Math.round( dist * 100)/100
         }
 
+        //Putting it all together
         let ReturnData = {
             Exptime: Data.experiment_time,
             Seed: Data.seed,
             Token: completion_code,
-            Train_Stim: Stimuli.getTrainingSetFennimalsInArray(),
+            FirstSim: Data.FirstSimTask,
+            SecondSim: Data.AdditionalSimTask,
+            TrainTemp: Stimuli.getTrainingSetFennimalsInArray(),
+            BindTemp: Stimuli.getBindingTemplatesInArray(),
+            Selected_Pairs: Data.Selected_Pairs,
             Expl: {
                 FoundOrdr: FennimalsFoundOrder,
                 LocSeq: NewLocationSequence
@@ -6232,7 +6028,6 @@ DataController = function(seed_number, Stimuli){
             Delivery: NewDeliveryData,
             Quiz: NewQuizData,
             Test: OptTestData,
-            Cat: OptCatData,
             open: open_question_answer,
             c_blind: colorblindness
         }
@@ -6248,6 +6043,9 @@ DataController = function(seed_number, Stimuli){
 ExperimentController = function(Stimuli, DataController){
     let that = this
 
+    // At the start of the experiment, we first need to calibrate the Fennimal head similarities. Store the results of this calibration here.
+    let StartingSimilarityResults
+
     //Keep track of which Fennimals are currently roaming free in Fenneland
     let FennimalsPresentOnMap = {}
 
@@ -6260,8 +6058,7 @@ ExperimentController = function(Stimuli, DataController){
     //Create a controller to handle the HUD
     let HUDCont = new HUDController()
 
-    //Keeping track of the Flashlight and FennimalController
-    let FlashCont = false
+    //Keeping track of the FennimalController
     let FenCont = false
 
     //Keeps track of the order in which the Fennimals are encountered
@@ -6337,10 +6134,6 @@ ExperimentController = function(Stimuli, DataController){
 
     //Call when a terminal location is left. This deletes the FennimalController
     this.location_left = function(){
-        if(FlashCont !== false){
-            FlashCont.leaving_area()
-            FlashCont = false
-        }
         if(FenCont !== false){
             FenCont.interactionAborted()
             FenCont = false
@@ -6500,6 +6293,34 @@ ExperimentController = function(Stimuli, DataController){
     this.showStartScreen = function(){
         InstrCont.gotoStartScreen()
     }
+
+    //Starts the first similarity task. We can only calibrate the stimuli afterwards.
+    this.start_first_similarity_task = function(){
+        let CatCont = new CategoryPhaseController_Arena(that, Stimuli.get_stim_for_first_sim_task(), LocCont, "first")
+        CatCont.start_category_phase();
+    }
+    //Call when the first similarity task has been completed. We can then pass the outcomes of the first sim task to the stimuli object to set all the Fennimals.
+    this.first_similarity_task_completed = function(StimTaskOutput){
+        StartingSimilarityResults = JSON.parse(JSON.stringify(StimTaskOutput))
+
+        //Log these results to the Data Controller
+        DataController.store_first_similarity_task_output(StartingSimilarityResults)
+
+        //Tell the Stimuli object to generate the Fennimals for the rest of the experiment
+        Stimuli.create_Fennimals_from_sim_task_results(StimTaskOutput)
+
+        //Store the Training stimuli
+        DataController.store_training_phase_templates(Stimuli.getTrainingTemplates())
+        DataController.store_binding_phase_templates(Stimuli.getBindingTemplates())
+        DataController.store_selected_pairs(Stimuli.getFeaturesSampledAfterFirstSimilarityTask())
+
+        //Continue to the starting instructions
+        this.show_starting_instructions()
+
+        //Testing
+        // this.start_test_phase()
+    }
+
     this.show_starting_instructions = function(){
         InstrCont.gotoWelcomeScreen()
     }
@@ -6509,10 +6330,6 @@ ExperimentController = function(Stimuli, DataController){
         start_exploration_subphase()
     }
     //Shows the GOING HOME black screen
-    function fade_to_travel_screen_home (_func){
-        MaskCont = new TopLayerMaskController(_func, "inbound", "Returning to Home")
-        LocCont.prevent_subject_from_leaving_location(true)
-    }
     function fade_to_next_fennimal(_func){
         MaskCont = new TopLayerMaskController(_func, "outbound", "Driving to the next Fennimal")
     }
@@ -6887,7 +6704,7 @@ ExperimentController = function(Stimuli, DataController){
                     CurrentBlockTrials = CurrentBlockData.Trials
                     InstrCont.show_test_phase_instructions_repeat_block(CurrentBlockData.number, total_number_of_blocks,function(){that.start_next_test_trial()})
                     break
-                case("category"):
+                case("additional_similarity"):
                     InstrCont.clearInstructionPage()
                     start_category_phase()
                     break
@@ -6973,28 +6790,14 @@ ExperimentController = function(Stimuli, DataController){
     //CATEGORY PHASE
     function start_category_phase(){
         //Here the controller handles all the interactions
-        if(Stimuli.getCategoryType() === "binary"){
-            let CatCont = new CategoryPhaseController_Binary(that, Stimuli, LocCont, DataController)
-            CatCont.start_category_phase();
-        }
-        if(Stimuli.getCategoryType() === "binary_slider"){
-            let CatCont = new CategoryPhaseController_Binary_Slider(that, Stimuli, LocCont, DataController)
-            CatCont.start_category_phase();
-        }
-        if(Stimuli.getCategoryType() === "two_alternatives"){
-            let CatCont = new CategoryPhaseController_TwoAlts(that, Stimuli, LocCont, DataController)
-            CatCont.start_category_phase();
-        }
-        if(Stimuli.getCategoryType() === "three_alternatives"){
-            let CatCont = new CategoryPhaseController_ThreeAlts(that, Stimuli, LocCont, DataController)
-            CatCont.start_category_phase();
-        }
-        if(Stimuli.getCategoryType() === "two_alt_slider"){
-            let CatCont = new CategoryPhaseController_Two_Alt_Slider(that, Stimuli, LocCont, DataController)
-            CatCont.start_category_phase();
-        }
+        let CatCont = new CategoryPhaseController_Arena(that, Stimuli.get_stim_for_first_sim_task(), LocCont, "additional")
+        CatCont.start_category_phase();
     }
-    this.category_phase_finished = function(){
+    this.additional_similarity_phase_finished = function(sim_data){
+        //Log these results to the Data Controller
+        DataController.store_additional_similarity_task_output(sim_data)
+
+        //Start the next block
         start_next_test_phase_block()
     }
 
@@ -7243,7 +7046,8 @@ let SVGObjects = {
 let DataCont = new DataController(participant_number, Stimuli)
 
 let EC = new ExperimentController(Stimuli, DataCont)
-EC.showStartScreen()
+EC.start_first_similarity_task()
+//EC.showStartScreen()
 //EC.show_starting_instructions()
 //EC.start_targeted_search_subphase()
 //EC.start_delivery_subphase()
@@ -7255,5 +7059,7 @@ EC.showStartScreen()
 //  Set seed based on PID
 // SVG Garbage collector?
 
-console.log("Version: 21.11.23 B")
+console.log("Version: 27.11.23")
 
+//TODO: shuffle card order
+// Place all the heads on the blue area
