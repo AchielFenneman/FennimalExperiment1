@@ -567,6 +567,10 @@ STIMULUSDATA = function(participant_number){
     // NO CALLS TO RANDOMIZATION SHOULD BE MADE ABOVE THIS LINE //
     RNG = new RandomNumberGenerator(participant_number)
 
+    //Max time for the timed block
+    let max_rt_tt = 4000
+    let max_rt_tt_dist = 3500
+
     // SETTING THE CONTENTS OF THE FIRST SIMILARITY TASK (the rest of the Fennimals will be created according to these results)
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     let Head_Available_For_First_Sim_Task = shuffleArray(JSON.parse(JSON.stringify(Param.Available_Fennimal_Heads)))
@@ -591,17 +595,17 @@ STIMULUSDATA = function(participant_number){
     ///////////////////////////////////////////////////////////
     let Available_Regions = shuffleArray(["North","Desert","Village","Jungle","Flowerfields","Swamp", "Beach", "Mountains"])
 
-    let Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 5, false ))
+    let Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 6, false ))
     let Random_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
 
-    let Drawn_Training_Regions = Available_Regions.splice(0,3)
+    let Drawn_Training_Regions = Available_Regions.splice(0,4)
     let TrainingRegions = {
         IA: Drawn_Training_Regions[0],
         IB: Drawn_Training_Regions[0],
         DA: Drawn_Training_Regions[1],
         DB: Drawn_Training_Regions[1],
-        C: Drawn_Training_Regions[2],
-        //C2: Drawn_Training_Regions[3],
+        C1: Drawn_Training_Regions[2],
+        C2: Drawn_Training_Regions[3],
     }
     let I_Locations = shuffleArray( Param.RegionData[TrainingRegions.IA].Locations )
     let D_Locations = shuffleArray( Param.RegionData[TrainingRegions.DA].Locations )
@@ -610,8 +614,8 @@ STIMULUSDATA = function(participant_number){
         IB: I_Locations[1],
         DA: D_Locations[0],
         DB: D_Locations[1],
-        C: shuffleArray( Param.RegionData[TrainingRegions.C].Locations )[0],
-        //C2: shuffleArray( Param.RegionData[TrainingRegions.C2].Locations )[0],
+        C1: shuffleArray( Param.RegionData[TrainingRegions.C1].Locations )[0],
+        C2: shuffleArray( Param.RegionData[TrainingRegions.C2].Locations )[0],
     }
 
     let Drawn_Binding_Phase_Regions = Available_Regions.splice(0,4)
@@ -620,20 +624,20 @@ STIMULUSDATA = function(participant_number){
         IB: Drawn_Binding_Phase_Regions[1],
         DA: Drawn_Binding_Phase_Regions[2],
         DB: Drawn_Binding_Phase_Regions[3],
-        C: TrainingRegions.C,
-        //C2: TrainingRegions.C2
+        C1: TrainingRegions.C1,
+        C2: TrainingRegions.C2
     }
     let BindingPhaseLocations = {
         IA: shuffleArray( Param.RegionData[BindingPhaseRegions.IA].Locations ),
         IB: shuffleArray( Param.RegionData[BindingPhaseRegions.IB].Locations ),
         DA: shuffleArray( Param.RegionData[BindingPhaseRegions.DA].Locations ),
         DB: shuffleArray( Param.RegionData[BindingPhaseRegions.DB].Locations ),
-        C: shuffleArray( TrainingLocations.C),
-        //C2: shuffleArray( TrainingLocations.C2),
+        C1: shuffleArray( TrainingLocations.C1),
+        C2: shuffleArray( TrainingLocations.C2),
     }
 
     //These will only be filled after the first similarity task
-    let TrainingFennimals, BindingPhaseTemplates, BindingPhaseSetup
+    let TrainingFennimals, BindingPhaseTemplates, BindingPhaseSetup, TimedBlockTemplates
 
     this.create_Fennimals_from_sim_task_results = function(FirstSimData){
         //Storing the results from the first similarity task.
@@ -650,15 +654,16 @@ STIMULUSDATA = function(participant_number){
         let Pairs = find_training_phase_heads_max_distinct(SimsArr)
 
         //Randomly pick one pair to be the indirect pair, one to be the direct pair. In addition, controls should be randomly selected to be C1 and C2
-        let Main_Pairs = shuffleArray([Pairs.Pair1, Pairs.Pair2])
+        let Main_Pairs = shuffleArray([Pairs.Pair1, Pairs.Pair2, Pairs.Pair3])
         let I_Pair = Main_Pairs[0]
         let D_Pair = Main_Pairs[1]
+        let C_Pair = Main_Pairs[2]
 
         //Storing as  seperate object (easier for analyses down the line)
         Selected_Pairs = {
             I: I_Pair,
             D: D_Pair,
-            C: Pairs.ControlPair
+            C: C_Pair
         }
 
         //Now we can create all the Fennimals
@@ -668,8 +673,8 @@ STIMULUSDATA = function(participant_number){
             IB: createFennimalObj(TrainingRegions.IB, TrainingLocations.IB, Selected_Pairs.I.IDs[1],Param.RegionData[TrainingRegions.IB].preferredBodyType, Random_Items[1] ),
             DA: createFennimalObj(TrainingRegions.DA, TrainingLocations.DA, Selected_Pairs.D.IDs[0],Param.RegionData[TrainingRegions.DA].preferredBodyType, Random_Items[2] ),
             DB: createFennimalObj(TrainingRegions.DB, TrainingLocations.DB, Selected_Pairs.D.IDs[1],Param.RegionData[TrainingRegions.DB].preferredBodyType, Random_Items[3] ),
-            C: createFennimalObj(TrainingRegions.C, TrainingLocations.C, Selected_Pairs.C.IDs[0],Param.RegionData[TrainingRegions.C].preferredBodyType, Random_Items[4] ),
-            //C2: createFennimalObj(TrainingRegions.C2, TrainingLocations.C2, Selected_Pairs.C2.IDs[0],Param.RegionData[TrainingRegions.C2].preferredBodyType, Random_Items[4] ),
+            C1: createFennimalObj(TrainingRegions.C1, TrainingLocations.C1, Selected_Pairs.C.IDs[0],Param.RegionData[TrainingRegions.C1].preferredBodyType, Random_Items[4] ),
+            C2: createFennimalObj(TrainingRegions.C2, TrainingLocations.C2, Selected_Pairs.C.IDs[1],Param.RegionData[TrainingRegions.C2].preferredBodyType, Random_Items[5] ),
         }
 
         BindingPhaseTemplates= {
@@ -677,55 +682,25 @@ STIMULUSDATA = function(participant_number){
             IB: {ID: "IB", head: TrainingFennimals.IB.head, body: Param.RegionData[BindingPhaseRegions.IB].preferredBodyType, region: BindingPhaseRegions.IB, location: BindingPhaseLocations.IB[0],item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
             DA: {ID: "DA", head: TrainingFennimals.DA.head, body: Param.RegionData[BindingPhaseRegions.DA].preferredBodyType, region: BindingPhaseRegions.DA, location: BindingPhaseLocations.DA[0],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
             DB: {ID: "DB", head: TrainingFennimals.DB.head, body: Param.RegionData[BindingPhaseRegions.DB].preferredBodyType, region: BindingPhaseRegions.DB, location: BindingPhaseLocations.DB[0],item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
-            C: {ID: "C", head: Selected_Pairs.C.IDs[1], body: Param.RegionData[BindingPhaseRegions.C].preferredBodyType, region: BindingPhaseRegions.C, location: BindingPhaseLocations.C, item_direct: TrainingFennimals.C.item, item_indirect: false},
-            //C2: {ID: "C2", head: Selected_Pairs.C2.IDs[1], body: Param.RegionData[BindingPhaseRegions.C2].preferredBodyType, region: BindingPhaseRegions.C2, location: BindingPhaseLocations.C2, item_direct: TrainingFennimals.C2.item, item_indirect: false},
+            C1: {ID: "C1", head: TrainingFennimals.C1.head, body: Param.RegionData[BindingPhaseRegions.C1].preferredBodyType, region: BindingPhaseRegions.C1, location: BindingPhaseLocations.C1, item_direct: TrainingFennimals.C1.item, item_indirect: false},
+            C2: {ID: "C2", head: TrainingFennimals.C2.head, body: Param.RegionData[BindingPhaseRegions.C2].preferredBodyType, region: BindingPhaseRegions.C2, location: BindingPhaseLocations.C2, item_direct: TrainingFennimals.C2.item, item_indirect: false},
         }
+
+        //Setting the trials for the timed block
+        /*TimedBlockTemplates =  {
+            IA: {ID: "IA", head: TrainingFennimals.IA.head, item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
+            IB: {ID: "IB", head: TrainingFennimals.IB.head, item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
+            DA: {ID: "DA", head: TrainingFennimals.DA.head, item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
+            DB: {ID: "DB", head: TrainingFennimals.DB.head, item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
+            C: {ID: "C", head: TrainingFennimals.C.head, item_direct: TrainingFennimals.C.item, item_indirect: false},
+        }
+
+         */
 
         //Setting all the trials for the Binding phase
         BindingPhaseSetup = [
             {
-                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C"], "direct", true,true ),
-                type: "direct",
-                hint_type: "text",
-                number: 1
-            },{
-                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C"],  "indirect", false,true ),
-                type: "indirect",
-                hint_type: "text",
-                number: 2
-            },{
-                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C"],  "indirect", false,true ),
-                type: "indirect",
-                hint_type: "text",
-                number: 3
-            },{
-                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C"], "indirect", false,true ),
-                type: "indirect",
-                hint_type: "text",
-                number: 4
-            },{
-                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C"],  "indirect", false,true ),
-                type: "indirect",
-                hint_type: "text",
-                number: 5
-            }, {
-                type: "additional_similarity",
-                number: 6
-            },{
-                Trials: createBlockOfRepeatTrainingTrials(true),
-                type: "repeat_training",
-                hint_type: "text",
-                number: 7
-            }]
-        console.log(Selected_Pairs)
-        console.log(TrainingFennimals)
-        console.log(BindingPhaseTemplates)
-        console.log(BindingPhaseSetup)
-
-        /*
-         BindingPhaseSetup = [
-            {
-                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C1"], "direct", true,true ),
+                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB"], "direct", true,true ),
                 type: "direct",
                 hint_type: "text",
                 number: 1
@@ -758,7 +733,13 @@ STIMULUSDATA = function(participant_number){
                 hint_type: "text",
                 number: 8
             }]
-*/
+
+
+        console.log(Selected_Pairs)
+        console.log(TrainingFennimals)
+        console.log(BindingPhaseTemplates)
+        console.log(BindingPhaseSetup)
+
 
 
     }
@@ -774,8 +755,149 @@ STIMULUSDATA = function(participant_number){
         //Create an array of all different IDs.
         let IDs = Object.getOwnPropertyNames(SimPoints)
 
-        //Now we need to figure out all groups that we can make with 4 different Fennimals.
-        let Combos = combinations(IDs,4)
+        //Now we need to figure out all groups that we can make with 6 different Fennimals.
+        let Combos = combinations(IDs,6)
+
+        //For each group, calculate the distance between all of the elements. For each group, store the shortest distance in an array
+        let GroupDistances = []
+        let Shortest_Distances = []
+        for(let i = 0; i<Combos.length;i++){
+            let AllPairs = combinations(Combos[i], 2)
+            let AllDistances = []
+            let GroupInfo = {
+                IDs: Combos[i],
+                distances: []
+            }
+            for(let p=0; p<AllPairs.length;p++){
+                //Calculating EU-distance between these pairs
+                let point1 = SimPoints[AllPairs[p][0]]
+                let point2 = SimPoints[AllPairs[p][1]]
+                let dist = EUDist(point1.x,point1.y,point2.x,point2.y)
+
+                AllDistances.push(dist)
+
+                GroupInfo.distances.push( {
+                    pair: AllPairs[p],
+                    p1: point1,
+                    p2: point2,
+                    dist: dist
+                }  )
+            }
+
+            GroupInfo.min = Math.min(... AllDistances)
+            Shortest_Distances.push(Math.min(... AllDistances))
+            GroupDistances.push(GroupInfo)
+        }
+
+        //We now need to find the group with the longest shortest distance. (That is, the group for which the closest two Fennimals are maximally apart).
+        let longest_sortest_distance = Math.max(...Shortest_Distances)
+        let PotentialGroups = []
+        for(let i = 0; i<GroupDistances.length;i++){
+            if(GroupDistances[i].min === longest_sortest_distance){
+                PotentialGroups.push(GroupDistances[i])
+            }
+        }
+
+        //Note: there may be multiple groups with this shortest distance (if some elements are perfectly overlapping). If so, pick one at random
+        let SelectedGroup
+        if(PotentialGroups.length > 1){
+            SelectedGroup = drawRandomElementsFromArray(PotentialGroups,1,false)[0].IDs
+        }else{
+            SelectedGroup = PotentialGroups[0].IDs
+        }
+
+        console.log(SelectedGroup)
+
+        //Now we have our winning group.
+        //First, lets store these elements in a backup, so we can call onthese later (while still using splice)
+        let SelectedGroupIds = JSON.parse(JSON.stringify(SelectedGroup))
+
+        //Now we need to figure out all possible combinations to make from these elements
+        let SelectedGroup_Permutations = all_permutations(SelectedGroupIds)
+        let SelectedGroup_Range_Distances = []
+        for(let i =0; i<SelectedGroup_Permutations.length;i++){
+            let p1 = SimPoints[SelectedGroup_Permutations[i][0]]
+            let p2 = SimPoints[SelectedGroup_Permutations[i][1]]
+            let dist1 = EUDist(p1.x,p1.y,p2.x,p2.y)
+
+            let p3 = SimPoints[SelectedGroup_Permutations[i][2]]
+            let p4 = SimPoints[SelectedGroup_Permutations[i][3]]
+            let dist2 = EUDist(p3.x,p3.y,p4.x,p4.y)
+
+            let p5 = SimPoints[SelectedGroup_Permutations[i][4]]
+            let p6 = SimPoints[SelectedGroup_Permutations[i][5]]
+            let dist3 = EUDist(p5.x,p5.y,p6.x,p6.y)
+
+            let min_dist = Math.min(...[dist1,dist2,dist3])
+            let max_dist = Math.max(...[dist1,dist2,dist3])
+
+            SelectedGroup_Range_Distances.push(max_dist -  min_dist)
+        }
+
+        //Findings pairs with the lowest deviations in difference
+        let perm_smallest_range = Math.min(...SelectedGroup_Range_Distances)
+        let Potential_Pairs = []
+        for(let i = 0; i<SelectedGroup_Permutations.length;i++){
+            if(SelectedGroup_Range_Distances[i] === perm_smallest_range){
+                Potential_Pairs.push(SelectedGroup_Permutations[i])
+            }
+        }
+        //These are massively over-counted (above we didnt take ordering into proper account). Randomly pick one here.
+        let Sampled_Pair = shuffleArray(Potential_Pairs)[0]
+
+        //Creating the selected pairs
+        let Pair1 = [Sampled_Pair[0], Sampled_Pair[1]].flat()
+        let Pair2 = [Sampled_Pair[2], Sampled_Pair[3]].flat()
+        let Pair3 = [Sampled_Pair[4], Sampled_Pair[5]].flat()
+
+        //Now finally we want to keep track of the distance between these pairs (round to two numbers)
+        let dist_pair1 = Math.round(EUDist(SimPoints[Pair1[0]].x, SimPoints[Pair1[0]].y, SimPoints[Pair1[1]].x, SimPoints[Pair1[1]].y) * 100)/100
+        let dist_pair2 = Math.round(EUDist(SimPoints[Pair2[0]].x, SimPoints[Pair2[0]].y, SimPoints[Pair2[1]].x, SimPoints[Pair2[1]].y) * 100)/100
+        let dist_pair3 = Math.round(EUDist(SimPoints[Pair3[0]].x, SimPoints[Pair3[0]].y, SimPoints[Pair3[1]].x, SimPoints[Pair3[1]].y) * 100)/100
+
+        let Selected_Pairs = {Pair1: {IDs: Pair1, dist_t1: dist_pair1}, Pair2: {IDs: Pair2, dist_t1: dist_pair2}, Pair3: {IDs: Pair3, dist_t1: dist_pair3}}
+        return(Selected_Pairs)
+    }
+
+
+    function find_training_phase_heads_max_distinct2(SimsArr){
+        //First transform the arry of Sims into an object where each property only has points
+        let SimPoints = {}
+        for(let i =0; i<SimsArr.length; i++){
+            SimPoints[SimsArr[i].ID] = {x : SimsArr[i].x, y: SimsArr[i].y}
+        }
+
+        //Create an array of all different IDs.
+        let IDs = Object.getOwnPropertyNames(SimPoints)
+
+        //Now we need to figure out all groups that we can make with 6 different Fennimals.
+        let Combos = combinations(IDs,6)
+
+        //For each of these groups, figure out which combinations exist
+        let AllPairs = []
+        for(let i=0;i<Combos.length;i++){
+            let Pairs_From_Combo = all_permutations(Combos[i])
+            for(let j =0; j< Pairs_From_Combo.length;j++){
+                let pair1 = [Pairs_From_Combo[j][0], Pairs_From_Combo[j][1]]
+                let pair2 = [Pairs_From_Combo[j][2], Pairs_From_Combo[j][3]]
+                let pair3 = [Pairs_From_Combo[j][4], Pairs_From_Combo[j][5]]
+
+                //Calculating distances
+                let dist1 = EUDist(SimPoints[Pairs_From_Combo[j][0]].x, SimPoints[Pairs_From_Combo[j][0]].y, SimPoints[Pairs_From_Combo[j][1]].x, SimPoints[Pairs_From_Combo[j][1]].y )
+                let dist2 = EUDist(SimPoints[Pairs_From_Combo[j][2]].x, SimPoints[Pairs_From_Combo[j][2]].y, SimPoints[Pairs_From_Combo[j][3]].x, SimPoints[Pairs_From_Combo[j][3]].y )
+                let dist3 = EUDist(SimPoints[Pairs_From_Combo[j][4]].x, SimPoints[Pairs_From_Combo[j][4]].y, SimPoints[Pairs_From_Combo[j][5]].x, SimPoints[Pairs_From_Combo[j][5]].y )
+
+                //Calculating mean distances
+
+
+                AllPairs.push([pair1,pair2,pair3])
+            }
+        }
+
+        //For all combinations, figure out the
+
+        console.log(Combos)
+        console.log(AllPairs)
 
         //For each group, calculate the distance between all of the elements. For each group, store the shortest distance in an array
         let GroupDistances = []
@@ -974,20 +1096,35 @@ STIMULUSDATA = function(participant_number){
         //First, lets store these elements in a backup, so we can call onthese later (while still using splice)
         let SelectedGroupIds = JSON.parse(JSON.stringify(SelectedGroup))
 
-        // To create pairs, we first select one ID at random and re-calculate all differences between this point and the other IDs in the group
-        let random_ID = shuffleArray(SelectedGroup).splice(0,1)
+        // To create pairs, we search for the combination of heads which results in the mis similar distance between the pairs
+        let SelectedGroup_Permutations = all_permutations(SelectedGroupIds)
+        let SelectedGroup_Diff_Between_Distances = []
+        for(let i =0; i<SelectedGroup_Permutations.length;i++){
+            let p1 = SimPoints[SelectedGroup_Permutations[i][0]]
+            let p2 = SimPoints[SelectedGroup_Permutations[i][1]]
+            let dist1 = EUDist(p1.x,p1.y,p2.x,p2.y)
 
-        let Distances_To_Others = []
-        let p1 = SimPoints[random_ID]
-        for(let i = 0; i<SelectedGroup.length;i++){
-            let p2 = SimPoints[SelectedGroup[i]]
-            Distances_To_Others.push(EUDist(p1.x,p1.y,p2.x,p2.y))
+            let p3 = SimPoints[SelectedGroup_Permutations[i][2]]
+            let p4 = SimPoints[SelectedGroup_Permutations[i][3]]
+            let dist2 = EUDist(p3.x,p3.y,p4.x,p4.y)
+
+            SelectedGroup_Diff_Between_Distances.push( Math.abs(dist1 - dist2) )
         }
 
-        //The min and maximum values determine the other pair
-        let Indexes_Pair_2 = [Distances_To_Others.indexOf(Math.min(...Distances_To_Others)),Distances_To_Others.indexOf(Math.max(...Distances_To_Others))]
-        let Pair2 = [SelectedGroup[Indexes_Pair_2[0]], SelectedGroup[Indexes_Pair_2[1]]].flat()
-        let Pair1 = [random_ID,SelectedGroup.filter(x => !Pair2.includes(x)) ].flat()
+        //Findings pairs with the highest min difference
+        let perm_least_diff = Math.min(...SelectedGroup_Diff_Between_Distances)
+        let Potential_Pairs = []
+        for(let i = 0; i<SelectedGroup_Permutations.length;i++){
+            if(SelectedGroup_Diff_Between_Distances[i] === perm_least_diff){
+                Potential_Pairs.push(SelectedGroup_Permutations[i])
+            }
+        }
+        //These are massively over-counted (above we didnt take ordering into proper account). Randomly pick one here.
+        let Sampled_Pair = shuffleArray(Potential_Pairs)[0]
+
+        //Creating the selected pairs
+        let Pair1 = [Sampled_Pair[0], Sampled_Pair[1]].flat()
+        let Pair2 = [Sampled_Pair[2], Sampled_Pair[3]].flat()
 
         //Now finally we want to keep track of the distance between these pairs (round to two numbers)
         let dist_pair1 = Math.round(EUDist(SimPoints[Pair1[0]].x, SimPoints[Pair1[0]].y, SimPoints[Pair1[1]].x, SimPoints[Pair1[1]].y) * 100)/100
@@ -995,7 +1132,7 @@ STIMULUSDATA = function(participant_number){
 
         let Selected_Pairs = [{IDs: Pair1, dist_t1: dist_pair1}, {IDs: Pair2, dist_t1: dist_pair2}]
 
-        //Now we also need to find four IDs for the control Fennimals (two for training, two for binding).
+        //Now we also need to find two IDs for the control Fennimals (one for training, one for binding).
         // Here we first calculate the minimum distance between each remaining ID and the four selected IDs.
         let Remaining_IDs = IDs.filter(x => !SelectedGroupIds.includes(x))
         let Remaining_Min_Distances = []
@@ -1014,58 +1151,31 @@ STIMULUSDATA = function(participant_number){
             Remaining_Min_Distances.push(min_distance)
         }
 
-        //Now we select the four IDs with the largest minimum distance to the pairs
-        let Control_IDs_indexes = getIndexesOfNLargestElementsInArray(Remaining_Min_Distances,4)
+        //Now we select the two IDs with the largest minimum distance to the pairs
+        let Control_IDs_indexes = getIndexesOfNLargestElementsInArray(Remaining_Min_Distances,2)
         let Control_IDs = []
         for(let i =0;i<Control_IDs_indexes.length; i++){
             Control_IDs.push(Remaining_IDs[Control_IDs_indexes[i]])
         }
 
-        //Finally, we try to make the control pairs also a bit more different.
-        // Here we use the same trick as before: look at all combinations of pairs, and choose the two with the highest min difference
-        let Control_Permutations = all_permutations(Control_IDs)
-        let Control_Permutations_Min_Distances = []
-        for(let i =0;i<Control_Permutations.length;i++){
-            let p1 = SimPoints[Control_Permutations[i][0]]
-            let p2 = SimPoints[Control_Permutations[i][1]]
-            let dist1 = EUDist(p1.x,p1.y,p2.x,p2.y)
-
-            let p3 = SimPoints[Control_Permutations[i][2]]
-            let p4 = SimPoints[Control_Permutations[i][3]]
-            let dist2 = EUDist(p3.x,p3.y,p4.x,p4.y)
-
-            Control_Permutations_Min_Distances.push(Math.min(dist1,dist2))
-        }
-        //Findings pairs with the highest min difference
-        let perm_max_min = Math.max(...Control_Permutations_Min_Distances)
-        let Potential_Control_Pairs = []
-        for(let i = 0; i<Control_Permutations.length;i++){
-            if(Control_Permutations_Min_Distances[i] === perm_max_min){
-                Potential_Control_Pairs.push(Control_Permutations[i])
-            }
-        }
-        //These are massively over-counted (above we didnt take ordering into proper account). Randomly pick one here.
-        let Control_Pairs = shuffleArray(Potential_Control_Pairs)[0]
-
         //Creating objects containing both control pairs and their distances
-        let ControlPair1= {
-            IDs: [Control_Pairs[0], Control_Pairs[1]].flat(),
-            dist_t1: Math.round( EUDist( SimPoints[Control_Pairs[0]].x , SimPoints[Control_Pairs[0]].y,  SimPoints[Control_Pairs[1]].x , SimPoints[Control_Pairs[1]].y, ) * 100) / 100
+        let ControlPair= {
+            IDs: [Control_IDs[0], Control_IDs[1]].flat(),
+            dist_t1: Math.round( EUDist( SimPoints[Control_IDs[0]].x , SimPoints[Control_IDs[0]].y,  SimPoints[Control_IDs[1]].x , SimPoints[Control_IDs[1]].y, ) * 100) / 100
         }
-        let ControlPair2= {
-            IDs: [Control_Pairs[2], Control_Pairs[3]].flat(),
-            dist_t1: Math.round( EUDist( SimPoints[Control_Pairs[2]].x , SimPoints[Control_Pairs[2]].y,  SimPoints[Control_Pairs[3]].x , SimPoints[Control_Pairs[3]].y, ) * 100)/100
-        }
+
+        console.log(Control_IDs)
+        console.log(ControlPair)
 
         //Creating the return object
         let Output = {
             Pair1: Selected_Pairs[0],
             Pair2: Selected_Pairs[1],
-            ControlPair1: ControlPair1,
-            ControlPair2: ControlPair2
+            ControlPair: ControlPair,
         }
         return(Output)
     }
+
 
     // SUPPORTING FUNCTIONS
     ////////////////////////
@@ -1132,19 +1242,19 @@ STIMULUSDATA = function(participant_number){
                 case("IB"): if(items_allowed_for_indirect_pair === "direct"){correct_item = TrainingFennimals.IB.item} else {correct_item = TrainingFennimals.IA.item} break
                 case("DA"): correct_item = TrainingFennimals.DA.item; break
                 case("DB"): correct_item = TrainingFennimals.DB.item; break
-                case("C"): correct_item = TrainingFennimals.C.item; break;
-                //case("C2"): correct_item = TrainingFennimals.C2.item; break;
+                case("C1"): correct_item = TrainingFennimals.C1.item; break;
+                case("C2"): correct_item = TrainingFennimals.C2.item; break;
             }
 
             //We will select one element from each of the arrays. So arrays with one element will always be selected
             let OtherPairItems
             switch(key){
-                case("IA"): OtherPairItems = [ [TrainingFennimals.C.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("IB"): OtherPairItems = [ [TrainingFennimals.C.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("DA"): OtherPairItems = [ [TrainingFennimals.C.item],[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
-                case("DB"): OtherPairItems = [ [TrainingFennimals.C.item],[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
-                case("C"): OtherPairItems = [ [TrainingFennimals.IA.item, TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
-                //case("C2"): OtherPairItems = [ [TrainingFennimals.IA.item, TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
+                case("IA"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("IB"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("DA"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
+                case("DB"): OtherPairItems = [ [TrainingFennimals.C1.item,TrainingFennimals.C2.item],[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
+                case("C1"): OtherPairItems = [ [TrainingFennimals.IB.item,TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
+                case("C2"): OtherPairItems = [ [TrainingFennimals.IA.item,TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
             }
 
             //Creating an array containing all the trial's available items
@@ -1166,8 +1276,8 @@ STIMULUSDATA = function(participant_number){
                 case("IB"): TestObj.item_direct = TrainingFennimals.IB.item; TestObj.item_indirect = TrainingFennimals.IA.item; break
                 case("DA"): TestObj.item_direct = TrainingFennimals.DA.item; TestObj.item_indirect = TrainingFennimals.DB.item; break
                 case("DB"): TestObj.item_direct = TrainingFennimals.DB.item; TestObj.item_indirect = TrainingFennimals.DA.item; break
-                case("C"): TestObj.item_direct = TrainingFennimals.C.item; TestObj.item_indirect = false; break
-                //case("C2"): TestObj.item_direct = TrainingFennimals.C2.item; TestObj.item_indirect = false; break
+                case("C1"): TestObj.item_direct = TrainingFennimals.C1.item; TestObj.item_indirect = false; break
+                case("C2"): TestObj.item_direct = TrainingFennimals.C2.item; TestObj.item_indirect = false; break
             }
 
             TestObj.ID = FenObj.ID
@@ -1198,14 +1308,169 @@ STIMULUSDATA = function(participant_number){
                 case("IB"): NewFenObj.item_direct = TrainingFennimals.IB.item; NewFenObj.item_indirect = TrainingFennimals.IA.item; break
                 case("DA"): NewFenObj.item_direct = TrainingFennimals.DA.item; NewFenObj.item_indirect = TrainingFennimals.DB.item; break
                 case("DB"): NewFenObj.item_direct = TrainingFennimals.DB.item; NewFenObj.item_indirect = TrainingFennimals.DA.item; break
-                case("C"): NewFenObj.item_direct = TrainingFennimals.C.item; NewFenObj.item_indirect = false; break
-                //case("C2"): NewFenObj.item_direct = TrainingFennimals.C2.item; NewFenObj.item_indirect = false; break
+                case("C1"): NewFenObj.item_direct = TrainingFennimals.C1.item; NewFenObj.item_indirect = false; break
+                case("C2"): NewFenObj.item_direct = TrainingFennimals.C2.item; NewFenObj.item_indirect = false; break
             }
 
             NewFenObj.correct_item = NewFenObj.item_direct
             NewFenObj.feedback = false
 
             Block.push(NewFenObj)
+        }
+
+        if(shuffle_trials){
+            return(shuffleArray(Block))
+        }else{
+            return(Block)
+        }
+    }
+
+    // Returns a block of timed trials. Bodies are sampled randomly for each block (for the non-distractor trials)
+    function createTimedBlockTrials(shuffle_trials, add_mixed_trials_A, add_mixed_trials_B ){
+        let Block = []
+        let Keys_Used = ["IA","IB","DA","DB"]
+
+        //Sample a random set of bodies
+        let Bodies = shuffleArray(JSON.parse(JSON.stringify(Param.Regionfree_Fennimal_Bodies)))
+
+        for(let k = 0;k<Keys_Used.length; k++){
+            let key = Keys_Used[k]
+            let TemplateObj = TimedBlockTemplates[key]
+            TemplateObj.body = Bodies[k]
+            TemplateObj.region = "Neutral"
+            TemplateObj.location =  "Neutral"
+
+            let TestObj = createFennimalObj("Neutral","Neutral", TemplateObj.head, TemplateObj.body, false)
+            TestObj.name = createConjunctiveNameHeadBody(TemplateObj.body,TemplateObj.head)
+            TestObj.feedback = false
+
+            //Setting item references
+            TestObj.item_direct = TemplateObj.item_direct
+            TestObj.item_indirect = TemplateObj.item_indirect
+
+            //Finding the correct item
+            let correct_item
+            switch(key){
+                case("IA"): correct_item = TrainingFennimals.IB.item; break
+                case("IB"): correct_item = TrainingFennimals.IA.item; break
+                case("DA"): correct_item = TrainingFennimals.DB.item; break
+                case("DB"): correct_item = TrainingFennimals.DA.item; break
+                case("C"): correct_item = TrainingFennimals.C.item; break
+            }
+
+            //We will select one element from each of the arrays. So arrays with one element will always be selected
+            let OtherPairItems
+            switch(key){
+                case("IA"): OtherPairItems = [ TrainingFennimals.C.item, [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("IB"): OtherPairItems = [ TrainingFennimals.C.item, [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+                case("DA"): OtherPairItems = [ TrainingFennimals.C.item, [TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
+                case("DB"): OtherPairItems = [ TrainingFennimals.C.item, [TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
+                case("C"): OtherPairItems = [ TrainingFennimals.C.item, [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
+            }
+
+            //Creating an array containing all the trial's available items
+            let Available_Items = [correct_item]
+            for(let i=0;i<OtherPairItems.length;i++){
+                if(typeof OtherPairItems[i] === "string"){
+                    Available_Items.push(OtherPairItems[i])
+                }else{
+                    Available_Items.push(shuffleArray(OtherPairItems[i])[0] )
+                }
+            }
+
+            //Assigning the properties to the TestObject.
+            TestObj.items_available = Available_Items
+            TestObj.correct_item = correct_item
+
+            //Adding ID for easy analysis
+            TestObj.ID = TemplateObj.ID
+
+            //Setting a max decision time
+            TestObj.max_decision_time = max_rt_tt
+
+            //Pushing to the DirectTestBlock
+            Block.push(TestObj)
+        }
+
+        //If requested, add a number of mixed trials. These trials have the head of IA (IB) or DA (DB) and the body of C1 or C2.
+        // Any items associated to the head-pair are not available. Hence the correct item is C1 or C2.
+        if(add_mixed_trials_A){
+            //Adding a Fennimal with the head of IA and the body of C1. Available items: C1 (correct), C2, DA, DB, and
+            //Adding a Fennimal with the head of DA and the body of C2. Available items: C2 (correct), C1, IA, IB
+            let MixedTrialI = {}
+
+            MixedTrialI = createFennimalObj("Neutral","Neutral", TrainingFennimals.IA.head, TrainingFennimals.C.body, false)
+
+            MixedTrialI.name = createConjunctiveNameHeadBody(MixedTrialI.body,MixedTrialI.head)
+            //MixedTrialD.name = createConjunctiveNameHeadBody(MixedTrialD.body,MixedTrialD.head)
+            MixedTrialI.feedback = false
+            //MixedTrialD.feedback = false
+
+            //Setting item references
+            MixedTrialI.item_direct = TrainingFennimals.C.item
+            //MixedTrialD.item_direct = TrainingFennimals.C.item
+
+            MixedTrialI.item_indirect = false
+            //MixedTrialD.item_indirect = false
+
+            MixedTrialI.correct_item = MixedTrialI.item_direct
+            //MixedTrialD.correct_item = MixedTrialD.item_direct
+
+            MixedTrialI.items_available = [MixedTrialI.correct_item, TrainingFennimals.DA.item, TrainingFennimals.DB.item]
+            //MixedTrialD.items_available = [MixedTrialD.correct_item, TrainingFennimals.IA.item, TrainingFennimals.IB.item]
+
+            //Adding ID for easy analysis
+            MixedTrialI.ID = "IA_mix"
+            //MixedTrialD.ID = "DA_mix"
+
+            //Setting a max decision time
+            MixedTrialI.max_decision_time = max_rt_tt_dist
+            //MixedTrialD.max_decision_time = max_rt_tt_dist
+
+            //Pushing to the DirectTestBlock
+            Block.push(MixedTrialI)
+            //Block.push(MixedTrialD)
+
+        }
+
+        if(add_mixed_trials_B){
+            //Adding a Fennimal with the head of IB and the body of C2. Available items: C2 (correct), C1, DA, DB, and
+            //Adding a Fennimal with the head of DB and the body of C1. Available items: C1 (correct), C2, IA, IB
+            let MixedTrialI = {}//, MixedTrialD = {}
+
+            MixedTrialI = createFennimalObj("Neutral","Neutral", TrainingFennimals.IB.head, TrainingFennimals.C.body, false)
+            //MixedTrialD = createFennimalObj("Neutral","Neutral", TrainingFennimals.DB.head, TrainingFennimals.C.body, false)
+
+            MixedTrialI.name = createConjunctiveNameHeadBody(MixedTrialI.body,MixedTrialI.head)
+            //MixedTrialD.name = createConjunctiveNameHeadBody(MixedTrialD.body,MixedTrialD.head)
+            MixedTrialI.feedback = false
+            //MixedTrialD.feedback = false
+
+            //Setting item references
+            MixedTrialI.item_direct = TrainingFennimals.C.item
+            //MixedTrialD.item_direct = TrainingFennimals.C.item
+
+            MixedTrialI.item_indirect = false
+            //MixedTrialD.item_indirect = false
+
+            MixedTrialI.correct_item = MixedTrialI.item_direct
+            //MixedTrialD.correct_item = MixedTrialD.item_direct
+
+            MixedTrialI.items_available = [MixedTrialI.correct_item, TrainingFennimals.DA.item, TrainingFennimals.DB.item]
+            //MixedTrialD.items_available = [MixedTrialD.correct_item, TrainingFennimals.IA.item, TrainingFennimals.IB.item]
+
+            //Adding ID for easy analysis
+            MixedTrialI.ID = "IB_mix"
+            //MixedTrialD.ID = "DB_mix"
+
+            //Setting a max decision time
+            MixedTrialI.max_decision_time = max_rt_tt_dist
+            //MixedTrialD.max_decision_time = max_rt_tt_dist
+
+            //Pushing to the DirectTestBlock
+            Block.push(MixedTrialI)
+            //Block.push(MixedTrialD)
+
         }
 
         if(shuffle_trials){
@@ -1292,10 +1557,6 @@ STIMULUSDATA = function(participant_number){
         return(JSON.parse(JSON.stringify(BindingPhaseSetup)))
     }
 
-    //Returns which category task is specified above
-    this.getCategoryType = function(){
-        return(similarity_phase_setup)
-    }
 }
 
 //Defines all experiment parameters which are not part of the stimuli
@@ -1317,7 +1578,7 @@ PARAMETERS = function() {
     this.location_Names = ["Pineforest", "Iceberg", "Windmill", "Garden", "Waterfall", "Mine", "Church", "Farm","Marsh", "Cottage","Oasis", "Cactus", "Beachbar", "Port", "Bush", "Jungleforest"]
     //["Crab", "Snake", "Giraffe", "Mushroom", "Ant", "Beaver", "Spider","Flamingo","Grasshopper",
     // "Frog", "Dragon", "Bunny", "Bird", "Elephant", "Tiger", "Walrus", "Turtle", "Crocodile", "Gnome", "Plant", "Robot"]
-    this.Available_Fennimal_Heads = ["A", "B", "C", "D", "E", "F","G","H", "I", "J"]
+    this.Available_Fennimal_Heads = ["A", "B", "C", "D", "E", "F","G","H", "I", "J", "K", "L", "M", "N"]
     this.Available_Fennimal_Bodies = ["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M", "N"] // ["A", "B", "C", "D", "F","G","H", "I","J","K"] //["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M","N"]
     this.Regionfree_Fennimal_Bodies = ["A", "E", "F","H","K","M"] // ["A", "B", "C", "D", "F","G","H", "I","J","K"] //["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M","N"]
 
@@ -1869,7 +2130,7 @@ PARAMETERS = function() {
         Jungleforest: "The Deep Jungle"
     }
 
-    this.Available_items = ["ball", "duck", "car", "trumpet", "kite"] // ["car","spinner","boomerang","balloon","shovel","trumpet"]
+    this.Available_items = ["ball", "duck", "car", "trumpet", "kite", "shovel"] // ["car","spinner","boomerang","balloon","shovel","trumpet"]
 
     //Alternative colorscheme when the location should not be shown
     this.GrayColorScheme ={
@@ -1964,7 +2225,11 @@ PARAMETERS = function() {
         G: "Snail",
         H: "Scout",
         I: "Unihorn",
-        J: "Cheeks"
+        J: "Cheeks",
+        K: "Pooch",
+        L: "Grazer",
+        M: "Mischief",
+        N: "Earsy"
     }
 
     //Given a location name, returns its associated region. If no region contains this location, returns false
@@ -5614,6 +5879,10 @@ CategoryPhaseController_Arena = function(ExpCont, CardStimData, LocCont, instruc
                     case("E"): CardDims = {w:50,h:50, scale: 0.43, dx:3, dy: -3}; break //Chirpy
                     case("F"): CardDims = {w:50,h:50, scale: 0.5, dx:0, dy: 5}; break //Punk
                     case("H"): CardDims = {w:50,h:50, scale: 0.5, dx:0, dy: 0}; break //Scout
+                    case("K"): CardDims = {w:50,h:50, scale: 0.4, dx:-1, dy: -3}; break //Pooch
+                    case("L"): CardDims = {w:50,h:50, scale: 0.4, dx:0, dy: 0}; break //Grazer
+                    case("M"): CardDims = {w:50,h:50, scale: 0.38, dx:0, dy: 2}; break //Mischief
+                    case("N"): CardDims = {w:50,h:50, scale: 0.4, dx:0, dy: 3}; break //Earsy
                     default: CardDims = {w:50,h:50, scale: 0.45, dx:0, dy: 0}; break
                 }
 
@@ -7198,4 +7467,4 @@ EC.showStartScreen()
 //EC.start_test_phase()
 
 
-console.log("Version: 27.11.23 C")
+console.log("Version: 4.12.23")
