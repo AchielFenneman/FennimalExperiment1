@@ -560,7 +560,9 @@ function all_permutations(array) {
     return result;
 }
 
-STIMULUSDATA = function(participant_number){
+//Experiment 1: Does the random walk increase the similarity between features (five max different features, 2 sets of equidistant heads)
+STIMULUSDATA_EXP1 = function(participant_number){
+    let experiment_code = "exp1"
 
     // RESETTING THE RNG SEED HERE //
     ////////////////////////////////
@@ -683,17 +685,6 @@ STIMULUSDATA = function(participant_number){
             C: {ID: "C", head: TrainingFennimals.C.head, body: Param.RegionData[BindingPhaseRegions.C].preferredBodyType, region: BindingPhaseRegions.C, location: BindingPhaseLocations.C, item_direct: TrainingFennimals.C.item, item_indirect: false},
             //C2: {ID: "C2", head: TrainingFennimals.C2.head, body: Param.RegionData[BindingPhaseRegions.C2].preferredBodyType, region: BindingPhaseRegions.C2, location: BindingPhaseLocations.C2, item_direct: TrainingFennimals.C2.item, item_indirect: false},
         }
-
-        //Setting the trials for the timed block
-        /*TimedBlockTemplates =  {
-            IA: {ID: "IA", head: TrainingFennimals.IA.head, item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
-            IB: {ID: "IB", head: TrainingFennimals.IB.head, item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
-            DA: {ID: "DA", head: TrainingFennimals.DA.head, item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
-            DB: {ID: "DB", head: TrainingFennimals.DB.head, item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
-            C: {ID: "C", head: TrainingFennimals.C.head, item_direct: TrainingFennimals.C.item, item_indirect: false},
-        }
-
-         */
 
         //Setting all the trials for the Binding phase
         BindingPhaseSetup = [
@@ -997,165 +988,14 @@ STIMULUSDATA = function(participant_number){
         }
     }
 
-    // Returns a block of timed trials. Bodies are sampled randomly for each block (for the non-distractor trials)
-    function createTimedBlockTrials(shuffle_trials, add_mixed_trials_A, add_mixed_trials_B ){
-        let Block = []
-        let Keys_Used = ["IA","IB","DA","DB"]
-
-        //Sample a random set of bodies
-        let Bodies = shuffleArray(JSON.parse(JSON.stringify(Param.Regionfree_Fennimal_Bodies)))
-
-        for(let k = 0;k<Keys_Used.length; k++){
-            let key = Keys_Used[k]
-            let TemplateObj = TimedBlockTemplates[key]
-            TemplateObj.body = Bodies[k]
-            TemplateObj.region = "Neutral"
-            TemplateObj.location =  "Neutral"
-
-            let TestObj = createFennimalObj("Neutral","Neutral", TemplateObj.head, TemplateObj.body, false)
-            TestObj.name = createConjunctiveNameHeadBody(TemplateObj.body,TemplateObj.head)
-            TestObj.feedback = false
-
-            //Setting item references
-            TestObj.item_direct = TemplateObj.item_direct
-            TestObj.item_indirect = TemplateObj.item_indirect
-
-            //Finding the correct item
-            let correct_item
-            switch(key){
-                case("IA"): correct_item = TrainingFennimals.IB.item; break
-                case("IB"): correct_item = TrainingFennimals.IA.item; break
-                case("DA"): correct_item = TrainingFennimals.DB.item; break
-                case("DB"): correct_item = TrainingFennimals.DA.item; break
-                case("C"): correct_item = TrainingFennimals.C.item; break
-            }
-
-            //We will select one element from each of the arrays. So arrays with one element will always be selected
-            let OtherPairItems
-            switch(key){
-                case("IA"): OtherPairItems = [ TrainingFennimals.C.item, [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("IB"): OtherPairItems = [ TrainingFennimals.C.item, [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("DA"): OtherPairItems = [ TrainingFennimals.C.item, [TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
-                case("DB"): OtherPairItems = [ TrainingFennimals.C.item, [TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
-                case("C"): OtherPairItems = [ TrainingFennimals.C.item, [TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-            }
-
-            //Creating an array containing all the trial's available items
-            let Available_Items = [correct_item]
-            for(let i=0;i<OtherPairItems.length;i++){
-                if(typeof OtherPairItems[i] === "string"){
-                    Available_Items.push(OtherPairItems[i])
-                }else{
-                    Available_Items.push(shuffleArray(OtherPairItems[i])[0] )
-                }
-            }
-
-            //Assigning the properties to the TestObject.
-            TestObj.items_available = Available_Items
-            TestObj.correct_item = correct_item
-
-            //Adding ID for easy analysis
-            TestObj.ID = TemplateObj.ID
-
-            //Setting a max decision time
-            TestObj.max_decision_time = max_rt_tt
-
-            //Pushing to the DirectTestBlock
-            Block.push(TestObj)
-        }
-
-        //If requested, add a number of mixed trials. These trials have the head of IA (IB) or DA (DB) and the body of C1 or C2.
-        // Any items associated to the head-pair are not available. Hence the correct item is C1 or C2.
-        if(add_mixed_trials_A){
-            //Adding a Fennimal with the head of IA and the body of C1. Available items: C1 (correct), C2, DA, DB, and
-            //Adding a Fennimal with the head of DA and the body of C2. Available items: C2 (correct), C1, IA, IB
-            let MixedTrialI = {}
-
-            MixedTrialI = createFennimalObj("Neutral","Neutral", TrainingFennimals.IA.head, TrainingFennimals.C.body, false)
-
-            MixedTrialI.name = createConjunctiveNameHeadBody(MixedTrialI.body,MixedTrialI.head)
-            //MixedTrialD.name = createConjunctiveNameHeadBody(MixedTrialD.body,MixedTrialD.head)
-            MixedTrialI.feedback = false
-            //MixedTrialD.feedback = false
-
-            //Setting item references
-            MixedTrialI.item_direct = TrainingFennimals.C.item
-            //MixedTrialD.item_direct = TrainingFennimals.C.item
-
-            MixedTrialI.item_indirect = false
-            //MixedTrialD.item_indirect = false
-
-            MixedTrialI.correct_item = MixedTrialI.item_direct
-            //MixedTrialD.correct_item = MixedTrialD.item_direct
-
-            MixedTrialI.items_available = [MixedTrialI.correct_item, TrainingFennimals.DA.item, TrainingFennimals.DB.item]
-            //MixedTrialD.items_available = [MixedTrialD.correct_item, TrainingFennimals.IA.item, TrainingFennimals.IB.item]
-
-            //Adding ID for easy analysis
-            MixedTrialI.ID = "IA_mix"
-            //MixedTrialD.ID = "DA_mix"
-
-            //Setting a max decision time
-            MixedTrialI.max_decision_time = max_rt_tt_dist
-            //MixedTrialD.max_decision_time = max_rt_tt_dist
-
-            //Pushing to the DirectTestBlock
-            Block.push(MixedTrialI)
-            //Block.push(MixedTrialD)
-
-        }
-
-        if(add_mixed_trials_B){
-            //Adding a Fennimal with the head of IB and the body of C2. Available items: C2 (correct), C1, DA, DB, and
-            //Adding a Fennimal with the head of DB and the body of C1. Available items: C1 (correct), C2, IA, IB
-            let MixedTrialI = {}//, MixedTrialD = {}
-
-            MixedTrialI = createFennimalObj("Neutral","Neutral", TrainingFennimals.IB.head, TrainingFennimals.C.body, false)
-            //MixedTrialD = createFennimalObj("Neutral","Neutral", TrainingFennimals.DB.head, TrainingFennimals.C.body, false)
-
-            MixedTrialI.name = createConjunctiveNameHeadBody(MixedTrialI.body,MixedTrialI.head)
-            //MixedTrialD.name = createConjunctiveNameHeadBody(MixedTrialD.body,MixedTrialD.head)
-            MixedTrialI.feedback = false
-            //MixedTrialD.feedback = false
-
-            //Setting item references
-            MixedTrialI.item_direct = TrainingFennimals.C.item
-            //MixedTrialD.item_direct = TrainingFennimals.C.item
-
-            MixedTrialI.item_indirect = false
-            //MixedTrialD.item_indirect = false
-
-            MixedTrialI.correct_item = MixedTrialI.item_direct
-            //MixedTrialD.correct_item = MixedTrialD.item_direct
-
-            MixedTrialI.items_available = [MixedTrialI.correct_item, TrainingFennimals.DA.item, TrainingFennimals.DB.item]
-            //MixedTrialD.items_available = [MixedTrialD.correct_item, TrainingFennimals.IA.item, TrainingFennimals.IB.item]
-
-            //Adding ID for easy analysis
-            MixedTrialI.ID = "IB_mix"
-            //MixedTrialD.ID = "DB_mix"
-
-            //Setting a max decision time
-            MixedTrialI.max_decision_time = max_rt_tt_dist
-            //MixedTrialD.max_decision_time = max_rt_tt_dist
-
-            //Pushing to the DirectTestBlock
-            Block.push(MixedTrialI)
-            //Block.push(MixedTrialD)
-
-        }
-
-        if(shuffle_trials){
-            return(shuffleArray(Block))
-        }else{
-            return(Block)
-        }
-    }
-
 
     // CALL FUNCTIONS //
     ////////////////////
     //Call to get return a deepcopy of the training set Fennimals, keyed on location.
+    this.get_experiment_code = function(){
+        return(experiment_code)
+    }
+
     this.getTrainingSetFennimalsKeyedOnLocation = function(){
         //Creating an object to hold all the Fennimals based on location. Empty locations should have a value of false, taken locations should have the Fennimal object.
         //Here we can rely on the assumption that each location will have been used only once.
@@ -1231,7 +1071,548 @@ STIMULUSDATA = function(participant_number){
 
 }
 
-STIMULUSDATA_MAX_DIFF = function(participant_number){
+//Experiment 2: Does the random walk increase the similarity between semantic clusters (4 pairs of max close heads into 2 sets of equidistant heads and a distractor in the middle)
+STIMULUSDATA_EXP2 = function(participant_number){
+    let experiment_code = "exp2"
+
+    // RESETTING THE RNG SEED HERE //
+    ////////////////////////////////
+    // NO CALLS TO RANDOMIZATION SHOULD BE MADE ABOVE THIS LINE //
+    RNG = new RandomNumberGenerator(participant_number)
+
+    // SETTING THE CONTENTS OF THE FIRST SIMILARITY TASK (the rest of the Fennimals will be created according to these results)
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    let Head_Available_For_First_Sim_Task = shuffleArray(JSON.parse(JSON.stringify(Param.Available_Fennimal_Heads)))
+    let FirstSimTaskStim = []
+    for(let i = 0; i< Head_Available_For_First_Sim_Task.length; i++){
+        FirstSimTaskStim.push({
+            ID: Head_Available_For_First_Sim_Task[i],
+            head: Head_Available_For_First_Sim_Task[i]
+        })
+    }
+
+    //The results from the first sim task (and associated selected pairs) will be set here.
+    let FirstSimResults, Selected_Pairs
+
+    this.get_stim_for_first_sim_task = function(){
+        return  {
+            features: "heads",
+            Stim: FirstSimTaskStim
+        }}
+
+    // DEFINING THE AVAILABLE FEATURES FROM THE PARAM OBJECT
+    ///////////////////////////////////////////////////////////
+    let Available_Regions = shuffleArray(["North","Desert","Village","Jungle","Flowerfields","Swamp", "Beach", "Mountains"])
+
+    let Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 5, false ))
+    let Random_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
+
+    let Drawn_Training_Regions = Available_Regions.splice(0,3)
+    let TrainingRegions = {
+        CA: Drawn_Training_Regions[0],
+        CB: Drawn_Training_Regions[0],
+        EA: Drawn_Training_Regions[1],
+        EB: Drawn_Training_Regions[1],
+        D: Drawn_Training_Regions[2],
+    }
+    let C_Locations = shuffleArray( Param.RegionData[TrainingRegions.CA].Locations )
+    let E_Locations = shuffleArray( Param.RegionData[TrainingRegions.EA].Locations )
+    let TrainingLocations = {
+        CA: C_Locations[0],
+        CB: C_Locations[1],
+        EA: E_Locations[0],
+        EB: E_Locations[1],
+        D: shuffleArray( Param.RegionData[TrainingRegions.D].Locations )[0],
+    }
+
+    let Drawn_Binding_Phase_Regions = Available_Regions.splice(0,5)
+    let BindingPhaseRegions = {
+        CA: Drawn_Binding_Phase_Regions[0],
+        CB: Drawn_Binding_Phase_Regions[1],
+        EA: Drawn_Binding_Phase_Regions[2],
+        EB: Drawn_Binding_Phase_Regions[3],
+        D: Drawn_Binding_Phase_Regions[4],
+    }
+    let BindingPhaseLocations = {
+        CA: shuffleArray( Param.RegionData[BindingPhaseRegions.CA].Locations ),
+        CB: shuffleArray( Param.RegionData[BindingPhaseRegions.CB].Locations ),
+        EA: shuffleArray( Param.RegionData[BindingPhaseRegions.EA].Locations ),
+        EB: shuffleArray( Param.RegionData[BindingPhaseRegions.EB].Locations ),
+        D: shuffleArray(  Param.RegionData[BindingPhaseRegions.D].Locations),
+    }
+
+    //These will only be filled after the first similarity task
+    let TrainingFennimals, BindingPhaseTemplates, BindingPhaseSetup
+
+    this.create_Fennimals_from_sim_task_results = function(FirstSimData){
+        //Storing the results from the first similarity task.
+        FirstSimResults = JSON.parse(JSON.stringify(FirstSimData))
+
+        //Now we can update the stimuli in accordance to the setting outlined above
+        // For two pairs of equally different (exp 1): "equally_distinct"
+        // For one maximally close and one maximally distinct (exp 2, 3): "max_difference"
+        set_all_Fennimals(FirstSimResults.Data)
+
+    }
+
+    function set_all_Fennimals (SimsArr){
+        //Finding both pairs and a control head.
+        //{Closest: {IDs: Closest_Pair, dist_t1: dist_pairC}, Furthest: {IDs: Furthest_Pair, dist_t1: dist_pairF}, Control: central_ID}
+        let Pairs = find_training_phase_heads(SimsArr)
+
+        //Storing as  seperate object (easier for analyses down the line)
+        Selected_Pairs = Pairs
+
+        //Now we can create all the Fennimals
+        TrainingFennimals = {
+            CA: createFennimalObj(TrainingRegions.CA, TrainingLocations.CA, Pairs.Pair_Control.used_in_exp[0],Param.RegionData[TrainingRegions.CA].preferredBodyType, Random_Items[0] ),
+            CB: createFennimalObj(TrainingRegions.CB, TrainingLocations.CB, Pairs.Pair_Control.used_in_exp[1],Param.RegionData[TrainingRegions.CB].preferredBodyType, Random_Items[1] ),
+            EA: createFennimalObj(TrainingRegions.EA, TrainingLocations.EA, Pairs.Pair_Experimental.used_in_exp[0],Param.RegionData[TrainingRegions.EA].preferredBodyType, Random_Items[2] ),
+            EB: createFennimalObj(TrainingRegions.EB, TrainingLocations.EB, Pairs.Pair_Experimental.used_in_exp[1],Param.RegionData[TrainingRegions.EB].preferredBodyType, Random_Items[3] ),
+            D: createFennimalObj(TrainingRegions.D, TrainingLocations.D, Pairs.distractor,Param.RegionData[TrainingRegions.D].preferredBodyType, Random_Items[4] ),
+        }
+
+        BindingPhaseTemplates= {
+            CA: {ID: "CA", head: TrainingFennimals.CA.head, body: Param.RegionData[BindingPhaseRegions.CA].preferredBodyType, region: BindingPhaseRegions.CA, location: BindingPhaseLocations.CA[0], item_direct: TrainingFennimals.CA.item, item_indirect: TrainingFennimals.CB.item },
+            CB: {ID: "CB", head: TrainingFennimals.CB.head, body: Param.RegionData[BindingPhaseRegions.CB].preferredBodyType, region: BindingPhaseRegions.CB, location: BindingPhaseLocations.CB[0],item_direct: TrainingFennimals.CB.item, item_indirect: TrainingFennimals.CA.item},
+            EA: {ID: "EA", head: TrainingFennimals.EA.head, body: Param.RegionData[BindingPhaseRegions.EA].preferredBodyType, region: BindingPhaseRegions.EA, location: BindingPhaseLocations.EA[0],item_direct: TrainingFennimals.EA.item, item_indirect: TrainingFennimals.EB.item},
+            EB: {ID: "EB", head: TrainingFennimals.EB.head, body: Param.RegionData[BindingPhaseRegions.EB].preferredBodyType, region: BindingPhaseRegions.EB, location: BindingPhaseLocations.EB[0],item_direct: TrainingFennimals.EB.item, item_indirect: TrainingFennimals.EA.item},
+            D: {ID: "D", head: TrainingFennimals.D.head, body: Param.RegionData[BindingPhaseRegions.D].preferredBodyType, region: BindingPhaseRegions.D, location: BindingPhaseLocations.D[0], item_direct: TrainingFennimals.D.item, item_indirect: false},
+        }
+
+        //Setting all the trials for the Binding phase
+        BindingPhaseSetup = [
+            {
+                Trials:  createBlockOfBindingTrials(["CA","CB","EA","EB", "D"], "direct", true,true ),
+                type: "direct",
+                hint_type: "text",
+                number: 1
+            },{
+                Trials:  createBlockOfBindingTrials(["CA","CB","EA","EB", "D"],  "indirect", false,true ),
+                type: "indirect",
+                hint_type: "text",
+                number: 2
+            },{
+                Trials:  createBlockOfBindingTrials(["CA","CB","EA","EB", "D"],  "indirect", false,true ),
+                type: "indirect",
+                hint_type: "text",
+                number: 3
+            },{
+                Trials:  createBlockOfBindingTrials(["CA","CB","EA","EB", "D"], "indirect", false,true ),
+                type: "indirect",
+                hint_type: "text",
+                number: 4
+            },{
+                Trials:  createBlockOfBindingTrials(["CA","CB","EA","EB", "D"],  "indirect", false,true ),
+                type: "indirect",
+                hint_type: "text",
+                number: 5
+            }, {
+                type: "additional_similarity_reduced",
+                number: 6
+            }, {
+                Trials: createBlockOfRepeatTrainingTrials(true),
+                type: "repeat_training",
+                hint_type: "text",
+                number: 7
+            }]
+
+
+        console.log(Selected_Pairs)
+        console.log(TrainingFennimals)
+        console.log(BindingPhaseTemplates)
+        console.log(BindingPhaseSetup)
+
+
+
+    }
+
+    //Given a similarity setup, returns two pairs of maximally dis-similar IDs
+    function find_training_phase_heads(SimsArr){
+        //First transform the arry of Sims into an object where each property only has points
+        let SimPoints = {}
+        for(let i =0; i<SimsArr.length; i++){
+            SimPoints[SimsArr[i].ID] = {x : SimsArr[i].x, y: SimsArr[i].y}
+        }
+
+        //Create an array of all different IDs.
+        let IDs = Object.getOwnPropertyNames(SimPoints)
+
+        //Now we need to iteratively find the 4 pairs which are closest to each other.
+        let Unassigned_IDs = JSON.parse(JSON.stringify(IDs))
+        let Closests_Pairs = []
+
+        let number_of_close_pairs_to_be_found = 4
+        for(let pairnum =0; pairnum< number_of_close_pairs_to_be_found; pairnum++){
+            let All_Possible_Pairs = combinations(Unassigned_IDs, 2)
+            let smallest_found_dist = 99999
+            let Current_Closest_Pair
+
+            for(let i =0;i<All_Possible_Pairs.length; i++){
+                //Calculating EU-distance between these pairs
+                let point1 = SimPoints[All_Possible_Pairs[i][0]]
+                let point2 = SimPoints[All_Possible_Pairs[i][1]]
+                let dist = EUDist(point1.x,point1.y,point2.x,point2.y)
+
+                if(dist < smallest_found_dist){
+                    smallest_found_dist = dist
+                    Current_Closest_Pair = All_Possible_Pairs[i]
+                }
+            }
+
+            //Now we have found the closest pair. Append it to the pairs array and remove these cards from the unassigned array.
+            // First we shuffle to randomize which of the two we pick to use in the experiment and which one will be held back
+            Closests_Pairs.push(shuffleArray(Current_Closest_Pair))
+            Unassigned_IDs = Unassigned_IDs.filter( ( el ) => !Current_Closest_Pair.includes( el ) );
+        }
+
+        //Figure out which combinations of two pairs have the most similar distance between them. That is, which combination of heads has the minimal difference in distance between them
+        let Pair_indices = [0,1,2,3]
+        let Pair_permutations = all_permutations(Pair_indices)
+        let lowest_difference_in_distances = 9999
+
+        //The permutations approach results in some duplicates (e.g., [0,1,2,3] results in the same as [1,0,3,2] and [2,3,0,1]). So we need to keep track of all permutations with the same minimal distance and then select one at random
+        let Current_lowest_combinations = []
+
+        for(let i=0; i <Pair_permutations.length; i++){
+            let head_1 = Closests_Pairs[Pair_permutations[i][0]][0]
+            let head_2 = Closests_Pairs[Pair_permutations[i][1]][0]
+
+            let point1 = SimPoints[head_1]
+            let point2 = SimPoints[head_2]
+            let dist12 = EUDist(point1.x,point1.y,point2.x,point2.y)
+
+            let head_3 = Closests_Pairs[Pair_permutations[i][2]][0]
+            let head_4 = Closests_Pairs[Pair_permutations[i][3]][0]
+
+            let point3 = SimPoints[head_3]
+            let point4 = SimPoints[head_4]
+            let dist34 = EUDist(point3.x,point3.y,point4.x,point4.y)
+
+            let diff_distances = Math.abs(dist12 - dist34)
+            if(diff_distances < lowest_difference_in_distances){
+                //New minimum found!
+                lowest_difference_in_distances = diff_distances
+                Current_lowest_combinations = [Pair_permutations[i]]
+            }
+
+            if(diff_distances === lowest_difference_in_distances){
+                //New variation on the current minimum found
+                Current_lowest_combinations.push(Pair_permutations[i])
+            }
+        }
+
+        //Randomly sample the combination of pairs with the lowest difference in distances
+        let Lowest_Permutation = shuffleArray(Current_lowest_combinations)[0]
+
+        //Now we need to find the distractor head. This is the remaining head with the lowest maximal distance to any of the four heads selected to be in the experiment already
+        let Heads_in_exp = [Closests_Pairs[0][0], Closests_Pairs[1][0], Closests_Pairs[2][0], Closests_Pairs[3][0]]
+        let distractor_head
+        let current_minimal_max_distractor_distance = 999999
+
+        for(let i = 0; i< Unassigned_IDs.length; i++){
+            let point_head = SimPoints[Unassigned_IDs[i]]
+
+            let point1 = SimPoints[Heads_in_exp[0]]
+            let point2 = SimPoints[Heads_in_exp[1]]
+            let point3 = SimPoints[Heads_in_exp[2]]
+            let point4 = SimPoints[Heads_in_exp[3]]
+
+            let dist1 = EUDist(point_head.x,point_head.y,point1.x,point1.y)
+            let dist2 = EUDist(point_head.x,point_head.y,point2.x,point2.y)
+            let dist3 = EUDist(point_head.x,point_head.y,point3.x,point3.y)
+            let dist4 = EUDist(point_head.x,point_head.y,point4.x,point4.y)
+
+            let max_distance = Math.max(...[dist1,dist2,dist3,dist4])
+            if(max_distance < current_minimal_max_distractor_distance){
+                distractor_head = Unassigned_IDs[i]
+                current_minimal_max_distractor_distance = max_distance
+            }
+        }
+
+        //Remove the distractor head from the unassigned IDs
+        Unassigned_IDs = Unassigned_IDs.filter(e => e !== distractor_head)
+
+        //Now we need to draw 4 unassigned heads to be used in the second card task
+        shuffleArray(Unassigned_IDs)
+        let Second_card_heads = []
+        for(let i =0;i<4;i++){
+            Second_card_heads.push(Unassigned_IDs[i])
+        }
+
+
+        //Now we have all the heads we need to finalize the final Pairs object
+        console.log(Closests_Pairs)
+        console.log(Lowest_Permutation)
+        console.log(Heads_in_exp)
+
+        let Pairs = {
+            Pair_Control : {
+                used_in_exp : [ Closests_Pairs[Lowest_Permutation[0]][0], Closests_Pairs[Lowest_Permutation[1]][0] ],
+                held_back: [ Closests_Pairs[Lowest_Permutation[0]][1], Closests_Pairs[Lowest_Permutation[1]][1] ],
+            },
+            Pair_Experimental : {
+                used_in_exp : [ Closests_Pairs[Lowest_Permutation[2]][0], Closests_Pairs[Lowest_Permutation[3]][0] ],
+                held_back: [ Closests_Pairs[Lowest_Permutation[2]][1], Closests_Pairs[Lowest_Permutation[3]][1] ],
+            },
+            distractor: distractor_head,
+        }
+
+        //Calculating the distiance of the heads used in the experiment for both pairs (this makes analyses of the data easier later)
+        let point_control_held_backA = SimPoints[Pairs.Pair_Control.held_back[0]]
+        let point_control_held_backB = SimPoints[Pairs.Pair_Control.held_back[1]]
+        Pairs.Pair_Control.dist_held_back_t1 = EUDist(point_control_held_backA.x, point_control_held_backA.y, point_control_held_backB.x, point_control_held_backB.y)
+
+        let point_control_expA = SimPoints[Pairs.Pair_Control.used_in_exp[0]]
+        let point_control_expB = SimPoints[Pairs.Pair_Control.used_in_exp[1]]
+        Pairs.Pair_Control.dist_exp_t1 = EUDist(point_control_expA.x, point_control_expA.y, point_control_expB.x, point_control_expB.y)
+
+        let point_exp_held_backA = SimPoints[Pairs.Pair_Experimental.held_back[0]]
+        let point_exp_held_backB = SimPoints[Pairs.Pair_Experimental.held_back[1]]
+        Pairs.Pair_Experimental.dist_held_back_t1 = EUDist(point_exp_held_backA.x, point_exp_held_backA.y, point_exp_held_backB.x, point_exp_held_backB.y)
+
+        let point_exp_expA = SimPoints[Pairs.Pair_Experimental.used_in_exp[0]]
+        let point_exp_expB = SimPoints[Pairs.Pair_Experimental.used_in_exp[1]]
+        Pairs.Pair_Experimental.dist_exp_t1 = EUDist(point_exp_expA.x, point_exp_expA.y, point_exp_expB.x, point_exp_expB.y)
+
+        //Figuring out which heads to show during the second card task
+        Second_card_heads.push(Pairs.Pair_Control.held_back[0],Pairs.Pair_Control.held_back[1],Pairs.Pair_Experimental.held_back[0],Pairs.Pair_Experimental.held_back[1])
+        Pairs.Second_card_heads = Second_card_heads
+
+        console.log(Pairs)
+        return(Pairs)
+
+    }
+
+
+    // SUPPORTING FUNCTIONS
+    ////////////////////////
+    function generate_item_details(Items_Used){
+        //Location on screen ranges from 1 - N
+        let Background_Colors = Param.ItemBackgroundColors[Items_Used.length]
+
+        let LocationArr = []
+        for(let i =0; i<Items_Used.length;i++){
+            LocationArr.push(i+1)
+        }
+        shuffleArray(LocationArr)
+
+        let ItemObj = {All_Items: Items_Used}
+        for(let i =0;i<Items_Used.length;i++){
+            ItemObj[Items_Used[i]] = {
+                //location_on_screen: LocationArr[i],
+                backgroundColor: Background_Colors[i]
+            }
+        }
+        return(ItemObj)
+    }
+    function createFennimalObj(region, location, head, body, item){
+        let FenObj = {
+            region: region,
+            location: location,
+            head: head,
+            body: body,
+        }
+
+        if(item !== false){
+            FenObj.item = item
+        }
+
+        //Adding name and color scheme
+        FenObj.name = createConjunctiveNameHeadBody(body,head)//createConjunctiveNameRegionHead(region, head) //Param.Names_Head[head]//createConjunctiveNameHeadBody(body,head)//createConjunctiveNameRegionHead(region, head)
+        FenObj.head_color_scheme = JSON.parse(JSON.stringify(Param.RegionData[region].Fennimal_location_colors))
+        FenObj.body_color_scheme = JSON.parse(JSON.stringify(Param.RegionData[region].Fennimal_location_colors))
+        FenObj.body_color_scheme.tertiary_color = Param.RegionData[region].contrast_color
+
+        return(FenObj)
+    }
+
+    //Returns a block of inference-phase trials. items_allowed_... can be "direct" or "indirect.
+    function createBlockOfBindingTrials(Array_of_Keys_Of_Fennimal_IDs_used, items_allowed_for_indirect_pair, include_feedback, shuffle_trials){
+        let Block = []
+
+        for(let key_ind = 0; key_ind<Array_of_Keys_Of_Fennimal_IDs_used.length; key_ind++){
+            let key = Array_of_Keys_Of_Fennimal_IDs_used[key_ind]
+            let FenObj = BindingPhaseTemplates[key]
+
+            let TestObj = createFennimalObj(FenObj.region,FenObj.location, FenObj.head, FenObj.body, false)
+            TestObj.name = createConjunctiveNameHeadBody(FenObj.body,FenObj.head)
+            TestObj.feedback = include_feedback
+
+            //Setting items available.
+            // First we make sure that there are two distractors: the control item and one of the items belonging to the other pair.
+            TestObj.item_direct = FenObj.item_direct
+
+            //Finding the correct item
+            let correct_item
+            switch(key){
+                case("EA"): if(items_allowed_for_indirect_pair === "direct"){correct_item = TrainingFennimals.EA.item} else {correct_item = TrainingFennimals.EB.item} break
+                case("EB"): if(items_allowed_for_indirect_pair === "direct"){correct_item = TrainingFennimals.EB.item} else {correct_item = TrainingFennimals.EA.item} break
+                case("CA"): correct_item = TrainingFennimals.CA.item; break
+                case("CB"): correct_item = TrainingFennimals.CB.item; break
+                case("D"): correct_item = TrainingFennimals.D.item; break;
+            }
+
+            //We will select one element from each of the arrays. So arrays with one element will always be selected
+            let OtherPairItems
+            switch(key){
+                case("CA"): OtherPairItems = [ TrainingFennimals.D.item,[TrainingFennimals.EA.item, TrainingFennimals.EB.item]]; break
+                case("CB"): OtherPairItems = [ TrainingFennimals.D.item,[TrainingFennimals.EA.item, TrainingFennimals.EB.item]]; break
+                case("EA"): OtherPairItems = [ TrainingFennimals.D.item,[TrainingFennimals.CA.item, TrainingFennimals.CB.item]]; break
+                case("EB"): OtherPairItems = [ TrainingFennimals.D.item,[TrainingFennimals.CA.item, TrainingFennimals.CB.item]]; break
+                case("D"): OtherPairItems = [ [TrainingFennimals.CA.item,TrainingFennimals.CB.item],[TrainingFennimals.EA.item, TrainingFennimals.EB.item]]; break;
+            }
+
+            //Creating an array containing all the trial's available items
+            let Available_Items = [correct_item]
+            for(let i=0;i<OtherPairItems.length;i++){
+                if(typeof OtherPairItems[i] === "string"){
+                    Available_Items.push(OtherPairItems[i])
+                }else{
+                    Available_Items.push(shuffleArray(OtherPairItems[i])[0] )
+                }
+            }
+
+            //Assigning the properties to the TestObject.
+            TestObj.items_available = Available_Items
+            TestObj.correct_item = correct_item
+
+            switch(key){
+                case("CA"): TestObj.item_direct = TrainingFennimals.CA.item; TestObj.item_indirect = TrainingFennimals.CB.item; break
+                case("CB"): TestObj.item_direct = TrainingFennimals.CB.item; TestObj.item_indirect = TrainingFennimals.CA.item; break
+                case("EA"): TestObj.item_direct = TrainingFennimals.EA.item; TestObj.item_indirect = TrainingFennimals.EB.item; break
+                case("EB"): TestObj.item_direct = TrainingFennimals.EB.item; TestObj.item_indirect = TrainingFennimals.EA.item; break
+                case("D"): TestObj.item_direct = TrainingFennimals.D.item; TestObj.item_indirect = false; break
+            }
+
+            TestObj.ID = FenObj.ID
+
+            //Pushing to the DirectTestBlock
+            Block.push(TestObj)
+        }
+        if(shuffle_trials){
+            return(shuffleArray(Block))
+        }else{
+            return(Block)
+        }
+    }
+    //Returns a block of the original training trials with all items available
+    function createBlockOfRepeatTrainingTrials(shuffle_trials){
+        let Block = []
+        for(let key in TrainingFennimals){
+            let NewFenObj = JSON.parse(JSON.stringify(TrainingFennimals[key]))
+            delete NewFenObj.item
+
+            NewFenObj.ID = key
+            NewFenObj.items_available = Random_Items
+
+            switch(key){
+                case("LA"): NewFenObj.item_direct = TrainingFennimals.LA.item; NewFenObj.item_indirect = TrainingFennimals.LB.item; break
+                case("LB"): NewFenObj.item_direct = TrainingFennimals.LB.item; NewFenObj.item_indirect = TrainingFennimals.LA.item; break
+                case("HA"): NewFenObj.item_direct = TrainingFennimals.HA.item; NewFenObj.item_indirect = TrainingFennimals.HB.item; break
+                case("HB"): NewFenObj.item_direct = TrainingFennimals.HB.item; NewFenObj.item_indirect = TrainingFennimals.HA.item; break
+                case("C"): NewFenObj.item_direct = TrainingFennimals.C.item; NewFenObj.item_indirect = false; break
+            }
+
+            NewFenObj.correct_item = NewFenObj.item_direct
+            NewFenObj.feedback = false
+
+            Block.push(NewFenObj)
+        }
+
+        if(shuffle_trials){
+            return(shuffleArray(Block))
+        }else{
+            return(Block)
+        }
+    }
+
+    // CALL FUNCTIONS //
+    ////////////////////
+    //Call to get return a deepcopy of the training set Fennimals, keyed on location.
+    this.get_experiment_code = function(){
+        return(experiment_code)
+    }
+
+    this.getTrainingSetFennimalsKeyedOnLocation = function(){
+        //Creating an object to hold all the Fennimals based on location. Empty locations should have a value of false, taken locations should have the Fennimal object.
+        //Here we can rely on the assumption that each location will have been used only once.
+        let FennimalLocations = {}
+
+        //First retrieving all location names and setting their value in FennimalLocations to false. Note, here we cannot rely on Available_Regions!
+        let All_Region_Names = Object.getOwnPropertyNames(Param.RegionData)
+        for(let i=0;i<All_Region_Names.length;i++){
+            if(All_Region_Names[i] !== "Home"){
+                let Locations_In_Region = Param.RegionData[All_Region_Names[i]].Locations
+                FennimalLocations[Locations_In_Region[0]] = false
+                FennimalLocations[Locations_In_Region[1]] = false
+            }
+        }
+
+        //Now we can go through all the Training set Fennimals and add them to the Fennimal locations
+        let Training_Stimuli_In_Array = this.getTrainingSetFennimalsInArray()
+        for(let i = 0;i<Training_Stimuli_In_Array.length;i++){
+            FennimalLocations[Training_Stimuli_In_Array[i].location] = Training_Stimuli_In_Array[i]
+        }
+
+        //Adding some meta-data
+        FennimalLocations.MetaData = {
+            total_number_of_Fennimals: 5,
+            total_number_of_locations: Param.location_Names.length
+        }
+
+        return(JSON.parse(JSON.stringify(FennimalLocations)))
+    }
+
+    //Call to return a deepcopy of the training set Fennimals, in an array. Each element is an object containing a single Fennimal. Order is not randomized!
+    this.getTrainingSetFennimalsInArray = function(){
+        let Arr = []
+        for(let key in TrainingFennimals){
+            Arr.push(TrainingFennimals[key])
+        }
+
+        return(JSON.parse(JSON.stringify(Arr)))
+    }
+
+    //Call to get the Training templates
+    this.getTrainingTemplates = function(){
+        return(JSON.parse(JSON.stringify(TrainingFennimals)))
+    }
+
+    //Call to get the Binding Templates
+    this.getBindingTemplates = function(){
+        return(JSON.parse(JSON.stringify(BindingPhaseTemplates)))
+    }
+    this.getBindingTemplatesInArray = function(){
+        let Arr = []
+        for (let key in BindingPhaseTemplates){
+            Arr.push(BindingPhaseTemplates[key])
+        }
+
+        return(JSON.parse(JSON.stringify(Arr)))
+    }
+
+    //Call to get the features sampled after the first similarity task
+    this.getFeaturesSampledAfterFirstSimilarityTask = function(){
+        return(JSON.parse(JSON.stringify(Selected_Pairs)))
+    }
+
+    //Call to get a deep copy of the ItemDetails object (keyed on item)
+    this.getItemDetails = function(){
+        return(JSON.parse(JSON.stringify(Item_Details)))
+    }
+
+    //Returns an array containing all the blocks of the test phase
+    this.getTestPhaseData = function(){
+        return(JSON.parse(JSON.stringify(BindingPhaseSetup)))
+    }
+
+}
+
+//Experiment 3: Does semantic similarity influence the random walk (2 max similar, 2 max distant and a distractor)
+STIMULUSDATA_EXP3 = function(participant_number){
+    let experiment_code = "exp3"
+
     // RESETTING THE RNG SEED HERE //
     ////////////////////////////////
     // NO CALLS TO RANDOMIZATION SHOULD BE MADE ABOVE THIS LINE //
@@ -1471,8 +1852,6 @@ STIMULUSDATA_MAX_DIFF = function(participant_number){
         return(Selected_Pairs)
     }
 
-
-
     // SUPPORTING FUNCTIONS
     ////////////////////////
     function generate_item_details(Items_Used){
@@ -1617,10 +1996,13 @@ STIMULUSDATA_MAX_DIFF = function(participant_number){
         }
     }
 
-
     // CALL FUNCTIONS //
     ////////////////////
     //Call to get return a deepcopy of the training set Fennimals, keyed on location.
+    this.get_experiment_code = function(){
+        return(experiment_code)
+    }
+
     this.getTrainingSetFennimalsKeyedOnLocation = function(){
         //Creating an object to hold all the Fennimals based on location. Empty locations should have a value of false, taken locations should have the Fennimal object.
         //Here we can rely on the assumption that each location will have been used only once.
@@ -4403,6 +4785,41 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
     let welcome_screen_current_box_shown = 1
     let number_of_instruction_boxes = 8
 
+    //Shows the screen with the completion code (if page is reloaded after submission)
+    this.show_completion_code_reloaded_screen = function(code){
+        //Hide all pages
+        hide_all_instruction_pages()
+
+        //Show the instructions layer and the welcome screen
+        SVGObjects.Instructions.Layer.style.display = "inherit"
+
+        //Show the map background
+        show_map_background()
+
+        //Create the instructions page with the title and text
+        showNewInstructionsPage()
+
+        //Creating the container to hold all elements
+        let Container = createInstructionContainer()
+        SVGObjects.Instructions.Layer.appendChild(Container)
+        SVGObjects.Instructions.Layer.style.display = "inherit"
+
+        let TextTop = createTextField(30, 40, 508-2*30,250, "<b>Your completion code </b>")
+        TextTop.style.textAlign = "center"
+        TextTop.style.fontSize = "15px"
+        Container.appendChild(TextTop)
+
+        let Text2 = createTextField(30, 100, 508-2*30,250, "Do NOT close or refresh this window before submitting your code to Prolific. Your completion code is:  <b>" + code + "</b>")
+        Text2.style.textAlign = "center"
+        Text2.style.fontSize = "15px"
+        Container.appendChild(Text2)
+
+        let Text3 = createTextField(30, 175, 508-2*30,250, "After you have submitted this code to Prolific, it is safe to close this window. Thank you for participating!")
+        Text3.style.textAlign = "center"
+        Text3.style.fontSize = "15px"
+        Container.appendChild(Text3)
+    }
+
     //Shows the consent page
     this.show_consent_screen = function(){
         //Hide all pages
@@ -4437,7 +4854,6 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
 
 
     }
-
 
     //Shows the start screen with the F11 prompt\
     this.gotoStartScreen = function(){
@@ -6535,7 +6951,7 @@ DataController = function(seed_number, Stimuli){
 
         //Give some feedback to the participant
         let alertmessage
-        switch(Param.ExperimentRecruitmentMethod){
+        /*switch(Param.ExperimentRecruitmentMethod){
             case("mturk"):
                 alertmessage = "You are now submitting this page. After submitting you will not be able to go back. If you did not yet submit your token on MTURK, then please do so now! Your token is: " + completion_code
                 break
@@ -6548,6 +6964,10 @@ DataController = function(seed_number, Stimuli){
 
         }
         alert(alertmessage)
+         */
+
+        //Store the completion code locally, for when the website reloads after submitting the form.
+        localStorage.setItem("experiment_completion_code", completion_code )
 
         //Automatically submit
         document.getElementById("submitbutton").click()
@@ -7014,6 +7434,20 @@ ExperimentController = function(Stimuli, DataController){
 
     // INSTRUCTION FUNCTIONS //
     //Call to show the first set of instructions
+
+    //On start, check if there exists an "experiment_completion_code" in the windowStorage.
+    this.startExperiment = function(){
+        //If there is no exp completion code, then start the experiment.
+        //If there is an exp completion code, then the experiment has already been completed and we just show this code to the subject.
+
+        if(localStorage.getItem("experiment_completion_code") === null){
+            //Start the experiment
+            this.showConsentScreen()
+        }else{
+            InstrCont.show_completion_code_reloaded_screen(localStorage.getItem("experiment_completion_code"))
+        }
+    }
+
     this.showConsentScreen = function(){
         InstrCont.show_consent_screen()
     }
@@ -7045,7 +7479,7 @@ ExperimentController = function(Stimuli, DataController){
         this.show_starting_instructions()
 
         //Testing
-        // this.start_test_phase()
+        //this.start_test_phase()
     }
 
     this.show_starting_instructions = function(){
@@ -7556,10 +7990,11 @@ if(Param.ExperimentRecruitmentMethod === "prolific"){
 else{
     participant_number = draw_random_participant_seed()
 }
-console.log(participant_number)
+
 let RNG = new RandomNumberGenerator(participant_number)
 
-let Stimuli = new STIMULUSDATA_MAX_DIFF(participant_number);
+
+let Stimuli = new STIMULUSDATA_EXP2(participant_number);
 
 //Instructions shown to the participant
 let Instructions = {
@@ -7772,7 +8207,7 @@ let SVGObjects = {
 let DataCont = new DataController(participant_number, Stimuli)
 
 let EC = new ExperimentController(Stimuli, DataCont)
-EC.showConsentScreen()
+EC.startExperiment()
 //EC.start_first_similarity_task()
 //EC.showStartScreen()
 //EC.show_starting_instructions()
@@ -7782,8 +8217,14 @@ EC.showConsentScreen()
 //EC.start_test_phase()
 
 
-console.log("Version: 8.1.24")
+console.log("Version: 4.12.23")
 
 // Instructions repeat block showing last panel too early
 // Instructios number of days
 // No repeat block for second experiemnt
+
+//TODO: data controller needs to correctly differentiate between experiments
+
+
+//localStorage.setItem("experiment_completion_code", completion_code )
+//localStorage.removeItem("experiment_completion_code")
