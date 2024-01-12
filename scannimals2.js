@@ -587,12 +587,6 @@ STIMULUSDATA_EXP1 = function(participant_number){
     //The results from the first sim task (and associated selected pairs) will be set here.
     let FirstSimResults, Selected_Pairs
 
-    this.get_stim_for_first_sim_task = function(){
-        return  {
-            features: "heads",
-            Stim: FirstSimTaskStim
-        }}
-
     // DEFINING THE AVAILABLE FEATURES FROM THE PARAM OBJECT
     ///////////////////////////////////////////////////////////
     let Available_Regions = shuffleArray(["North","Desert","Village","Jungle","Flowerfields","Swamp", "Beach", "Mountains"])
@@ -996,6 +990,18 @@ STIMULUSDATA_EXP1 = function(participant_number){
         return(experiment_code)
     }
 
+    this.get_stim_for_first_sim_task = function(){
+        return  {
+            features: "heads",
+            Stim: FirstSimTaskStim
+        }}
+
+    this.get_stim_for_second_sim_task = function(){
+        return  {
+            features: "heads",
+            Stim: FirstSimTaskStim
+        }}
+
     this.getTrainingSetFennimalsKeyedOnLocation = function(){
         //Creating an object to hold all the Fennimals based on location. Empty locations should have a value of false, taken locations should have the Fennimal object.
         //Here we can rely on the assumption that each location will have been used only once.
@@ -1094,12 +1100,6 @@ STIMULUSDATA_EXP2 = function(participant_number){
     //The results from the first sim task (and associated selected pairs) will be set here.
     let FirstSimResults, Selected_Pairs
 
-    this.get_stim_for_first_sim_task = function(){
-        return  {
-            features: "heads",
-            Stim: FirstSimTaskStim
-        }}
-
     // DEFINING THE AVAILABLE FEATURES FROM THE PARAM OBJECT
     ///////////////////////////////////////////////////////////
     let Available_Regions = shuffleArray(["North","Desert","Village","Jungle","Flowerfields","Swamp", "Beach", "Mountains"])
@@ -1158,7 +1158,7 @@ STIMULUSDATA_EXP2 = function(participant_number){
     function set_all_Fennimals (SimsArr){
         //Finding both pairs and a control head.
         //{Closest: {IDs: Closest_Pair, dist_t1: dist_pairC}, Furthest: {IDs: Furthest_Pair, dist_t1: dist_pairF}, Control: central_ID}
-        let Pairs = find_training_phase_heads(SimsArr)
+        let Pairs = find_stimulus_heads(SimsArr)
 
         //Storing as  seperate object (easier for analyses down the line)
         Selected_Pairs = Pairs
@@ -1208,7 +1208,7 @@ STIMULUSDATA_EXP2 = function(participant_number){
                 hint_type: "text",
                 number: 5
             }, {
-                type: "additional_similarity_reduced",
+                type: "additional_similarity",
                 number: 6
             }, {
                 Trials: createBlockOfRepeatTrainingTrials(true),
@@ -1216,6 +1216,44 @@ STIMULUSDATA_EXP2 = function(participant_number){
                 hint_type: "text",
                 number: 7
             }]
+
+        /*
+        BindingPhaseSetup = [
+            {
+                Trials:  createBlockOfBindingTrials(["CA","CB","EA","EB", "D"], "direct", true,true ),
+                type: "direct",
+                hint_type: "text",
+                number: 1
+            },{
+                Trials:  createBlockOfBindingTrials(["CA","CB","EA","EB", "D"],  "indirect", false,true ),
+                type: "indirect",
+                hint_type: "text",
+                number: 2
+            },{
+                Trials:  createBlockOfBindingTrials(["CA","CB","EA","EB", "D"],  "indirect", false,true ),
+                type: "indirect",
+                hint_type: "text",
+                number: 3
+            },{
+                Trials:  createBlockOfBindingTrials(["CA","CB","EA","EB", "D"], "indirect", false,true ),
+                type: "indirect",
+                hint_type: "text",
+                number: 4
+            },{
+                Trials:  createBlockOfBindingTrials(["CA","CB","EA","EB", "D"],  "indirect", false,true ),
+                type: "indirect",
+                hint_type: "text",
+                number: 5
+            }, {
+                type: "additional_similarity",
+                number: 6
+            }, {
+                Trials: createBlockOfRepeatTrainingTrials(true),
+                type: "repeat_training",
+                hint_type: "text",
+                number: 7
+            }]
+         */
 
 
         console.log(Selected_Pairs)
@@ -1228,7 +1266,7 @@ STIMULUSDATA_EXP2 = function(participant_number){
     }
 
     //Given a similarity setup, returns two pairs of maximally dis-similar IDs
-    function find_training_phase_heads(SimsArr){
+    function find_stimulus_heads(SimsArr){
         //First transform the arry of Sims into an object where each property only has points
         let SimPoints = {}
         for(let i =0; i<SimsArr.length; i++){
@@ -1266,7 +1304,7 @@ STIMULUSDATA_EXP2 = function(participant_number){
             Unassigned_IDs = Unassigned_IDs.filter( ( el ) => !Current_Closest_Pair.includes( el ) );
         }
 
-        //Figure out which combinations of two pairs have the most similar distance between them. That is, which combination of heads has the minimal difference in distance between them
+        //Figure out which combinations of two pairs have the most similar distance (the minimial difference) between the LEFT OUT heads.
         let Pair_indices = [0,1,2,3]
         let Pair_permutations = all_permutations(Pair_indices)
         let lowest_difference_in_distances = 9999
@@ -1275,15 +1313,15 @@ STIMULUSDATA_EXP2 = function(participant_number){
         let Current_lowest_combinations = []
 
         for(let i=0; i <Pair_permutations.length; i++){
-            let head_1 = Closests_Pairs[Pair_permutations[i][0]][0]
-            let head_2 = Closests_Pairs[Pair_permutations[i][1]][0]
+            let head_1 = Closests_Pairs[Pair_permutations[i][0]][1]
+            let head_2 = Closests_Pairs[Pair_permutations[i][1]][1]
 
             let point1 = SimPoints[head_1]
             let point2 = SimPoints[head_2]
             let dist12 = EUDist(point1.x,point1.y,point2.x,point2.y)
 
-            let head_3 = Closests_Pairs[Pair_permutations[i][2]][0]
-            let head_4 = Closests_Pairs[Pair_permutations[i][3]][0]
+            let head_3 = Closests_Pairs[Pair_permutations[i][2]][1]
+            let head_4 = Closests_Pairs[Pair_permutations[i][3]][1]
 
             let point3 = SimPoints[head_3]
             let point4 = SimPoints[head_4]
@@ -1340,12 +1378,7 @@ STIMULUSDATA_EXP2 = function(participant_number){
             Second_card_heads.push(Unassigned_IDs[i])
         }
 
-
         //Now we have all the heads we need to finalize the final Pairs object
-        console.log(Closests_Pairs)
-        console.log(Lowest_Permutation)
-        console.log(Heads_in_exp)
-
         let Pairs = {
             Pair_Control : {
                 used_in_exp : [ Closests_Pairs[Lowest_Permutation[0]][0], Closests_Pairs[Lowest_Permutation[1]][0] ],
@@ -1383,7 +1416,6 @@ STIMULUSDATA_EXP2 = function(participant_number){
         return(Pairs)
 
     }
-
 
     // SUPPORTING FUNCTIONS
     ////////////////////////
@@ -1507,11 +1539,11 @@ STIMULUSDATA_EXP2 = function(participant_number){
             NewFenObj.items_available = Random_Items
 
             switch(key){
-                case("LA"): NewFenObj.item_direct = TrainingFennimals.LA.item; NewFenObj.item_indirect = TrainingFennimals.LB.item; break
-                case("LB"): NewFenObj.item_direct = TrainingFennimals.LB.item; NewFenObj.item_indirect = TrainingFennimals.LA.item; break
-                case("HA"): NewFenObj.item_direct = TrainingFennimals.HA.item; NewFenObj.item_indirect = TrainingFennimals.HB.item; break
-                case("HB"): NewFenObj.item_direct = TrainingFennimals.HB.item; NewFenObj.item_indirect = TrainingFennimals.HA.item; break
-                case("C"): NewFenObj.item_direct = TrainingFennimals.C.item; NewFenObj.item_indirect = false; break
+                case("CA"): NewFenObj.item_direct = TrainingFennimals.CA.item; NewFenObj.item_indirect = TrainingFennimals.CB.item; break
+                case("CB"): NewFenObj.item_direct = TrainingFennimals.CB.item; NewFenObj.item_indirect = TrainingFennimals.CA.item; break
+                case("EA"): NewFenObj.item_direct = TrainingFennimals.EA.item; NewFenObj.item_indirect = TrainingFennimals.EB.item; break
+                case("EB"): NewFenObj.item_direct = TrainingFennimals.EB.item; NewFenObj.item_indirect = TrainingFennimals.EA.item; break
+                case("D"): NewFenObj.item_direct = TrainingFennimals.D.item; NewFenObj.item_indirect = false; break
             }
 
             NewFenObj.correct_item = NewFenObj.item_direct
@@ -1532,6 +1564,29 @@ STIMULUSDATA_EXP2 = function(participant_number){
     //Call to get return a deepcopy of the training set Fennimals, keyed on location.
     this.get_experiment_code = function(){
         return(experiment_code)
+    }
+
+    this.get_stim_for_first_sim_task = function(){
+        return  {
+            features: "heads",
+            Stim: FirstSimTaskStim
+        }}
+
+    this.get_stim_for_second_sim_task = function(){
+        let Head_Available_For_Second_Sim_Task = shuffleArray(JSON.parse(JSON.stringify(Selected_Pairs.Second_card_heads)))
+        let SecondSimTaskStim = []
+        for(let i = 0; i< Head_Available_For_Second_Sim_Task.length; i++){
+            SecondSimTaskStim.push({
+                ID: Head_Available_For_Second_Sim_Task[i],
+                head: Head_Available_For_Second_Sim_Task[i]
+            })
+        }
+
+        return  {
+            features: "heads",
+            Stim: SecondSimTaskStim
+        }
+
     }
 
     this.getTrainingSetFennimalsKeyedOnLocation = function(){
@@ -6750,6 +6805,7 @@ DataController = function(seed_number, Stimuli){
     let that = this
     //Always store data here as a deep copy!
     let Data = {
+        experiment_type: Stimuli.get_experiment_code(),
         seed: seed_number,
         FirstSimTask: {},
         Training_Templates : [],
@@ -7119,48 +7175,16 @@ DataController = function(seed_number, Stimuli){
             OptTestData.push(TrialData)
         }
 
-        //SIMILARITY DATA
-        // We want to store the heads selected for all of the pairs.
-        //Transforming the results of the second similarity task into an object where each property only has points
-        if(Object.keys(Data.AdditionalSimTask).length > 0){
-            let SimPoints_S2 = {}
-            for(let i =0; i<Data.AdditionalSimTask.Data.length; i++){
-                SimPoints_S2[Data.AdditionalSimTask.Data[i].ID] = {x : Data.AdditionalSimTask.Data[i].x, y: Data.AdditionalSimTask.Data[i].y}
-            }
-
-            let Pairs = Object.getOwnPropertyNames(Data.Selected_Pairs)
-            for(let i =0;i< Pairs.length;i++){
-                if(Pairs[i] !== "C" && Pairs[i] !== "cntrl"){
-                    //Finding Ids
-                    let ID1 = Data.Selected_Pairs[Pairs[i]].IDs[0]
-                    let ID2 = Data.Selected_Pairs[Pairs[i]].IDs[1]
-
-                    //Finding points on the second task
-                    let p1 = SimPoints_S2[ID1]
-                    let p2 = SimPoints_S2[ID2]
-
-                    //Calculating distance
-                    let dist = EUDist(p1.x,p1.y, p2.x,p2.y)
-
-                    //Adding to the Selected Pairs object
-                    Data.Selected_Pairs[Pairs[i]].dist_t2 = Math.round( dist * 100)/100
-                }
-            }
-
-        }
-
-
-
-        //Putting it all together
+        //Putting all the non-experiment-specific data together
         let ReturnData = {
+            Exp: Data.experiment_type,
+            Date: new Date().toDateString(),
             Exptime: Data.experiment_time,
             Seed: Data.seed,
             Token: completion_code,
             FirstSim: Data.FirstSimTask,
-            SecondSim: Data.AdditionalSimTask,
             TrainTemp: Stimuli.getTrainingSetFennimalsInArray(),
             BindTemp: Stimuli.getBindingTemplatesInArray(),
-            Selected_Pairs: Data.Selected_Pairs,
             Expl: {
                 FoundOrdr: FennimalsFoundOrder,
                 LocSeq: NewLocationSequence
@@ -7178,6 +7202,63 @@ DataController = function(seed_number, Stimuli){
 
         if(Param.ExperimentRecruitmentMethod === "prolific"){ ReturnData.Prlfc = Data.Prolific}
 
+        //Adding experiment-specific data
+        let SimPoints_S2, Pairs
+        switch(Data.experiment_type){
+            case("exp1"):
+                //Here participants completed two similarity tasks. Storing the second task here
+                ReturnData.SecondSim = Data.AdditionalSimTask
+
+                //Calculating the differences between pairs for the second task
+                SimPoints_S2 = {}
+                for(let i =0; i<Data.AdditionalSimTask.Data.length; i++){
+                    SimPoints_S2[Data.AdditionalSimTask.Data[i].ID] = {x : Data.AdditionalSimTask.Data[i].x, y: Data.AdditionalSimTask.Data[i].y}
+                }
+
+                Pairs = Object.getOwnPropertyNames(Data.Selected_Pairs)
+                for(let i =0;i< Pairs.length;i++){
+                    if(Pairs[i] !== "C"){
+                        //Finding Ids
+                        let ID1 = Data.Selected_Pairs[Pairs[i]].IDs[0]
+                        let ID2 = Data.Selected_Pairs[Pairs[i]].IDs[1]
+
+                        //Finding points on the second task
+                        let p1 = SimPoints_S2[ID1]
+                        let p2 = SimPoints_S2[ID2]
+
+                        //Calculating distance
+                        let dist = EUDist(p1.x,p1.y, p2.x,p2.y)
+
+                        //Adding to the Selected Pairs object
+                        Data.Selected_Pairs[Pairs[i]].dist_t2 = Math.round( dist * 100)/100
+                    }
+                }
+
+                //Storing in the return data
+                ReturnData.Selected_Pairs = Data.Selected_Pairs
+                break
+            case("exp2"):
+                //Participants also completed two similarity tasks.
+                ReturnData.SecondSim = Data.AdditionalSimTask
+
+                //This time, we need to calculate the T2 distance in the held-back heads.
+                SimPoints_S2 = {}
+                for(let i =0; i<Data.AdditionalSimTask.Data.length; i++){
+                    SimPoints_S2[Data.AdditionalSimTask.Data[i].ID] = {x : Data.AdditionalSimTask.Data[i].x, y: Data.AdditionalSimTask.Data[i].y}
+                }
+
+
+                let point_control_held_backA = SimPoints_S2[Data.Selected_Pairs.Pair_Control.held_back[0]]
+                let point_control_held_backB = SimPoints_S2[Data.Selected_Pairs.Pair_Control.held_back[1]]
+                Data.Selected_Pairs.Pair_Control.dist_held_back_t2 = EUDist(point_control_held_backA.x, point_control_held_backA.y, point_control_held_backB.x, point_control_held_backB.y)
+
+                let point_exp_held_backA = SimPoints_S2[Data.Selected_Pairs.Pair_Experimental.held_back[0]]
+                let point_exp_held_backB = SimPoints_S2[Data.Selected_Pairs.Pair_Experimental.held_back[1]]
+                Data.Selected_Pairs.Pair_Experimental.dist_held_back_t2 = EUDist(point_exp_held_backA.x, point_exp_held_backA.y, point_exp_held_backB.x, point_exp_held_backB.y)
+
+                //Storing in the return data
+                ReturnData.Selected_Pairs = Data.Selected_Pairs
+        }
         return(ReturnData)
     }
 
@@ -7867,7 +7948,7 @@ ExperimentController = function(Stimuli, DataController){
                     break
                 case("additional_similarity"):
                     InstrCont.clearInstructionPage()
-                    start_category_phase()
+                    start_second_category_phase()
                     break
                 case("final_block"):
                     CurrentBlockTrials = CurrentBlockData.Trials
@@ -7949,9 +8030,9 @@ ExperimentController = function(Stimuli, DataController){
     }
 
     //CATEGORY PHASE
-    function start_category_phase(){
+    function start_second_category_phase(){
         //Here the controller handles all the interactions
-        let CatCont = new CategoryPhaseController_Arena(that, Stimuli.get_stim_for_first_sim_task(), LocCont, "additional")
+        let CatCont = new CategoryPhaseController_Arena(that, Stimuli.get_stim_for_second_sim_task(), LocCont, "additional")
         CatCont.start_category_phase();
     }
     this.additional_similarity_phase_finished = function(sim_data){
@@ -7992,7 +8073,6 @@ else{
 }
 
 let RNG = new RandomNumberGenerator(participant_number)
-
 
 let Stimuli = new STIMULUSDATA_EXP2(participant_number);
 
@@ -8217,7 +8297,7 @@ EC.startExperiment()
 //EC.start_test_phase()
 
 
-console.log("Version: 4.12.23")
+console.log("Version: 12.01.23")
 
 // Instructions repeat block showing last panel too early
 // Instructios number of days
