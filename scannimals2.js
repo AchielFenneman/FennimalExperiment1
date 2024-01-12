@@ -1371,10 +1371,10 @@ STIMULUSDATA_EXP2 = function(participant_number){
         //Remove the distractor head from the unassigned IDs
         Unassigned_IDs = Unassigned_IDs.filter(e => e !== distractor_head)
 
-        //Now we need to draw 4 unassigned heads to be used in the second card task
+        //Now we need to draw 2 unassigned heads to be used in the second card task
         shuffleArray(Unassigned_IDs)
         let Second_card_heads = []
-        for(let i =0;i<4;i++){
+        for(let i =0;i<2;i++){
             Second_card_heads.push(Unassigned_IDs[i])
         }
 
@@ -7007,7 +7007,7 @@ DataController = function(seed_number, Stimuli){
 
         //Give some feedback to the participant
         let alertmessage
-        /*switch(Param.ExperimentRecruitmentMethod){
+        switch(Param.ExperimentRecruitmentMethod){
             case("mturk"):
                 alertmessage = "You are now submitting this page. After submitting you will not be able to go back. If you did not yet submit your token on MTURK, then please do so now! Your token is: " + completion_code
                 break
@@ -7020,7 +7020,6 @@ DataController = function(seed_number, Stimuli){
 
         }
         alert(alertmessage)
-         */
 
         //Store the completion code locally, for when the website reloads after submitting the form.
         localStorage.setItem("experiment_completion_code", completion_code )
@@ -8297,7 +8296,7 @@ EC.startExperiment()
 //EC.start_test_phase()
 
 
-console.log("Version: 12.01.23")
+console.log("Version: 4.12.23")
 
 // Instructions repeat block showing last panel too early
 // Instructios number of days
