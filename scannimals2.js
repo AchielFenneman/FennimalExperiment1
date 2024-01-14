@@ -8073,7 +8073,7 @@ else{
 
 let RNG = new RandomNumberGenerator(participant_number)
 
-let Stimuli = new STIMULUSDATA_EXP2(participant_number);
+let Stimuli = new STIMULUSDATA_EXP3(participant_number);
 
 //Instructions shown to the participant
 let Instructions = {
@@ -8296,7 +8296,7 @@ EC.startExperiment()
 //EC.start_test_phase()
 
 
-console.log("Version: 12.01.23 F")
+console.log("Version: 4.12.23")
 
 // Instructions repeat block showing last panel too early
 // Instructios number of days
