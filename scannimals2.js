@@ -385,7 +385,7 @@ function createFennimal(FennimalObj){
 
     //Resizing head and bodies
     HeadObj.style.transformOrigin = "50% 35%"
-    HeadObj.style.transform = "scale(1.25)"
+    //HeadObj.style.transform = "scale(1.25)"
 
     BodyObj.style.transformOrigin = "50% 10%"
     BodyObj.style.transform = "scale(.9)"
@@ -421,7 +421,7 @@ function createFennimalOutline(head,body, include_targets){
 
     //Resizing head and bodies
     HeadObj.style.transformOrigin = "50% 35%"
-    HeadObj.style.transform = "scale(1.25)"
+    //HeadObj.style.transform = "scale(1.25)"
 
     BodyObj.style.transformOrigin = "50% 10%"
     BodyObj.style.transform = "scale(0.9)"
@@ -2152,7 +2152,7 @@ PARAMETERS = function() {
     this.location_Names = ["Pineforest", "Iceberg", "Windmill", "Garden", "Waterfall", "Mine", "Church", "Farm","Marsh", "Cottage","Oasis", "Cactus", "Beachbar", "Port", "Bush", "Jungleforest"]
     //["Crab", "Snake", "Giraffe", "Mushroom", "Ant", "Beaver", "Spider","Flamingo","Grasshopper",
     // "Frog", "Dragon", "Bunny", "Bird", "Elephant", "Tiger", "Walrus", "Turtle", "Crocodile", "Gnome", "Plant", "Robot"]
-    this.Available_Fennimal_Heads = ["A", "B", "C", "D", "E", "F","G","H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R"]
+    this.Available_Fennimal_Heads = ["A", "B", "C", "D", "E", "F","G","H", "I", "J", "K", "L"]
     this.Available_Fennimal_Bodies = ["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M", "N"] // ["A", "B", "C", "D", "F","G","H", "I","J","K"] //["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M","N"]
     this.Regionfree_Fennimal_Bodies = ["A", "E", "F","H","K","M"] // ["A", "B", "C", "D", "F","G","H", "I","J","K"] //["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M","N"]
 
@@ -2790,24 +2790,18 @@ PARAMETERS = function() {
     }
     // Description of the head
     this.Names_Head = {
-        A: "Elephant",
-        B: "Widehead",
-        C: "Slither",
-        D: "Antler",
-        E: "Chirpy",
-        F: "Punk",
-        G: "Snail",
-        H: "Scout",
-        I: "Unihorn",
-        J: "Cheeks",
-        K: "Pooch",
-        L: "Grazer",
-        M: "Mischief",
-        N: "Earsy",
-        O: "Buzzer",
-        P: "Worker",
-        Q: "Dragon",
-        R: "Kitty"
+        A: "Leo",
+        B: "Kitty",
+        C: "Worker",
+        D: "Buzzer",
+        E: "Moo",
+        F: "Fawn",
+        G: "Slither",
+        H: "Lizzy",
+        I: "Trunkie",
+        J: "Nosey",
+        K: "Hoppy",
+        L: "Nibbles",
     }
 
     //Given a location name, returns its associated region. If no region contains this location, returns false
@@ -6618,20 +6612,21 @@ CategoryPhaseController_Arena = function(ExpCont, CardStimData, LocCont, instruc
                 //Finding the correct card sizes for the heads. A few heads need slightly different proportions
                 //dx and dy are small shims to translate the heads to the center of the card
                 switch(Head){
-                    case("B"): CardDims = {w:50,h:50, scale: 0.25, dx:0, dy: 0}; break //Widehead
-                    case("D"): CardDims = {w:50,h:50, scale: 0.3, dx:0, dy: 4}; break //Antler
-                    case("I"): CardDims = {w:50,h:50, scale: 0.42, dx:0, dy: 3}; break //Unihorn
-                    case("E"): CardDims = {w:50,h:50, scale: 0.43, dx:3, dy: -3}; break //Chirpy
-                    case("F"): CardDims = {w:50,h:50, scale: 0.5, dx:0, dy: 5}; break //Punk
-                    case("H"): CardDims = {w:50,h:50, scale: 0.5, dx:0, dy: 0}; break //Scout
-                    case("K"): CardDims = {w:50,h:50, scale: 0.4, dx:-1, dy: -3}; break //Pooch
-                    case("L"): CardDims = {w:50,h:50, scale: 0.4, dx:0, dy: 0}; break //Grazer
-                    case("M"): CardDims = {w:50,h:50, scale: 0.42, dx:0, dy: -4}; break //Mischief
-                    case("N"): CardDims = {w:50,h:50, scale: 0.4, dx:0, dy: 3}; break //Earsy
-                    case("O"): CardDims = {w:50,h:50, scale: 0.41, dx:0, dy: 0}; break //Buzzer
-                    case("P"): CardDims = {w:50,h:50, scale: 0.38, dx:0, dy: -3}; break //Worker
-                    case("Q"): CardDims = {w:50,h:50, scale: 0.48, dx:1, dy: -3}; break //Dragon
-                    case("R"): CardDims = {w:50,h:50, scale: 0.42, dx:0, dy: 5}; break //Kitty
+                    case("A"): CardDims = {w:50,h:50, scale: 0.45, dx:0, dy: -1}; break // Lion
+                    case("B"): CardDims = {w:50,h:50, scale: 0.44, dx:0, dy: 2.5}; break // Kitty
+                    case("C"): CardDims = {w:50,h:50, scale: 0.39, dx:0, dy: -3}; break // Worker
+                    case("D"): CardDims = {w:50,h:50, scale: 0.42, dx:0, dy: 2}; break // Buzzer
+                    case("E"): CardDims = {w:50,h:50, scale: 0.43, dx:0, dy: 1}; break // Moo
+                    case("F"): CardDims = {w:50,h:50, scale: 0.38, dx:0, dy: 2.5}; break // Fawn
+                    case("G"): CardDims = {w:50,h:50, scale: 0.43, dx:0, dy: -7}; break // Slither
+                    case("H"): CardDims = {w:50,h:50, scale: 0.48, dx:0, dy: -1}; break // Lizzy
+                    case("I"): CardDims = {w:50,h:50, scale: 0.39, dx:0, dy: -5}; break // Trunkie
+                    case("J"): CardDims = {w:50,h:50, scale: 0.45, dx:1, dy: 3}; break // Nosey
+                    case("K"): CardDims = {w:50,h:50, scale: 0.39, dx:0, dy: 2}; break // Hoppy
+                    case("L"): CardDims = {w:50,h:50, scale: 0.48, dx:2, dy: -2}; break // Nibbles
+
+
+
                     default: CardDims = {w:50,h:50, scale: 0.45, dx:0, dy: 0}; break
                 }
 
@@ -8073,7 +8068,7 @@ else{
 
 let RNG = new RandomNumberGenerator(participant_number)
 
-let Stimuli = new STIMULUSDATA_EXP3(participant_number);
+let Stimuli = new STIMULUSDATA_EXP2(participant_number);
 
 //Instructions shown to the participant
 let Instructions = {
@@ -8296,13 +8291,13 @@ EC.startExperiment()
 //EC.start_test_phase()
 
 
-console.log("Version: 4.12.23")
+console.log("Version: 17.01.23")
 
 // Instructions repeat block showing last panel too early
 // Instructios number of days
 // No repeat block for second experiemnt
 
-//TODO: data controller needs to correctly differentiate between experiments
+//TODO: add selected pairs for experiment 3
 
 
 //localStorage.setItem("experiment_completion_code", completion_code )
