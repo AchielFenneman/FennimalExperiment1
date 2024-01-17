@@ -385,7 +385,7 @@ function createFennimal(FennimalObj){
 
     //Resizing head and bodies
     HeadObj.style.transformOrigin = "50% 35%"
-    //HeadObj.style.transform = "scale(1.25)"
+    HeadObj.style.transform = "scale(0.9)"
 
     BodyObj.style.transformOrigin = "50% 10%"
     BodyObj.style.transform = "scale(.9)"
@@ -1373,10 +1373,13 @@ STIMULUSDATA_EXP2 = function(participant_number){
 
         //Now we need to draw 2 unassigned heads to be used in the second card task
         shuffleArray(Unassigned_IDs)
+        /*
         let Second_card_heads = []
         for(let i =0;i<2;i++){
             Second_card_heads.push(Unassigned_IDs[i])
         }
+
+         */
 
         //Now we have all the heads we need to finalize the final Pairs object
         let Pairs = {
@@ -1409,8 +1412,9 @@ STIMULUSDATA_EXP2 = function(participant_number){
         Pairs.Pair_Experimental.dist_exp_t1 = EUDist(point_exp_expA.x, point_exp_expA.y, point_exp_expB.x, point_exp_expB.y)
 
         //Figuring out which heads to show during the second card task
+        let Second_card_heads = []
         Second_card_heads.push(Pairs.Pair_Control.held_back[0],Pairs.Pair_Control.held_back[1],Pairs.Pair_Experimental.held_back[0],Pairs.Pair_Experimental.held_back[1])
-        Pairs.Second_card_heads = Second_card_heads
+        Pairs.Second_card_heads = shuffleArray(Second_card_heads)
 
         console.log(Pairs)
         return(Pairs)
@@ -2152,7 +2156,7 @@ PARAMETERS = function() {
     this.location_Names = ["Pineforest", "Iceberg", "Windmill", "Garden", "Waterfall", "Mine", "Church", "Farm","Marsh", "Cottage","Oasis", "Cactus", "Beachbar", "Port", "Bush", "Jungleforest"]
     //["Crab", "Snake", "Giraffe", "Mushroom", "Ant", "Beaver", "Spider","Flamingo","Grasshopper",
     // "Frog", "Dragon", "Bunny", "Bird", "Elephant", "Tiger", "Walrus", "Turtle", "Crocodile", "Gnome", "Plant", "Robot"]
-    this.Available_Fennimal_Heads = ["A", "B", "C", "D", "E", "F","G","H", "I", "J", "K", "L"]
+    this.Available_Fennimal_Heads = ["A", "B", "C", "D", "E", "F","G","H", "M", "N", "O"]
     this.Available_Fennimal_Bodies = ["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M", "N"] // ["A", "B", "C", "D", "F","G","H", "I","J","K"] //["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M","N"]
     this.Regionfree_Fennimal_Bodies = ["A", "E", "F","H","K","M"] // ["A", "B", "C", "D", "F","G","H", "I","J","K"] //["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M","N"]
 
@@ -2802,6 +2806,9 @@ PARAMETERS = function() {
         J: "Nosey",
         K: "Hoppy",
         L: "Nibbles",
+        M: "Hoot",
+        N: "Chirpy",
+        O: "Peepers"
     }
 
     //Given a location name, returns its associated region. If no region contains this location, returns false
@@ -6624,6 +6631,9 @@ CategoryPhaseController_Arena = function(ExpCont, CardStimData, LocCont, instruc
                     case("J"): CardDims = {w:50,h:50, scale: 0.45, dx:1, dy: 3}; break // Nosey
                     case("K"): CardDims = {w:50,h:50, scale: 0.39, dx:0, dy: 2}; break // Hoppy
                     case("L"): CardDims = {w:50,h:50, scale: 0.48, dx:2, dy: -2}; break // Nibbles
+                    case("M"): CardDims = {w:50,h:50, scale: 0.41, dx:0, dy: 2}; break // OWL
+                    case("N"): CardDims = {w:50,h:50, scale: 0.38, dx:0, dy: 0}; break // Chirpie
+                    case("O"): CardDims = {w:50,h:50, scale: 0.43, dx:0, dy: 6}; break // SNAIL
 
 
 
@@ -8291,7 +8301,7 @@ EC.startExperiment()
 //EC.start_test_phase()
 
 
-console.log("Version: 17.01.23")
+console.log("Version: 17.01.23 B")
 
 // Instructions repeat block showing last panel too early
 // Instructios number of days
