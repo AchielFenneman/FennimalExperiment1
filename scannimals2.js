@@ -7299,7 +7299,7 @@ DataController = function(seed_number, Stimuli, stimulus_pilot_only){
 
         //Populating the form
         if(stimulus_pilot_only){
-            completion_code = "SP01"
+            completion_code = "CPIYE0PO"
             document.getElementById("data_form_field").innerHTML = JSON.stringify(optimize_data_stim_pilot())
             alert("Your completion code is: " + completion_code)
             console.log(optimize_data_stim_pilot())
