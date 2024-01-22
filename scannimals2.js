@@ -7299,9 +7299,9 @@ DataController = function(seed_number, Stimuli, stimulus_pilot_only){
 
         //Populating the form
         if(stimulus_pilot_only){
-            completion_code = "CPIYE0PO"
             document.getElementById("data_form_field").innerHTML = JSON.stringify(optimize_data_stim_pilot())
-            alert("Your completion code is: " + completion_code)
+            completion_code = "CPIYE0PO"
+            alert("Your completion code is: " + completion_code + ". Please enter this code on Prolific now, and then press the button below to complete the experiment. PLEASE DO NOT CLOSE THIS WINDOW WITHOUT PRESSING THE BUTTON!")
             console.log(optimize_data_stim_pilot())
         }else{
             console.log(optimize_data())
