@@ -383,6 +383,12 @@ function createFennimal(FennimalObj){
         Tertiary_regions[i].style.fill = FennimalObj.head_color_scheme.tertiary_color
     }
 
+    //Set eye color
+    let Eye_regions = HeadObj.getElementsByClassName("Fennimal_eye_color")
+    for(let i = 0; i< Eye_regions.length; i++){
+        Eye_regions[i].style.fill = FennimalObj.head_color_scheme.eye_color
+    }
+
     //Resizing head and bodies
     HeadObj.style.transformOrigin = "50% 35%"
     HeadObj.style.transform = "scale(0.9)"
@@ -2156,9 +2162,12 @@ PARAMETERS = function() {
     this.location_Names = ["Pineforest", "Iceberg", "Windmill", "Garden", "Waterfall", "Mine", "Church", "Farm","Marsh", "Cottage","Oasis", "Cactus", "Beachbar", "Port", "Bush", "Jungleforest"]
     //["Crab", "Snake", "Giraffe", "Mushroom", "Ant", "Beaver", "Spider","Flamingo","Grasshopper",
     // "Frog", "Dragon", "Bunny", "Bird", "Elephant", "Tiger", "Walrus", "Turtle", "Crocodile", "Gnome", "Plant", "Robot"]
-    this.Available_Fennimal_Heads = ["A", "B", "C", "D", "E", "F","G","H", "M", "N", "O"]
+    this.Available_Fennimal_Heads = ["A", "B", "C", "D", "E", "F","G","H","I","J", "K", "L", "M", "N"]
     this.Available_Fennimal_Bodies = ["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M", "N"] // ["A", "B", "C", "D", "F","G","H", "I","J","K"] //["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M","N"]
     this.Regionfree_Fennimal_Bodies = ["A", "E", "F","H","K","M"] // ["A", "B", "C", "D", "F","G","H", "I","J","K"] //["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M","N"]
+
+    this.Heads_Set_A = ["A", "C", "E", "G", "I", "K", "M"]
+    this.Heads_Set_B = ["B", "D", "F", "H", "J", "L", "N"]
 
     this.LocationTransitionData = {
         //This object holds all the location transitions.
@@ -2527,6 +2536,7 @@ PARAMETERS = function() {
                 primary_color: "#526785",
                 secondary_color: "#b0c9d4",
                 tertiary_color: "#1a46b8",
+                eye_color: "#d2dfff",
             },
             contrast_color: "#edc25e",
             preferredBodyType: "B",
@@ -2542,6 +2552,7 @@ PARAMETERS = function() {
                 primary_color: "#566e44",
                 secondary_color: "#cfedbe",
                 tertiary_color: "#78ab09",
+                eye_color: "#dcff8f",
             },
             contrast_color: "#ac7dd7ff",
             preferredBodyType: "N",
@@ -2557,6 +2568,7 @@ PARAMETERS = function() {
                 primary_color: "#969239",
                 secondary_color: "#d1caa9",
                 tertiary_color: "#d2d911",
+                eye_color: "#f7fe25",
             },
             contrast_color: "#47395b",
             preferredBodyType: "I",
@@ -2572,6 +2584,7 @@ PARAMETERS = function() {
                 primary_color: "#953f05", //"#ded3d6",
                 secondary_color: "#b09a90",//"#dedcdc",
                 tertiary_color: "#502d16",
+                eye_color: "#47230a",
             },
             contrast_color: "#9fd8ee",
             preferredBodyType: "J",
@@ -2586,7 +2599,8 @@ PARAMETERS = function() {
             Fennimal_location_colors:{
                 primary_color: "#f5a149",//"#665244",
                 secondary_color: "#ffe6d5",//"#dedcdc",//"#f7cdbc",
-                tertiary_color: "#ffd0b0"//"#f2e7df",
+                tertiary_color: "#ffd0b0",//"#f2e7df",
+                eye_color: "#f6e8da",
             },
             contrast_color: "#c30b69",
             preferredBodyType: "D",
@@ -2602,6 +2616,7 @@ PARAMETERS = function() {
                 primary_color:  "#4d2f49",
                 secondary_color: "#d3bfd9",
                 tertiary_color: "#890fbd",
+                eye_color: "#e8b3ff",
             },
             contrast_color: "#799742",
             preferredBodyType: "G",
@@ -2618,6 +2633,7 @@ PARAMETERS = function() {
                 primary_color: "#734b53",
                 secondary_color: "#ccb1b8",
                 tertiary_color: "#d10f0f",
+                eye_color: "#ffbdbd",
             },
             contrast_color: "#80eeca",
             preferredBodyType: "L",
@@ -2633,7 +2649,8 @@ PARAMETERS = function() {
             Fennimal_location_colors:{
                 primary_color: "#5b7878",
                 secondary_color: "#c2f0ea",
-                tertiary_color:  "#00b3b3"
+                tertiary_color:  "#00b3b3",
+                eye_color: "#8affff",
             },
             contrast_color: "#cb156b",
             preferredBodyType: "C",
@@ -2651,6 +2668,8 @@ PARAMETERS = function() {
                 primary_color: "#AAAAAA",
                 secondary_color: "#DDDDDD",
                 tertiary_color: "#777777",
+                eye_color: "#CCCCCC",
+
             },
             contrast_color: "#444444"
         }
@@ -2715,6 +2734,7 @@ PARAMETERS = function() {
         primary_color: "#AAAAAA",
         secondary_color: "#DDDDDD",
         tertiary_color: "#777777",
+        eye_color: "#cccccc"
     }
 
     //Indexed first on the number of items, then left-to-right  = A,B, ... on the item bar
@@ -2794,21 +2814,20 @@ PARAMETERS = function() {
     }
     // Description of the head
     this.Names_Head = {
-        A: "Leo",
-        B: "Kitty",
+        A: "Kitty",
+        B: "Leo",
         C: "Worker",
         D: "Buzzer",
-        E: "Moo",
-        F: "Fawn",
-        G: "Slither",
-        H: "Lizzy",
-        I: "Trunkie",
-        J: "Nosey",
-        K: "Hoppy",
-        L: "Nibbles",
-        M: "Hoot",
-        N: "Chirpy",
-        O: "Peepers"
+        E: "Chirpy",
+        F: "Hoot",
+        G: "Finny",
+        H: "Hammer",
+        I: "Piggy",
+        J: "Boar",
+        K: "Hisser",
+        L: "Slither",
+        M: "Squeaky",
+        N: "Nibbler",
     }
 
     //Given a location name, returns its associated region. If no region contains this location, returns false
@@ -5478,6 +5497,12 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
             NameText.style.textAlign = "center"
             Page.appendChild(NameText)
         }
+        if(current_hint_type === "location"){
+            let NameText = createTextField(22, 140, 125,90, "This Fennimal lives at <br> " + Param.SubjectFacingLocationNames[Current_Search_Trial_Fennimal.location])
+            NameText.style.fontSize = "20px"
+            NameText.style.textAlign = "center"
+            Page.appendChild(NameText)
+        }
 
         //Creating the buttons at the bottom of the page
         let InstructionsButton = createSVGButtonElem(40,250,150,22,"Instructions")
@@ -6374,6 +6399,7 @@ CategoryPhaseController_Arena = function(ExpCont, CardStimData, LocCont, instruc
     let PhaseLayer = document.getElementById("Category_Layer")
     let ArenaLayer = document.getElementById("category_screen_layer")
     let InstructionsLayer
+
     if(instructions_type === "additional"){
         document.getElementById("category_instructions_first_time").style.display = "none"
         document.getElementById("category_instructions_additional").style.dislplay = "inherit"
@@ -6382,6 +6408,15 @@ CategoryPhaseController_Arena = function(ExpCont, CardStimData, LocCont, instruc
         document.getElementById("category_instructions_additional").style.display = "none"
         document.getElementById("category_instructions_first_time").style.dislplay = "inherit"
         InstructionsLayer = document.getElementById("category_instructions_first_time")
+    }
+
+    if(instructions_type === "stimulus_pilot"){
+        document.getElementById("cat_instr_top_stimpilot").style.display = "inherit"
+        document.getElementById("cat_instr_top_normal").style.display = "none"
+        document.getElementById("cat_instr_title").childNodes[0].innerHTML = "Your task in this experiment"
+    }else{
+        document.getElementById("cat_instr_top_stimpilot").style.display = "none"
+        document.getElementById("cat_instr_top_normal").style.display = "inherit"
     }
 
     // Arena functions
@@ -6531,7 +6566,7 @@ CategoryPhaseController_Arena = function(ExpCont, CardStimData, LocCont, instruc
 
     //Creates the completion button and sets its events handler
     function create_completion_button(){
-        CompletionButton = createSVGButtonElem(300,262,160,20,"CONTINUE")
+        CompletionButton = createSVGButtonElem(405,270,100,25,"Continue")
         ArenaGroup.appendChild(CompletionButton)
 
         //Show the text on the bottom of the arena
@@ -6554,7 +6589,7 @@ CategoryPhaseController_Arena = function(ExpCont, CardStimData, LocCont, instruc
         }
 
         //Tell the experiment controller that this part of the experiment is finished
-        if(instructions_type === "first"){
+        if(instructions_type === "first" || instructions_type === "stimulus_pilot"){
             ExpCont.first_similarity_task_completed(Output)
         }
         if(instructions_type === "additional"){
@@ -6619,21 +6654,29 @@ CategoryPhaseController_Arena = function(ExpCont, CardStimData, LocCont, instruc
                 //Finding the correct card sizes for the heads. A few heads need slightly different proportions
                 //dx and dy are small shims to translate the heads to the center of the card
                 switch(Head){
-                    case("A"): CardDims = {w:50,h:50, scale: 0.45, dx:0, dy: -1}; break // Lion
-                    case("B"): CardDims = {w:50,h:50, scale: 0.44, dx:0, dy: 2.5}; break // Kitty
-                    case("C"): CardDims = {w:50,h:50, scale: 0.39, dx:0, dy: -3}; break // Worker
-                    case("D"): CardDims = {w:50,h:50, scale: 0.42, dx:0, dy: 2}; break // Buzzer
-                    case("E"): CardDims = {w:50,h:50, scale: 0.43, dx:0, dy: 1}; break // Moo
-                    case("F"): CardDims = {w:50,h:50, scale: 0.38, dx:0, dy: 2.5}; break // Fawn
-                    case("G"): CardDims = {w:50,h:50, scale: 0.43, dx:0, dy: -7}; break // Slither
-                    case("H"): CardDims = {w:50,h:50, scale: 0.48, dx:0, dy: -1}; break // Lizzy
-                    case("I"): CardDims = {w:50,h:50, scale: 0.39, dx:0, dy: -5}; break // Trunkie
-                    case("J"): CardDims = {w:50,h:50, scale: 0.45, dx:1, dy: 3}; break // Nosey
-                    case("K"): CardDims = {w:50,h:50, scale: 0.39, dx:0, dy: 2}; break // Hoppy
-                    case("L"): CardDims = {w:50,h:50, scale: 0.48, dx:2, dy: -2}; break // Nibbles
-                    case("M"): CardDims = {w:50,h:50, scale: 0.41, dx:0, dy: 2}; break // OWL
-                    case("N"): CardDims = {w:50,h:50, scale: 0.38, dx:0, dy: 0}; break // Chirpie
-                    case("O"): CardDims = {w:50,h:50, scale: 0.43, dx:0, dy: 6}; break // SNAIL
+                    case("A"): CardDims = {w:50,h:50, scale: 0.44, dx:0, dy: 2.75}; break // Kitty
+                    case("B"): CardDims = {w:50,h:50, scale: 0.45, dx:0, dy: -3.5}; break // Leo
+                    case("C"): CardDims = {w:50,h:50, scale: 0.39, dx:0, dy: -5}; break // Worker
+                    case("D"): CardDims = {w:50,h:50, scale: 0.42, dx:0, dy: 1}; break // Buzzer
+                    case("E"): CardDims = {w:50,h:50, scale: 0.38, dx:0, dy: -4}; break // Chirpie
+                    case("F"): CardDims = {w:50,h:50, scale: 0.41, dx:0, dy: -4}; break // Hoot
+                    case("G"): CardDims = {w:50,h:50, scale: 0.32, dx:0, dy: 0}; break // SHARK
+                    case("H"): CardDims = {w:50,h:50, scale: 0.33, dx:0, dy: 0}; break // HAMMERHEAD
+                    case("I"): CardDims = {w:50,h:50, scale: 0.41, dx:0, dy: 0}; break // Piggy
+                    case("J"): CardDims = {w:50,h:50, scale: 0.45, dx:0, dy: 5}; break // BOAR
+                    case("K"): CardDims = {w:50,h:50, scale: 0.43, dx:0, dy: -2}; break // SNAKE
+                    case("L"): CardDims = {w:50,h:50, scale: 0.43, dx:0, dy: -7}; break // Slither
+                    case("M"): CardDims = {w:50,h:50, scale: 0.47, dx:0, dy: 0}; break // RAT
+                    case("N"): CardDims = {w:50,h:50, scale: 0.43, dx:0, dy: 4}; break // MOUSE
+
+                    //case("E"): CardDims = {w:50,h:50, scale: 0.43, dx:0, dy: 1}; break // Moo
+                    //case("F"): CardDims = {w:50,h:50, scale: 0.38, dx:0, dy: 2.5}; break // Fawn
+                    //case("H"): CardDims = {w:50,h:50, scale: 0.48, dx:0, dy: -1}; break // Lizzy
+                    //case("I"): CardDims = {w:50,h:50, scale: 0.39, dx:0, dy: -5}; break // Trunkie
+                    //case("J"): CardDims = {w:50,h:50, scale: 0.45, dx:1, dy: 3}; break // Nosey
+                    //case("K"): CardDims = {w:50,h:50, scale: 0.39, dx:0, dy: 2}; break // Hoppy
+                    //case("L"): CardDims = {w:50,h:50, scale: 0.48, dx:2, dy: -2}; break // Nibbles
+                    //case("O"): CardDims = {w:50,h:50, scale: 0.43, dx:0, dy: 6}; break // SNAIL
 
 
 
@@ -6784,6 +6827,11 @@ CategoryPhaseController_Arena = function(ExpCont, CardStimData, LocCont, instruc
             Tertiary_regions[i].style.fill = ColorScheme.tertiary_color
         }
 
+        let Eye_regions =  HeadObj.getElementsByClassName("Fennimal_eye_color")
+        for(let i = 0; i< Eye_regions.length; i++){
+            Eye_regions[i].style.fill = ColorScheme.eye_color
+        }
+
         //Create a group to move the center of the head to 0,0 (this is somewhat approximately and hacky, needs to be changed at some point in the future)
         let TranslateOriginContainer = document.createElementNS("http://www.w3.org/2000/svg", 'g')
         TranslateOriginContainer.appendChild(HeadContainer)
@@ -6806,7 +6854,7 @@ CategoryPhaseController_Arena = function(ExpCont, CardStimData, LocCont, instruc
 }
 
 // Manages all data that needs to be preserved. Call at the end of the experiment to download / store a JSON containing all subject-relevant data.
-DataController = function(seed_number, Stimuli){
+DataController = function(seed_number, Stimuli, stimulus_pilot_only){
     let that = this
     //Always store data here as a deep copy!
     let Data = {
@@ -6997,40 +7045,6 @@ DataController = function(seed_number, Stimuli){
     }
     this.update_gender_answer = function(ans){
         gender = ans
-    }
-
-    //Call to submit the hidden form with the subject's data
-    this.submitDataForm = function(){
-        //Downloading hard copy
-        // downloadObjectAsJson(Data, "data participant "+ participant_number + ".json")
-
-        console.log(Data)
-        console.log(optimize_data())
-
-        //Populating the form
-        document.getElementById("data_form_field").innerHTML = JSON.stringify(optimize_data())
-
-        //Give some feedback to the participant
-        let alertmessage
-        switch(Param.ExperimentRecruitmentMethod){
-            case("mturk"):
-                alertmessage = "You are now submitting this page. After submitting you will not be able to go back. If you did not yet submit your token on MTURK, then please do so now! Your token is: " + completion_code
-                break
-            case("prolific"):
-                alertmessage = "You are now submitting this page. After submitting you will not be able to go back. If you did not yet submit the completion code on Prolific, then please do so now! The completion code is: " + completion_code
-                break;
-            case(false):
-                alertmessage = "Experiment completed, thanks for participating!"
-                break
-
-        }
-        alert(alertmessage)
-
-        //Store the completion code locally, for when the website reloads after submitting the form.
-        localStorage.setItem("experiment_completion_code", completion_code )
-
-        //Automatically submit
-        document.getElementById("submitbutton").click()
     }
 
     // Call to the optimize the data, so that we don't have to send a huge amount of redundant data
@@ -7266,10 +7280,60 @@ DataController = function(seed_number, Stimuli){
         return(ReturnData)
     }
 
+    function optimize_data_stim_pilot(){
+        let ReturnData = {
+            Exp: "Stim pilot",
+            Date: new Date().toDateString(),
+            Exptime: Data.experiment_time,
+            Seed: Data.seed,
+            Sim: Data.FirstSimTask,
+        }
+        return(ReturnData)
+    }
+
+    //Call to submit the hidden form with the subject's data
+    this.submitDataForm = function(){
+        //Downloading hard copy
+        // downloadObjectAsJson(Data, "data participant "+ participant_number + ".json")
+        console.log(Data)
+
+        //Populating the form
+        if(stimulus_pilot_only){
+            completion_code = "SP01"
+            document.getElementById("data_form_field").innerHTML = JSON.stringify(optimize_data_stim_pilot())
+            alert("Your completion code is: " + completion_code)
+            console.log(optimize_data_stim_pilot())
+        }else{
+            console.log(optimize_data())
+            document.getElementById("data_form_field").innerHTML = JSON.stringify(optimize_data())
+
+            //Give some feedback to the participant
+            let alertmessage
+            switch(Param.ExperimentRecruitmentMethod){
+                case("mturk"):
+                    alertmessage = "You are now submitting this page. After submitting you will not be able to go back. If you did not yet submit your token on MTURK, then please do so now! Your token is: " + completion_code
+                    break
+                case("prolific"):
+                    alertmessage = "You are now submitting this page. After submitting you will not be able to go back. If you did not yet submit the completion code on Prolific, then please do so now! The completion code is: " + completion_code
+                    break;
+                case(false):
+                    alertmessage = "Experiment completed, thanks for participating!"
+                    break
+
+            }
+            alert(alertmessage)
+        }
+
+        //Store the completion code locally, for when the website reloads after submitting the form.
+        localStorage.setItem("experiment_completion_code", completion_code )
+
+        //Automatically submit
+        document.getElementById("submitbutton").click()
+    }
 }
 
 //Manages the top-level flow of the experiment
-ExperimentController = function(Stimuli, DataController){
+ExperimentController = function(Stimuli, DataController, stimulus_pilot_only){
     let that = this
 
     // At the start of the experiment, we first need to calibrate the Fennimal head similarities. Store the results of this calibration here.
@@ -7527,7 +7591,11 @@ ExperimentController = function(Stimuli, DataController){
 
         if(localStorage.getItem("experiment_completion_code") === null){
             //Start the experiment
-            this.showConsentScreen()
+            if(stimulus_pilot_only){
+                this.start_first_similarity_task()
+            }else{
+                this.showConsentScreen()
+            }
         }else{
             InstrCont.show_completion_code_reloaded_screen(localStorage.getItem("experiment_completion_code"))
         }
@@ -7542,7 +7610,13 @@ ExperimentController = function(Stimuli, DataController){
 
     //Starts the first similarity task. We can only calibrate the stimuli afterwards.
     this.start_first_similarity_task = function(){
-        let CatCont = new CategoryPhaseController_Arena(that, Stimuli.get_stim_for_first_sim_task(), LocCont, "first")
+        let CatCont
+        if(stimulus_pilot_only){
+            CatCont = new CategoryPhaseController_Arena(that, Stimuli.get_stim_for_first_sim_task(), LocCont, "stimulus_pilot")
+        }else{
+            CatCont = new CategoryPhaseController_Arena(that, Stimuli.get_stim_for_first_sim_task(), LocCont, "first")
+        }
+
         CatCont.start_category_phase();
     }
     //Call when the first similarity task has been completed. We can then pass the outcomes of the first sim task to the stimuli object to set all the Fennimals.
@@ -7552,16 +7626,20 @@ ExperimentController = function(Stimuli, DataController){
         //Log these results to the Data Controller
         DataController.store_first_similarity_task_output(StartingSimilarityResults)
 
-        //Tell the Stimuli object to generate the Fennimals for the rest of the experiment
-        Stimuli.create_Fennimals_from_sim_task_results(StimTaskOutput)
+        if(stimulus_pilot_only){
+            experiment_complete()
+        }else{
+            //Tell the Stimuli object to generate the Fennimals for the rest of the experiment
+            Stimuli.create_Fennimals_from_sim_task_results(StimTaskOutput)
 
-        //Store the Training stimuli
-        DataController.store_training_phase_templates(Stimuli.getTrainingTemplates())
-        DataController.store_binding_phase_templates(Stimuli.getBindingTemplates())
-        DataController.store_selected_pairs(Stimuli.getFeaturesSampledAfterFirstSimilarityTask())
+            //Store the Training stimuli
+            DataController.store_training_phase_templates(Stimuli.getTrainingTemplates())
+            DataController.store_binding_phase_templates(Stimuli.getBindingTemplates())
+            DataController.store_selected_pairs(Stimuli.getFeaturesSampledAfterFirstSimilarityTask())
 
-        //Continue to the starting instructions
-        this.show_starting_instructions()
+            //Continue to the starting instructions
+            this.show_starting_instructions()
+        }
 
         //Testing
         //this.start_test_phase()
@@ -7792,7 +7870,7 @@ ExperimentController = function(Stimuli, DataController){
 
             RandomOrderedStimuli = shuffleArray(JSON.parse(JSON.stringify(Stimuli.getTrainingSetFennimalsInArray())))
             for(let i = 0; i<RandomOrderedStimuli.length; i++){
-                ArrayOfFennimalsToBeDelivered = ArrayOfFennimalsToBeDelivered.concat([{Fennimal: RandomOrderedStimuli[i], hint_type: "name"}])
+                ArrayOfFennimalsToBeDelivered = ArrayOfFennimalsToBeDelivered.concat([{Fennimal: RandomOrderedStimuli[i], hint_type: "location"}])
             }
         }
         //Start the first search trial
@@ -8049,11 +8127,18 @@ ExperimentController = function(Stimuli, DataController){
 
     function experiment_complete(){
         console.log("EXPERIMENT COMPLETED")
-        DataCont.experiment_completed()
-        InstrCont.show_score_screen(DataCont.get_score(), DataCont.submitDataForm)
+
+        if(stimulus_pilot_only){
+            DataCont.submitDataForm()
+        }else{
+            DataCont.experiment_completed()
+            InstrCont.show_score_screen(DataCont.get_score(), DataCont.submitDataForm)
+        }
     }
 
 }
+
+
 
 // ON PAGE START //
 // Generate the RNG here. This takes the participant number as a random seed. Request participant number with a prompt
@@ -8287,10 +8372,11 @@ let SVGObjects = {
     IngameHintBox: document.getElementById("hint_box"),
 }
 
-//Creating a data controller to handle all the data that we need to store throughout the experiment
-let DataCont = new DataController(participant_number, Stimuli)
+// Creating controllers. NOTE THE LAST PARAMETER: set to false for the experiments, true for the stimulus pilot
+let DataCont = new DataController(participant_number, Stimuli, true)
+let EC = new ExperimentController(Stimuli, DataCont, true)
 
-let EC = new ExperimentController(Stimuli, DataCont)
+
 EC.startExperiment()
 //EC.start_first_similarity_task()
 //EC.showStartScreen()
@@ -8301,7 +8387,7 @@ EC.startExperiment()
 //EC.start_test_phase()
 
 
-console.log("Version: 17.01.23 B")
+console.log("Version: 17.01.23")
 
 // Instructions repeat block showing last panel too early
 // Instructios number of days
@@ -8312,3 +8398,6 @@ console.log("Version: 17.01.23 B")
 
 //localStorage.setItem("experiment_completion_code", completion_code )
 //localStorage.removeItem("experiment_completion_code")
+
+// Change training round to focus on location
+// Merge experiments 1 and 2 with fixed pairs (first set shown at start and used for exp 1. Then show a third matching screen with the second set to capture experiment 2)
