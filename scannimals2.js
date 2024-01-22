@@ -2734,7 +2734,7 @@ PARAMETERS = function() {
         primary_color: "#AAAAAA",
         secondary_color: "#DDDDDD",
         tertiary_color: "#777777",
-        eye_color: "#cccccc"
+        eye_color: "#a7cdfe"
     }
 
     //Indexed first on the number of items, then left-to-right  = A,B, ... on the item bar
