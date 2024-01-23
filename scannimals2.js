@@ -6664,7 +6664,7 @@ CategoryPhaseController_Arena = function(ExpCont, CardStimData, LocCont, instruc
                     case("H"): CardDims = {w:50,h:50, scale: 0.33, dx:0, dy: 0}; break // HAMMERHEAD
                     case("I"): CardDims = {w:50,h:50, scale: 0.41, dx:0, dy: 0}; break // Piggy
                     case("J"): CardDims = {w:50,h:50, scale: 0.45, dx:0, dy: 5}; break // BOAR
-                    case("K"): CardDims = {w:50,h:50, scale: 0.43, dx:0, dy: -2}; break // SNAKE
+                    case("K"): CardDims = {w:50,h:50, scale: 0.43, dx:0, dy: -6}; break // SNAKE
                     case("L"): CardDims = {w:50,h:50, scale: 0.43, dx:0, dy: -7}; break // Slither
                     case("M"): CardDims = {w:50,h:50, scale: 0.47, dx:0, dy: 0}; break // RAT
                     case("N"): CardDims = {w:50,h:50, scale: 0.43, dx:0, dy: 4}; break // MOUSE
@@ -8387,7 +8387,7 @@ EC.startExperiment()
 //EC.start_test_phase()
 
 
-console.log("Version: 23.01.23")
+console.log("Version: 24.01.23")
 
 // Instructions repeat block showing last panel too early
 // Instructios number of days
