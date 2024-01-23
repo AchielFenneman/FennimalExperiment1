@@ -2162,7 +2162,7 @@ PARAMETERS = function() {
     this.location_Names = ["Pineforest", "Iceberg", "Windmill", "Garden", "Waterfall", "Mine", "Church", "Farm","Marsh", "Cottage","Oasis", "Cactus", "Beachbar", "Port", "Bush", "Jungleforest"]
     //["Crab", "Snake", "Giraffe", "Mushroom", "Ant", "Beaver", "Spider","Flamingo","Grasshopper",
     // "Frog", "Dragon", "Bunny", "Bird", "Elephant", "Tiger", "Walrus", "Turtle", "Crocodile", "Gnome", "Plant", "Robot"]
-    this.Available_Fennimal_Heads = ["A", "B", "C", "D", "E", "F","G","H","I","J", "K", "L", "M", "N"]
+    this.Available_Fennimal_Heads = [ "C", "D", "E", "F","G","H","I","J", "K", "L"]
     this.Available_Fennimal_Bodies = ["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M", "N"] // ["A", "B", "C", "D", "F","G","H", "I","J","K"] //["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M","N"]
     this.Regionfree_Fennimal_Bodies = ["A", "E", "F","H","K","M"] // ["A", "B", "C", "D", "F","G","H", "I","J","K"] //["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M","N"]
 
@@ -6446,7 +6446,7 @@ CategoryPhaseController_Arena = function(ExpCont, CardStimData, LocCont, instruc
         Button.onclick = go_to_next_instruction_step
     }
     function go_to_next_instruction_step(){
-        if(instructions_type === "first"){
+        if(instructions_type === "first" || instructions_type === "stimulus_pilot"){
             switch(current_instruction_step){
                 case(1): {
                     document.getElementById("sim_instructions_groupA").style.opacity = 1
@@ -8387,7 +8387,7 @@ EC.startExperiment()
 //EC.start_test_phase()
 
 
-console.log("Version: 17.01.23")
+console.log("Version: 23.01.23")
 
 // Instructions repeat block showing last panel too early
 // Instructios number of days
