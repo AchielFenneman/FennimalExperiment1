@@ -2038,7 +2038,7 @@ STIMULUSDATA_STIMPILOT = function(){
     // There are two types of stimulus pilots:
     //      all: one screen containing all possible heads. Used to verify whether participants correctly identify the clusters of heads.
     //      split: two screens, each containing one member of all pairs
-    let stim_pilot_type = "all"
+    let stim_pilot_type = "split"
     this.is_stimulus_pilot = true
 
     // Determining the stimulus heads
