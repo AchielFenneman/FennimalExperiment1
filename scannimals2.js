@@ -8774,7 +8774,7 @@ else{
     participant_number = draw_random_participant_seed()
 }
 
-participant_number = 19901
+//participant_number = 19901
 let RNG = new RandomNumberGenerator(participant_number)
 let Stimuli = new STIMULUSDATA_STIMPILOT(participant_number);
 //let Stimuli = new STIMULUSDATA_SIMILARITY_ON_SEARCH()
