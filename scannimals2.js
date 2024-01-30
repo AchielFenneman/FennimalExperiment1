@@ -417,7 +417,7 @@ function createFennimalOutline(head,body, include_targets){
     HeadObj.style.display = "inherit"
 
     //Then the targets for both the head and the body, if required
-    if(include_targets){
+    if(include_targets){ //include_targets
         let BodyTargets = document.getElementById("targets_body_" + body).cloneNode(true)
         Container.appendChild(BodyTargets)
         let HeadTargets = document.getElementById("targets_head_" + head).cloneNode(true)
@@ -1677,6 +1677,7 @@ STIMULUSDATA_EXP2 = function(participant_number){
 //Experiment 1: Does semantic similarity influence the random walk (2 max similar, 2 max distant and a distractor)
 STIMULUSDATA_SIMILARITY_ON_SEARCH = function(participant_number){
     let experiment_code = "exp_sim_on_search"
+    this.is_stimulus_pilot = false
 
     // RESETTING THE RNG SEED HERE //
     ////////////////////////////////
@@ -2038,6 +2039,7 @@ STIMULUSDATA_STIMPILOT = function(){
     //      all: one screen containing all possible heads. Used to verify whether participants correctly identify the clusters of heads.
     //      split: two screens, each containing one member of all pairs
     let stim_pilot_type = "all"
+    this.is_stimulus_pilot = true
 
     // Determining the stimulus heads
     let Stimulus_sets = []
@@ -2816,6 +2818,9 @@ PARAMETERS = function() {
         bonus_per_star: "0.50"
     }
 
+    this.flashlight_radius = 30
+    this.flashlight_target_sensitivity = 35
+
 }
 
 //Controls movement across the SVG (both the map and through the regions)
@@ -3453,6 +3458,399 @@ LocationController = function(ExpCont){
         SVGObjects.Return_to_Home_button.getElementsByTagName("rect")[0].classList.add("location_arrow")
         SVGObjects.Return_to_Home_button.getElementsByTagName("rect")[0].style.display = "inherit"
         SVGObjects.Return_to_Home_button.onclick = outputfun
+    }
+
+}
+
+//Handles the flashlight elements. Presents the outline for a given FennimalObject (call with false if no Fennimal is present at this location).
+//
+Flashlight_Controller = function(FennimalObj,LocCont, ExpCont){
+    let that = this
+
+    //We need the references to the SVG elements of the flashlight
+    let FlashlightIcon = document.getElementById("flashlight")
+    let FlashlightIcon_symbol = document.getElementById("flashlight_light")
+    let FlashlightIcon_box = document.getElementById("flashlight_background")
+
+    let Flashlight_Mask_Black = document.getElementById("spotlight_background_mask_black")
+    let Flashlight_Mask_Yellow = document.getElementById("spotlight_background_mask")
+    let FlashlightPrompt = document.getElementById("prompt_flashlight")
+
+    //Stores the state of the flashlight. True is on, False is off. Toggle with the correct function.
+    let flashlight_state_on = false
+
+    //Creates a radial gradient object, appends it to the SVG and returns a reference
+    function createRadialGradient(id, maxopacity, color){
+        //Check if the gradient already exists or not
+        if(document.getElementById(id) === null){
+            let svgns = 'http://www.w3.org/2000/svg';
+            let gradient = document.createElementNS(svgns, 'radialGradient');
+            gradient.id = id
+            gradient.setAttribute('cx', '9999');
+            gradient.setAttribute('cy', '9999');
+            gradient.setAttribute('r', Param.flashlight_radius);
+            gradient.setAttribute("gradientUnits","userSpaceOnUse")
+            SVGObjects.SVG.childNodes[1].appendChild(gradient)
+
+            //Creating the stops
+            let stop1 = document.createElementNS(svgns, 'stop');
+            stop1.setAttribute("offset",0)
+            stop1.setAttribute("stop-color", color)
+            gradient.appendChild(stop1)
+
+            let stop2 =  document.createElementNS(svgns, 'stop');
+            stop2.setAttribute("offset",.7)
+            stop2.setAttribute("stop-opacity",maxopacity)
+            stop2.setAttribute("stop-color", color)
+            gradient.appendChild(stop2)
+
+            let stop3 =  document.createElementNS(svgns, 'stop');
+            stop3.setAttribute("offset",1)
+            stop3.setAttribute("stop-opacity",0)
+            gradient.appendChild(stop3)
+
+            return(gradient)
+        }else{
+            return(document.getElementById(id))
+        }
+
+    }
+
+    let SpotlightGradient_FennimalOutline = createRadialGradient("spotlight_gradient",1, "black")
+    let SpotlightGradient_Background = createRadialGradient("spotlight_gradient_background",1, "yellow")
+
+    function show_Fennimal_background_mask(){
+        SVGObjects.Splashscreen_Fennimal.Mask.style.display = "inherit"
+    }
+
+    function hide_Fennimal_background_mask(){
+        SVGObjects.Splashscreen_Fennimal.Mask.style.display = "none"
+    }
+
+    ///////////////////
+    //EVENT HANDLERS //
+    ///////////////////
+    //Once the flashlight is active, we need to listen for mouseup and mouse leave events all over the documents.
+    // Leaving the document or lifting the mouse should trigger the flashlight off (if it is on)
+    document.onmouseup = function(){
+        if(flashlight_state_on){
+            toggleFlashlight(false)
+        }
+    }
+    document.onmouseleave = function(){
+        if(flashlight_state_on){
+            toggleFlashlight(false)
+        }
+    }
+
+    //The flashlight should be triggered to active once the icon has been pressed
+    FlashlightIcon.onmousedown = function(){
+        toggleFlashlight(true)
+    }
+
+    //If the mouse moves anywhere on the document AND the flashlight is active, then the gradient of the outline needs to be adjusted
+    // (This gives the splotlight effect!)
+    document.onmousemove = function(event){
+        if(flashlight_state_on){
+            //Get the correct mouse position in the SVG coordinates
+            let mouse_pos = getMousePosition(event)
+
+            //Keep track of how much the subject has searched across the screen
+            amount_dragged++
+
+            //Set the gradients
+            changeOutlineGradient(mouse_pos.x,mouse_pos.y)
+
+            if(FennimalObj !== false){
+                //Scan if any Targets are in range
+                scanForTargets(mouse_pos.x,mouse_pos.y)
+            }else{
+                if( (! no_fennimal_hint_shown) && amount_dragged>400){
+                    show_ingame_hint((508-300)/2,50,300,100,"Some locations may not have any Fennimals present. Try searching in other locations!")
+                    no_fennimal_hint_shown = true
+                }
+            }
+
+            if(try_first_use_hint_timeout !== 'undefined'){
+                if(amount_dragged === 200){
+                    clear_ingame_hint()
+                }
+            }
+
+
+        }
+    }
+
+    function changeOutlineGradient(mouseX,mouseY){
+        //Change the Fennimal outline
+        SpotlightGradient_FennimalOutline.setAttribute("cx", mouseX)
+        SpotlightGradient_FennimalOutline.setAttribute("cy", mouseY)
+
+        //Change the flashlight background shine
+        SpotlightGradient_Background.setAttribute("cx", mouseX)
+        SpotlightGradient_Background.setAttribute("cy", mouseY)
+
+    }
+
+    //Show the item bar with the flashlight icon
+    function showFlashLightIcon(){
+        //Make sure that the item layer is set to visible
+        document.getElementById("Item_bar_layer").style.display = "inherit"
+
+        //Make sure that the item bar is displayed
+        document.getElementById("item_bar").style.display = "inherit"
+
+        //Show the Flashlight icon on the item bar
+        FlashlightIcon.style.display = "inherit"
+    }
+
+    function hideFlashLightIcon(){
+        //Hidng the item bar
+        document.getElementById("Item_bar_layer").style.display = "none"
+        document.getElementById("item_bar").style.display = "inherit"
+
+        //Hide the Flashlight icon on the item bar
+        FlashlightIcon.style.display = "none"
+    }
+
+    //New state should be a bool. True for on, false for off.
+    function toggleFlashlight(new_state){
+        //Change the icon color
+        if(new_state){
+            FlashlightIcon_box.style.fill = "#2c5aa0"
+            FlashlightIcon_symbol.style.fill =  "#ffff00"
+            FlashlightIcon_box.classList.remove("shimmered_object")
+            FlashlightPrompt.style.opacity = 0
+
+        }else{
+            FlashlightIcon_box.style.fill = "#b3b3b3"
+            FlashlightIcon_symbol.style.fill = "black"
+            FlashlightIcon_box.classList.add("shimmered_object")
+            FlashlightPrompt.style.opacity = 1
+        }
+
+        //Set the correct state
+        flashlight_state_on = new_state
+
+        //Hide or show the outline
+        if(new_state){
+            if(FennimalObj !== false){
+                Container.style.display = "inherit"
+            }
+        }else{
+            if(FennimalObj !== false){
+                Container.style.display = "none"
+            }
+        }
+
+        //Set the masks (make the background darker, and show the spotlight yellow) and set the correct gradients
+        if(new_state){
+            Flashlight_Mask_Black.style.display = "inherit"
+            Flashlight_Mask_Yellow.style.display = "inherit"
+            document.getElementById("Fennimal_outlines_spotlight_background").style.display = "inherit"
+
+        }else{
+            Flashlight_Mask_Black.style.display = "none"
+            Flashlight_Mask_Yellow.style.display = "none"
+            document.getElementById("Fennimal_outlines_spotlight_background").style.display = "none"
+
+            //Reset the gradients
+            SpotlightGradient_FennimalOutline.setAttribute("cx", 9999)
+            SpotlightGradient_FennimalOutline.setAttribute("cy", 9999)
+            SpotlightGradient_Background.setAttribute("cx", 9999)
+            SpotlightGradient_Background.setAttribute("cy", 9999)
+        }
+    }
+
+    /////////////
+    // TARGETS //
+    /////////////
+    //Returns an array of targets associated to the Fennimal. Each target has
+    function createTargets(List_of_Elem){
+        //Get all target circles from the SVG
+        let TargetCircles = List_of_Elem
+        let arr = []
+
+        for(let i=0;i<TargetCircles.length;i++){
+            let x = TargetCircles[i].getAttribute("cx")
+            let y = TargetCircles[i].getAttribute("cy")
+            arr.push(new Target(x,y, Param.flashlight_target_sensitivity))
+        }
+        return arr
+    }
+
+    Target = function(x,y, minimum_dist){
+        this.has_been_found = false
+
+        this.checkIfFound = function(mouseX,mouseY){
+            if(!this.has_been_found){
+                //Get the distance between the target and the mouse.
+                let dist = EUDist(x,y, mouseX, mouseY)
+
+                //If this distance is smaller than the threshold determined by Param, then this target has been found
+                if(dist <= minimum_dist){
+                    this.has_been_found = true
+
+                }
+            }
+        }
+    }
+
+    //Call to check if the cursors is sufficiently close to any of the targets.
+    function scanForTargets(mouseX,mouseY){
+        for(let i=0;i<Targets.length;i++){
+            Targets[i].checkIfFound(mouseX,mouseY)
+        }
+
+        //Check if all the targets have been found, if yes, call the proper function.
+        if(checkIfAllTargetsFound()){
+            AllTargetsFound()
+        }
+    }
+
+    //Call to check how many Targets have not been found yet. Returns true if all targets have been found
+    function checkIfAllTargetsFound(){
+        let remainingTargets = 0
+        for(let i=0;i<Targets.length;i++){
+            if(! Targets[i].has_been_found){
+                return false
+            }
+        }
+        return true
+
+    }
+
+    //Call when all Targets have been found. This concludes the spotlight portion of the trial
+    function AllTargetsFound(){
+        //Turn off the flashlight
+        toggleFlashlight(false)
+
+        //Prevent the subject from leaving until the starting animation is completed
+        LocCont.prevent_subject_from_leaving_location(true)
+
+        //Hide the items bar
+        document.getElementById("item_bar").style.display = "none"
+        FlashlightPrompt.style.display = "none"
+
+        //Mellow the background
+        show_Fennimal_background_mask()
+
+        //Hide the item bar
+        FlashlightIcon.style.display = "none"
+
+        //Prevent any hints from being shown and clear any existing hints
+        clear_ingame_hint()
+        if(try_first_use_hint_timeout !== "undefined"){clearTimeout(try_first_use_hint_timeout)}
+
+        //For a short period, show the entire outline
+        Container.style.display = "none"
+        Container.style.opacity = 0
+        Container.style.transition = "all 500ms ease-out"
+
+        setTimeout(function(){
+            Container.style.display = "inherit"
+            HeadObject.style.stroke = "black"
+            HeadObject.style.fill = "black"
+            BodyObject.style.stroke = "black"
+            BodyObject.style.fill = "black"
+
+        }, 5)
+
+        //Fade the outline in
+        setTimeout(function(){
+            Container.style.opacity = 1
+        },100)
+
+        //After a brief delay, fade the outline out and continue with the remaining portion of the trial
+        setTimeout(function(){
+            Container.style.opacity = 0
+            //Wait for the animation to finish before hiding the outline
+            setTimeout(function(){
+                that.leaving_area();
+                ExpCont.FennimalFound(FennimalObj)
+                Container.style.transition = ""
+                Container.style.opacity = 1
+            },600)
+
+        }, 750)
+
+
+
+    }
+
+    //Call when leaving the area (before deleting this controller
+    this.leaving_area = function(){
+        //Hide the prompt
+        FlashlightPrompt.style.display = "none"
+
+        //Hiding the item bar and the flashlight icon
+        toggleFlashlight(false)
+        hideFlashLightIcon()
+        hide_Fennimal_background_mask()
+
+        //Clear the Container
+        document.getElementById("Fennimal_Container").innerHTML = ""
+
+        if(try_first_use_hint_timeout !== "undefined"){
+            clearTimeout(try_first_use_hint_timeout)
+        }
+        clear_ingame_hint()
+    }
+
+    /////////////////////
+    // ON CONSTRUCTION //
+    /////////////////////
+    let Targets, Container, HeadObject, BodyObject
+    document.getElementById("Fennimal_Container").innerHTML = ""
+
+    //Check if there is a Fennimal in this location
+    if(FennimalObj !== false){
+        Container = document.getElementById("Fennimal_Container")
+        //Creating the outline object and attaching it to the Container
+        let OutlineObject = createFennimalOutline(FennimalObj.head,FennimalObj.body, true)
+        Container.appendChild(OutlineObject)
+
+        //Storing references to the head and body part of the outline
+        HeadObject = document.getElementById("outline_head")
+        BodyObject = document.getElementById("outline_body")
+
+        //Setting the correct fills
+        HeadObject.style.fill = "url(#spotlight_gradient)"
+        HeadObject.style.stroke = "url(#spotlight_gradient)"
+        BodyObject.style.fill = "url(#spotlight_gradient)"
+        BodyObject.style.stroke = "url(#spotlight_gradient)"
+
+        //Finding the targets
+        let TargetsList = OutlineObject.getElementsByClassName("outline_target")
+        Targets = createTargets(TargetsList)
+    }
+    LocCont.prevent_subject_from_leaving_location(false)
+
+    //Showing the layers on screen
+    SVGObjects.Layers.Stage.style.display = "inherit"
+
+    //Creating and setting elements
+    showFlashLightIcon()
+    toggleFlashlight(false)
+
+    Flashlight_Mask_Yellow.style.fill = "url(#spotlight_gradient_background)"
+    FlashlightPrompt.style.display = "inherit"
+
+    // DISPLAYING INGAME HINTS
+    //When the first flashlight controller is generated, show subjects a hint on how to use the flashlight.
+    let try_first_use_hint_timeout
+    let amount_dragged = 0
+    let no_fennimal_hint_shown = false
+
+    function try_first_use_hint(){
+        if(!IngameHintsGiven.flashlight_first_use){
+            show_ingame_hint((508-400)/2,35,400,175,"A flashlight icon will automatically appear in some locations. These locations may contain a Fennimal. <br> <br> You can search for Fennimals by holding down the flashlight icon and dragging the light across the screen")
+            IngameHintsGiven.flashlight_first_use = true
+        }
+    }
+
+    if(!IngameHintsGiven.flashlight_first_use){
+        try_first_use_hint_timeout =  setTimeout(function(){try_first_use_hint()},6500)
     }
 
 }
@@ -6828,7 +7226,7 @@ CategoryPhaseController_Arena = function(ExpCont, CardStimData, LocCont, instruc
 }
 
 // Manages all data that needs to be preserved. Call at the end of the experiment to download / store a JSON containing all subject-relevant data.
-DataController = function(seed_number, Stimuli, stimulus_pilot_only){
+DataController = function(seed_number, Stimuli){
     let that = this
     //Always store data here as a deep copy!
     let Data = {
@@ -7268,7 +7666,7 @@ DataController = function(seed_number, Stimuli, stimulus_pilot_only){
         console.log(Data)
 
         //Populating the form
-        if(stimulus_pilot_only){
+        if(Stimuli.is_stimulus_pilot){
             document.getElementById("data_form_field").innerHTML = JSON.stringify(optimize_data_stim_pilot())
             completion_code = "CPIYE0PO"
             alert("Your completion code is: " + completion_code + ". Please enter this code on Prolific now, and then press the button below to complete the experiment. PLEASE DO NOT CLOSE THIS WINDOW WITHOUT PRESSING THE BUTTON!")
@@ -7304,7 +7702,8 @@ DataController = function(seed_number, Stimuli, stimulus_pilot_only){
 }
 
 //Manages the top-level flow of the experiment
-ExperimentController = function(Stimuli, DataController, stimulus_pilot_only){
+ExperimentController = function(Stimuli, DataController){
+    //Check if we're doing a stimulus pilot, as this has a radically different experiment flow
     let that = this
 
     // At the start of the experiment, we first need to calibrate the Fennimal head similarities. Store the results of this calibration here.
@@ -7324,6 +7723,7 @@ ExperimentController = function(Stimuli, DataController, stimulus_pilot_only){
 
     //Keeping track of the FennimalController
     let FenCont = false
+    let FlashCont = false
 
     //Keeps track of the order in which the Fennimals are encountered
     let Fennimal_found_number, number_of_locations_visited, location_visitation_counter, current_training_subphase, MaskCont
@@ -7385,7 +7785,14 @@ ExperimentController = function(Stimuli, DataController, stimulus_pilot_only){
             }else{
                 //Fennimal has not been found yet. Show after a brief delay if this is the first visit to the locaiton
                 setTimeout(function(){
-                    that.FennimalFound(FennimalsPresentOnMap[location_name] )
+                    //Check if a spotlight search needs to be done first
+                    if(current_phase_of_the_experiment === "training" && current_training_subphase === "exploration"){
+                        console.log("Creating spotlight")
+                        FlashCont= new Flashlight_Controller(FennimalsPresentOnMap[location_name] , LocCont, that)
+                    }else{
+                        //No spotlight search needed, go straight to Fennimal
+                        that.FennimalFound(FennimalsPresentOnMap[location_name] )
+                    }
                 }, delay_time)
 
                 //FlashCont = new Flashlight_Controller(FennimalsPresentOnMap[location_name],LocCont, this)
@@ -7401,6 +7808,11 @@ ExperimentController = function(Stimuli, DataController, stimulus_pilot_only){
         if(FenCont !== false){
             FenCont.interactionAborted()
             FenCont = false
+        }
+
+        if(FlashCont !== false){
+            FlashCont.leaving_area()
+            FlashCont= false
         }
 
         //Show the HUD again
@@ -7562,7 +7974,7 @@ ExperimentController = function(Stimuli, DataController, stimulus_pilot_only){
 
         if(localStorage.getItem("experiment_completion_code") === null){
             //Start the experiment
-            if(stimulus_pilot_only){
+            if(Stimuli.is_stimulus_pilot){
                 this.start_first_similarity_task()
 
             }else{
@@ -7587,7 +7999,7 @@ ExperimentController = function(Stimuli, DataController, stimulus_pilot_only){
     //Starts the first similarity task. We can only calibrate the stimuli afterwards.
     this.start_first_similarity_task = function(){
         let CatCont
-        if(stimulus_pilot_only){
+        if(Stimuli.is_stimulus_pilot){
             CatCont = new CategoryPhaseController_Arena(that, Stimuli.getNextStimulusHeads(), LocCont, "stimulus_pilot_first")
         }else{
             CatCont = new CategoryPhaseController_Arena(that, Stimuli.get_stim_for_first_sim_task(), LocCont, "first")
@@ -7602,7 +8014,7 @@ ExperimentController = function(Stimuli, DataController, stimulus_pilot_only){
         //Log these results to the Data Controller
         DataController.store_similarity_task_output(StartingSimilarityResults)
 
-        if(stimulus_pilot_only){
+        if(Stimuli.is_stimulus_pilot){
             if(Stimuli.get_number_of_stim_sets() === 0){
                 experiment_complete()
             }else{
@@ -8095,7 +8507,7 @@ ExperimentController = function(Stimuli, DataController, stimulus_pilot_only){
     function start_second_category_phase(){
         //Here the controller handles all the interactions
         let CatCont
-        if(stimulus_pilot_only){
+        if(Stimuli.is_stimulus_pilot){
             CatCont = new CategoryPhaseController_Arena(that, Stimuli.getNextStimulusHeads(), LocCont, "stimulus_pilot_additional")
         }else{
             CatCont = CatCont = new CategoryPhaseController_Arena(that, Stimuli.get_stim_for_second_sim_task(), LocCont, "additional")
@@ -8108,7 +8520,7 @@ ExperimentController = function(Stimuli, DataController, stimulus_pilot_only){
         //Log these results to the Data Controller
         DataController.store_similarity_task_output(sim_data)
 
-        if(stimulus_pilot_only){
+        if(Stimuli.is_stimulus_pilot){
             if(Stimuli.get_number_of_stim_sets() === 0){
                 experiment_complete()
             }else{
@@ -8124,7 +8536,7 @@ ExperimentController = function(Stimuli, DataController, stimulus_pilot_only){
     function experiment_complete(){
         console.log("EXPERIMENT COMPLETED")
 
-        if(stimulus_pilot_only){
+        if(Stimuli.is_stimulus_pilot){
             DataCont.submitDataForm()
         }else{
             DataCont.experiment_completed()
@@ -8365,11 +8777,11 @@ else{
 participant_number = 19901
 let RNG = new RandomNumberGenerator(participant_number)
 let Stimuli = new STIMULUSDATA_STIMPILOT(participant_number);
-
+//let Stimuli = new STIMULUSDATA_SIMILARITY_ON_SEARCH()
 
 // Creating controllers. NOTE THE LAST PARAMETER: set to false for the experiments, true for the stimulus pilot
-let DataCont = new DataController(participant_number, Stimuli, true)
-let EC = new ExperimentController(Stimuli, DataCont, true)
+let DataCont = new DataController(participant_number, Stimuli)
+let EC = new ExperimentController(Stimuli, DataCont)
 
 
 EC.startExperiment()
@@ -8382,7 +8794,7 @@ EC.startExperiment()
 //EC.start_test_phase()
 
 
-console.log("Version: 17.01.23")
+console.log("Version: 30.01.23")
 
 // Instructions repeat block showing last panel too early
 // Instructios number of days
@@ -8394,5 +8806,4 @@ console.log("Version: 17.01.23")
 //localStorage.setItem("experiment_completion_code", completion_code )
 //localStorage.removeItem("experiment_completion_code")
 
-// Change training round to focus on location
-// Merge experiments 1 and 2 with fixed pairs (first set shown at start and used for exp 1. Then show a third matching screen with the second set to capture experiment 2)
+// Reintroduce spotlight to exploration phase
