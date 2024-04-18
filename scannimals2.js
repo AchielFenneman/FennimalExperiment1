@@ -391,7 +391,7 @@ function createFennimal(FennimalObj){
 
     //Resizing head and bodies
     HeadObj.style.transformOrigin = "50% 35%"
-    HeadObj.style.transform = "scale(0.9)"
+    HeadObj.style.transform = "scale(0.8)"
 
     BodyObj.style.transformOrigin = "50% 10%"
     BodyObj.style.transform = "scale(.9)"
@@ -427,6 +427,7 @@ function createFennimalOutline(head,body, include_targets){
 
     //Resizing head and bodies
     HeadObj.style.transformOrigin = "50% 35%"
+    HeadObj.style.transform = "scale(.8)"
     //HeadObj.style.transform = "scale(1.25)"
 
     BodyObj.style.transformOrigin = "50% 10%"
@@ -566,1244 +567,13 @@ function all_permutations(array) {
     return result;
 }
 
-//Experiment 1: Does the random walk increase the similarity between features (five max different features, 2 sets of equidistant heads)
-STIMULUSDATA_EXP1 = function(participant_number){
-    let experiment_code = "exp1"
-
-    // RESETTING THE RNG SEED HERE //
-    ////////////////////////////////
-    // NO CALLS TO RANDOMIZATION SHOULD BE MADE ABOVE THIS LINE //
-    RNG = new RandomNumberGenerator(participant_number)
-
-    //Max time for the timed block
-    let max_rt_tt = 4000
-    let max_rt_tt_dist = 3500
-
-    // SETTING THE CONTENTS OF THE FIRST SIMILARITY TASK (the rest of the Fennimals will be created according to these results)
-    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    let Head_Available_For_First_Sim_Task = shuffleArray(JSON.parse(JSON.stringify(Param.Available_Fennimal_Heads)))
-    let FirstSimTaskStim = []
-    for(let i = 0; i< Head_Available_For_First_Sim_Task.length; i++){
-        FirstSimTaskStim.push({
-            ID: Head_Available_For_First_Sim_Task[i],
-            head: Head_Available_For_First_Sim_Task[i]
-        })
-    }
-
-    //The results from the first sim task (and associated selected pairs) will be set here.
-    let FirstSimResults, Selected_Pairs
-
-    // DEFINING THE AVAILABLE FEATURES FROM THE PARAM OBJECT
-    ///////////////////////////////////////////////////////////
-    let Available_Regions = shuffleArray(["North","Desert","Village","Jungle","Flowerfields","Swamp", "Beach", "Mountains"])
-
-    let Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 5, false ))
-    let Random_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
-
-    let Drawn_Training_Regions = Available_Regions.splice(0,3)
-    let TrainingRegions = {
-        IA: Drawn_Training_Regions[0],
-        IB: Drawn_Training_Regions[0],
-        DA: Drawn_Training_Regions[1],
-        DB: Drawn_Training_Regions[1],
-        C: Drawn_Training_Regions[2],
-        //C2: Drawn_Training_Regions[3],
-    }
-    let I_Locations = shuffleArray( Param.RegionData[TrainingRegions.IA].Locations )
-    let D_Locations = shuffleArray( Param.RegionData[TrainingRegions.DA].Locations )
-    let TrainingLocations = {
-        IA: I_Locations[0],
-        IB: I_Locations[1],
-        DA: D_Locations[0],
-        DB: D_Locations[1],
-        C: shuffleArray( Param.RegionData[TrainingRegions.C].Locations )[0],
-        //C2: shuffleArray( Param.RegionData[TrainingRegions.C2].Locations )[0],
-    }
-
-    let Drawn_Binding_Phase_Regions = Available_Regions.splice(0,5)
-    let BindingPhaseRegions = {
-        IA: Drawn_Binding_Phase_Regions[0],
-        IB: Drawn_Binding_Phase_Regions[1],
-        DA: Drawn_Binding_Phase_Regions[2],
-        DB: Drawn_Binding_Phase_Regions[3],
-        C: Drawn_Binding_Phase_Regions[4],
-        //C2: TrainingRegions.C2
-    }
-    let BindingPhaseLocations = {
-        IA: shuffleArray( Param.RegionData[BindingPhaseRegions.IA].Locations ),
-        IB: shuffleArray( Param.RegionData[BindingPhaseRegions.IB].Locations ),
-        DA: shuffleArray( Param.RegionData[BindingPhaseRegions.DA].Locations ),
-        DB: shuffleArray( Param.RegionData[BindingPhaseRegions.DB].Locations ),
-        C: shuffleArray(  Param.RegionData[BindingPhaseRegions.C].Locations),
-        //C2: shuffleArray( TrainingLocations.C2),
-    }
-
-    //These will only be filled after the first similarity task
-    let TrainingFennimals, BindingPhaseTemplates, BindingPhaseSetup, TimedBlockTemplates
-
-    this.create_Fennimals_from_sim_task_results = function(FirstSimData){
-        //Storing the results from the first similarity task.
-        FirstSimResults = JSON.parse(JSON.stringify(FirstSimData))
-
-        set_all_Fennimals_equally_distinct(FirstSimResults.Data)
-
-    }
-
-    function set_all_Fennimals_equally_distinct (SimsArr){
-        // First we need to find four heads.
-        // Here we want the four most distinct Fennimals, in two maximally distinct pairs.
-        // In addition, we want 2 pairs for the control stimuli. These should not be too similar to the previous pars, nor too similar within a pair.
-        let Pairs = find_training_phase_heads_equally_distinct(SimsArr)
-
-        //Randomly pick one pair to be the indirect pair, one to be the direct pair. In addition, controls should be randomly selected to be C1 and C2
-        let Main_Pairs = shuffleArray([Pairs.Pair1, Pairs.Pair2])
-        let I_Pair = Main_Pairs[0]
-        let D_Pair = Main_Pairs[1]
-
-        //Storing as  seperate object (easier for analyses down the line)
-        Selected_Pairs = {
-            I: I_Pair,
-            D: D_Pair,
-            C: Pairs.Control
-        }
-
-        //Now we can create all the Fennimals
-        TrainingFennimals = {
-            IA: createFennimalObj(TrainingRegions.IA, TrainingLocations.IA, Selected_Pairs.I.IDs[0],Param.RegionData[TrainingRegions.IA].preferredBodyType, Random_Items[0] ),
-            IB: createFennimalObj(TrainingRegions.IB, TrainingLocations.IB, Selected_Pairs.I.IDs[1],Param.RegionData[TrainingRegions.IB].preferredBodyType, Random_Items[1] ),
-            DA: createFennimalObj(TrainingRegions.DA, TrainingLocations.DA, Selected_Pairs.D.IDs[0],Param.RegionData[TrainingRegions.DA].preferredBodyType, Random_Items[2] ),
-            DB: createFennimalObj(TrainingRegions.DB, TrainingLocations.DB, Selected_Pairs.D.IDs[1],Param.RegionData[TrainingRegions.DB].preferredBodyType, Random_Items[3] ),
-            C: createFennimalObj(TrainingRegions.C, TrainingLocations.C, Pairs.Control,Param.RegionData[TrainingRegions.C].preferredBodyType, Random_Items[4] ),
-            //C2: createFennimalObj(TrainingRegions.C2, TrainingLocations.C2, Selected_Pairs.C.IDs[1],Param.RegionData[TrainingRegions.C2].preferredBodyType, Random_Items[5] ),
-        }
-
-        BindingPhaseTemplates= {
-            IA: {ID: "IA", head: TrainingFennimals.IA.head, body: Param.RegionData[BindingPhaseRegions.IA].preferredBodyType, region: BindingPhaseRegions.IA, location: BindingPhaseLocations.IA[0], item_direct: TrainingFennimals.IA.item, item_indirect: TrainingFennimals.IB.item },
-            IB: {ID: "IB", head: TrainingFennimals.IB.head, body: Param.RegionData[BindingPhaseRegions.IB].preferredBodyType, region: BindingPhaseRegions.IB, location: BindingPhaseLocations.IB[0],item_direct: TrainingFennimals.IB.item, item_indirect: TrainingFennimals.IA.item},
-            DA: {ID: "DA", head: TrainingFennimals.DA.head, body: Param.RegionData[BindingPhaseRegions.DA].preferredBodyType, region: BindingPhaseRegions.DA, location: BindingPhaseLocations.DA[0],item_direct: TrainingFennimals.DA.item, item_indirect: TrainingFennimals.DB.item},
-            DB: {ID: "DB", head: TrainingFennimals.DB.head, body: Param.RegionData[BindingPhaseRegions.DB].preferredBodyType, region: BindingPhaseRegions.DB, location: BindingPhaseLocations.DB[0],item_direct: TrainingFennimals.DB.item, item_indirect: TrainingFennimals.DA.item},
-            C: {ID: "C", head: TrainingFennimals.C.head, body: Param.RegionData[BindingPhaseRegions.C].preferredBodyType, region: BindingPhaseRegions.C, location: BindingPhaseLocations.C, item_direct: TrainingFennimals.C.item, item_indirect: false},
-            //C2: {ID: "C2", head: TrainingFennimals.C2.head, body: Param.RegionData[BindingPhaseRegions.C2].preferredBodyType, region: BindingPhaseRegions.C2, location: BindingPhaseLocations.C2, item_direct: TrainingFennimals.C2.item, item_indirect: false},
-        }
-
-        //Setting all the trials for the Binding phase
-        BindingPhaseSetup = [
-            {
-                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB", "C"], "direct", true,true ),
-                type: "direct",
-                hint_type: "text",
-                number: 1
-            },{
-                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C"],  "indirect", false,true ),
-                type: "indirect",
-                hint_type: "text",
-                number: 2
-            },{
-                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C"],  "indirect", false,true ),
-                type: "indirect",
-                hint_type: "text",
-                number: 3
-            },{
-                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C"], "indirect", false,true ),
-                type: "indirect",
-                hint_type: "text",
-                number: 4
-            },{
-                Trials:  createBlockOfBindingTrials(["IA","IB","DA","DB","C"],  "indirect", false,true ),
-                type: "indirect",
-                hint_type: "text",
-                number: 5
-            }, {
-                type: "additional_similarity",
-                number: 6
-            },{
-                Trials: createBlockOfRepeatTrainingTrials(true),
-                type: "repeat_training",
-                hint_type: "text",
-                number: 8
-            }]
-
-
-        console.log(Selected_Pairs)
-        console.log(TrainingFennimals)
-        console.log(BindingPhaseTemplates)
-        console.log(BindingPhaseSetup)
-
-
-
-    }
-
-    //Given a similarity setup, returns two pairs of maximally dis-similar IDs
-    function find_training_phase_heads_equally_distinct(SimsArr){
-        //First transform the arry of Sims into an object where each property only has points
-        let SimPoints = {}
-        for(let i =0; i<SimsArr.length; i++){
-            SimPoints[SimsArr[i].ID] = {x : SimsArr[i].x, y: SimsArr[i].y}
-        }
-
-        //Create an array of all different IDs.
-        let IDs = Object.getOwnPropertyNames(SimPoints)
-
-        //Now we need to figure out all groups that we can make with 6 different Fennimals.
-        let Combos = combinations(IDs,5)
-
-        //For each group, calculate the distance between all of the elements. For each group, store the shortest distance in an array
-        let GroupDistances = []
-        let Shortest_Distances = []
-        for(let i = 0; i<Combos.length;i++){
-            let AllPairs = combinations(Combos[i], 2)
-            let AllDistances = []
-            let GroupInfo = {
-                IDs: Combos[i],
-                distances: []
-            }
-            for(let p=0; p<AllPairs.length;p++){
-                //Calculating EU-distance between these pairs
-                let point1 = SimPoints[AllPairs[p][0]]
-                let point2 = SimPoints[AllPairs[p][1]]
-                let dist = EUDist(point1.x,point1.y,point2.x,point2.y)
-
-                AllDistances.push(dist)
-
-                GroupInfo.distances.push( {
-                    pair: AllPairs[p],
-                    p1: point1,
-                    p2: point2,
-                    dist: dist
-                }  )
-            }
-
-            GroupInfo.min = Math.min(... AllDistances)
-            Shortest_Distances.push(Math.min(... AllDistances))
-            GroupDistances.push(GroupInfo)
-        }
-
-        //We now need to find the group with the longest shortest distance. (That is, the group for which the closest two Fennimals are maximally apart).
-        let longest_sortest_distance = Math.max(...Shortest_Distances)
-        let PotentialGroups = []
-        for(let i = 0; i<GroupDistances.length;i++){
-            if(GroupDistances[i].min === longest_sortest_distance){
-                PotentialGroups.push(GroupDistances[i])
-            }
-        }
-
-        //Note: there may be multiple groups with this shortest distance (if some elements are perfectly overlapping). If so, pick one at random
-        let SelectedGroup
-        if(PotentialGroups.length > 1){
-            SelectedGroup = drawRandomElementsFromArray(PotentialGroups,1,false)[0].IDs
-        }else{
-            SelectedGroup = PotentialGroups[0].IDs
-        }
-
-        console.log(SelectedGroup)
-
-        //Now we have our winning group.
-        //First, lets store these elements in a backup, so we can call onthese later (while still using splice)
-        let SelectedGroupIds = JSON.parse(JSON.stringify(SelectedGroup))
-
-        //Now we need to figure out all possible combinations to make from these elements
-        let SelectedGroup_Permutations = all_permutations(SelectedGroupIds)
-        let SelectedGroup_Dist_Diff = []
-        for(let i =0; i<SelectedGroup_Permutations.length;i++){
-            let p1 = SimPoints[SelectedGroup_Permutations[i][0]]
-            let p2 = SimPoints[SelectedGroup_Permutations[i][1]]
-            let dist1 = EUDist(p1.x,p1.y,p2.x,p2.y)
-
-            let p3 = SimPoints[SelectedGroup_Permutations[i][2]]
-            let p4 = SimPoints[SelectedGroup_Permutations[i][3]]
-            let dist2 = EUDist(p3.x,p3.y,p4.x,p4.y)
-
-            SelectedGroup_Dist_Diff.push(Math.abs(dist1 - dist2))
-        }
-
-        //Findings pairs with the lowest difference in distances
-        let perm_smallest_range = Math.min(...SelectedGroup_Dist_Diff)
-        let Potential_Pairs = []
-        for(let i = 0; i<SelectedGroup_Permutations.length;i++){
-            if(SelectedGroup_Dist_Diff[i] === perm_smallest_range){
-                Potential_Pairs.push(SelectedGroup_Permutations[i])
-            }
-        }
-        //These are massively over-counted (above we didnt take ordering into proper account). Randomly pick one here.
-        let Sampled_Pair = shuffleArray(Potential_Pairs)[0]
-
-        //Creating the selected pairs
-        let Pair1 = [Sampled_Pair[0], Sampled_Pair[1]].flat()
-        let Pair2 = [Sampled_Pair[2], Sampled_Pair[3]].flat()
-        let Control = Sampled_Pair[4]
-
-        //Now finally we want to keep track of the distance between these pairs (round to two numbers)
-        let dist_pair1 = Math.round(EUDist(SimPoints[Pair1[0]].x, SimPoints[Pair1[0]].y, SimPoints[Pair1[1]].x, SimPoints[Pair1[1]].y) * 100)/100
-        let dist_pair2 = Math.round(EUDist(SimPoints[Pair2[0]].x, SimPoints[Pair2[0]].y, SimPoints[Pair2[1]].x, SimPoints[Pair2[1]].y) * 100)/100
-
-        let Selected_Pairs = {Pair1: {IDs: Pair1, dist_t1: dist_pair1}, Pair2: {IDs: Pair2, dist_t1: dist_pair2}, Control: Control}
-        return(Selected_Pairs)
-    }
-
-    // SUPPORTING FUNCTIONS
-    ////////////////////////
-    function generate_item_details(Items_Used){
-        //Location on screen ranges from 1 - N
-        let Background_Colors = Param.ItemBackgroundColors[Items_Used.length]
-
-        let LocationArr = []
-        for(let i =0; i<Items_Used.length;i++){
-            LocationArr.push(i+1)
-        }
-        shuffleArray(LocationArr)
-
-        let ItemObj = {All_Items: Items_Used}
-        for(let i =0;i<Items_Used.length;i++){
-            ItemObj[Items_Used[i]] = {
-                //location_on_screen: LocationArr[i],
-                backgroundColor: Background_Colors[i]
-            }
-        }
-        return(ItemObj)
-    }
-    function createFennimalObj(region, location, head, body, item){
-        let FenObj = {
-            region: region,
-            location: location,
-            head: head,
-            body: body,
-        }
-
-        if(item !== false){
-            FenObj.item = item
-        }
-
-        //Adding name and color scheme
-        FenObj.name = createConjunctiveNameHeadBody(body,head)//createConjunctiveNameRegionHead(region, head) //Param.Names_Head[head]//createConjunctiveNameHeadBody(body,head)//createConjunctiveNameRegionHead(region, head)
-        FenObj.head_color_scheme = JSON.parse(JSON.stringify(Param.RegionData[region].Fennimal_location_colors))
-        FenObj.body_color_scheme = JSON.parse(JSON.stringify(Param.RegionData[region].Fennimal_location_colors))
-        FenObj.body_color_scheme.tertiary_color = Param.RegionData[region].contrast_color
-
-        return(FenObj)
-    }
-
-    //Returns a block of inference-phase trials. items_allowed_... can be "direct" or "indirect.
-    function createBlockOfBindingTrials(Array_of_Keys_Of_Fennimal_IDs_used, items_allowed_for_indirect_pair, include_feedback, shuffle_trials){
-        let Block = []
-
-        for(let key_ind = 0; key_ind<Array_of_Keys_Of_Fennimal_IDs_used.length; key_ind++){
-            let key = Array_of_Keys_Of_Fennimal_IDs_used[key_ind]
-            let FenObj = BindingPhaseTemplates[key]
-
-            let TestObj = createFennimalObj(FenObj.region,FenObj.location, FenObj.head, FenObj.body, false)
-            TestObj.name = createConjunctiveNameHeadBody(FenObj.body,FenObj.head)
-            TestObj.feedback = include_feedback
-
-            //Setting items available.
-            // First we make sure that there are two distractors: the control item and one of the items belonging to the other pair.
-            TestObj.item_direct = FenObj.item_direct
-
-            //Finding the correct item
-            let correct_item
-            switch(key){
-                case("IA"): if(items_allowed_for_indirect_pair === "direct"){correct_item = TrainingFennimals.IA.item} else {correct_item = TrainingFennimals.IB.item} break
-                case("IB"): if(items_allowed_for_indirect_pair === "direct"){correct_item = TrainingFennimals.IB.item} else {correct_item = TrainingFennimals.IA.item} break
-                case("DA"): correct_item = TrainingFennimals.DA.item; break
-                case("DB"): correct_item = TrainingFennimals.DB.item; break
-                case("C"): correct_item = TrainingFennimals.C.item; break;
-                // case("C2"): correct_item = TrainingFennimals.C2.item; break;
-            }
-
-            //We will select one element from each of the arrays. So arrays with one element will always be selected
-            let OtherPairItems
-            switch(key){
-                case("IA"): OtherPairItems = [ TrainingFennimals.C.item,[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("IB"): OtherPairItems = [ TrainingFennimals.C.item,[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break
-                case("DA"): OtherPairItems = [ TrainingFennimals.C.item,[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
-                case("DB"): OtherPairItems = [ TrainingFennimals.C.item,[TrainingFennimals.IA.item, TrainingFennimals.IB.item]]; break
-                case("C"): OtherPairItems = [ [TrainingFennimals.IA.item,TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
-                // case("C2"): OtherPairItems = [ [TrainingFennimals.IA.item,TrainingFennimals.IB.item],[TrainingFennimals.DA.item, TrainingFennimals.DB.item]]; break;
-            }
-
-            //Creating an array containing all the trial's available items
-            let Available_Items = [correct_item]
-            for(let i=0;i<OtherPairItems.length;i++){
-                if(typeof OtherPairItems[i] === "string"){
-                    Available_Items.push(OtherPairItems[i])
-                }else{
-                    Available_Items.push(shuffleArray(OtherPairItems[i])[0] )
-                }
-            }
-
-            //Assigning the properties to the TestObject.
-            TestObj.items_available = Available_Items
-            TestObj.correct_item = correct_item
-
-            switch(key){
-                case("IA"): TestObj.item_direct = TrainingFennimals.IA.item; TestObj.item_indirect = TrainingFennimals.IB.item; break
-                case("IB"): TestObj.item_direct = TrainingFennimals.IB.item; TestObj.item_indirect = TrainingFennimals.IA.item; break
-                case("DA"): TestObj.item_direct = TrainingFennimals.DA.item; TestObj.item_indirect = TrainingFennimals.DB.item; break
-                case("DB"): TestObj.item_direct = TrainingFennimals.DB.item; TestObj.item_indirect = TrainingFennimals.DA.item; break
-                case("C"): TestObj.item_direct = TrainingFennimals.C.item; TestObj.item_indirect = false; break
-                //case("C2"): TestObj.item_direct = TrainingFennimals.C2.item; TestObj.item_indirect = false; break
-            }
-
-            TestObj.ID = FenObj.ID
-
-            //Pushing to the DirectTestBlock
-            Block.push(TestObj)
-        }
-        if(shuffle_trials){
-            return(shuffleArray(Block))
-        }else{
-            return(Block)
-        }
-
-    }
-
-    //Returns a block of the original training trials with all items available
-    function createBlockOfRepeatTrainingTrials(shuffle_trials){
-        let Block = []
-        for(let key in TrainingFennimals){
-            let NewFenObj = JSON.parse(JSON.stringify(TrainingFennimals[key]))
-            delete NewFenObj.item
-
-            NewFenObj.ID = key
-            NewFenObj.items_available = Random_Items
-
-            switch(key){
-                case("IA"): NewFenObj.item_direct = TrainingFennimals.IA.item; NewFenObj.item_indirect = TrainingFennimals.IB.item; break
-                case("IB"): NewFenObj.item_direct = TrainingFennimals.IB.item; NewFenObj.item_indirect = TrainingFennimals.IA.item; break
-                case("DA"): NewFenObj.item_direct = TrainingFennimals.DA.item; NewFenObj.item_indirect = TrainingFennimals.DB.item; break
-                case("DB"): NewFenObj.item_direct = TrainingFennimals.DB.item; NewFenObj.item_indirect = TrainingFennimals.DA.item; break
-                case("C"): NewFenObj.item_direct = TrainingFennimals.C.item; NewFenObj.item_indirect = false; break
-                //case("C2"): NewFenObj.item_direct = TrainingFennimals.C2.item; NewFenObj.item_indirect = false; break
-            }
-
-            NewFenObj.correct_item = NewFenObj.item_direct
-            NewFenObj.feedback = false
-
-            Block.push(NewFenObj)
-        }
-
-        if(shuffle_trials){
-            return(shuffleArray(Block))
-        }else{
-            return(Block)
-        }
-    }
-
-
-    // CALL FUNCTIONS //
-    ////////////////////
-    //Call to get return a deepcopy of the training set Fennimals, keyed on location.
-    this.get_experiment_code = function(){
-        return(experiment_code)
-    }
-
-    this.get_stim_for_first_sim_task = function(){
-        return  {
-            features: "heads",
-            Stim: FirstSimTaskStim
-        }}
-
-    this.get_stim_for_second_sim_task = function(){
-        return  {
-            features: "heads",
-            Stim: FirstSimTaskStim
-        }}
-
-    this.getTrainingSetFennimalsKeyedOnLocation = function(){
-        //Creating an object to hold all the Fennimals based on location. Empty locations should have a value of false, taken locations should have the Fennimal object.
-        //Here we can rely on the assumption that each location will have been used only once.
-        let FennimalLocations = {}
-
-        //First retrieving all location names and setting their value in FennimalLocations to false. Note, here we cannot rely on Available_Regions!
-        let All_Region_Names = Object.getOwnPropertyNames(Param.RegionData)
-        for(let i=0;i<All_Region_Names.length;i++){
-            if(All_Region_Names[i] !== "Home"){
-                let Locations_In_Region = Param.RegionData[All_Region_Names[i]].Locations
-                FennimalLocations[Locations_In_Region[0]] = false
-                FennimalLocations[Locations_In_Region[1]] = false
-            }
-        }
-
-        //Now we can go through all the Training set Fennimals and add them to the Fennimal locations
-        let Training_Stimuli_In_Array = this.getTrainingSetFennimalsInArray()
-        for(let i = 0;i<Training_Stimuli_In_Array.length;i++){
-            FennimalLocations[Training_Stimuli_In_Array[i].location] = Training_Stimuli_In_Array[i]
-        }
-
-        //Adding some meta-data
-        FennimalLocations.MetaData = {
-            total_number_of_Fennimals: 5,
-            total_number_of_locations: Param.location_Names.length
-        }
-
-        return(JSON.parse(JSON.stringify(FennimalLocations)))
-    }
-
-    //Call to return a deepcopy of the training set Fennimals, in an array. Each element is an object containing a single Fennimal. Order is not randomized!
-    this.getTrainingSetFennimalsInArray = function(){
-        let Arr = []
-        for(let key in TrainingFennimals){
-            Arr.push(TrainingFennimals[key])
-        }
-
-        return(JSON.parse(JSON.stringify(Arr)))
-    }
-
-    //Call to get the Training templates
-    this.getTrainingTemplates = function(){
-        return(JSON.parse(JSON.stringify(TrainingFennimals)))
-    }
-
-    //Call to get the Binding Templates
-    this.getBindingTemplates = function(){
-        return(JSON.parse(JSON.stringify(BindingPhaseTemplates)))
-    }
-    this.getBindingTemplatesInArray = function(){
-        let Arr = []
-        for (let key in BindingPhaseTemplates){
-            Arr.push(BindingPhaseTemplates[key])
-        }
-
-        return(JSON.parse(JSON.stringify(Arr)))
-    }
-
-    //Call to get the features sampled after the first similarity task
-    this.getFeaturesSampledAfterFirstSimilarityTask = function(){
-        return(JSON.parse(JSON.stringify(Selected_Pairs)))
-    }
-
-    //Call to get a deep copy of the ItemDetails object (keyed on item)
-    this.getItemDetails = function(){
-        return(JSON.parse(JSON.stringify(Item_Details)))
-    }
-
-    //Returns an array containing all the blocks of the test phase
-    this.getTestPhaseData = function(){
-        return(JSON.parse(JSON.stringify(BindingPhaseSetup)))
-    }
-
-}
-
-//Experiment 2: Does the random walk increase the similarity between semantic clusters (4 pairs of max close heads into 2 sets of equidistant heads and a distractor in the middle)
-STIMULUSDATA_EXP2 = function(participant_number){
-    let experiment_code = "exp2"
-
-    // RESETTING THE RNG SEED HERE //
-    ////////////////////////////////
-    // NO CALLS TO RANDOMIZATION SHOULD BE MADE ABOVE THIS LINE //
-    RNG = new RandomNumberGenerator(participant_number)
-
-    // SETTING THE CONTENTS OF THE FIRST SIMILARITY TASK (the rest of the Fennimals will be created according to these results)
-    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    let Head_Available_For_First_Sim_Task = shuffleArray(JSON.parse(JSON.stringify(Param.Available_Fennimal_Heads)))
-    let FirstSimTaskStim = []
-    for(let i = 0; i< Head_Available_For_First_Sim_Task.length; i++){
-        FirstSimTaskStim.push({
-            ID: Head_Available_For_First_Sim_Task[i],
-            head: Head_Available_For_First_Sim_Task[i]
-        })
-    }
-
-    //The results from the first sim task (and associated selected pairs) will be set here.
-    let FirstSimResults, Selected_Pairs
-
-    // DEFINING THE AVAILABLE FEATURES FROM THE PARAM OBJECT
-    ///////////////////////////////////////////////////////////
-    let Available_Regions = shuffleArray(["North","Desert","Village","Jungle","Flowerfields","Swamp", "Beach", "Mountains"])
-
-    let Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 5, false ))
-    let Random_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
-
-    let Drawn_Training_Regions = Available_Regions.splice(0,3)
-    let TrainingRegions = {
-        CA: Drawn_Training_Regions[0],
-        CB: Drawn_Training_Regions[0],
-        EA: Drawn_Training_Regions[1],
-        EB: Drawn_Training_Regions[1],
-        D: Drawn_Training_Regions[2],
-    }
-    let C_Locations = shuffleArray( Param.RegionData[TrainingRegions.CA].Locations )
-    let E_Locations = shuffleArray( Param.RegionData[TrainingRegions.EA].Locations )
-    let TrainingLocations = {
-        CA: C_Locations[0],
-        CB: C_Locations[1],
-        EA: E_Locations[0],
-        EB: E_Locations[1],
-        D: shuffleArray( Param.RegionData[TrainingRegions.D].Locations )[0],
-    }
-
-    let Drawn_Binding_Phase_Regions = Available_Regions.splice(0,5)
-    let BindingPhaseRegions = {
-        CA: Drawn_Binding_Phase_Regions[0],
-        CB: Drawn_Binding_Phase_Regions[1],
-        EA: Drawn_Binding_Phase_Regions[2],
-        EB: Drawn_Binding_Phase_Regions[3],
-        D: Drawn_Binding_Phase_Regions[4],
-    }
-    let BindingPhaseLocations = {
-        CA: shuffleArray( Param.RegionData[BindingPhaseRegions.CA].Locations ),
-        CB: shuffleArray( Param.RegionData[BindingPhaseRegions.CB].Locations ),
-        EA: shuffleArray( Param.RegionData[BindingPhaseRegions.EA].Locations ),
-        EB: shuffleArray( Param.RegionData[BindingPhaseRegions.EB].Locations ),
-        D: shuffleArray(  Param.RegionData[BindingPhaseRegions.D].Locations),
-    }
-
-    //These will only be filled after the first similarity task
-    let TrainingFennimals, BindingPhaseTemplates, BindingPhaseSetup
-
-    this.create_Fennimals_from_sim_task_results = function(FirstSimData){
-        //Storing the results from the first similarity task.
-        FirstSimResults = JSON.parse(JSON.stringify(FirstSimData))
-
-        //Now we can update the stimuli in accordance to the setting outlined above
-        // For two pairs of equally different (exp 1): "equally_distinct"
-        // For one maximally close and one maximally distinct (exp 2, 3): "max_difference"
-        set_all_Fennimals(FirstSimResults.Data)
-
-    }
-
-    function set_all_Fennimals (SimsArr){
-        //Finding both pairs and a control head.
-        //{Closest: {IDs: Closest_Pair, dist_t1: dist_pairC}, Furthest: {IDs: Furthest_Pair, dist_t1: dist_pairF}, Control: central_ID}
-        let Pairs = find_stimulus_heads(SimsArr)
-
-        //Storing as  seperate object (easier for analyses down the line)
-        Selected_Pairs = Pairs
-
-        //Now we can create all the Fennimals
-        TrainingFennimals = {
-            CA: createFennimalObj(TrainingRegions.CA, TrainingLocations.CA, Pairs.Pair_Control.used_in_exp[0],Param.RegionData[TrainingRegions.CA].preferredBodyType, Random_Items[0] ),
-            CB: createFennimalObj(TrainingRegions.CB, TrainingLocations.CB, Pairs.Pair_Control.used_in_exp[1],Param.RegionData[TrainingRegions.CB].preferredBodyType, Random_Items[1] ),
-            EA: createFennimalObj(TrainingRegions.EA, TrainingLocations.EA, Pairs.Pair_Experimental.used_in_exp[0],Param.RegionData[TrainingRegions.EA].preferredBodyType, Random_Items[2] ),
-            EB: createFennimalObj(TrainingRegions.EB, TrainingLocations.EB, Pairs.Pair_Experimental.used_in_exp[1],Param.RegionData[TrainingRegions.EB].preferredBodyType, Random_Items[3] ),
-            D: createFennimalObj(TrainingRegions.D, TrainingLocations.D, Pairs.distractor,Param.RegionData[TrainingRegions.D].preferredBodyType, Random_Items[4] ),
-        }
-
-        BindingPhaseTemplates= {
-            CA: {ID: "CA", head: TrainingFennimals.CA.head, body: Param.RegionData[BindingPhaseRegions.CA].preferredBodyType, region: BindingPhaseRegions.CA, location: BindingPhaseLocations.CA[0], item_direct: TrainingFennimals.CA.item, item_indirect: TrainingFennimals.CB.item },
-            CB: {ID: "CB", head: TrainingFennimals.CB.head, body: Param.RegionData[BindingPhaseRegions.CB].preferredBodyType, region: BindingPhaseRegions.CB, location: BindingPhaseLocations.CB[0],item_direct: TrainingFennimals.CB.item, item_indirect: TrainingFennimals.CA.item},
-            EA: {ID: "EA", head: TrainingFennimals.EA.head, body: Param.RegionData[BindingPhaseRegions.EA].preferredBodyType, region: BindingPhaseRegions.EA, location: BindingPhaseLocations.EA[0],item_direct: TrainingFennimals.EA.item, item_indirect: TrainingFennimals.EB.item},
-            EB: {ID: "EB", head: TrainingFennimals.EB.head, body: Param.RegionData[BindingPhaseRegions.EB].preferredBodyType, region: BindingPhaseRegions.EB, location: BindingPhaseLocations.EB[0],item_direct: TrainingFennimals.EB.item, item_indirect: TrainingFennimals.EA.item},
-            D: {ID: "D", head: TrainingFennimals.D.head, body: Param.RegionData[BindingPhaseRegions.D].preferredBodyType, region: BindingPhaseRegions.D, location: BindingPhaseLocations.D[0], item_direct: TrainingFennimals.D.item, item_indirect: false},
-        }
-
-        //Setting all the trials for the Binding phase
-        BindingPhaseSetup = [
-            {
-                Trials:  createBlockOfBindingTrials(["CA","CB","EA","EB", "D"], "direct", true,true ),
-                type: "direct",
-                hint_type: "text",
-                number: 1
-            },{
-                Trials:  createBlockOfBindingTrials(["CA","CB","EA","EB", "D"],  "indirect", false,true ),
-                type: "indirect",
-                hint_type: "text",
-                number: 2
-            },{
-                Trials:  createBlockOfBindingTrials(["CA","CB","EA","EB", "D"],  "indirect", false,true ),
-                type: "indirect",
-                hint_type: "text",
-                number: 3
-            },{
-                Trials:  createBlockOfBindingTrials(["CA","CB","EA","EB", "D"], "indirect", false,true ),
-                type: "indirect",
-                hint_type: "text",
-                number: 4
-            },{
-                Trials:  createBlockOfBindingTrials(["CA","CB","EA","EB", "D"],  "indirect", false,true ),
-                type: "indirect",
-                hint_type: "text",
-                number: 5
-            }, {
-                type: "additional_similarity",
-                number: 6
-            }, {
-                Trials: createBlockOfRepeatTrainingTrials(true),
-                type: "repeat_training",
-                hint_type: "text",
-                number: 7
-            }]
-
-        /*
-        BindingPhaseSetup = [
-            {
-                Trials:  createBlockOfBindingTrials(["CA","CB","EA","EB", "D"], "direct", true,true ),
-                type: "direct",
-                hint_type: "text",
-                number: 1
-            },{
-                Trials:  createBlockOfBindingTrials(["CA","CB","EA","EB", "D"],  "indirect", false,true ),
-                type: "indirect",
-                hint_type: "text",
-                number: 2
-            },{
-                Trials:  createBlockOfBindingTrials(["CA","CB","EA","EB", "D"],  "indirect", false,true ),
-                type: "indirect",
-                hint_type: "text",
-                number: 3
-            },{
-                Trials:  createBlockOfBindingTrials(["CA","CB","EA","EB", "D"], "indirect", false,true ),
-                type: "indirect",
-                hint_type: "text",
-                number: 4
-            },{
-                Trials:  createBlockOfBindingTrials(["CA","CB","EA","EB", "D"],  "indirect", false,true ),
-                type: "indirect",
-                hint_type: "text",
-                number: 5
-            }, {
-                type: "additional_similarity",
-                number: 6
-            }, {
-                Trials: createBlockOfRepeatTrainingTrials(true),
-                type: "repeat_training",
-                hint_type: "text",
-                number: 7
-            }]
-         */
-
-
-        console.log(Selected_Pairs)
-        console.log(TrainingFennimals)
-        console.log(BindingPhaseTemplates)
-        console.log(BindingPhaseSetup)
-
-
-
-    }
-
-    //Given a similarity setup, returns two pairs of maximally dis-similar IDs
-    function find_stimulus_heads(SimsArr){
-        //First transform the arry of Sims into an object where each property only has points
-        let SimPoints = {}
-        for(let i =0; i<SimsArr.length; i++){
-            SimPoints[SimsArr[i].ID] = {x : SimsArr[i].x, y: SimsArr[i].y}
-        }
-
-        //Create an array of all different IDs.
-        let IDs = Object.getOwnPropertyNames(SimPoints)
-
-        //Now we need to iteratively find the 4 pairs which are closest to each other.
-        let Unassigned_IDs = JSON.parse(JSON.stringify(IDs))
-        let Closests_Pairs = []
-
-        let number_of_close_pairs_to_be_found = 4
-        for(let pairnum =0; pairnum< number_of_close_pairs_to_be_found; pairnum++){
-            let All_Possible_Pairs = combinations(Unassigned_IDs, 2)
-            let smallest_found_dist = 99999
-            let Current_Closest_Pair
-
-            for(let i =0;i<All_Possible_Pairs.length; i++){
-                //Calculating EU-distance between these pairs
-                let point1 = SimPoints[All_Possible_Pairs[i][0]]
-                let point2 = SimPoints[All_Possible_Pairs[i][1]]
-                let dist = EUDist(point1.x,point1.y,point2.x,point2.y)
-
-                if(dist < smallest_found_dist){
-                    smallest_found_dist = dist
-                    Current_Closest_Pair = All_Possible_Pairs[i]
-                }
-            }
-
-            //Now we have found the closest pair. Append it to the pairs array and remove these cards from the unassigned array.
-            // First we shuffle to randomize which of the two we pick to use in the experiment and which one will be held back
-            Closests_Pairs.push(shuffleArray(Current_Closest_Pair))
-            Unassigned_IDs = Unassigned_IDs.filter( ( el ) => !Current_Closest_Pair.includes( el ) );
-        }
-
-        //Figure out which combinations of two pairs have the most similar distance (the minimial difference) between the LEFT OUT heads.
-        let Pair_indices = [0,1,2,3]
-        let Pair_permutations = all_permutations(Pair_indices)
-        let lowest_difference_in_distances = 9999
-
-        //The permutations approach results in some duplicates (e.g., [0,1,2,3] results in the same as [1,0,3,2] and [2,3,0,1]). So we need to keep track of all permutations with the same minimal distance and then select one at random
-        let Current_lowest_combinations = []
-
-        for(let i=0; i <Pair_permutations.length; i++){
-            let head_1 = Closests_Pairs[Pair_permutations[i][0]][1]
-            let head_2 = Closests_Pairs[Pair_permutations[i][1]][1]
-
-            let point1 = SimPoints[head_1]
-            let point2 = SimPoints[head_2]
-            let dist12 = EUDist(point1.x,point1.y,point2.x,point2.y)
-
-            let head_3 = Closests_Pairs[Pair_permutations[i][2]][1]
-            let head_4 = Closests_Pairs[Pair_permutations[i][3]][1]
-
-            let point3 = SimPoints[head_3]
-            let point4 = SimPoints[head_4]
-            let dist34 = EUDist(point3.x,point3.y,point4.x,point4.y)
-
-            let diff_distances = Math.abs(dist12 - dist34)
-            if(diff_distances < lowest_difference_in_distances){
-                //New minimum found!
-                lowest_difference_in_distances = diff_distances
-                Current_lowest_combinations = [Pair_permutations[i]]
-            }
-
-            if(diff_distances === lowest_difference_in_distances){
-                //New variation on the current minimum found
-                Current_lowest_combinations.push(Pair_permutations[i])
-            }
-        }
-
-        //Randomly sample the combination of pairs with the lowest difference in distances
-        let Lowest_Permutation = shuffleArray(Current_lowest_combinations)[0]
-
-        //Now we need to find the distractor head. This is the remaining head with the lowest maximal distance to any of the four heads selected to be in the experiment already
-        let Heads_in_exp = [Closests_Pairs[0][0], Closests_Pairs[1][0], Closests_Pairs[2][0], Closests_Pairs[3][0]]
-        let distractor_head
-        let current_minimal_max_distractor_distance = 999999
-
-        for(let i = 0; i< Unassigned_IDs.length; i++){
-            let point_head = SimPoints[Unassigned_IDs[i]]
-
-            let point1 = SimPoints[Heads_in_exp[0]]
-            let point2 = SimPoints[Heads_in_exp[1]]
-            let point3 = SimPoints[Heads_in_exp[2]]
-            let point4 = SimPoints[Heads_in_exp[3]]
-
-            let dist1 = EUDist(point_head.x,point_head.y,point1.x,point1.y)
-            let dist2 = EUDist(point_head.x,point_head.y,point2.x,point2.y)
-            let dist3 = EUDist(point_head.x,point_head.y,point3.x,point3.y)
-            let dist4 = EUDist(point_head.x,point_head.y,point4.x,point4.y)
-
-            let max_distance = Math.max(...[dist1,dist2,dist3,dist4])
-            if(max_distance < current_minimal_max_distractor_distance){
-                distractor_head = Unassigned_IDs[i]
-                current_minimal_max_distractor_distance = max_distance
-            }
-        }
-
-        //Remove the distractor head from the unassigned IDs
-        Unassigned_IDs = Unassigned_IDs.filter(e => e !== distractor_head)
-
-        //Now we need to draw 2 unassigned heads to be used in the second card task
-        shuffleArray(Unassigned_IDs)
-        /*
-        let Second_card_heads = []
-        for(let i =0;i<2;i++){
-            Second_card_heads.push(Unassigned_IDs[i])
-        }
-
-         */
-
-        //Now we have all the heads we need to finalize the final Pairs object
-        let Pairs = {
-            Pair_Control : {
-                used_in_exp : [ Closests_Pairs[Lowest_Permutation[0]][0], Closests_Pairs[Lowest_Permutation[1]][0] ],
-                held_back: [ Closests_Pairs[Lowest_Permutation[0]][1], Closests_Pairs[Lowest_Permutation[1]][1] ],
-            },
-            Pair_Experimental : {
-                used_in_exp : [ Closests_Pairs[Lowest_Permutation[2]][0], Closests_Pairs[Lowest_Permutation[3]][0] ],
-                held_back: [ Closests_Pairs[Lowest_Permutation[2]][1], Closests_Pairs[Lowest_Permutation[3]][1] ],
-            },
-            distractor: distractor_head,
-        }
-
-        //Calculating the distiance of the heads used in the experiment for both pairs (this makes analyses of the data easier later)
-        let point_control_held_backA = SimPoints[Pairs.Pair_Control.held_back[0]]
-        let point_control_held_backB = SimPoints[Pairs.Pair_Control.held_back[1]]
-        Pairs.Pair_Control.dist_held_back_t1 = EUDist(point_control_held_backA.x, point_control_held_backA.y, point_control_held_backB.x, point_control_held_backB.y)
-
-        let point_control_expA = SimPoints[Pairs.Pair_Control.used_in_exp[0]]
-        let point_control_expB = SimPoints[Pairs.Pair_Control.used_in_exp[1]]
-        Pairs.Pair_Control.dist_exp_t1 = EUDist(point_control_expA.x, point_control_expA.y, point_control_expB.x, point_control_expB.y)
-
-        let point_exp_held_backA = SimPoints[Pairs.Pair_Experimental.held_back[0]]
-        let point_exp_held_backB = SimPoints[Pairs.Pair_Experimental.held_back[1]]
-        Pairs.Pair_Experimental.dist_held_back_t1 = EUDist(point_exp_held_backA.x, point_exp_held_backA.y, point_exp_held_backB.x, point_exp_held_backB.y)
-
-        let point_exp_expA = SimPoints[Pairs.Pair_Experimental.used_in_exp[0]]
-        let point_exp_expB = SimPoints[Pairs.Pair_Experimental.used_in_exp[1]]
-        Pairs.Pair_Experimental.dist_exp_t1 = EUDist(point_exp_expA.x, point_exp_expA.y, point_exp_expB.x, point_exp_expB.y)
-
-        //Figuring out which heads to show during the second card task
-        let Second_card_heads = []
-        Second_card_heads.push(Pairs.Pair_Control.held_back[0],Pairs.Pair_Control.held_back[1],Pairs.Pair_Experimental.held_back[0],Pairs.Pair_Experimental.held_back[1])
-        Pairs.Second_card_heads = shuffleArray(Second_card_heads)
-
-        console.log(Pairs)
-        return(Pairs)
-
-    }
-
-    // SUPPORTING FUNCTIONS
-    ////////////////////////
-    function generate_item_details(Items_Used){
-        //Location on screen ranges from 1 - N
-        let Background_Colors = Param.ItemBackgroundColors[Items_Used.length]
-
-        let LocationArr = []
-        for(let i =0; i<Items_Used.length;i++){
-            LocationArr.push(i+1)
-        }
-        shuffleArray(LocationArr)
-
-        let ItemObj = {All_Items: Items_Used}
-        for(let i =0;i<Items_Used.length;i++){
-            ItemObj[Items_Used[i]] = {
-                //location_on_screen: LocationArr[i],
-                backgroundColor: Background_Colors[i]
-            }
-        }
-        return(ItemObj)
-    }
-    function createFennimalObj(region, location, head, body, item){
-        let FenObj = {
-            region: region,
-            location: location,
-            head: head,
-            body: body,
-        }
-
-        if(item !== false){
-            FenObj.item = item
-        }
-
-        //Adding name and color scheme
-        FenObj.name = createConjunctiveNameHeadBody(body,head)//createConjunctiveNameRegionHead(region, head) //Param.Names_Head[head]//createConjunctiveNameHeadBody(body,head)//createConjunctiveNameRegionHead(region, head)
-        FenObj.head_color_scheme = JSON.parse(JSON.stringify(Param.RegionData[region].Fennimal_location_colors))
-        FenObj.body_color_scheme = JSON.parse(JSON.stringify(Param.RegionData[region].Fennimal_location_colors))
-        FenObj.body_color_scheme.tertiary_color = Param.RegionData[region].contrast_color
-
-        return(FenObj)
-    }
-
-    //Returns a block of inference-phase trials. items_allowed_... can be "direct" or "indirect.
-    function createBlockOfBindingTrials(Array_of_Keys_Of_Fennimal_IDs_used, items_allowed_for_indirect_pair, include_feedback, shuffle_trials){
-        let Block = []
-
-        for(let key_ind = 0; key_ind<Array_of_Keys_Of_Fennimal_IDs_used.length; key_ind++){
-            let key = Array_of_Keys_Of_Fennimal_IDs_used[key_ind]
-            let FenObj = BindingPhaseTemplates[key]
-
-            let TestObj = createFennimalObj(FenObj.region,FenObj.location, FenObj.head, FenObj.body, false)
-            TestObj.name = createConjunctiveNameHeadBody(FenObj.body,FenObj.head)
-            TestObj.feedback = include_feedback
-
-            //Setting items available.
-            // First we make sure that there are two distractors: the control item and one of the items belonging to the other pair.
-            TestObj.item_direct = FenObj.item_direct
-
-            //Finding the correct item
-            let correct_item
-            switch(key){
-                case("EA"): if(items_allowed_for_indirect_pair === "direct"){correct_item = TrainingFennimals.EA.item} else {correct_item = TrainingFennimals.EB.item} break
-                case("EB"): if(items_allowed_for_indirect_pair === "direct"){correct_item = TrainingFennimals.EB.item} else {correct_item = TrainingFennimals.EA.item} break
-                case("CA"): correct_item = TrainingFennimals.CA.item; break
-                case("CB"): correct_item = TrainingFennimals.CB.item; break
-                case("D"): correct_item = TrainingFennimals.D.item; break;
-            }
-
-            //We will select one element from each of the arrays. So arrays with one element will always be selected
-            let OtherPairItems
-            switch(key){
-                case("CA"): OtherPairItems = [ TrainingFennimals.D.item,[TrainingFennimals.EA.item, TrainingFennimals.EB.item]]; break
-                case("CB"): OtherPairItems = [ TrainingFennimals.D.item,[TrainingFennimals.EA.item, TrainingFennimals.EB.item]]; break
-                case("EA"): OtherPairItems = [ TrainingFennimals.D.item,[TrainingFennimals.CA.item, TrainingFennimals.CB.item]]; break
-                case("EB"): OtherPairItems = [ TrainingFennimals.D.item,[TrainingFennimals.CA.item, TrainingFennimals.CB.item]]; break
-                case("D"): OtherPairItems = [ [TrainingFennimals.CA.item,TrainingFennimals.CB.item],[TrainingFennimals.EA.item, TrainingFennimals.EB.item]]; break;
-            }
-
-            //Creating an array containing all the trial's available items
-            let Available_Items = [correct_item]
-            for(let i=0;i<OtherPairItems.length;i++){
-                if(typeof OtherPairItems[i] === "string"){
-                    Available_Items.push(OtherPairItems[i])
-                }else{
-                    Available_Items.push(shuffleArray(OtherPairItems[i])[0] )
-                }
-            }
-
-            //Assigning the properties to the TestObject.
-            TestObj.items_available = Available_Items
-            TestObj.correct_item = correct_item
-
-            switch(key){
-                case("CA"): TestObj.item_direct = TrainingFennimals.CA.item; TestObj.item_indirect = TrainingFennimals.CB.item; break
-                case("CB"): TestObj.item_direct = TrainingFennimals.CB.item; TestObj.item_indirect = TrainingFennimals.CA.item; break
-                case("EA"): TestObj.item_direct = TrainingFennimals.EA.item; TestObj.item_indirect = TrainingFennimals.EB.item; break
-                case("EB"): TestObj.item_direct = TrainingFennimals.EB.item; TestObj.item_indirect = TrainingFennimals.EA.item; break
-                case("D"): TestObj.item_direct = TrainingFennimals.D.item; TestObj.item_indirect = false; break
-            }
-
-            TestObj.ID = FenObj.ID
-
-            //Pushing to the DirectTestBlock
-            Block.push(TestObj)
-        }
-        if(shuffle_trials){
-            return(shuffleArray(Block))
-        }else{
-            return(Block)
-        }
-    }
-    //Returns a block of the original training trials with all items available
-    function createBlockOfRepeatTrainingTrials(shuffle_trials){
-        let Block = []
-        for(let key in TrainingFennimals){
-            let NewFenObj = JSON.parse(JSON.stringify(TrainingFennimals[key]))
-            delete NewFenObj.item
-
-            NewFenObj.ID = key
-            NewFenObj.items_available = Random_Items
-
-            switch(key){
-                case("CA"): NewFenObj.item_direct = TrainingFennimals.CA.item; NewFenObj.item_indirect = TrainingFennimals.CB.item; break
-                case("CB"): NewFenObj.item_direct = TrainingFennimals.CB.item; NewFenObj.item_indirect = TrainingFennimals.CA.item; break
-                case("EA"): NewFenObj.item_direct = TrainingFennimals.EA.item; NewFenObj.item_indirect = TrainingFennimals.EB.item; break
-                case("EB"): NewFenObj.item_direct = TrainingFennimals.EB.item; NewFenObj.item_indirect = TrainingFennimals.EA.item; break
-                case("D"): NewFenObj.item_direct = TrainingFennimals.D.item; NewFenObj.item_indirect = false; break
-            }
-
-            NewFenObj.correct_item = NewFenObj.item_direct
-            NewFenObj.feedback = false
-
-            Block.push(NewFenObj)
-        }
-
-        if(shuffle_trials){
-            return(shuffleArray(Block))
-        }else{
-            return(Block)
-        }
-    }
-
-    // CALL FUNCTIONS //
-    ////////////////////
-    //Call to get return a deepcopy of the training set Fennimals, keyed on location.
-    this.get_experiment_code = function(){
-        return(experiment_code)
-    }
-
-    this.get_stim_for_first_sim_task = function(){
-        return  {
-            features: "heads",
-            Stim: FirstSimTaskStim
-        }}
-
-    this.get_stim_for_second_sim_task = function(){
-        let Head_Available_For_Second_Sim_Task = shuffleArray(JSON.parse(JSON.stringify(Selected_Pairs.Second_card_heads)))
-        let SecondSimTaskStim = []
-        for(let i = 0; i< Head_Available_For_Second_Sim_Task.length; i++){
-            SecondSimTaskStim.push({
-                ID: Head_Available_For_Second_Sim_Task[i],
-                head: Head_Available_For_Second_Sim_Task[i]
-            })
-        }
-
-        return  {
-            features: "heads",
-            Stim: SecondSimTaskStim
-        }
-
-    }
-
-    this.getTrainingSetFennimalsKeyedOnLocation = function(){
-        //Creating an object to hold all the Fennimals based on location. Empty locations should have a value of false, taken locations should have the Fennimal object.
-        //Here we can rely on the assumption that each location will have been used only once.
-        let FennimalLocations = {}
-
-        //First retrieving all location names and setting their value in FennimalLocations to false. Note, here we cannot rely on Available_Regions!
-        let All_Region_Names = Object.getOwnPropertyNames(Param.RegionData)
-        for(let i=0;i<All_Region_Names.length;i++){
-            if(All_Region_Names[i] !== "Home"){
-                let Locations_In_Region = Param.RegionData[All_Region_Names[i]].Locations
-                FennimalLocations[Locations_In_Region[0]] = false
-                FennimalLocations[Locations_In_Region[1]] = false
-            }
-        }
-
-        //Now we can go through all the Training set Fennimals and add them to the Fennimal locations
-        let Training_Stimuli_In_Array = this.getTrainingSetFennimalsInArray()
-        for(let i = 0;i<Training_Stimuli_In_Array.length;i++){
-            FennimalLocations[Training_Stimuli_In_Array[i].location] = Training_Stimuli_In_Array[i]
-        }
-
-        //Adding some meta-data
-        FennimalLocations.MetaData = {
-            total_number_of_Fennimals: 5,
-            total_number_of_locations: Param.location_Names.length
-        }
-
-        return(JSON.parse(JSON.stringify(FennimalLocations)))
-    }
-
-    //Call to return a deepcopy of the training set Fennimals, in an array. Each element is an object containing a single Fennimal. Order is not randomized!
-    this.getTrainingSetFennimalsInArray = function(){
-        let Arr = []
-        for(let key in TrainingFennimals){
-            Arr.push(TrainingFennimals[key])
-        }
-
-        return(JSON.parse(JSON.stringify(Arr)))
-    }
-
-    //Call to get the Training templates
-    this.getTrainingTemplates = function(){
-        return(JSON.parse(JSON.stringify(TrainingFennimals)))
-    }
-
-    //Call to get the Binding Templates
-    this.getBindingTemplates = function(){
-        return(JSON.parse(JSON.stringify(BindingPhaseTemplates)))
-    }
-    this.getBindingTemplatesInArray = function(){
-        let Arr = []
-        for (let key in BindingPhaseTemplates){
-            Arr.push(BindingPhaseTemplates[key])
-        }
-
-        return(JSON.parse(JSON.stringify(Arr)))
-    }
-
-    //Call to get the features sampled after the first similarity task
-    this.getFeaturesSampledAfterFirstSimilarityTask = function(){
-        return(JSON.parse(JSON.stringify(Selected_Pairs)))
-    }
-
-    //Call to get a deep copy of the ItemDetails object (keyed on item)
-    this.getItemDetails = function(){
-        return(JSON.parse(JSON.stringify(Item_Details)))
-    }
-
-    //Returns an array containing all the blocks of the test phase
-    this.getTestPhaseData = function(){
-        return(JSON.parse(JSON.stringify(BindingPhaseSetup)))
-    }
-
-}
-
 //Experiment 1: Does semantic similarity influence the random walk (2 max similar, 2 max distant and a distractor)
-STIMULUSDATA_SIMILARITY_ON_SEARCH = function(participant_number){
-    let experiment_code = "exp_sim_on_search"
+STIMULUSDATA = function(participant_number, exp_code){
     this.is_stimulus_pilot = false
 
     // RESETTING THE RNG SEED HERE //
-    ////////////////////////////////
-    // NO CALLS TO RANDOMIZATION SHOULD BE MADE ABOVE THIS LINE //
     RNG = new RandomNumberGenerator(participant_number)
-
-    // SELECTING A SET OF HEADS FOR THE EXPERIMENT.
-    //  Here we need:
-    //      Two heads from the same group (HSS pair)
-    //      Three heads from different groups (2 for the LSS pair, one distractor)
-    ////////////////////////////////////////////////////////////////////////////////
-    let Available_Head_Pairs = shuffleArray(JSON.parse(JSON.stringify(Param.Heads_Semantic_Pairs)))
-    shuffleArray(Available_Head_Pairs[0])
-    shuffleArray(Available_Head_Pairs[1])
-    shuffleArray(Available_Head_Pairs[2])
-    shuffleArray(Available_Head_Pairs[3])
-    shuffleArray(Available_Head_Pairs[4])
-
-    let StimulusHeads = {
-        HSS: [Available_Head_Pairs[0][0], Available_Head_Pairs[1][0]],
-        LSS: [Available_Head_Pairs[2][0], Available_Head_Pairs[3][0]],
-        distr: Available_Head_Pairs[4][0]
-    }
-
-    /*
-    let StimulusHeads = {
-        HSS: [Available_Head_Pairs[0][0], Available_Head_Pairs[0][1]],
-        LSS: [Available_Head_Pairs[1][0], Available_Head_Pairs[2][0]],
-        distr: Available_Head_Pairs[3][0]
-    }
-     */
-    console.log(StimulusHeads)
-
-    // DEFINING THE AVAILABLE NON-HEAD FEATURES FROM THE PARAM OBJECT
-    ///////////////////////////////////////////////////////////
-    let Available_Regions = shuffleArray(["North","Desert","Village","Jungle","Flowerfields","Swamp", "Beach", "Mountains"])
-
-    let Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 5, false ))
-    let Random_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
-
-    let Drawn_Training_Regions = Available_Regions.splice(0,3)
-    let TrainingRegions = {
-        LA: Drawn_Training_Regions[0],
-        LB: Drawn_Training_Regions[0],
-        HA: Drawn_Training_Regions[1],
-        HB: Drawn_Training_Regions[1],
-        C: Drawn_Training_Regions[2],
-    }
-    let L_Locations = shuffleArray( Param.RegionData[TrainingRegions.LA].Locations )
-    let H_Locations = shuffleArray( Param.RegionData[TrainingRegions.HA].Locations )
-    let TrainingLocations = {
-        LA: L_Locations[0],
-        LB: L_Locations[1],
-        HA: H_Locations[0],
-        HB: H_Locations[1],
-        C: shuffleArray( Param.RegionData[TrainingRegions.C].Locations )[0],
-    }
-
-    let Drawn_Binding_Phase_Regions = Available_Regions.splice(0,5)
-    let BindingPhaseRegions = {
-        LA: Drawn_Binding_Phase_Regions[0],
-        LB: Drawn_Binding_Phase_Regions[1],
-        HA: Drawn_Binding_Phase_Regions[2],
-        HB: Drawn_Binding_Phase_Regions[3],
-        C: Drawn_Binding_Phase_Regions[4],
-    }
-    let BindingPhaseLocations = {
-        LA: shuffleArray( Param.RegionData[BindingPhaseRegions.LA].Locations ),
-        LB: shuffleArray( Param.RegionData[BindingPhaseRegions.LB].Locations ),
-        HA: shuffleArray( Param.RegionData[BindingPhaseRegions.HA].Locations ),
-        HB: shuffleArray( Param.RegionData[BindingPhaseRegions.HB].Locations ),
-        C: shuffleArray(  Param.RegionData[BindingPhaseRegions.C].Locations),
-    }
-
-    //Now we can create all the Fennimals
-    let TrainingFennimals = {
-        LA: createFennimalObj(TrainingRegions.LA, TrainingLocations.LA, StimulusHeads.LSS[0],Param.RegionData[TrainingRegions.LA].preferredBodyType, Random_Items[0] ),
-        LB: createFennimalObj(TrainingRegions.LB, TrainingLocations.LB, StimulusHeads.LSS[1],Param.RegionData[TrainingRegions.LB].preferredBodyType, Random_Items[1] ),
-        HA: createFennimalObj(TrainingRegions.HA, TrainingLocations.HA, StimulusHeads.HSS[0],Param.RegionData[TrainingRegions.HA].preferredBodyType, Random_Items[2] ),
-        HB: createFennimalObj(TrainingRegions.HB, TrainingLocations.HB, StimulusHeads.HSS[1],Param.RegionData[TrainingRegions.HB].preferredBodyType, Random_Items[3] ),
-        C: createFennimalObj(TrainingRegions.C, TrainingLocations.C, StimulusHeads.distr,Param.RegionData[TrainingRegions.C].preferredBodyType, Random_Items[4] ),
-    }
-
-    let BindingPhaseTemplates= {
-        LA: {ID: "LA", head: TrainingFennimals.LA.head, body: Param.RegionData[BindingPhaseRegions.LA].preferredBodyType, region: BindingPhaseRegions.LA, location: BindingPhaseLocations.LA[0], item_direct: TrainingFennimals.LA.item, item_indirect: TrainingFennimals.LB.item },
-        LB: {ID: "LB", head: TrainingFennimals.LB.head, body: Param.RegionData[BindingPhaseRegions.LB].preferredBodyType, region: BindingPhaseRegions.LB, location: BindingPhaseLocations.LB[0],item_direct: TrainingFennimals.LB.item, item_indirect: TrainingFennimals.LA.item},
-        HA: {ID: "HA", head: TrainingFennimals.HA.head, body: Param.RegionData[BindingPhaseRegions.HA].preferredBodyType, region: BindingPhaseRegions.HA, location: BindingPhaseLocations.HA[0],item_direct: TrainingFennimals.HA.item, item_indirect: TrainingFennimals.HB.item},
-        HB: {ID: "HB", head: TrainingFennimals.HB.head, body: Param.RegionData[BindingPhaseRegions.HB].preferredBodyType, region: BindingPhaseRegions.HB, location: BindingPhaseLocations.HB[0],item_direct: TrainingFennimals.HB.item, item_indirect: TrainingFennimals.HA.item},
-        C: {ID: "C", head: TrainingFennimals.C.head, body: Param.RegionData[BindingPhaseRegions.C].preferredBodyType, region: BindingPhaseRegions.C, location: BindingPhaseLocations.C[0], item_direct: TrainingFennimals.C.item, item_indirect: false},
-    }
-
-    //Setting all the trials for the Binding phase
-    let BindingPhaseSetup = [
-        {
-            Trials:  createBlockOfBindingTrials(["LA","LB","HA","HB", "C"], "direct", true,true ),
-            type: "direct",
-            hint_type: "text",
-            number: 1
-        },{
-            Trials:  createBlockOfBindingTrials(["LA","LB","HA","HB", "C"],  "indirect", false,true ),
-            type: "indirect",
-            hint_type: "text",
-            number: 2
-        },{
-            Trials:  createBlockOfBindingTrials(["LA","LB","HA","HB", "C"],  "indirect", false,true ),
-            type: "indirect",
-            hint_type: "text",
-            number: 3
-        },{
-            Trials:  createBlockOfBindingTrials(["LA","LB","HA","HB", "C"], "indirect", false,true ),
-            type: "indirect",
-            hint_type: "text",
-            number: 4
-        },{
-            Trials:  createBlockOfBindingTrials(["LA","LB","HA","HB", "C"],  "indirect", false,true ),
-            type: "indirect",
-            hint_type: "text",
-            number: 5
-        }, {
-            Trials: createBlockOfRepeatTrainingTrials(true),
-            type: "repeat_training",
-            hint_type: "text",
-            number: 6
-        }]
-
-    console.log(BindingPhaseSetup)
+    console.log(participant_number)
 
     // SUPPORTING FUNCTIONS
     ////////////////////////
@@ -1826,86 +596,113 @@ STIMULUSDATA_SIMILARITY_ON_SEARCH = function(participant_number){
         }
         return(ItemObj)
     }
-    function createFennimalObj(region, location, head, body, item){
+    function createFennimalObj(region, location, head, _optional_body, _optional_ItemResponseArr, _optional_ColorScheme, _optional_special_item){
         let FenObj = {
             region: region,
             location: location,
             head: head,
-            body: body,
         }
 
-        if(item !== false){
-            FenObj.item = item
+        //If a body has been defined, add it to the object here. If not, then use the default optio: base body on region
+        if(_optional_body !== false){
+            FenObj.body = _optional_body
+        }else{
+            FenObj.body = Param.RegionData[region].preferredBodyType
         }
+
+        //If a colorscheme has been defined, add it to the object here. If not, default to the region-specific head and body color schemes
+        if(_optional_ColorScheme !== false){
+            FenObj.head_color_scheme = _optional_ColorScheme.Head
+            FenObj.body_color_scheme = _optional_ColorScheme.Body
+        }else{
+            FenObj.head_color_scheme = JSON.parse(JSON.stringify(Param.RegionData[region].Fennimal_location_colors))
+            FenObj.body_color_scheme = JSON.parse(JSON.stringify(Param.RegionData[region].Fennimal_location_colors))
+            FenObj.body_color_scheme.tertiary_color = Param.RegionData[region].contrast_color
+        }
+
+        //If any item preferences are given, set them here. Otherwise, all items will default to unavailable
+        let ItemResponseMap = {}
+        for(let i=0;i<All_Items.length; i++){
+            ItemResponseMap[All_Items[i]] = "unavailable"
+        }
+        if(_optional_ItemResponseArr !== false){
+            for(let i=0;i<_optional_ItemResponseArr.length;i++){
+                ItemResponseMap[_optional_ItemResponseArr[i][0]] = _optional_ItemResponseArr[i][1]
+            }
+        }
+        FenObj.ItemResponses = ItemResponseMap
 
         //Adding name and color scheme
-        FenObj.name = createConjunctiveNameHeadBody(body,head)//createConjunctiveNameRegionHead(region, head) //Param.Names_Head[head]//createConjunctiveNameHeadBody(body,head)//createConjunctiveNameRegionHead(region, head)
-        FenObj.head_color_scheme = JSON.parse(JSON.stringify(Param.RegionData[region].Fennimal_location_colors))
-        FenObj.body_color_scheme = JSON.parse(JSON.stringify(Param.RegionData[region].Fennimal_location_colors))
-        FenObj.body_color_scheme.tertiary_color = Param.RegionData[region].contrast_color
+        FenObj.name = createConjunctiveNameHeadBody(FenObj.body,FenObj.head)//createConjunctiveNameRegionHead(region, head) //Param.Names_Head[head]//createConjunctiveNameHeadBody(body,head)//createConjunctiveNameRegionHead(region, head)
+
+        //In some cases (training phase), we want to make sure that the Fennimal has a special item. This will be used for the quiz
+        FenObj.special_item = _optional_special_item
 
         return(FenObj)
     }
 
     //Returns a block of inference-phase trials. items_allowed_... can be "direct" or "indirect.
-    function createBlockOfBindingTrials(Array_of_Keys_Of_Fennimal_IDs_used, items_allowed_for_indirect_pair, include_feedback, shuffle_trials){
+    function createBlockOfStandardSearchTrials(Array_of_Keys_Of_Fennimal_IDs_used, direct_items_allowed, number_of_distrator_items, withhold_feedback, shuffle_trials){
         let Block = []
 
         for(let key_ind = 0; key_ind<Array_of_Keys_Of_Fennimal_IDs_used.length; key_ind++){
             let key = Array_of_Keys_Of_Fennimal_IDs_used[key_ind]
-            let FenObj = BindingPhaseTemplates[key]
+            let FenObj = SearchPhaseTemplates[key]
 
-            let TestObj = createFennimalObj(FenObj.region,FenObj.location, FenObj.head, FenObj.body, false)
-            TestObj.name = createConjunctiveNameHeadBody(FenObj.body,FenObj.head)
-            TestObj.feedback = include_feedback
+            //Setting items available. Any items not available should be set to "unavailable"
+            let ModifiedItemResponseArr = JSON.parse(JSON.stringify(FenObj.ItemResponseArr))
+            let ItemResponseMap = {}
 
-            //Setting items available.
-            // First we make sure that there are two distractors: the control item and one of the items belonging to the other pair.
-            TestObj.item_direct = FenObj.item_direct
+            //Finding distractors. That is, any items which are not the direct or indirect items
+            let Possible_Distractor_Items = JSON.parse(JSON.stringify(All_Items.filter(x => ! [FenObj.item_direct, FenObj.item_indirect].includes(x))))
+            let Distractors_Arr = shuffleArray(Possible_Distractor_Items).splice(0,number_of_distrator_items)
 
-            //Finding the correct item
-            let correct_item
-            switch(key){
-                case("LA"): if(items_allowed_for_indirect_pair === "direct"){correct_item = TrainingFennimals.LA.item} else {correct_item = TrainingFennimals.LB.item} break
-                case("LB"): if(items_allowed_for_indirect_pair === "direct"){correct_item = TrainingFennimals.LB.item} else {correct_item = TrainingFennimals.LA.item} break
-                case("HA"): if(items_allowed_for_indirect_pair === "direct"){correct_item = TrainingFennimals.HA.item} else {correct_item = TrainingFennimals.HB.item} break
-                case("HB"): if(items_allowed_for_indirect_pair === "direct"){correct_item = TrainingFennimals.HB.item} else {correct_item = TrainingFennimals.HA.item} break
-                case("C"): correct_item = TrainingFennimals.C.item; break;
-            }
+            //Going over all items in the ItemResponseMap_array.
+            for(let i =0;i<ModifiedItemResponseArr.length;i++){
+                let item_name = ModifiedItemResponseArr[i][0]
+                let putative_outcome = ModifiedItemResponseArr[i][1]
+                if(item_name === FenObj.item_direct){
+                    if(direct_items_allowed){
+                        if(! withhold_feedback){
+                            ItemResponseMap[item_name] = putative_outcome
+                        }else{
+                            ItemResponseMap[item_name] = "unknown"
+                        }
 
-            //We will select one element from each of the arrays. So arrays with one element will always be selected
-            let OtherPairItems
-            switch(key){
-                case("LA"): OtherPairItems = [ TrainingFennimals.C.item,[TrainingFennimals.HA.item, TrainingFennimals.HB.item]]; break
-                case("LB"): OtherPairItems = [ TrainingFennimals.C.item,[TrainingFennimals.HA.item, TrainingFennimals.HB.item]]; break
-                case("HA"): OtherPairItems = [ TrainingFennimals.C.item,[TrainingFennimals.LA.item, TrainingFennimals.LB.item]]; break
-                case("HB"): OtherPairItems = [ TrainingFennimals.C.item,[TrainingFennimals.LA.item, TrainingFennimals.LB.item]]; break
-                case("C"): OtherPairItems = [ [TrainingFennimals.LA.item,TrainingFennimals.LB.item],[TrainingFennimals.HA.item, TrainingFennimals.HB.item]]; break;
-            }
-
-            //Creating an array containing all the trial's available items
-            let Available_Items = [correct_item]
-            for(let i=0;i<OtherPairItems.length;i++){
-                if(typeof OtherPairItems[i] === "string"){
-                    Available_Items.push(OtherPairItems[i])
+                    }else{
+                        ItemResponseMap[item_name] = "unavailable"
+                    }
                 }else{
-                    Available_Items.push(shuffleArray(OtherPairItems[i])[0] )
+                    if(item_name === FenObj.item_indirect){
+                        if(direct_items_allowed){
+                            ItemResponseMap[item_name] = "unavailable"
+                        }else{
+                            if(! withhold_feedback){
+                                ItemResponseMap[item_name] = putative_outcome
+                            }else{
+                                ItemResponseMap[item_name] = "unknown"
+                            }
+
+                        }
+                    }else{
+                        //If the item is in the distractor set, then set it to "incorrect"
+                        if(Distractors_Arr.includes(item_name) ){
+                            if(! withhold_feedback){
+                                ItemResponseMap[item_name] = "incorrect"
+                            }else{
+                                ItemResponseMap[item_name] = "unknown"
+                            }
+                        }else{
+                            //Item is not a distractor, direct or indirect item. So set it to unavailable
+                            ItemResponseMap[item_name] = "unavailable"
+                        }
+                    }
                 }
             }
-
-            //Assigning the properties to the TestObject.
-            TestObj.items_available = Available_Items
-            TestObj.correct_item = correct_item
-
-            switch(key){
-                case("LA"): TestObj.item_direct = TrainingFennimals.LA.item; TestObj.item_indirect = TrainingFennimals.LB.item; break
-                case("LB"): TestObj.item_direct = TrainingFennimals.LB.item; TestObj.item_indirect = TrainingFennimals.LA.item; break
-                case("HA"): TestObj.item_direct = TrainingFennimals.HA.item; TestObj.item_indirect = TrainingFennimals.HB.item; break
-                case("HB"): TestObj.item_direct = TrainingFennimals.HB.item; TestObj.item_indirect = TrainingFennimals.HA.item; break
-                case("C"): TestObj.item_direct = TrainingFennimals.C.item; TestObj.item_indirect = false; break
-            }
+            let TestObj = createFennimalObj(FenObj.region,FenObj.location, FenObj.head, FenObj.body, ItemResponseMap, FenObj.ColorScheme)
 
             TestObj.ID = FenObj.ID
+            TestObj.ItemResponses = ItemResponseMap
 
             //Pushing to the DirectTestBlock
             Block.push(TestObj)
@@ -1923,22 +720,20 @@ STIMULUSDATA_SIMILARITY_ON_SEARCH = function(participant_number){
         let Block = []
         for(let key in TrainingFennimals){
             let NewFenObj = JSON.parse(JSON.stringify(TrainingFennimals[key]))
-            delete NewFenObj.item
+
+            //Note that here only the special item should be listed as correct, all the other items are incorrect
+            let ItemResponseMap = {}
+            for(let i=0;i<All_Items.length; i++){
+                if(NewFenObj.special_item === All_Items[i]){
+                    ItemResponseMap[All_Items[i]] = "correct"
+                }else{
+                    ItemResponseMap[All_Items[i]] = "incorrect"
+                }
+
+            }
+            NewFenObj.ItemResponses = ItemResponseMap
 
             NewFenObj.ID = key
-            NewFenObj.items_available = Random_Items
-
-            switch(key){
-                case("LA"): NewFenObj.item_direct = TrainingFennimals.LA.item; NewFenObj.item_indirect = TrainingFennimals.LB.item; break
-                case("LB"): NewFenObj.item_direct = TrainingFennimals.LB.item; NewFenObj.item_indirect = TrainingFennimals.LA.item; break
-                case("HA"): NewFenObj.item_direct = TrainingFennimals.HA.item; NewFenObj.item_indirect = TrainingFennimals.HB.item; break
-                case("HB"): NewFenObj.item_direct = TrainingFennimals.HB.item; NewFenObj.item_indirect = TrainingFennimals.HA.item; break
-                case("C"): NewFenObj.item_direct = TrainingFennimals.C.item; NewFenObj.item_indirect = false; break
-            }
-
-            NewFenObj.correct_item = NewFenObj.item_direct
-            NewFenObj.feedback = false
-
             Block.push(NewFenObj)
         }
 
@@ -1949,11 +744,415 @@ STIMULUSDATA_SIMILARITY_ON_SEARCH = function(participant_number){
         }
     }
 
+    //Here we define the different experiment structures
+    let TrainingFennimals, SearchPhaseTemplates, SearchPhaseSetup, Item_Details, All_Items
+    let Available_Regions = shuffleArray(["North","Desert","Village","Jungle","Flowerfields","Swamp", "Beach", "Mountains"])
+
+    //Determine the exact experiment contents here
+    switch(exp_code){
+        case("slideshow"):
+            //Creating Item details
+            Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 3, false ))
+            All_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
+
+            let All_Heads = shuffleArray(JSON.parse(JSON.stringify(Param.Heads_Semantic_Pairs))).flat()
+            let All_Regions = ["Desert"]//Param.Preferred_Region_Selections["8"]
+
+            TrainingFennimals = {}
+            for(let head_ind = 0; head_ind<All_Heads.length; head_ind++){
+                for(let region_ind = 0; region_ind<All_Regions.length;region_ind++  ){
+                    let random_location = shuffleArray(Param.RegionData[All_Regions[region_ind]].Locations)[0]
+                    TrainingFennimals[All_Heads[head_ind] + All_Regions[region_ind]] = createFennimalObj(All_Regions[region_ind], random_location, All_Heads[head_ind],false, false, false, "none" )
+                }
+
+            }
+
+            console.log(TrainingFennimals)
+
+            break
+
+
+
+        case("exp_sim_on_search") : {
+            let Available_Head_Pairs = shuffleArray(JSON.parse(JSON.stringify(Param.Heads_Semantic_Pairs)))
+            //shuffleArray(Available_Head_Pairs[0])
+            //shuffleArray(Available_Head_Pairs[1])
+            //shuffleArray(Available_Head_Pairs[2])
+            //shuffleArray(Available_Head_Pairs[3])
+            //shuffleArray(Available_Head_Pairs[4])
+
+            let StimulusHeads = {
+                HSS: [Available_Head_Pairs[0][0], Available_Head_Pairs[0][1]],
+                LSS: [Available_Head_Pairs[1][0], Available_Head_Pairs[2][0]],
+                distr: Available_Head_Pairs[3][0]
+            }
+
+            // DEFINING THE AVAILABLE NON-HEAD FEATURES FROM THE PARAM OBJECT
+            ///////////////////////////////////////////////////////////
+            Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 5, false ))
+            All_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
+
+            let Drawn_Training_Regions = Available_Regions.splice(0,3)
+            let TrainingRegions = {
+                LA: Drawn_Training_Regions[0],
+                LB: Drawn_Training_Regions[0],
+                HA: Drawn_Training_Regions[1],
+                HB: Drawn_Training_Regions[1],
+                C: Drawn_Training_Regions[2],
+            }
+            let L_Locations = shuffleArray( Param.RegionData[TrainingRegions.LA].Locations.filter(v => Param.Available_Location_Names.includes(v)) )
+            let H_Locations = shuffleArray( Param.RegionData[TrainingRegions.HA].Locations.filter(v => Param.Available_Location_Names.includes(v)) )
+            let TrainingLocations = {
+                LA: L_Locations[0],
+                LB: L_Locations[1],
+                HA: H_Locations[0],
+                HB: H_Locations[1],
+                C: shuffleArray( Param.RegionData[TrainingRegions.C].Locations.filter(v => Param.Available_Location_Names.includes(v)) )[0],
+            }
+
+            let Drawn_Binding_Phase_Regions = Available_Regions.splice(0,5)
+            let SearchPhaseRegions = {
+                LA: Drawn_Binding_Phase_Regions[0],
+                LB: Drawn_Binding_Phase_Regions[1],
+                HA: Drawn_Binding_Phase_Regions[2],
+                HB: Drawn_Binding_Phase_Regions[3],
+                C: Drawn_Binding_Phase_Regions[4],
+            }
+            let SearchPhaseLocations = {
+                LA: shuffleArray( Param.RegionData[SearchPhaseRegions.LA].Locations.filter(v => Param.Available_Location_Names.includes(v))),
+                LB: shuffleArray( Param.RegionData[SearchPhaseRegions.LB].Locations.filter(v => Param.Available_Location_Names.includes(v))),
+                HA: shuffleArray( Param.RegionData[SearchPhaseRegions.HA].Locations.filter(v => Param.Available_Location_Names.includes(v)) ),
+                HB: shuffleArray( Param.RegionData[SearchPhaseRegions.HB].Locations.filter(v => Param.Available_Location_Names.includes(v))),
+                C: shuffleArray(  Param.RegionData[SearchPhaseRegions.C].Locations.filter(v => Param.Available_Location_Names.includes(v))),
+            }
+
+            //Now we can create all the Fennimals
+            TrainingFennimals = {
+                LA: createFennimalObj(TrainingRegions.LA, TrainingLocations.LA, StimulusHeads.LSS[0],false, [ [All_Items[0], "smile"]], false, All_Items[0] ),
+                LB: createFennimalObj(TrainingRegions.LB, TrainingLocations.LB, StimulusHeads.LSS[1],false, [ [All_Items[1], "smile"]] ,false, All_Items[1]),
+                HA: createFennimalObj(TrainingRegions.HA, TrainingLocations.HA, StimulusHeads.HSS[0],false, [ [All_Items[2], "smile"]], false, All_Items[2] ),
+                HB: createFennimalObj(TrainingRegions.HB, TrainingLocations.HB, StimulusHeads.HSS[1],false, [ [All_Items[3], "smile"]], false, All_Items[3]),
+                C: createFennimalObj(TrainingRegions.C, TrainingLocations.C, StimulusHeads.distr,false, [ [All_Items[4], "smile"]], false, All_Items[4] ),
+            }
+
+            //Creating item response maps for all the search phase Fennimals
+            let SearchPhaseItemResponse_Arr = {
+                LA: [ [All_Items[0], "smile"], [All_Items[1], "smile"], [All_Items[2], "incorrect"], [All_Items[3], "incorrect"], [All_Items[4], "incorrect"]],
+                LB: [ [All_Items[0], "smile"], [All_Items[1], "smile"], [All_Items[2], "incorrect"], [All_Items[3], "incorrect"], [All_Items[4], "incorrect"]],
+                HA: [ [All_Items[0], "incorrect"], [All_Items[1], "incorrect"], [All_Items[2], "smile"], [All_Items[3], "smile"], [All_Items[4], "incorrect"]],
+                HB: [ [All_Items[0], "incorrect"], [All_Items[1], "incorrect"], [All_Items[2], "smile"], [All_Items[3], "smile"], [All_Items[4], "incorrect"]],
+                C: [ [All_Items[0], "incorrect"], [All_Items[1], "incorrect"], [All_Items[2], "incorrect"], [All_Items[3], "incorrect"], [All_Items[4], "smile"]],
+            }
+
+            SearchPhaseTemplates= {
+                LA: {ID: "LA", head: TrainingFennimals.LA.head, body: false, ColorScheme: false,  region: SearchPhaseRegions.LA, location: SearchPhaseLocations.LA[0],ItemResponseArr: SearchPhaseItemResponse_Arr.LA, item_direct: TrainingFennimals.LA.special_item, item_indirect: TrainingFennimals.LB.special_item },
+                LB: {ID: "LB", head: TrainingFennimals.LB.head, body: false, ColorScheme: false, region: SearchPhaseRegions.LB, location: SearchPhaseLocations.LB[0],ItemResponseArr: SearchPhaseItemResponse_Arr.LB,item_direct: TrainingFennimals.LB.special_item, item_indirect: TrainingFennimals.LA.special_item},
+                HA: {ID: "HA", head: TrainingFennimals.HA.head, body: false, ColorScheme: false, region: SearchPhaseRegions.HA, location: SearchPhaseLocations.HA[0], ItemResponseArr: SearchPhaseItemResponse_Arr.HA,item_direct: TrainingFennimals.HA.special_item, item_indirect: TrainingFennimals.HB.special_item},
+                HB: {ID: "HB", head: TrainingFennimals.HB.head, body: false, ColorScheme: false, region: SearchPhaseRegions.HB, location: SearchPhaseLocations.HB[0], ItemResponseArr: SearchPhaseItemResponse_Arr.HB,item_direct: TrainingFennimals.HB.special_item, item_indirect: TrainingFennimals.HA.special_item},
+                C: {ID: "C", head: TrainingFennimals.C.head, body: false, ColorScheme: false, region: SearchPhaseRegions.C, location: SearchPhaseLocations.C[0],ItemResponseArr: SearchPhaseItemResponse_Arr.C, item_direct: TrainingFennimals.C.special_item, item_indirect: false},
+            }
+
+            //Setting all the trials for the search phase
+            SearchPhaseSetup = [
+                {
+                    Trials:  createBlockOfStandardSearchTrials(["LA","LB","HA","HB", "C"], true, 2,false, true ),
+                    type: "direct",
+                    hint_type: "text",
+                    number: 1
+                },{
+                    Trials: createBlockOfRepeatTrainingTrials(true),
+                    type: "repeat_training",
+                    hint_type: "text",
+                    number: 6
+                }]
+
+            break;
+
+        }
+
+        case("exp_closer_neighbors"): {
+            //In this experiment the training phase consists of 3 Fennimals, all in the same location.
+            // Two Fennimals also have the same color scheme and body. The third differs. All have different heads
+            // The Search phase consists of 3 trials, each sharing a head with one of the trainig phase Fennimals (and nothing else). Available options are the two indirect ones.
+
+            //Drawing 4 Regions (one for training, three for search). We can use the other regions for their color schemes
+            let Visited_Regions = shuffleArray(Param.Preferred_Region_Selections["4"])
+            let Unused_Regions = Available_Regions.filter(x => !Visited_Regions.includes(x));
+
+            let training_region = Visited_Regions.splice(0,1)
+            let Training_Locations = shuffleArray(Param.RegionData[training_region].Locations)
+
+            //Drawing 3 heards
+            let Used_Heads = shuffleArray(JSON.parse(JSON.stringify(Param.Heads_Set_A))).splice(0,3)
+
+            //Now we want to draw two color schemes, associated to the regions NOT used during the rest of the experiment
+            let Available_Colorschemes = []
+            for(let i =0;i<Unused_Regions.length; i++){
+                let Scheme = Param.RegionData[Unused_Regions[i]].Fennimal_location_colors
+                Available_Colorschemes.push({Head: Scheme, Body : Scheme})
+            }
+            let Training_phase_Color_schemes = shuffleArray(Available_Colorschemes).splice(0,2)
+
+            //Drawing body types from the unused regions.
+            let Available_Bodies = []
+            for(let i =0;i<Unused_Regions.length; i++){
+                Available_Bodies.push(Param.RegionData[Unused_Regions[i]].preferredBodyType)
+            }
+            let Training_phase_bodies = shuffleArray(Available_Bodies).splice(0,2)
+
+            //Creating Item details
+            Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 3, false ))
+            All_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
+
+            //Creating the training Fennimals
+            TrainingFennimals = {
+                A: createFennimalObj(training_region, Training_Locations[0], Used_Heads[0],Training_phase_bodies[0], [ [All_Items[0], "smile"]], Training_phase_Color_schemes [0], All_Items[0] ),
+                B: createFennimalObj(training_region, Training_Locations[1], Used_Heads[1],Training_phase_bodies[0], [ [All_Items[1], "smile"]], Training_phase_Color_schemes [0], All_Items[1] ),
+                C: createFennimalObj(training_region, Training_Locations[2], Used_Heads[2],Training_phase_bodies[1], [ [All_Items[2], "smile"]], Training_phase_Color_schemes [1], All_Items[2] ),
+            }
+
+            //Drawing search phase locations
+            let SearchPhaseLocations = {
+                S1:  shuffleArray(Param.RegionData[Visited_Regions[0]].Locations)[0],
+                S2:  shuffleArray(Param.RegionData[Visited_Regions[1]].Locations)[0],
+                S3:  shuffleArray(Param.RegionData[Visited_Regions[2]].Locations)[0],
+            }
+
+            //Creating the search phase response arrays
+            let SearchPhaseItemResponse_Arr = {
+                S1: [ [All_Items[0], "unavailable"], [All_Items[1], "unknown"], [All_Items[2], "unknown"]],
+                S2: [ [All_Items[0], "unknown"], [All_Items[1], "unavailable"], [All_Items[2], "unknown"]],
+                S3: [ [All_Items[0], "unknown"], [All_Items[1], "unknown"], [All_Items[2], "unavailable"]],
+            }
+
+            //Transforming into item response object
+            let ItemResponses = {}
+            for(let key in  SearchPhaseItemResponse_Arr){
+                let newobj = {}
+                for(let i=0;i<SearchPhaseItemResponse_Arr[key].length; i++){
+                    newobj[SearchPhaseItemResponse_Arr[key][i][0]] = SearchPhaseItemResponse_Arr[key][i][1]
+                }
+                ItemResponses[key] = newobj
+            }
+
+            //Creating the search stimuli templates
+            SearchPhaseTemplates = {
+                S1: {ID: "S1", head: TrainingFennimals.A.head, body: false, ColorScheme: false,  region: Visited_Regions[0], location: SearchPhaseLocations.S1},
+                S2: {ID: "S2", head: TrainingFennimals.B.head, body: false, ColorScheme: false,  region: Visited_Regions[1], location: SearchPhaseLocations.S2},
+                S3: {ID: "S3", head: TrainingFennimals.C.head, body: false, ColorScheme: false,  region: Visited_Regions[2], location: SearchPhaseLocations.S3},
+            }
+
+            //Transforming the search stimuli into a block
+            let SearchPhaseTrials = []
+            for(let key in SearchPhaseTemplates){
+                let FenObj = SearchPhaseTemplates[key]
+                let TestObj = createFennimalObj(FenObj.region,FenObj.location, FenObj.head, FenObj.body, false, FenObj.ColorScheme)
+
+                TestObj.ID = FenObj.ID
+                TestObj.ItemResponses = ItemResponses[key]
+                SearchPhaseTrials.push(TestObj)
+            }
+            shuffleArray(SearchPhaseTrials)
+
+            //Creating the search phase setup
+            SearchPhaseSetup = [
+                {
+                    Trials:  SearchPhaseTrials,
+                    type: "indirect",
+                    hint_type: "text",
+                    number: 1
+                },{
+                    Trials: createBlockOfRepeatTrainingTrials(true),
+                    type: "repeat_training",
+                    hint_type: "text",
+                    number: 2
+                }]
+
+            break;
+
+        }
+
+        case("search_centrality"): {
+            //Drawing 4 Regions to be usedduign the experiment. We can use the other regions for their color schemes
+            let Visited_Regions = shuffleArray(Param.Preferred_Region_Selections["4"])
+            let Unused_Regions = Available_Regions.filter(x => !Visited_Regions.includes(x));
+
+            //Shuffling locations for the regions
+            let Visited_Location_Arr = []
+            for(let i = 0; i<Visited_Regions.length;i++){
+                Visited_Location_Arr.push(shuffleArray( JSON.parse(JSON.stringify(Param.RegionData[Visited_Regions[i]].Locations))))
+            }
+
+            //Drawing 4 heards
+            let Used_Heads = shuffleArray(JSON.parse(JSON.stringify(Param.Heads_Set_A))).splice(0,4)
+
+            //Creating Item details
+            Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 5, false ))
+            All_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
+
+            //Creating the training Fennimals
+            TrainingFennimals = {
+                A: createFennimalObj(Visited_Regions[0], Visited_Location_Arr[0][0], Used_Heads[0],false, [ [All_Items[0], "smile"]], false, All_Items[0] ),
+                B: createFennimalObj(Visited_Regions[1], Visited_Location_Arr[1][0], Used_Heads[0],false, [ [All_Items[1], "smile"]], false, All_Items[1] ),
+                C: createFennimalObj(Visited_Regions[2], Visited_Location_Arr[2][0], Used_Heads[0],false, [ [All_Items[2], "smile"]], false, All_Items[2] ),
+                D: createFennimalObj(Visited_Regions[2], Visited_Location_Arr[2][1], Used_Heads[1],false, [ [All_Items[3], "smile"]], false, All_Items[3] ),
+                E: createFennimalObj(Visited_Regions[2], Visited_Location_Arr[2][2], Used_Heads[2],false, [ [All_Items[4], "smile"]], false, All_Items[4] ),
+            }
+
+            //Creating the search phase response arrays
+            let SearchPhaseItemResponse_Arr = {
+                S1: [ [All_Items[0], "unavailable"], [All_Items[1], "unknown"], [All_Items[2], "unknown"], [All_Items[3], "unknown"], [All_Items[4], "unavailable"]],
+                S2: [ [All_Items[0], "unavailable"], [All_Items[1], "unknown"], [All_Items[2], "unknown"], [All_Items[3], "unknown"], [All_Items[4], "unavailable"]],
+            }
+            let SearchPhaseItemResponse_Arr_Hidden = {
+                S1: [ [All_Items[0], "unavailable"], [All_Items[1], "smile"], [All_Items[2], "smile"], [All_Items[3], "smile"], [All_Items[4], "unavailable"]],
+                S2: [ [All_Items[0], "unavailable"], [All_Items[1], "smile"], [All_Items[2], "smile"], [All_Items[3], "smile"], [All_Items[4], "unavailable"]],
+            }
+
+            //Transforming into item response object
+            let ItemResponses = {}
+            for(let key in  SearchPhaseItemResponse_Arr){
+                let newobj = {}
+                for(let i=0;i<SearchPhaseItemResponse_Arr[key].length; i++){
+                    newobj[SearchPhaseItemResponse_Arr[key][i][0]] = SearchPhaseItemResponse_Arr[key][i][1]
+                }
+                ItemResponses[key] = newobj
+            }
+            let HiddenItemResponses = {}
+            for(let key in  SearchPhaseItemResponse_Arr_Hidden){
+                let newobj = {}
+                for(let i=0;i<SearchPhaseItemResponse_Arr_Hidden[key].length; i++){
+                    newobj[SearchPhaseItemResponse_Arr_Hidden[key][i][0]] = SearchPhaseItemResponse_Arr_Hidden[key][i][1]
+                }
+                HiddenItemResponses[key] = newobj
+            }
+
+            //Creating the search stimuli templates
+            SearchPhaseTemplates = {
+                S1: {ID: "S1", head: Used_Heads[3], body: false, ColorScheme: false,  region: Visited_Regions[0], location: Visited_Location_Arr[0][0]},
+                S2: {ID: "S2", head: TrainingFennimals.D.head, body: false, ColorScheme: false,  region: Visited_Regions[3], location: Visited_Location_Arr[3][0]},
+            }
+
+            //Transforming the search stimuli into a block
+            let SearchPhaseTrials = []
+            for(let key in SearchPhaseTemplates){
+                let FenObj = SearchPhaseTemplates[key]
+                let TestObj = createFennimalObj(FenObj.region,FenObj.location, FenObj.head, FenObj.body, false, false)
+
+                TestObj.ID = FenObj.ID
+                TestObj.ItemResponses = ItemResponses[key]
+                TestObj.HiddenItemResponses = HiddenItemResponses[key]
+                SearchPhaseTrials.push(TestObj)
+            }
+            shuffleArray(SearchPhaseTrials)
+
+            //Creating the search phase setup
+            SearchPhaseSetup = [
+                {
+                    Trials:  SearchPhaseTrials,
+                    type: "sole_block",
+                    hint_type: "text",
+                    number: 1
+                }]
+
+            break;
+        }
+
+        case("search_availability"): {
+            //Drawing Regions to be used during the experiment.
+            let Visited_Regions = shuffleArray(Param.Preferred_Region_Selections["4"])
+
+            //Shuffling locations for the regions
+            let Visited_Location_Arr = []
+            for(let i = 0; i<Visited_Regions.length;i++){
+                Visited_Location_Arr.push(shuffleArray( JSON.parse(JSON.stringify(Param.RegionData[Visited_Regions[i]].Locations))))
+            }
+
+            //Drawing 4 heads
+            let Used_Heads = shuffleArray(JSON.parse(JSON.stringify(Param.Heads_Set_A))).splice(0,4)
+
+            //Creating Item details
+            Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 5, false ))
+            All_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
+
+            //Creating the training Fennimals
+            TrainingFennimals = {
+                A: createFennimalObj(Visited_Regions[0], Visited_Location_Arr[0][0], Used_Heads[0],false, [ [All_Items[0], "smile"]], false, All_Items[0] ),
+                B: createFennimalObj(Visited_Regions[0], Visited_Location_Arr[0][1], Used_Heads[1],false, [ [All_Items[1], "smile"]], false, All_Items[1] ),
+                C: createFennimalObj(Visited_Regions[1], Visited_Location_Arr[1][0], Used_Heads[1],false, [ [All_Items[2], "smile"]], false, All_Items[2] ),
+                D: createFennimalObj(Visited_Regions[2], Visited_Location_Arr[2][0], Used_Heads[2],false, [ [All_Items[3], "smile"]], false, All_Items[3] ),
+                E: createFennimalObj(Visited_Regions[2], Visited_Location_Arr[2][1], Used_Heads[3],false, [ [All_Items[4], "smile"]], false, All_Items[4] ),
+            }
+
+            //Creating the search phase response arrays
+            let SearchPhaseItemResponse_Arr = {
+                SC: [ [All_Items[0], "unavailable"], [All_Items[1], "unknown"], [All_Items[2], "unavailable"], [All_Items[3], "unknown"], [All_Items[4], "unavailable"]],
+                SL: [ [All_Items[0], "unavailable"], [All_Items[1], "unknown"], [All_Items[2], "unavailable"], [All_Items[3], "unknown"], [All_Items[4], "unavailable"]],
+                SD: [ [All_Items[0], "unavailable"], [All_Items[1], "unknown"], [All_Items[2], "unavailable"], [All_Items[3], "unknown"], [All_Items[4], "unavailable"]],
+            }
+            let SearchPhaseItemResponse_Arr_Hidden = {
+                SC: [ [All_Items[0], "unavailable"], [All_Items[1], "smile"], [All_Items[2], "unavailable"], [All_Items[3], "smile"], [All_Items[4], "unavailable"]],
+                SL: [ [All_Items[0], "unavailable"], [All_Items[1], "smile"], [All_Items[2], "unavailable"], [All_Items[3], "smile"], [All_Items[4], "unavailable"]],
+                SD: [ [All_Items[0], "unavailable"], [All_Items[1], "smile"], [All_Items[2], "unavailable"], [All_Items[3], "smile"], [All_Items[4], "unavailable"]],
+            }
+
+            //Transforming into item response object
+            let ItemResponses = {}
+            for(let key in  SearchPhaseItemResponse_Arr){
+                let newobj = {}
+                for(let i=0;i<SearchPhaseItemResponse_Arr[key].length; i++){
+                    newobj[SearchPhaseItemResponse_Arr[key][i][0]] = SearchPhaseItemResponse_Arr[key][i][1]
+                }
+                ItemResponses[key] = newobj
+            }
+            let HiddenItemResponses = {}
+            for(let key in  SearchPhaseItemResponse_Arr_Hidden){
+                let newobj = {}
+                for(let i=0;i<SearchPhaseItemResponse_Arr_Hidden[key].length; i++){
+                    newobj[SearchPhaseItemResponse_Arr_Hidden[key][i][0]] = SearchPhaseItemResponse_Arr_Hidden[key][i][1]
+                }
+                HiddenItemResponses[key] = newobj
+            }
+
+            //Creating the search stimuli templates
+            SearchPhaseTemplates = {
+                SC: {ID: "SC", head: TrainingFennimals.A.head, body: false, ColorScheme: false,  region: Visited_Regions[1], location: Visited_Location_Arr[1][0]},
+                SL: {ID: "SL", head: TrainingFennimals.E.head, body: false, ColorScheme: false,  region: Visited_Regions[3], location: Visited_Location_Arr[3][0]},
+                SD: {ID: "SD", head: TrainingFennimals.E.head, body: false, ColorScheme: false,  region: Visited_Regions[1], location: Visited_Location_Arr[1][0]},
+                //S: {ID: "S", head: TrainingFennimals.D.head, body: false, ColorScheme: false,  region: Visited_Regions[3], location: Visited_Location_Arr[3][0]},
+            }
+
+            //Transforming the search stimuli into a block
+            let SearchPhaseTrials = []
+            for(let key in SearchPhaseTemplates){
+                let FenObj = SearchPhaseTemplates[key]
+                let TestObj = createFennimalObj(FenObj.region,FenObj.location, FenObj.head, FenObj.body, false, false)
+
+                TestObj.ID = FenObj.ID
+                TestObj.ItemResponses = ItemResponses[key]
+                TestObj.HiddenItemResponses = HiddenItemResponses[key]
+                SearchPhaseTrials.push(TestObj)
+            }
+            shuffleArray(SearchPhaseTrials)
+
+            //Creating the search phase setup
+            SearchPhaseSetup = [
+                {
+                    Trials:  SearchPhaseTrials,
+                    type: "sole_block",
+                    hint_type: "text",
+                    number: 1
+                }]
+            break;
+        }
+    }
+
+
     // CALL FUNCTIONS //
     ////////////////////
     //Call to get return a deepcopy of the training set Fennimals, keyed on location.
     this.get_experiment_code = function(){
-        return(experiment_code)
+        return(exp_code)
     }
 
     this.getTrainingSetFennimalsKeyedOnLocation = function(){
@@ -1962,13 +1161,9 @@ STIMULUSDATA_SIMILARITY_ON_SEARCH = function(participant_number){
         let FennimalLocations = {}
 
         //First retrieving all location names and setting their value in FennimalLocations to false. Note, here we cannot rely on Available_Regions!
-        let All_Region_Names = Object.getOwnPropertyNames(Param.RegionData)
-        for(let i=0;i<All_Region_Names.length;i++){
-            if(All_Region_Names[i] !== "Home"){
-                let Locations_In_Region = Param.RegionData[All_Region_Names[i]].Locations
-                FennimalLocations[Locations_In_Region[0]] = false
-                FennimalLocations[Locations_In_Region[1]] = false
-            }
+        let LocationNames = Param.Available_Location_Names
+        for(let i=0;i<LocationNames.length;i++){
+            FennimalLocations[LocationNames[i]] = false
         }
 
         //Now we can go through all the Training set Fennimals and add them to the Fennimal locations
@@ -1977,11 +1172,6 @@ STIMULUSDATA_SIMILARITY_ON_SEARCH = function(participant_number){
             FennimalLocations[Training_Stimuli_In_Array[i].location] = Training_Stimuli_In_Array[i]
         }
 
-        //Adding some meta-data
-        FennimalLocations.MetaData = {
-            total_number_of_Fennimals: 5,
-            total_number_of_locations: Param.location_Names.length
-        }
 
         return(JSON.parse(JSON.stringify(FennimalLocations)))
     }
@@ -2003,12 +1193,12 @@ STIMULUSDATA_SIMILARITY_ON_SEARCH = function(participant_number){
 
     //Call to get the Binding Templates
     this.getBindingTemplates = function(){
-        return(JSON.parse(JSON.stringify(BindingPhaseTemplates)))
+        return(JSON.parse(JSON.stringify(SearchPhaseTemplates)))
     }
     this.getBindingTemplatesInArray = function(){
         let Arr = []
-        for (let key in BindingPhaseTemplates){
-            Arr.push(BindingPhaseTemplates[key])
+        for (let key in SearchPhaseTemplates){
+            Arr.push(SearchPhaseTemplates[key])
         }
 
         return(JSON.parse(JSON.stringify(Arr)))
@@ -2026,8 +1216,69 @@ STIMULUSDATA_SIMILARITY_ON_SEARCH = function(participant_number){
 
     //Returns an array containing all the blocks of the test phase
     this.getTestPhaseData = function(){
-        return(JSON.parse(JSON.stringify(BindingPhaseSetup)))
+        return(JSON.parse(JSON.stringify(SearchPhaseSetup)))
     }
+
+    //Returns a list of all regions visited during the trials (both training and search phases)
+    this.getRegionsVisited = function(){
+        let Regions_Visited_During_Experiment = []
+        for(let key in TrainingFennimals){
+            Regions_Visited_During_Experiment.push(TrainingFennimals[key].region)
+        }
+        for(let key in SearchPhaseTemplates){
+            Regions_Visited_During_Experiment.push(SearchPhaseTemplates[key].region)
+        }
+
+        return([... new Set(Regions_Visited_During_Experiment)])
+
+    }
+
+    // Returns a list of all locations visited during the trials (both training and search phases)
+    this.getLocationsVisited = function(){
+        let Locations_Visited_During_Experiment = []
+        for(let key in TrainingFennimals){
+            Locations_Visited_During_Experiment.push(TrainingFennimals[key].location)
+        }
+        for(let key in SearchPhaseTemplates){
+            Locations_Visited_During_Experiment.push(SearchPhaseTemplates[key].location)
+        }
+
+        return([... new Set(Locations_Visited_During_Experiment)])
+
+    }
+
+    //Returns a list of all heads used during the trials (both training and search phases)
+    this.getHeadsUsed = function(){
+        let Heads_Used_During_Experiment = []
+        for(let key in TrainingFennimals){
+            Heads_Used_During_Experiment.push(TrainingFennimals[key].head)
+        }
+        for(let key in SearchPhaseTemplates){
+            Heads_Used_During_Experiment.push(SearchPhaseTemplates[key].head)
+        }
+        return(Heads_Used_During_Experiment)
+    }
+
+    //Returns a list of all bodies used during the trials (both training and search phases
+    this.getBodiesUsed = function(){
+        let Bodies_Used_During_Experiment = []
+        for(let key in TrainingFennimals){
+            Bodies_Used_During_Experiment.push(TrainingFennimals[key].body)
+        }
+        for(let key in SearchPhaseTemplates){
+            if(SearchPhaseTemplates[key].body !== false){
+                Bodies_Used_During_Experiment.push(SearchPhaseTemplates[key].body)
+            }else{
+                //Body is based on the region
+                Bodies_Used_During_Experiment.push(Param.RegionData[SearchPhaseTemplates[key].region].preferredBodyType)
+            }
+        }
+        return(Bodies_Used_During_Experiment)
+    }
+
+    console.log(TrainingFennimals)
+    console.log(SearchPhaseSetup)
+
 
 }
 
@@ -2038,7 +1289,7 @@ STIMULUSDATA_STIMPILOT = function(){
     // There are two types of stimulus pilots:
     //      all: one screen containing all possible heads. Used to verify whether participants correctly identify the clusters of heads.
     //      split: two screens, each containing one member of all pairs
-    let stim_pilot_type = "split"
+    let stim_pilot_type = "all"
     this.is_stimulus_pilot = true
 
     // Determining the stimulus heads
@@ -2113,22 +1364,46 @@ STIMULUSDATA_STIMPILOT = function(){
 
 //Defines all experiment parameters which are not part of the stimuli
 PARAMETERS = function() {
-    //Determines whether the text hints are based on the Fennimals location or region. Default is region.
-    this.hints_based_on_location = false
-
     ////////////////////
     // MAP PARAMETERS //
     ////////////////////
     //Setting the walking speed in the map. Note that this is the number of ms per step, so a lower number corresponds to a higher walking speed
     this.walking_interval_time = .20
-    this.total_zoom_time = 1500 //in ms
+    this.total_zoom_time = 1000 //in ms
     this.location_movement_transition = ""
 
-    /////////////////////////
     // LOCATION PARAMETERS //
     /////////////////////////
-    this.location_Names = ["Pineforest", "Iceberg", "Windmill", "Garden", "Waterfall", "Mine", "Church", "Farm","Marsh", "Cottage","Oasis", "Cactus", "Beachbar", "Port", "Bush", "Jungleforest"]
+    //Sets the number of visitable locations for all regions. If 3: all locations available. If 2: picks the left and right. If 1: go straight from map to location.
+    // Can be overwritten: just change the Available_Location_Names vector
+    let number_of_visitable_locations_per_region = 2
 
+    this.Preferred_Region_Selections = {
+        2: ["North", "Desert"],
+        3: ["North", "Desert", "Village"],
+        4: ["North", "Desert", "Village", "Jungle"],
+        5: ["North", "Desert", "Village", "Jungle", "Mountains"],
+        6: ["North", "Desert", "Village", "Jungle", "Mountains", "Swamp"],
+        7: ["North", "Desert", "Village", "Jungle", "Mountains", "Swamp", "Flowerfields"],
+        8: ["North", "Desert", "Village", "Jungle", "Mountains", "Swamp", "Flowerfields", "Beach"],
+
+    }
+
+    this.Available_Location_Names = []
+
+    this.All_Possible_Locations = ["Igloo", "Pineforest", "Iceberg", "Windmill", "Orchard", "Garden", "Waterfall", "Cliff", "Mine", "Manor", "Church", "Farm","Marsh", "Creek", "Cottage", "Camp", "Oasis", "Cactus", "Dunes", "Beachbar", "Port", "Lake", "Bush", "Jungleforest"]
+    switch(number_of_visitable_locations_per_region){
+        case(1): this.Available_Location_Names =  ["Iceberg", "Windmill", "Cliff", "Church", "Cottage","Oasis","Port", "Jungleforest"]; break
+        case(2): this.Available_Location_Names =  ["Igloo", "Iceberg","Windmill", "Garden", "Waterfall", "Mine", "Manor", "Farm","Marsh", "Cottage","Camp", "Cactus", "Dunes", "Port", "Lake", "Jungleforest"]; break
+        case(3): this.Available_Location_Names =  this.All_Possible_Locations
+    }
+
+    this.set_Available_Location_Names = function(Arr){
+        this.Available_Location_Names = Arr
+    }
+
+    // FENNIMAL FEATURE PARAMETERS //
+    /////////////////////////////////
     this.Available_Fennimal_Heads = [ "C", "D", "E", "F","G","H","I","J", "K", "L"]
     this.Available_Fennimal_Bodies = ["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M", "N"] // ["A", "B", "C", "D", "F","G","H", "I","J","K"] //["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M","N"]
     this.Regionfree_Fennimal_Bodies = ["A", "E", "F","H","K","M"] // ["A", "B", "C", "D", "F","G","H", "I","J","K"] //["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M","N"]
@@ -2160,23 +1435,36 @@ PARAMETERS = function() {
                     target_region: "map",
                 }, {
                     arrow_id: "arrow_intersection_left",
+                    target_region: "location_Igloo",
+                },{
+                    arrow_id: "arrow_intersection_middle",
                     target_region: "location_Pineforest",
                 },{
                     arrow_id: "arrow_intersection_right",
                     target_region: "location_Iceberg",
                 },]
         },
+        location_Igloo : {
+            zoomable: false,
+            may_contain_Fennimals: true,
+            location_name: "Igloo",
+            region: "North",
+            sky: "sky_North_3x",
+            AdjacentRegions: [{
+                arrow_id: "arrow_return_to_previous_region_right",
+                target_region: "intersection_North",
+            }]
+        },
         location_Pineforest : {
             zoomable: false,
             may_contain_Fennimals: true,
             region: "North",
             location_name: "Pineforest",
-            sky: "sky_North_2x",
+            sky: "sky_North_3x",
             AdjacentRegions: [{
-                arrow_id: "arrow_return_to_previous_region_right",
+                arrow_id: "arrow_back",
                 target_region: "intersection_North",
             }]
-
         },
         location_Iceberg : {
             zoomable: false,
@@ -2203,6 +1491,9 @@ PARAMETERS = function() {
                     arrow_id: "arrow_intersection_left",
                     target_region: "location_Windmill",
                 },{
+                    arrow_id: "arrow_intersection_middle",
+                    target_region: "location_Orchard",
+                },{
                     arrow_id: "arrow_intersection_right",
                     target_region: "location_Garden",
                 },]
@@ -2219,17 +1510,27 @@ PARAMETERS = function() {
                 target_region: "intersection_Flowerfields",
             }]
         },
+        location_Orchard : {
+            zoomable: false,
+            may_contain_Fennimals: true,
+            location_name: "Orchard",
+            region: "Flowerfields",
+            sky: "sky_Flowerfields_2x",
+            AdjacentRegions: [{
+                arrow_id: "arrow_back",
+                target_region: "intersection_Flowerfields",
+            }]
+        },
         location_Garden : {
             zoomable: false,
             may_contain_Fennimals: true,
             location_name: "Garden",
             region: "Flowerfields",
-            sky: "sky_Flowerfields_3x",
+            sky: "sky_Flowerfields_2x",
             AdjacentRegions: [{
                 arrow_id: "arrow_return_to_previous_region_left",
                 target_region: "intersection_Flowerfields",
             }]
-
         },
 
         intersection_Mountains: {
@@ -2246,6 +1547,9 @@ PARAMETERS = function() {
                 },{
                     arrow_id: "arrow_intersection_right",
                     target_region: "location_Mine",
+                },{
+                    arrow_id: "arrow_intersection_middle",
+                    target_region: "location_Cliff",
                 },]
 
         },
@@ -2259,6 +1563,16 @@ PARAMETERS = function() {
                 target_region: "intersection_Mountains",
             }]
 
+        },
+        location_Cliff : {
+            zoomable: false,
+            may_contain_Fennimals: true,
+            location_name: "Cliff",
+            region: "Mountains",
+            AdjacentRegions:  [{
+                arrow_id: "arrow_back",
+                target_region: "intersection_Mountains",
+            }]
         },
         location_Mine : {
             zoomable: false,
@@ -2282,11 +1596,25 @@ PARAMETERS = function() {
                     target_region: "map",
                 }, {
                     arrow_id: "arrow_intersection_left",
+                    target_region: "location_Manor",
+                },{
+                    arrow_id: "arrow_intersection_middle",
                     target_region: "location_Church",
                 },{
                     arrow_id: "arrow_intersection_right",
                     target_region: "location_Farm",
                 },]
+        },
+        location_Manor : {
+            zoomable: false,
+            may_contain_Fennimals: true,
+            location_name: "Manor",
+            region: "Village",
+            sky: "sky_Village_2x",
+            AdjacentRegions:  [{
+                arrow_id: "arrow_return_to_previous_region_right",
+                target_region: "intersection_Village",
+            }]
         },
         location_Church: {
             zoomable: false,
@@ -2295,7 +1623,7 @@ PARAMETERS = function() {
             region: "Village",
             sky: "sky_Village_2x",
             AdjacentRegions:  [{
-                arrow_id: "arrow_return_to_previous_region_right",
+                arrow_id: "arrow_back",
                 target_region: "intersection_Village",
             }]
 
@@ -2305,12 +1633,13 @@ PARAMETERS = function() {
             may_contain_Fennimals: true,
             location_name: "Farm",
             region: "Village",
-            sky: "sky_Village_3x",
+            sky: "sky_Village_2x",
             AdjacentRegions:  [{
                 arrow_id: "arrow_return_to_previous_region_left",
                 target_region: "intersection_Village",
             }]
         },
+
 
         intersection_Swamp: {
             zoomable: true,
@@ -2324,6 +1653,9 @@ PARAMETERS = function() {
                 }, {
                     arrow_id: "arrow_intersection_left",
                     target_region: "location_Marsh",
+                },{
+                    arrow_id: "arrow_intersection_middle",
+                    target_region: "location_Creek",
                 },{
                     arrow_id: "arrow_intersection_right",
                     target_region: "location_Cottage",
@@ -2341,12 +1673,23 @@ PARAMETERS = function() {
             }]
 
         },
+        location_Creek : {
+            zoomable: false,
+            may_contain_Fennimals: true,
+            location_name: "Creek",
+            region: "Swamp",
+            sky: "sky_Swamp_2x",
+            AdjacentRegions: [{
+                arrow_id: "arrow_back",
+                target_region: "intersection_Swamp",
+            }]
+        },
         location_Cottage : {
             zoomable: false,
             may_contain_Fennimals: true,
             location_name: "Cottage",
             region: "Swamp",
-            sky: "sky_Swamp_3x",
+            sky: "sky_Swamp_2x",
             AdjacentRegions: [{
                 arrow_id: "arrow_return_to_previous_region_left",
                 target_region: "intersection_Swamp",
@@ -2364,11 +1707,25 @@ PARAMETERS = function() {
                     target_region: "map",
                 }, {
                     arrow_id: "arrow_intersection_left",
+                    target_region: "location_Camp",
+                }, {
+                    arrow_id: "arrow_intersection_middle",
                     target_region: "location_Oasis",
                 },{
                     arrow_id: "arrow_intersection_right",
                     target_region: "location_Cactus",
                 },]
+        },
+        location_Camp : {
+            zoomable: false,
+            may_contain_Fennimals: true,
+            location_name: "Camp",
+            region: "Desert",
+            sky: "sky_Desert_2x",
+            AdjacentRegions:  [{
+                arrow_id: "arrow_return_to_previous_region_right",
+                target_region: "intersection_Desert",
+            }]
         },
         location_Oasis: {
             zoomable: false,
@@ -2377,7 +1734,7 @@ PARAMETERS = function() {
             region: "Desert",
             sky: "sky_Desert_2x",
             AdjacentRegions:  [{
-                arrow_id: "arrow_return_to_previous_region_right",
+                arrow_id: "arrow_back",
                 target_region: "intersection_Desert",
             }]
         },
@@ -2386,12 +1743,13 @@ PARAMETERS = function() {
             may_contain_Fennimals: true,
             location_name: "Cactus",
             region: "Desert",
-            sky: "sky_Desert_3x",
+            sky: "sky_Desert_2x",
             AdjacentRegions:  [{
                 arrow_id: "arrow_return_to_previous_region_left",
                 target_region: "intersection_Desert",
             }]
         },
+
 
         intersection_Beach: {
             zoomable: true,
@@ -2404,20 +1762,34 @@ PARAMETERS = function() {
                     target_region: "map",
                 }, {
                     arrow_id: "arrow_intersection_left",
+                    target_region: "location_Dunes",
+                }, {
+                    arrow_id: "arrow_intersection_middle",
                     target_region: "location_Beachbar",
                 },{
                     arrow_id: "arrow_intersection_right",
                     target_region: "location_Port",
                 },]
         },
+        location_Dunes: {
+            zoomable: false,
+            may_contain_Fennimals: true,
+            location_name: "Dunes",
+            region: "Beach",
+            sky: "sky_Beach_3x",
+            AdjacentRegions:  [{
+                arrow_id: "arrow_return_to_previous_region_right",
+                target_region: "intersection_Beach",
+            }]
+        },
         location_Beachbar: {
             zoomable: false,
             may_contain_Fennimals: true,
             location_name: "Beachbar",
             region: "Beach",
-            sky: "sky_Beach_2x",
+            sky: "sky_Beach_3x",
             AdjacentRegions:  [{
-                arrow_id: "arrow_return_to_previous_region_right",
+                arrow_id: "arrow_back",
                 target_region: "intersection_Beach",
             }]
         },
@@ -2444,11 +1816,25 @@ PARAMETERS = function() {
                     target_region: "map",
                 }, {
                     arrow_id: "arrow_intersection_left",
+                    target_region: "location_Lake",
+                }, {
+                    arrow_id: "arrow_intersection_middle",
                     target_region: "location_Bush",
                 },{
                     arrow_id: "arrow_intersection_right",
                     target_region: "location_Jungleforest",
                 },]
+        },
+        location_Lake: {
+            zoomable: false,
+            may_contain_Fennimals: true,
+            location_name: "Lake",
+            region: "Jungle",
+            sky: "sky_Jungle_3x",
+            AdjacentRegions:  [{
+                arrow_id: "arrow_return_to_previous_region_right",
+                target_region: "intersection_Jungle",
+            }]
         },
         location_Bush: {
             zoomable: false,
@@ -2457,7 +1843,7 @@ PARAMETERS = function() {
             region: "Jungle",
             sky: "sky_Jungle_3x",
             AdjacentRegions:  [{
-                arrow_id: "arrow_return_to_previous_region_right",
+                arrow_id: "arrow_back",
                 target_region: "intersection_Jungle",
             }]
         },
@@ -2466,7 +1852,7 @@ PARAMETERS = function() {
             may_contain_Fennimals: true,
             location_name: "Jungleforest",
             region: "Jungle",
-            sky: "sky_Jungle_2x",
+            sky: "sky_Jungle_3x",
             AdjacentRegions: [{
                 arrow_id: "arrow_return_to_previous_region_left",
                 target_region: "intersection_Jungle",
@@ -2494,7 +1880,7 @@ PARAMETERS = function() {
     //NB: Home should always be the last element.
     this.RegionData = {
         North : {
-            Locations : ["Pineforest", "Iceberg"],
+            Locations : ["Pineforest", "Iceberg", "Igloo"],
             lighter_color: "#a2b2fc",
             color: "#0020ac",
             darker_color: "#001987",
@@ -2510,7 +1896,7 @@ PARAMETERS = function() {
             preferredBodyType: "B",
         },
         Jungle: {
-            Locations : ["Bush", "Jungleforest"],
+            Locations : ["Bush", "Jungleforest", "Lake"],
             lighter_color: "#b5e092",
             color: "#588b1e",
             darker_color: "#235412",
@@ -2526,7 +1912,7 @@ PARAMETERS = function() {
             preferredBodyType: "N",
         },
         Desert: {
-            Locations : ["Oasis", "Cactus"],
+            Locations : ["Oasis", "Cactus", "Camp"],
             lighter_color: "#f5f55b",
             color: "#c7c602", //#fffe03
             darker_color: "#757500",
@@ -2542,7 +1928,7 @@ PARAMETERS = function() {
             preferredBodyType: "I",
         },
         Mountains: {
-            Locations : ["Waterfall", "Mine"],
+            Locations : ["Waterfall", "Mine", "Cliff"],
             lighter_color: "#d6bba9",
             color: "#502d16",
             darker_color: "#26150a",
@@ -2558,7 +1944,7 @@ PARAMETERS = function() {
             preferredBodyType: "J",
         },
         Beach: {
-            Locations : ["Beachbar", "Port"],
+            Locations : ["Beachbar", "Port", "Dunes"],
             lighter_color: "#ffd0b0",
             color: "#ffe6d5",
             darker_color: "#615c58",
@@ -2574,7 +1960,7 @@ PARAMETERS = function() {
             preferredBodyType: "D",
         },
         Flowerfields: {
-            Locations : ["Windmill", "Garden"],
+            Locations : ["Windmill", "Garden", "Orchard"],
             lighter_color: "#ffcffa",
             color: "#f472e6",
             darker_color: "#783771",
@@ -2591,7 +1977,7 @@ PARAMETERS = function() {
 
         },
         Village: {
-            Locations : ["Church", "Farm"],
+            Locations : ["Church", "Farm", "Manor"],
             lighter_color: "#fcb1b1",
             color: "#f20000",
             darker_color: "#7d0101",
@@ -2608,7 +1994,7 @@ PARAMETERS = function() {
 
         },
         Swamp: {
-            Locations : ["Marsh", "Cottage"],
+            Locations : ["Marsh", "Cottage", "Creek"],
             lighter_color: "#adffef",
             color: "#00fdcc",
             darker_color: "#025e4c",
@@ -2679,20 +2065,28 @@ PARAMETERS = function() {
     this.SubjectFacingLocationNames = {
         Pineforest: "The Pineforest",
         Iceberg: "The Iceberg",
+        Igloo: "The Igloo",
         Windmill: "The Windmills",
         Garden: "The Walled Garden",
+        Orchard: "The Orchard",
         Waterfall: "The Waterfall",
         Mine: "The Mines",
+        Cliff: "The Cliff",
         Church: "The Church",
         Farm: "The Farm",
+        Manor: "The Manor",
         Marsh: "The Marshes",
         Cottage: "The Cottage in the Swamp",
+        Creek: "Creek",
         Oasis: "The Oasis",
         Cactus: "The Cactus Garden",
+        Camp: "The Desert Camp",
         Beachbar: "The Beachbar",
         Port: "The Port",
+        Dunes: "The Dunes",
         Bush: "The Bush",
-        Jungleforest: "The Deep Jungle"
+        Jungleforest: "The Deep Jungle",
+        Lake: "The Lake"
     }
 
     this.Available_items = ["ball", "duck", "car", "trumpet", "kite"] // ["car","spinner","boomerang","balloon","shovel","trumpet"]
@@ -2719,9 +2113,6 @@ PARAMETERS = function() {
     //Minimum distance to the target before a dropped item is registered as given
     this.minimum_drop_target_distance = 35
 
-    //Determines how many hearts are generated (measured in ms between sets are constructed)
-    this.time_between_feedback_hearts = 50
-
     ///////////////////////
     // TIMING PARAMETERS //
     ///////////////////////
@@ -2745,6 +2136,24 @@ PARAMETERS = function() {
     //Denotes the X and Y positions for all items. First key denotes the total number of items, next keys indicate the coords on-screen
     this.ItemCoords = {
         flashlight: {x: 0, y: 0},
+        1: {
+            0: {x: 252, y: 255},
+        },
+        2: {
+            1: {x: 140, y: 203},
+            3: {x: 370, y: 203},
+        },
+        3: {
+            0: {x: 140, y: 203},
+            1: {x: 252, y: 255},
+            2: {x: 370, y: 203},
+        },
+        4: {
+            0: {x: 126, y: 132},
+            1: {x: 140, y: 203},
+            2: {x: 370, y: 203},
+            3: {x: 389, y: 132},
+        },
         5: {
             0: {x: 126, y: 132},
             1: {x: 140, y: 203},
@@ -2815,16 +2224,25 @@ PARAMETERS = function() {
     //The bonus earned per star. If set to false, then no bonus is mentioned throughout the instructions
     this.BonusEarnedPerStar = {
         currency_symbol: "$",
-        bonus_per_star: "0.50"
+        bonus_per_star: "0.25"
     }
 
-    this.flashlight_radius = 30
-    this.flashlight_target_sensitivity = 35
+    this.flashlight_radius = 50
+    this.flashlight_target_sensitivity = 50
+
+    this.OutcomesToPoints = {
+        heart: 2,
+        smile: 1,
+        neutral: 0,
+        unknown: 0,
+        frown: -1,
+        bites: -2
+    }
 
 }
 
 //Controls movement across the SVG (both the map and through the regions)
-LocationController = function(ExpCont){
+LocationController = function(ExpCont, Regions_Visited_During_Experiment){
     let LC = this
 
     //Storing SVG references here
@@ -2856,6 +2274,19 @@ LocationController = function(ExpCont){
 
     //Making sure some levels are shown, whilst some others are hidden
     document.getElementById("interface_elements").style.display = "inherit"
+
+    //General function: when calling with a region, returns an array containing all visitable locations in this region
+    function get_locations_visitable_in_region(region){
+        let locations_arr = Param.Available_Location_Names.filter(v1 => Param.RegionData[region].Locations.includes(v1))
+        return([... new Set(locations_arr)])
+    }
+
+    //Sets the visitable regions of the map
+    function show_regions_on_map(){
+        for(let i =0;i<Regions_Visited_During_Experiment.length;i++){
+            document.getElementById("map_region_" + Regions_Visited_During_Experiment[i]).style.display = "inherit"
+        }
+    }
 
     // MAP FUNCTIONS //
     ///////////////////
@@ -3048,8 +2479,8 @@ LocationController = function(ExpCont){
             SVGReferences.Buttons.Home_button.style.display = "inherit"
 
             //Make sure all the correct locations are highlighted
-            toggleLocationMarker(true, Param.region_Names)
-            //toggleLocationMarker(true, "Home")
+            toggleLocationMarker(true, Regions_Visited_During_Experiment)
+            toggleLocationMarker(true, "Home")
         }
 
         //Call to show a passive state of the map (just the figure, but no button interactions and no highlights)
@@ -3058,7 +2489,7 @@ LocationController = function(ExpCont){
             Player.hidePlayerIcon()
 
             //Disable all location marker controllers
-            toggleLocationMarker(false, Param.region_Names)
+            toggleLocationMarker(false, Regions_Visited_During_Experiment)
 
             //Make sure that the map layer is visible
             SVGReferences.Layers.Map.style.display = "inherit"
@@ -3067,8 +2498,8 @@ LocationController = function(ExpCont){
         //Creating subcontrollers for the location icons and the player
         let Player = new PlayerIconController(LocCont)
         let LocationMarkerControllers = {}
-        for(let i=0; i<Param.region_Names.length; i++){
-            let name = Param.region_Names[i]
+        for(let i=0; i<Regions_Visited_During_Experiment.length; i++){
+            let name = Regions_Visited_During_Experiment[i]
             if(name !== "Neutral"){
                 LocationMarkerControllers[name] = new LocationMarkerController(name, this)
             }
@@ -3171,20 +2602,31 @@ LocationController = function(ExpCont){
 
     }
 
-    //Call when the Player Icon has reached the end of a point on the map. Call with string location
-    function map_end_of_path_reached(location_string){
-        //go_to_location("start_"+ location_string,false)
-        go_to_location("intersection_"+ location_string,false)
-
+    //Call when the Player Icon has reached the end of a point on the map. Call with a string of the region name
+    function map_end_of_path_reached(region_string){
         //To prevent double-clicks when moving away from the map, hold the currently_moving_to_location flag a bit longer before freeing it up again.
         setTimeout(function(){currently_moving_to_location_flag = false},200)
+
+        //Find out all available locations in this region. If there is only one, jump to this location.
+        let Visitable_Locations = get_locations_visitable_in_region(region_string)
+        console.log(Visitable_Locations)
+
+        //If there are multiple, then go to the intersection. Else, jump straight to the only available location
+        if(Visitable_Locations.length > 1){
+            go_to_location("intersection_"+ region_string,false)
+        }
+
+        if(Visitable_Locations.length === 1){
+            console.log(Visitable_Locations)
+            go_to_location("location_" + Visitable_Locations[0],false)
+        }
     }
 
     // REGION LOCATION FUNCTIONS //
     ///////////////////////////////
     let currentLocation, CurrentLocationData, CurrentLocationSVGObj
 
-    //Hides all location arrows. This also removes any click eventListeners associated to them
+    //Hides all location arrows. This also removes any click eventListeners associated to them, as well as all the location display names
     function hide_all_location_arrows(){
         let AllArrows = document.getElementsByClassName("location_arrow")
         for(let i=0; i<AllArrows.length; i++){
@@ -3195,6 +2637,8 @@ LocationController = function(ExpCont){
             let NewElem = AllArrows[i].cloneNode(true);
             AllArrows[i].parentNode.replaceChild(NewElem, AllArrows[i]);
         }
+
+        hide_all_location_display_names()
     }
 
     //Hides all location backgrounds
@@ -3210,7 +2654,22 @@ LocationController = function(ExpCont){
         // Check if there is no flag raised against showing the location arrows
         if(available_to_show_location_arrows_flag){
             //Find the arrow object
-            let ArrowObj = document.getElementById(arrow_name)
+            let ArrowObj
+
+            //Special case if the target is an intersection: now we may need to change the position of the return array if there is only one location in this region.
+            if(target_location.includes("intersection")){
+                //Check if this intersection links to more than one visitable location
+                let region = target_location.split("_")[1]
+                if(get_locations_visitable_in_region(region).length === 1){
+                    ArrowObj = document.getElementById("arrow_back")
+                }else{
+                    ArrowObj = document.getElementById(arrow_name)
+                }
+
+
+            }else{
+                ArrowObj = document.getElementById(arrow_name)
+            }
             ArrowObj.style.display = "inherit"
 
             //Create event listener. Special case for the back-to-map arrow
@@ -3225,13 +2684,45 @@ LocationController = function(ExpCont){
                     if(target_location === "map"){
                         go_to_map();
                     }else{
-                        //Here we need to know whether we are leaving a terminal location (that is, a location with Fennimals) or not
-                        go_to_location(target_location, Param.LocationTransitionData[currentLocation].may_contain_Fennimals )
+                        //Here we need to know whether we are leaving a terminal location (that is, a location with Fennimals) or not.
+
+                        //If we try to go to an intersection AND we come from a terminal location, then we need to check how many terminal locations can be reached from the intersection.
+                        // If this value is exactly one, then we should not go to the intersection but instead skip straight to the map.
+                        if(target_location.includes("intersection")){
+                            //Find out which intersection we are trying to go to
+                            let region = target_location.split("_")[1]
+
+                            //Find out how many locations can be reached in this region
+                            let location_arr = get_locations_visitable_in_region(region)
+
+                            if(location_arr.length <= 1){
+                                //We do not need to go to the intersection, as there is only one location in this region. Go to the map instead
+                                go_to_map()
+                            }else{
+                                //Go to the intersection
+                                go_to_location(target_location, Param.LocationTransitionData[currentLocation].may_contain_Fennimals )
+                            }
+                        }else{
+                            go_to_location(target_location, Param.LocationTransitionData[currentLocation].may_contain_Fennimals )
+                        }
+
                     }
                 }
             })
         }
+    }
 
+    //Shows the text above a location arrow
+    function show_location_display_name(location){
+        document.getElementById("location_display_name_" + location).style.display = "inherit"
+    }
+
+    //Hides all the location text
+    function hide_all_location_display_names(){
+        let All_Names = document.getElementsByClassName("location_display_name")
+        for(let i =0;i<All_Names.length;i++){
+            All_Names[i].style.display = "none"
+        }
     }
 
     //Call when leaving a location with a possible Fennimal
@@ -3250,9 +2741,23 @@ LocationController = function(ExpCont){
     //Call with the AdjacentRegions object to show all the next location arrows on the map
     function show_next_location_arrows(Arrows_To_Be_Shown){
         hide_all_location_arrows()
+
         if(Arrows_To_Be_Shown !== undefined){
             for(let i=0;i<Arrows_To_Be_Shown.length;i++){
-                create_next_location_arrow(Arrows_To_Be_Shown[i].arrow_id, Arrows_To_Be_Shown[i].target_region)
+                //If the arrow points at a location, only show it if the target location is in Param.Available_Location_Names
+                if(Arrows_To_Be_Shown[i].target_region.includes("location")){
+                    let location = Arrows_To_Be_Shown[i].target_region.split("_")[1]
+                    if(Param.Available_Location_Names.includes(location)){
+                        //The target location should be shown. Also show the text above it
+                        create_next_location_arrow(Arrows_To_Be_Shown[i].arrow_id, Arrows_To_Be_Shown[i].target_region)
+                        show_location_display_name(location)
+                    }
+                }else{
+                    //Non-location arrows should always be shown
+                    create_next_location_arrow(Arrows_To_Be_Shown[i].arrow_id, Arrows_To_Be_Shown[i].target_region)
+                }
+
+
             }
         }
     }
@@ -3293,6 +2798,7 @@ LocationController = function(ExpCont){
                 setTimeout(function(){
                     available_to_show_location_arrows_flag = true
                     currently_moving_to_location_flag = false
+
                     show_next_location_arrows(CurrentLocationData.AdjacentRegions)
                 },100)
 
@@ -3390,7 +2896,10 @@ LocationController = function(ExpCont){
             if(typeof Param.LocationTransitionData[key] === "object"){
                 if("zoomable" in Param.LocationTransitionData[key]){
                     if(Param.LocationTransitionData[key].zoomable){
-                        document.getElementById(key).style.transform = "scale(1,1)"
+                        let SVGObj = document.getElementById(key)
+                        if(SVGObj != null){
+                            SVGObj.style.transform = "scale(1,1)"
+                        }
                     }
                 }
             }
@@ -3399,7 +2908,6 @@ LocationController = function(ExpCont){
 
     //Call to prevent a subject from leaving a location by hiding (true) or re-appearing (false) the return arrows
     this.prevent_subject_from_leaving_location = function(bool){
-        //throw "Deliberate Error!";
         if(bool){
             hide_all_location_arrows()
             location_move_blocked_flag = true
@@ -3459,6 +2967,9 @@ LocationController = function(ExpCont){
         SVGObjects.Return_to_Home_button.getElementsByTagName("rect")[0].style.display = "inherit"
         SVGObjects.Return_to_Home_button.onclick = outputfun
     }
+
+    //CONSTRUCTION
+    show_regions_on_map()
 
 }
 
@@ -3823,8 +3334,9 @@ Flashlight_Controller = function(FennimalObj,LocCont, ExpCont){
         //Finding the targets
         let TargetsList = OutlineObject.getElementsByClassName("outline_target")
         Targets = createTargets(TargetsList)
+        LocCont.prevent_subject_from_leaving_location(true)
     }
-    LocCont.prevent_subject_from_leaving_location(false)
+
 
     //Showing the layers on screen
     SVGObjects.Layers.Stage.style.display = "inherit"
@@ -3858,7 +3370,7 @@ Flashlight_Controller = function(FennimalObj,LocCont, ExpCont){
 //Manages all the Fennimal interestions. Needs to be created and destroyed for each interaction.
 //    Should also be called for an empty slot. Instead of calling with a Fennimal object, call with false (flashlight still works, but no Fennimal outline will appear.
 //Handles all the Fennimals and their interactions, including backgrounds and the draggable objects
-TrainingPhaseFennimalController = function(FennimalObj, ItemDetails, ItemAvailability, LocCont, ExpCont){
+TrainingPhaseFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCont){
     //ItemAvailability: should contain an object with one key for each element in ItemDetails.All_Items. Each key should be set to either invisible (item not displayed on the bar), "available" (present and availalbe) or "unavailable" (present, but grayed out).
     //The FennimalController gets created AFTER the subject has uncovered the Fennimal outline.
 
@@ -3895,8 +3407,9 @@ TrainingPhaseFennimalController = function(FennimalObj, ItemDetails, ItemAvailab
     }
 
     this.interactionCompleted = function(selected_item){
-        FeedbackCont = new ItemGivenPositiveFeedbackController(selected_item, FennimalObj.name)
         FennimalObj.selected_item = selected_item
+        FennimalObj.outcome_observed = FennimalObj.ItemResponses[selected_item]
+        FeedbackCont = new FeedbackController(FennimalObj,Container)
         ExpCont.FennimalInteractionCompleted(FennimalObj)
 
     }
@@ -3935,7 +3448,7 @@ TrainingPhaseFennimalController = function(FennimalObj, ItemDetails, ItemAvailab
     //After a brief delay, show the items by creating an item subcontroller
     let that = this
     setTimeout(function(){
-        ItemCont = new ItemController(FennimalObj, ItemAvailability, ItemDetails,LocCont, that, false)
+        ItemCont = new ItemController(FennimalObj, ItemDetails,LocCont, that, false)
     },2500)
 
 }
@@ -3952,13 +3465,18 @@ QuizFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCont){
     let Container = document.getElementById("Fennimal_Container")
     Container.appendChild(Fennimal)
     Container.style.display = "none"
+    Container.style.opacity = 1
 
-    //Set all items to appear as available
-    let ItemAvailability = {}
+    //Overwrite the Fennimal Objects item responses. Only the special item is correct, everything else is incorrect
+    let NewResponses = {}
     for(let i=0;i<ItemDetails.All_Items.length;i++){
-        ItemAvailability[ItemDetails.All_Items[i]] = "available"
+        if(ItemDetails.All_Items[i] === FennimalObj.special_item){
+            NewResponses[ItemDetails.All_Items[i]] = "correct"
+        }else{
+            NewResponses[ItemDetails.All_Items[i]] = "incorrect"
+        }
     }
-    let ItemCont
+    FennimalObj.ItemResponses = NewResponses
 
     function show_Fennimal_background_mask(){
         SVGObjects.Splashscreen_Fennimal.Mask.style.display = "inherit"
@@ -3971,15 +3489,36 @@ QuizFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCont){
         FennimalObj.reaction_time = Date.now() - StartTime
 
         FennimalObj.selected_item = selected_item
-        FennimalObj.correct_answer = (FennimalObj.item === selected_item)
-        showFeedback(selected_item, FennimalObj.item)
+        FennimalObj.outcome_observed = FennimalObj.ItemResponses[selected_item]
+        FeedbackGen = new FeedbackController(FennimalObj, Container)
+        //After a timeout, tell the ExpCon that this quiz trial is completed
+        setTimeout(function(){
+            //Container.style.transition = "all 500ms ease-in"
+            //setTimeout(function(){Container.style.opacity = 0},50)
+
+            setTimeout(function(){
+                if(FeedbackGen !== false){
+                    FeedbackGen.location_left()
+
+                }
+
+                ExpCont.FennimalInteractionCompleted(FennimalObj)
+                setTimeout(function(){
+                    Container.style.transition = ""
+                    Container.style.opacity = 1
+                },10)
+                document.getElementById("Fennimal_Container").innerHTML = ""
+                hide_Fennimal_background_mask()
+                SVGObjects.Prompts.Feedback.Prompt.style.display = "none"
+            },750)
+        },2000)
     }
 
     //Shows the feedback for the quiz trial
     let FeedbackGen = false
     showFeedback = function(answer_given, correct_answer){
         if(answer_given === correct_answer){
-            FeedbackGen = new ItemGivenPositiveFeedbackController(FennimalObj.item, FennimalObj.name)
+
             SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Correct! The " + FennimalObj.name + " likes the " + correct_answer
         }else{
             //Inform the subject that a mistake has been made
@@ -4013,21 +3552,7 @@ QuizFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCont){
 
         }
 
-        //After a timeout, tell the ExpCon that this quiz trial is completed
-        setTimeout(function(){
-            setTimeout(function(){
-                if(FeedbackGen !== false){
-                    FeedbackGen.location_left()
-                    //FeedbackGen = false
-                    document.getElementById("item_" + answer_given).style.display = "none"
-                }
 
-                ExpCont.FennimalInteractionCompleted(FennimalObj)
-                document.getElementById("Fennimal_Container").innerHTML = ""
-                hide_Fennimal_background_mask()
-                SVGObjects.Prompts.Feedback.Prompt.style.display = "none"
-            },500)
-        },3000)
     }
 
     // ON CONSTRUCTION
@@ -4041,7 +3566,7 @@ QuizFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCont){
         // Reaction time measurement
         StartTime = Date.now()
 
-        SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "What toy did the "+ FennimalObj.name + " like?"
+        SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "What toy did you previously give to the "+ FennimalObj.name + "?"
         SVGObjects.Prompts.Feedback.Prompt.style.opacity = 1
         SVGObjects.Prompts.Feedback.Prompt.style.display = "inherit"
 
@@ -4049,10 +3574,10 @@ QuizFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCont){
         Container.style.display = "inherit"
 
         setTimeout(function(){
-            ItemCont =  new ItemController(FennimalObj, ItemAvailability, ItemDetails,LocCont, that, false)
+            ItemCont =  new ItemController(FennimalObj, ItemDetails,LocCont, that, false)
         },2000)
 
-    },750)
+    },1000)
 
 
 }
@@ -4066,12 +3591,15 @@ TestPhaseFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCon
 
     //Creating the Fennimal SVG group and a container to hold it in
     let Fennimal = createFennimal(FennimalObj)
+
     Fennimal.style.opacity = 0
     Fennimal.style.transition = "all 500ms linear"
+
     let Container = document.getElementById("Fennimal_Container")
     Container.appendChild(Fennimal)
     Container.style.display = "inherit"
     SVGObjects.Layers.Stage.style.display = "inherit"
+    Container.style.opacity = 1
 
     //Set all items
     let ItemCont
@@ -4089,22 +3617,17 @@ TestPhaseFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCon
     }
 
     this.interactionCompleted = function(selected_item){
-        if(timed_trial){
-            deleteClassNamesFromElement(SVGObjects.Layers.Stage, "CountdownRect")
-            clearTimeout(Timer_Countdown)
-        }
-
         FennimalObj.selected_item = selected_item
+        FennimalObj.outcome_observed = FennimalObj.ItemResponses[selected_item]
         FennimalObj.reaction_time = Date.now() - StartTime
-        console.log("stopping time measurement: " + (Date.now() - StartTime))
-        FennimalObj.correct_item_selected = FennimalObj.selected_item === FennimalObj.correct_item
 
-        if(selected_item !== "timed_out"){
-            showFeedback()
-        }else{
+        let FeedbackCont = new FeedbackController(FennimalObj,Container)
+
+
+        setTimeout(function(){
             ExpCont.test_trial_completed(FennimalObj)
             hide_Fennimal_background_mask()
-        }
+        },2500)
 
     }
 
@@ -4119,78 +3642,6 @@ TestPhaseFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCon
 
     //Shows the feedback (only for direct trials)
     let FeedbackGen = false
-    function showFeedback(){
-        let time_to_feedback_end = 2500
-        //There are three types of feedback:
-        //      None: the Fennimal takes the toy and leaves
-        //      Correct: the Fennimal plays with the toy (hearts)
-        //      Incorrect: the Fennimal throws the toy away
-
-        //Finding relevant elements
-        SVGObjects.Prompts.Feedback.Prompt.style.display = "inherit"
-        //Fade out the Fennimal and the item over time
-        let ItemObj = document.getElementById("item_" + FennimalObj.selected_item)
-
-        //Store the original transition styles
-        let previous_item_transition_style = ItemObj.style.transition
-        let previous_Fennimal_transition_style = Container.style.transition
-
-        ItemObj.style.transition = "1000ms ease-out"
-        Container.style.transition = "1000ms ease-out"
-
-        //ANIMATE NO FEEDBACK
-        if(!FennimalObj.feedback){
-            SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "The " + FennimalObj.name + " takes the toy to its home"
-
-            //Animate the Fennimal and the item disappearing
-            setTimeout(function(){
-                Container.style.opacity = 0
-                ItemObj.style.opacity = 0
-            },1500)
-        }
-
-        //ANIMATE POSITVE FEEDBACK
-        if(FennimalObj.feedback){
-            //Determine positive or negative feedback
-            if(FennimalObj.correct_item_selected ){
-                //Correct item selected
-                FeedbackGen = new ItemGivenPositiveFeedbackController(FennimalObj.selected_item, FennimalObj.name)
-                SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Correct! The " + FennimalObj.name + " likes the " + FennimalObj.correct_item
-
-                //After the animations, tell the feedback generator to reset
-                setTimeout(function(){FeedbackGen.location_left(); ItemObj.style.display = "none"},time_to_feedback_end )
-
-            }else{
-                //Inform the subject that a mistake has been made
-                SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Oops! The " + FennimalObj.name + " does NOT like the " + FennimalObj.selected_item
-
-                setTimeout(function(){
-                    translate_pos_relative(ItemObj,0,250)
-                },1000)
-
-            }
-        }
-
-        //Animate the Fennimal Object disappearing
-        setTimeout(function(){Container.style.opacity = 0},time_to_feedback_end)
-
-        //After animations are concluded, reset the transition styles
-        setTimeout(function(){
-            ItemObj.style.transition = previous_item_transition_style
-            Container.style.transition = previous_Fennimal_transition_style
-            Container.style.opacity = 1
-            ItemObj.style.opacity = 1
-            ItemObj.style.display = "none"
-        },time_to_feedback_end + 500)
-
-
-        //After a timeout, tell the ExpCon that this trial is completed.
-        setTimeout(function(){
-            ExpCont.test_trial_completed(FennimalObj)
-            //Container.innerHTML = ""
-            hide_Fennimal_background_mask()
-        },time_to_feedback_end)
-    }
 
     function start_nontimed_trial(){
         //Set the correct layers to be visible
@@ -4218,17 +3669,7 @@ TestPhaseFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCon
             show_Fennimal_background_mask()
             Container.style.display = "inherit"
 
-            //Figure out which items are available and put them into the correct format for the item controller
-            let ItemAvailability = {}
-            for(let i = 0;i<ItemDetails.All_Items.length;i++){
-                if(FennimalObj.items_available.includes(ItemDetails.All_Items[i])){
-                    ItemAvailability[ItemDetails.All_Items[i]] = "available"
-                }else{
-                    ItemAvailability[ItemDetails.All_Items[i]] = "unavailable"
-                }
-            }
-
-            ItemCont = new ItemController(FennimalObj, ItemAvailability, ItemDetails,LocCont, that, false)
+            ItemCont = new ItemController(FennimalObj,  ItemDetails,LocCont, that, false)
 
         },2500)
 
@@ -4317,19 +3758,10 @@ TestPhaseFennimalController = function(FennimalObj, ItemDetails, LocCont, ExpCon
 
         Container.style.display = "inherit"
 
-        //Figure out which items are available and put them into the correct format for the item controller
-        let ItemAvailability = {}
-        for(let i = 0;i<ItemDetails.All_Items.length;i++){
-            if(FennimalObj.items_available.includes(ItemDetails.All_Items[i])){
-                ItemAvailability[ItemDetails.All_Items[i]] = "available"
-            }else{
-                ItemAvailability[ItemDetails.All_Items[i]] = "unavailable"
-            }
-        }
         //Jump to the correct location. Note that we now jump to a static location, no movement needed nor allowed
         LocCont.jump_to_static_location(FennimalObj.location)
 
-        ItemCont = new ItemController(FennimalObj, ItemAvailability, ItemDetails,LocCont, that, true)
+        ItemCont = new ItemController(FennimalObj,  ItemDetails,LocCont, that, true)
 
         //Start the timer
         start_trial_timer()
@@ -4399,7 +3831,7 @@ CompletedFennimalController = function(FennimalObj, LocCont){
     SVGObjects.Layers.Stage.style.display = "inherit"
 
     //Item and associates
-    let Item = document.getElementById("item_"+FennimalObj.item)
+    let Item = document.getElementById("item_"+FennimalObj.selected_item)
     let item_transition_style = Item.style.transition
     Item.style.transition = ""
     Item.style.display = "inherit"
@@ -4419,7 +3851,7 @@ CompletedFennimalController = function(FennimalObj, LocCont){
     document.getElementById("item_bar").style.display = "none"
 
     //Create a feedback generator
-    let FeedbackGen = new ItemGivenPositiveFeedbackController(FennimalObj.item, FennimalObj.name)
+    let FeedbackGen = new FeedbackController(FennimalObj, Container)
 
     function show_Fennimal_background_mask(){
         SVGObjects.Splashscreen_Fennimal.Mask.style.display = "inherit"
@@ -4444,8 +3876,35 @@ CompletedFennimalController = function(FennimalObj, LocCont){
     LocCont.prevent_subject_from_leaving_location(false)
 }
 
+//Creates a passive (non-interactable) Fennimal
+SlideShowFennimalController = function(FennimalObj, LocCont){
+    //Remove any existing Fennimals on the screen
+    document.getElementById("Fennimal_Container").innerHTML = ""
+
+    //Creating the Fennimal SVG group and a container to hold it in
+    let Fennimal = createFennimal(FennimalObj)
+    let Container = document.getElementById("Fennimal_Container")
+    Container.appendChild(Fennimal)
+    Container.style.display = "inherit"
+
+    //Show the correct layers
+    SVGObjects.Layers.Stage.style.display = "inherit"
+
+
+
+    function show_Fennimal_background_mask(){
+        SVGObjects.Splashscreen_Fennimal.Mask.style.display = "inherit"
+    }
+
+
+
+    show_Fennimal_background_mask()
+
+}
+
 //Given an array  of items, manages all the item interactions.
-ItemController = function(FennimalObj, ItemAvailability, ItemDetails,LocCont, FenCont, timed_trial){
+ItemController = function(FennimalObj, ItemDetails,LocCont, FenCont, timed_trial){
+    console.log(FennimalObj)
     //References to the item bar
     let ItemBar = document.getElementById("item_bar_circular")
     SVGObjects.Layers.Item_Bar.style.display = "inherit"
@@ -4454,13 +3913,14 @@ ItemController = function(FennimalObj, ItemAvailability, ItemDetails,LocCont, Fe
     let OpenBackpackIcon = document.getElementById("open_backpack_icon")
     let OpenBackpackIconPressable = document.getElementById("open_backpack_icon_center")
 
-    //Calculate which items should be shown on the screen
-    let Available_Items_On_Screen = []
-    for(let key in ItemAvailability){
-        if(ItemAvailability[key] === "available"){
-            Available_Items_On_Screen.push(key)
+    //Calculate the number of items to be shown on the screen
+    let number_of_available_items_on_screen = 0
+    for(let key in FennimalObj.ItemResponses){
+        if(FennimalObj.ItemResponses[key] !== "unavailable"){
+            number_of_available_items_on_screen ++
         }
     }
+    console.log(number_of_available_items_on_screen)
 
     //Keep track of the drop target
     let DropTarget = document.getElementById("Fennimal_Container").getElementsByClassName("Fennimal_droptarget")[0]
@@ -4609,15 +4069,18 @@ ItemController = function(FennimalObj, ItemAvailability, ItemDetails,LocCont, Fe
         for(let i=0;i<ItemDetails.All_Items.length;i++){
             let itemname = ItemDetails.All_Items[i]
 
-            let item_available = ItemAvailability[itemname]
+            let item_unavailable = FennimalObj.ItemResponses[itemname] === "unavailable"
             let backgroundcolor = ItemDetails[itemname].backgroundColor
 
-            if(item_available === "available"){
-                IconButtons[itemname] = new ItemIcon(itemname, i, backgroundcolor,that)
-            }
-
-            if(item_available === "unavailable"){
+            if(item_unavailable){
                 IconNotAvailable[itemname] = new NotAvailableIcon(itemname,i)
+            }else{
+                IconButtons[itemname] = new ItemIcon(itemname, i, backgroundcolor,that)
+
+                //Making sure that the associated item is set to have a full opacity
+                let ItemObj = document.getElementById("item_"+itemname)
+                ItemObj.style.opacity = 1
+
             }
         }
 
@@ -4726,12 +4189,14 @@ ItemController = function(FennimalObj, ItemAvailability, ItemDetails,LocCont, Fe
         shimmerAllButtons()
 
         //Set and show the prompt text
-        if(Available_Items_On_Screen.length === 0){
+        if(number_of_available_items_on_screen=== 0){
             SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Oops! You did not bring the correct toy with you"
             LocCont.prevent_subject_from_leaving_location(false)
         }else{
-            if(Available_Items_On_Screen.length === 1){
-                SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Give the " + FennimalObj.item + " to the " + FennimalObj.name
+            if(number_of_available_items_on_screen === 1){
+                //One item is not unavailable, so find the name
+                let available_item_name = Object.keys(FennimalObj.ItemResponses).find(x=>FennimalObj.ItemResponses[x]!=="unavailable");
+                SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Give the " + available_item_name + " to the " + FennimalObj.name
             }else{
                 SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "Give one of the available toys to " + FennimalObj.name
             }
@@ -4767,212 +4232,34 @@ ItemController = function(FennimalObj, ItemAvailability, ItemDetails,LocCont, Fe
 }
 
 //Given an item name, generates the feedback hearts and movement until stopped. Includes the prompt on top of the screen
-ItemGivenPositiveFeedbackController = function(item_name, fennimal_name){
+FeedbackController = function(FennimalObject, FennimalSVGContainer){
+    //Some shorthand variables
+    let item_given = FennimalObject.selected_item
+    let fennimal_name = FennimalObject.name
+    let outcome_observed = FennimalObject.outcome_observed
+
     SVGObjects.Layers.Feedback.style.display = "inherit"
-    let Item = document.getElementById("item_"+item_name)
-    Item.classList.add("item_selected")
-    let feedbacktime = Param.FennimalTimings.training_phase_feedback_animation_time
+    let Item = document.getElementById("item_"+item_given)
+    console.log(FennimalObject)
     let original_transition_style = Item.style.transition
     let animation_interval = false
 
-    //Set and show the prompt text
-    SVGObjects.Prompts.Feedback.Text.childNodes[0].innerHTML = "The " +  fennimal_name + " likes the " + item_name
-    SVGObjects.Prompts.Feedback.Prompt.style.opacity = 1
-    SVGObjects.Prompts.Feedback.Prompt.style.display = "inherit"
-
-    //Setting the maximum x and y deviation from the center item in which hearts can be generated
-    let max_deviation = 25
-
-    // Animation for the ball-bounce. Bounces are _height high and are set on an interval, which each bounce taking _time ms. The animation is terminated after _rep repetitions.
-    function BounceElem(_height, _time){
-        function bounce(){
-            //Going down
-            Item.style.transition = 0.3*_time + "ms ease-in"
-            translate_pos_relative(Item,0,_height)
-
-            //Back up again
-            setTimeout(function(){
-                Item.style.transition = 0.7*_time + "ms ease-out"
-                translate_pos_relative(Item,0,0-_height)
-            },0.3*_time)
-        }
-
-        animation_interval = setInterval(function(){
-            bounce()
-        },_time)
-    }
-
-    // Animation for the car-ride
-    //TODO: make repeat via interval
-    function RideElem(_total_time){
-        Item.style.transition = "all " + (0.10*_total_time) + "ms ease-out"
-
-        function ride(){
-            //Moving the car down (the first 10% of animation time)
-            translate_pos_relative(Item, 50, 50)
-
-            //Travel the car to the left (first iteration)
-            setTimeout(function(){
-                Item.style.transition = "all " + (0.10*_total_time) + "ms ease-out"
-                translate_pos_relative(Item, -100, 0)
-            }, 0.10 * _total_time)
-
-            //Travel the car back to the right (first iteration)
-            setTimeout(function(){
-                Item.style.transition = "all " + (0.20*_total_time) + "ms ease-out"
-                translate_pos_relative(Item, 100, 0)
-            }, 0.20 * _total_time)
-
-            //Travel the car to the left (second iteration)
-            setTimeout(function(){
-                Item.style.transition = "all " + (0.10*_total_time) + "ms ease-out"
-                translate_pos_relative(Item, -100, 0)
-            }, 0.40 * _total_time)
-
-            //Travel the car back to the right (second iteration)
-            setTimeout(function(){
-                Item.style.transition = "all " + (0.20*_total_time) + "ms ease-out"
-                translate_pos_relative(Item, 100, 0)
-            }, 0.50 * _total_time)
-
-            //Travel the car to the left (third iteration)
-            setTimeout(function(){
-                Item.style.transition = "all " + (0.10*_total_time) + "ms linear"
-                translate_pos_relative(Item, -100, 0)
-            }, 0.70 * _total_time)
-
-            //Travel the car back to the right (third iteration)
-            setTimeout(function(){
-                Item.style.transition = "all " + (0.15*_total_time) + "ms linear"
-                translate_pos_relative(Item, 100, 0)
-            }, 0.80 * _total_time)
-
-            setTimeout(function(){
-                Item.style.transition = "all " + (0.05*_total_time) + "ms linear"
-                translate_pos_relative(Item, -50, -50)
-            }, 0.95 * _total_time)
-
-            //At the end of animation, reset the original transition style
-            setTimeout(function(){Item.style.transition = original_transition_style},_total_time)
-        }
-
-        ride()
-        animation_interval = setInterval(function(){
-            ride()
-        }, _total_time)
-    }
-
-    //Animates a number of squeezes in an y and/or y direction
-    function SqueezeElem(_amountX, _amountY, _time_per_squeeze){
-        //Sqeeze actions.
-        function ScaleAtCenter(sx,sy){
-            Item.transform.baseVal.getItem(0).matrix.a = sx
-            Item.transform.baseVal.getItem(0).matrix.d = sy
-        }
-
-        //Setting the offsets to move the center
-        let x_offset = (1-_amountX)*75
-        let y_offset = (1-_amountY)*40
-
-        function squeeze(){
-            //Compress and reset center
-            Item.style.transition = 0.4*_time_per_squeeze + "ms ease-out"
-            ScaleAtCenter(_amountX,_amountY)
-            if(_amountX !== 1) { translate_pos_relative(Item,x_offset,0) }
-            if(_amountY !== 1) { translate_pos_relative(Item,0,y_offset) }
-
-            //Return and return center
-            setTimeout(function(){
-                Item.style.transition = 0.6*_time_per_squeeze + "ms ease-out"
-                ScaleAtCenter(1,1)
-                if(_amountX !== 1) { translate_pos_relative(Item,-x_offset*_amountX,0) }
-                if(_amountY !== 1) { translate_pos_relative(Item,0,-y_offset*_amountY) }
-            },0.4*_time_per_squeeze)
-        }
-
-        //Squeezing interval
-        squeeze()
-        animation_interval = setInterval(function(){
-            squeeze()
-        },_time_per_squeeze)
-
-    }
-
-    function ThrowElem(_height, _time){
-        function throwing(){
-            //Going up
-            Item.style.transition = 0.35*_time + "ms ease-out"
-            translate_pos_relative(Item,0,-(_height))
-
-            //Back down again
-            setTimeout(function(){
-                Item.style.transition = 0.7*_time + "ms ease-in"
-                translate_pos_relative(Item,0,_height)
-            },0.3*_time)
-
-        }
-        throwing()
-        animation_interval = setInterval(function(){
-            throwing()
-        },_time)
-    }
-
-    function FlyElement(_time_per_round){
-        function fly(){
-            let start_x = getViewBoxCenterPoint(Item).x
-            let start_y = getViewBoxCenterPoint(Item).y
-
-            //Storing original transform and transition style
-            let Original_Transform = Item.getAttribute("transform")
-            let original_transition_style = Item.style.transition
-
-            //Setting animation for the up-swing
-            Item.style.transition = "all " + 0.4 * _time_per_round +  "ms ease-out"
-            RotateElem(Item,-179)
-            MoveElemToCoords(Item, start_x -70, start_y + 90)
-
-            //Set a timer for the downswing
-            setTimeout(function(){
-                Item.style.transition = "all " + 0.4*_time_per_round +  "ms ease-in"
-                RotateElem(Item,-175)
-                MoveElemToCoords(Item, start_x - 70, start_y - 70)
-            },0.4 * _time_per_round)
-
-            //Right before the end of the animation, reset the element to its original transform (especially important with the rotation
-            setTimeout(function(){
-                Item.style.transition = "all " + 0.09*_time_per_round +  "ms linear"
-                Item.setAttribute("transform", Original_Transform)
-            },0.8* _time_per_round )
-
-            //At end, reset the transition attribute
-            setTimeout(function(){
-                Item.style.transition = original_transition_style
-            }, 0.85 * _time_per_round )
-        }
-
-        fly()
-        animation_interval = setInterval(function(){
-            fly()
-        }, _time_per_round)
-
-
-
-    }
-
-    //Creates a svg heart at the x and y position that moves to the top of the y axis, while fading out. Set animations with css.
-    FeedbackHeart = function(start_x,start_y){
+    //Creates a svg object at the x and y position that moves to the top of the y axis, while fading out. Set animations with css.
+    SmallFeedbackSymbol = function(start_x, start_y, feedback_type){
         //Copy the heart svg element
-        let HeartObj = document.getElementById("feedback_heart")
+        let FeedbackObj = document.getElementById("feedback_" + feedback_type + "_small")
         let FeedbackLayer = document.getElementById("Feedback_layer")
 
-        let NewHeart = HeartObj.cloneNode(true)
-        FeedbackLayer.appendChild(NewHeart)
-        NewHeart.style.display="none"
-        MoveElemToCoords(NewHeart, start_x,start_y)
-        NewHeart.style.opacity = .75
+        let NewObject = FeedbackObj.cloneNode(true)
+        FeedbackLayer.appendChild(NewObject)
+        NewObject.style.display="none"
+
+
+        MoveElemToCoords(NewObject, start_x,start_y)
+        NewObject.style.opacity = .75
 
         setTimeout(function(){
-            NewHeart.style.display = "inherit"
+            NewObject.style.display = "inherit"
         },10)
 
         //After a brief waiting period, move upwards
@@ -4980,114 +4267,169 @@ ItemGivenPositiveFeedbackController = function(item_name, fennimal_name){
             //Select a random movement around the starting xposition to translate to
             let max_deviation = 100
             let random_x = randomIntFromInterval(start_x- max_deviation, start_x + max_deviation)
-            MoveElemToCoords(NewHeart, random_x,-50)
-            NewHeart.style.opacity = 0
-            NewHeart.style.fill = "red"
+            MoveElemToCoords(NewObject, random_x,-50)
+            NewObject.style.opacity = 0
+            switch(feedback_type){
+                case("heart"): NewObject.style.fill = "blue"; break
+                case("bites"): NewObject.style.fill = "gold"; break
+                case("frown"): NewObject.style.fill = "red"; break
+                case("smile"): NewObject.style.fill = "lightgreen"; NewObject.style.stroke = "lightgreen"; break
+            }
         },100)
 
         //Self-destruct after 5 seconds to prevent cluttering the browser
         setTimeout(function(){
-            FeedbackLayer.removeChild(NewHeart)
+            FeedbackLayer.removeChild(NewObject)
         },5000)
 
-    }
-
-    //Showing the item animation
-    function animate_item_movement(){
-        switch(item_name){
-            case("ball"): BounceElem(50,feedbacktime/5); break;
-            case("car"): Item.getElementsByClassName("movement_container")[0].classList.add("movement_container_active"); break;
-            case("duck"): SqueezeElem(1,0.5,feedbacktime/5); break;
-            case("bear"): SqueezeElem(0.5,1,feedbacktime/5); break;
-            case("bone"): ThrowElem(50,feedbacktime/5); break;
-            case("plane"): FlyElement(feedbacktime); break;
-            case("shovel"):
-                // Shovel uses a subcontainer to animate the movement
-                Item.getElementsByClassName("movement_container")[0].classList.add("movement_container_active");
-                break
-            case("balloon"):
-                //Balloon uses a subcontainer to animate the movement
-                Item.getElementsByClassName("movement_container")[0].classList.add("movement_container_active");
-                break;
-            case("trumpet"):
-                Item.getElementsByClassName("rotation_container")[0].classList.add("swing_container_active")
-                break;
-            case("spinner"):
-                Item.getElementsByClassName("item_container")[0].classList.add("item_container_active")
-                break;
-            case("boomerang"):
-                Item.getElementsByClassName("spin_container")[0].classList.add("spin_container_active")
-                Item.getElementsByClassName("movement_container")[0].classList.add("movement_container_active")
-                break;
-
-        }
     }
 
     //Call when leaving an area to clear the intervals
     this.location_left = function(){
         SVGObjects.Prompts.Feedback.Prompt.style.display = "none"
-        clearInterval(heartgenerator)
+        clearInterval(SmallIconGenerator)
         clearInterval(animation_interval)
         Item.style.transition = original_transition_style
+        Item.style.display = "none"
 
         //Clear all remaining hearts
-        let Remaining_hearts = document.getElementsByClassName("feedback_heart")
-        for(let i=0; i<Remaining_hearts.length ; i++){
-            Remaining_hearts[i].style.display = "none"
-        }
-
-        //For some of the items, reset the classname
-        switch(item_name){
-            case("shovel"):
-                // Shovel uses a subcontainer to animate the movement
-                Item.getElementsByClassName("movement_container")[0].classList.remove("movement_container_active");
-                break
-            case("balloon"):
-                //Balloon uses a subcontainer to animate the movement
-                Item.getElementsByClassName("movement_container")[0].classList.remove("movement_container_active");
-                break;
-            case("trumpet"):
-                Item.getElementsByClassName("rotation_container")[0].classList.remove("swing_container_active")
-                break;
-            case("spinner"):
-                Item.getElementsByClassName("item_container")[0].classList.remove("item_container_active")
-                break;
-            case("boomerang"):
-                Item.getElementsByClassName("spin_container")[0].classList.remove("spin_container_active")
-                Item.getElementsByClassName("movement_container")[0].classList.remove("movement_container_active")
-                break
-            case("car"): Item.getElementsByClassName("movement_container")[0].classList.remove("movement_container_active");break;
-
-
+        let Feedback_Symbols = document.getElementsByClassName("feedback_symbol")
+        for(let i=0; i<Feedback_Symbols.length ; i++){
+            Feedback_Symbols[i].style.display = "none"
         }
 
         //Hide the smiley
         document.getElementById("feedback_smiley").style.display = "none"
 
-        Item.classList.remove("item_selected")
+        Item.classList.remove("item_selected_smile")
+
+        //Reset the item opacity
+        Item.style.opacity = 1
     }
 
     // CONSTRUCTION //
     //Now we can set an interval to create the hearts and movement
-    let heartgenerator = false
+    let SmallIconGenerator = false
+    let FeedbackPromptObject = SVGObjects.Prompts.Feedback.Prompt
+    let FeedbackTextObj = SVGObjects.Prompts.Feedback.Text.childNodes[0]
+    FeedbackPromptObject.style.opacity = 1
+    FeedbackPromptObject.style.display = "inherit"
 
-    //Show the feedback smiley
-    document.getElementById("feedback_smiley").style.display = "inherit"
+    //Showing the feedback
+    switch(outcome_observed){
+        case("heart"):
+            //Set and show the prompt text
+            FeedbackTextObj.innerHTML = "The " +  fennimal_name + " LOVES the " + item_given
 
-    setTimeout(function(){
-        heartgenerator = setInterval(function(){
-            //Get a random location within the range. For some reason the heart path seems to be mis-centered, so the constants are to adjust for this
-            let ItemCoords = getViewBoxCenterPoint(Item)
-            // let random_x = randomIntFromInterval(Math.round(ItemCoords.x) - max_deviation, Math.round(ItemCoords.x) + max_deviation) + 20
-            // let random_y = randomIntFromInterval(Math.round(ItemCoords.y) - max_deviation, Math.round(ItemCoords.y) + max_deviation) + 20
-            let random_x = randomIntFromInterval(50,458)
-            let random_y = randomIntFromInterval(20,263)
+            //Show the feedback smiley
+            document.getElementById("feedback_heart").style.display = "inherit"
 
-            //Generate a new heart
-            let NewHeart = new FeedbackHeart(random_x,random_y)
-        },2*Param.time_between_feedback_hearts)
-        //setTimeout(function(){animate_item_movement()},450)
-    },50)
+            setTimeout(function(){
+                SmallIconGenerator = setInterval(function(){
+                    let random_x = randomIntFromInterval(100,558)
+                    let random_y = randomIntFromInterval(120,263)
+                    let NewSymbol = new SmallFeedbackSymbol(random_x,random_y, "heart")
+                },75)
+            },50)
+
+            //Change item colors
+            Item.classList.add("item_selected_heart")
+
+            break;
+
+        case("smile"):
+            //Set and show the prompt text
+            FeedbackTextObj.innerHTML = "The " +  fennimal_name + " likes the " + item_given
+
+            //Show the feedback smiley
+            document.getElementById("feedback_smiley").style.display = "inherit"
+
+            setTimeout(function(){
+                SmallIconGenerator = setInterval(function(){
+                    let random_x = randomIntFromInterval(50,508)
+                    let random_y = randomIntFromInterval(150,263)
+                    let NewHeart = new SmallFeedbackSymbol(random_x,270, "smiley")
+                },75)
+            },50)
+
+            //Change item colors
+            Item.classList.add("item_selected_smile")
+
+            break;
+        case("frown"):
+            //Set and show the prompt text
+            FeedbackTextObj.innerHTML = "The " +  fennimal_name + " does <b>not</b> like the " + item_given
+
+            //Show the feedback smiley
+            document.getElementById("feedback_frown").style.display = "inherit"
+
+            setTimeout(function(){
+                SmallIconGenerator = setInterval(function(){
+                    let random_x = randomIntFromInterval(50,508)
+                    let random_y = randomIntFromInterval(20,263)
+                    let NewHeart = new SmallFeedbackSymbol(random_x,random_y, "frown")
+                },75)
+            },50)
+
+            //Change item colors
+            Item.classList.add("item_selected_frown")
+
+            break;
+        case("bites"):
+            //Set and show the prompt text
+            FeedbackTextObj.innerHTML = "Auch! The " +  fennimal_name + " bites you!"
+
+            //Show the feedback smiley
+            document.getElementById("feedback_bites").style.display = "inherit"
+
+            setTimeout(function(){
+                SmallIconGenerator = setInterval(function(){
+                    let random_x = randomIntFromInterval(50,508)
+                    let random_y = randomIntFromInterval(20,263)
+                    let NewHeart = new SmallFeedbackSymbol(random_x,random_y, "bites")
+                },75)
+            },50)
+
+            //Change item colors
+            Item.classList.add("item_selected_bites")
+
+            break;
+        case("unknown"):
+            FeedbackTextObj.innerHTML = "The " + fennimal_name + " takes the toy to its home"
+            Item.style.transition = "all 750ms ease-in"
+            FennimalSVGContainer.style.transition = "all 750ms ease-in"
+
+            //Animate the Fennimal and the item disappearing
+            setTimeout(function(){
+                FennimalSVGContainer.style.opacity = 0
+                Item.style.opacity = 0
+            },750)
+            break;
+        case("incorrect"):
+            //Inform the subject that a mistake has been made
+            FeedbackTextObj.innerHTML = "Oops! You picked the wrong toy!"
+            document.getElementById("feedback_incorrect").style.display = "inherit"
+            Item.style.transition = "all 750ms ease-out"
+            FennimalSVGContainer.style.transition = "all 750ms ease-in"
+
+            setTimeout(function(){
+                translate_pos_relative(Item,0,250)
+
+                setTimeout(function(){
+                    FennimalSVGContainer.style.opacity = 0
+                },500)
+
+            },1000)
+
+            break;
+        case("correct"):
+            //Correct item selected
+            FeedbackTextObj.innerHTML = "Yay! You selected the correct toy!"
+            document.getElementById("feedback_correct").style.display = "inherit"
+            break
+
+
+    }
 }
 
 //Inform the subject that an objective has been achieved, including the animated stars
@@ -5130,7 +4472,7 @@ ObjectiveAchievedController = function(text_top, text_bottom, show_mask, show_st
     setTimeout(function(){
         TopTextObj.style.opacity = 0
         BottomTextObj.style.opacity = 0
-    },3000)
+    },2500)
 
     //Creates a svg star at the x and y position that moves to A RANDOM DIRECTION, while fading out. Set animations with css.
     FeedbackStar = function(start_x,start_y){
@@ -5191,8 +4533,8 @@ ObjectiveAchievedController = function(text_top, text_bottom, show_mask, show_st
         clearInterval(stargenerator)
     }
 
-    setTimeout(function(){stop_generating_hearts()}, 3000)
-    setTimeout(function(){hide()}, 4000)
+    setTimeout(function(){stop_generating_hearts()}, 2500)
+    setTimeout(function(){hide()}, 3000)
 
 }
 
@@ -5369,23 +4711,16 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
 
                 break
             case("prolific"):
-                Container.appendChild(createInstructionTitleElem("INSTRUCTIONS FOR THIS EXPERIMENT"))
-                Container.appendChild(createTextField(30, 35, 508-2*30,250, "In this experiment you will be a participant in an experiment conducted at the University of Vienna. We will not provide any deceiving or erroneous information to you at any point throughout the experiment. <br>" +
+                Container.appendChild(createInstructionTitleElem("DURATION AND PAYMENT"))
+                Container.appendChild(createTextField(30, 80, 508-2*30,250, "This experiment is expected to last around 20-25 minutes. <br>" +
                     "<br>" +
-                    "This experiment is expected to last around 45 minutes. Based on your decisions in the last part of the experiment you can earn up to five stars for your performance. You will earn a bonus of " + Param.BonusEarnedPerStar.currency_symbol+ Param.BonusEarnedPerStar.bonus_per_star + " per star that you obtain. <br>" +
-                    "<br>" +
-                    "All the answers and data that you provide are completely anonymous. You will only be known to us via your Prolific ID. We will not store or record any personally identifiable information at any point during the experiment. Your anonymized data will be exclusively used for research-related goals. Your data will be archived and may be shared with other researchers in the future. <br>" +
-                    "<br>" +
-                    "By clicking on the button below you state that you are above the age of 18 and consent to the terms outlined above. <br>" +
-                    "<br>" +
-                    "Note: this experiment is only supported for Chrome. It is not recommended that you use any other browsers, as unforeseen bugs may prevent you from completing the experiment. "))
+                    "Based on your decisions in the last part of the experiment you can earn up to three stars for your performance. " +
+                    "You will earn a bonus of " + Param.BonusEarnedPerStar.currency_symbol+ Param.BonusEarnedPerStar.bonus_per_star + " per star that you obtain. <br>" ))
 
                 break
             case(false):
                 Container.appendChild(createInstructionTitleElem("INSTRUCTIONS FOR THIS EXPERIMENT"))
-                Container.appendChild(createTextField(30, 35, 508-2*30,250, "In this experiment you will be a participant in an experiment conducted at the University of Vienna. At no point during this experiment will we provide deceiving of erroneous information to you. <br>" +
-                    "<br>" +
-                    "This experiment is expected to last around 30-40 minutes. All the answers and data that you provide are completely anonymous. We will not store or record any personally identifiable information at any point during the experiment. Your anonymized data will be exclusively used for research-related goals. Your data will be archived and may be shared with other researchers in the future. <br>" +
+                Container.appendChild(createTextField(30, 35, 508-2*30,250, "This experiment is expected to last around 30-40 minutes. All the answers and data that you provide are completely anonymous. We will not store or record any personally identifiable information at any point during the experiment. Your anonymized data will be exclusively used for research-related goals. Your data will be archived and may be shared with other researchers in the future. <br>" +
                     "<br>" +
                     "By clicking on the button below you state that you are above the age of 18 and consent to the terms outlined above. <br>" +
                     "<br>" +
@@ -5569,6 +4904,7 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
         //Setting the correct text and state for the locations. These are assumed to be provided as an object with one key for each location.
         // If the value of this key is false, then the location has not yet been found. Any other values indicates that the location has been visited.
         let keys = Object.getOwnPropertyNames(CurrentLocationVisitationObject)
+        console.log(CurrentLocationVisitationObject)
         for(let i = 0; i<keys.length;i++){
             //All locations are labeled as instructions_exploration_target_location_ix, with i ranging from 1 to 16
             let Box = document.getElementById("instructions_exploration_target_location_" + (i+1) + "x")
@@ -6227,6 +5563,26 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
         },1000)
 
     }
+    this.show_test_phase_instructions_sole_block = function(){
+
+        showNewInstructionsPage()
+
+        //Creating the container to hold all elements
+        let Container = createInstructionContainer()
+        SVGObjects.Instructions.Layer.appendChild(Container)
+
+        Container.appendChild(createBackgroundElem())
+        Container.appendChild(createInstructionTitleElem(Instructions.Test_Phase.Sole_Block.title))
+        let TextField = createTextField(30, 15, 508-2*30,220, Instructions.Test_Phase.Sole_Block.text)
+        Container.appendChild(TextField)
+
+        setTimeout(function(){
+            let Button = createSVGButtonElem((508-150)/2,245,160,30,"CONTINUE")
+            Container.appendChild(Button)
+            Button.onclick = function(){EC.start_next_test_trial()}
+        },1000)
+
+    }
 
     //Shows the target for a test phase round
     this.show_test_phase_target_screen = function(Fennimal,block_type, hint_type){
@@ -6255,7 +5611,7 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
             if(block_type === "training"){
                 Container.appendChild(createFennimalIcon(Fennimal,150, 120,0.4,false, true))
             }
-            if(block_type === "direct" || block_type === "indirect" || block_type === "final_block" ){
+            if(block_type === "direct" || block_type === "indirect" || block_type === "final_block" || block_type ==="sole_block" ){
                 text = "A new Fennimal has been spotted at " + Param.SubjectFacingLocationNames[Fennimal.location]
                 let LocationText = createTextField((508/2)-200, 150, 400,55, text)
                 LocationText.style.fontSize = "20px"
@@ -6464,6 +5820,7 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
 
     //Shows the score screen with the download button
     this.show_score_screen = function(ScoreObject, datasubmissionFunc){
+        console.log(ScoreObject)
         showNewInstructionsPage()
 
         //Show the instructions layer and the welcome screen
@@ -6476,36 +5833,60 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
         SVGObjects.Instructions.Pages.Finished.appendChild(Container)
         Container.appendChild(createInstructionTitleElem("EXPERIMENT FINISHED"))
 
-        //Fill the stars
-        for(let i = 1; i<=5;i++){
-            if(ScoreObject.star_rating >= i){
-                document.getElementById("score_star_" + i + "x").classList.add("score_star_achieved")
-            }
-        }
-
-        //Check if there were any bonus stars to be earned during this experiment
+        //What happens next depends on the type of reward matching
+        console.log(ScoreObject.reward_type)
         let text
-
-        if("num_bonus_stars" in ScoreObject){
-            //Set the correct text
-            text = "Congratulations! You are now an <b> Expert Wildlife Ranger! </b>During your practical experience, you interacted with " + ScoreObject.num_total_Fennimals + " different Fennimals. Of these Fennimals, " + ScoreObject.num_liked_item + " liked the item you gave them! <br>" +
-                "<br>" +
-                "Based on your performance, you earned the distinguished title of " + ScoreObject.star_rating + "-star Fennimal Expert! " +
-                "" +
-                "In addition, you earned " + ScoreObject.num_bonus_stars + " bonus stars for your performance on rating the familiarity of the Fennimals. In total you have earned " + (ScoreObject.star_rating + ScoreObject.num_bonus_stars) + " stars during this experiment. "
-
-            //Fill the bonus stars
+        if(ScoreObject.reward_type === "average"){
+            //Fill the stars
             for(let i = 1; i<=5;i++){
-                if(ScoreObject.num_bonus_stars >= i){
-                    document.getElementById("bonus_star_" + i + "x").classList.add("bonus_star_achieved")
+                if(ScoreObject.star_rating >= i){
+                    document.getElementById("score_star_" + i + "x").classList.add("score_star_achieved")
                 }
             }
 
-        }else{
+
             text = "Congratulations! You are now an <b> Expert Wildlife Ranger! </b>During your practical experience, you interacted with " + ScoreObject.num_total_Fennimals + " different Fennimals. Of these Fennimals, " + ScoreObject.num_liked_item + " liked the item you gave them! <br>" +
                 "<br>" +
                 "Based on your performance, you earned the distinguished title of " + ScoreObject.star_rating + "-star Fennimal Expert! "
+
+
         }
+
+        if(ScoreObject.reward_type === "individual"){
+            //Determine which stars should be shown
+            let Stars_Shown
+            switch(ScoreObject.num_total_Fennimals){
+                case(1): Stars_Shown = [3]; break
+                case(2): Stars_Shown = [2,4]; break
+                case(3): Stars_Shown = [2,3,4]; break
+                case(4): Stars_Shown = [1,2,3,4]; break
+                case(5): Stars_Shown = [1,2,3,4,5]; break
+            }
+            console.log(Stars_Shown)
+
+            //Set all stars to invisible
+            for(let i = 1; i<=5;i++){
+                document.getElementById("score_star_" + i + "x").style.display = "none"
+            }
+
+            //Now go over the outcomes and adjust the stars accordingly
+            let total_liked = 0
+            for(let i = 0;i<ScoreObject.Outcomes.length;i++){
+                let starindex = Stars_Shown[i]
+                document.getElementById("score_star_" + starindex + "x").style.display = "inherit"
+                setTimeout(function(){
+                    document.getElementById("score_star_" + starindex + "x").classList.add("score_star_" + ScoreObject.Outcomes[i])
+                }, 300 + i*300)
+                if(ScoreObject.Outcomes[i] === "smile"){total_liked++}
+            }
+
+
+            text = "Congratulations! You are now an <b> Expert Wildlife Ranger! </b>During your practical experience, you interacted with " + ScoreObject.num_total_Fennimals + " different Fennimals. Of these Fennimals, " + total_liked + " liked the item you gave them! <br>" +
+                "<br>" +
+                "Based on your performance, you earned the distinguished title of " + total_liked + "-star Fennimal Expert! "
+
+        }
+
 
         //Set the text to the screen
         Container.appendChild(createTextField(30, 50, 508-2*30,500, text))
@@ -6553,7 +5934,7 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
                     "<br>" +
                     "You earned a "+  Param.BonusEarnedPerStar.currency_symbol +  Param.BonusEarnedPerStar.bonus_per_star + " per star, resulting in a bonus of " + Param.BonusEarnedPerStar.currency_symbol +  ScoreObject.earned_bonus + ". <br>" +
                     "<br>" +
-                    "The completion code is <b><u>" + ScoreObject.token + "</b></u> . " +
+                    "The completion code is <b><u>" + ScoreObject.completion_code + "</b></u> . " +
                     "<br><br>" +
                     "Please go to the Prolific page now and submit this code. " +
                     "Then come back to this page and press the button below. <br><br><b> We can only pay you for your performance if you submitted both the code AND submitted this page! </b>")
@@ -6691,6 +6072,73 @@ TopLayerMaskController = function(_outputfunction, direction, text){
 
 
 
+
+
+}
+
+//Used to delete unused SVG layers after the stimuli have been defined
+SVGGarbageCollector = function(){
+    //Call to delete unused locations.
+    this.remove_unused_locations_from_SVG = function(All_Location_Names, Used_Location_Names){
+        let To_Remove = []
+
+        //Add any locations that are not used
+        for(let i=0;i<All_Location_Names.length; i++){
+            if(! Used_Location_Names.includes(All_Location_Names[i])){
+                To_Remove.push("location_" + All_Location_Names[i])
+            }
+        }
+
+        //Add any intersections that we do not need (using Param.RegionData)
+        for(key in Param.RegionData){
+            if(key !== "Home" && key!=="Neutral"){
+                let locations_in_region_used = Param.RegionData[key].Locations.filter(v => Used_Location_Names.includes(v))
+                if(locations_in_region_used.length <= 1){
+                    To_Remove.push("intersection_" + key)
+                }
+            }
+        }
+
+        //Removing unused locations from the SVG
+        for(let i=0;i<To_Remove.length;i++){
+            document.getElementById(To_Remove[i]).remove()
+        }
+
+    }
+
+    //Call to delete unused heads from the SVG
+    this.remove_unused_heads_from_SVG = function(All_heads, Used_heads){
+        let To_Remove = []
+
+        for(let i =0;i< All_heads.length;i++){
+            if(! Used_heads.includes(All_heads[i])){
+                To_Remove.push(All_heads[i])
+            }
+        }
+
+        for(let i=0;i<To_Remove.length;i++){
+            document.getElementById("head_" + To_Remove[i]).remove()
+            document.getElementById("outline_head_" + To_Remove[i]).remove()
+        }
+
+    }
+
+    //Call to delete all unused bodies from the SVG
+    this.remove_unused_bodies_from_SVG = function(All_bodies,Used_bodies){
+        let To_Remove = []
+
+        for(let i =0;i< All_bodies.length;i++){
+            if(! Used_bodies.includes(All_bodies[i])){
+                To_Remove.push(All_bodies[i])
+            }
+        }
+
+        for(let i=0;i<To_Remove.length;i++){
+            document.getElementById("body_" + To_Remove[i]).remove()
+            document.getElementById("outline_body_" + To_Remove[i]).remove()
+        }
+
+    }
 
 
 }
@@ -7364,36 +6812,61 @@ DataController = function(seed_number, Stimuli){
 
     //Call after experiment is completed to return the subject's score. Also updates the completion code to include the star rating
     this.get_score = function(){
-        //Calculating base stars (from the test trials)
-        let total = 0, liked = 0
-        for(let i =0;i<Data.TestTrials.length;i++){
-            total++
-            if(Data.TestTrials[i].correct_item_selected) {liked++;}
+        //Determining the type of Fennimals-to-stars matching.
+        // If there is only a single block, then there is one star per individual Fennimal
+        // If there are multiple block, then stars are based on averages.
+
+        let reward_matching = "average"
+
+        if(Stimuli.getTestPhaseData().length === 1){
+            reward_matching = "individual"
         }
-        let percentage = liked / total
 
-        let star_rating = 1
-        if(percentage > .30){ star_rating = 2}
-        if(percentage > .50){ star_rating = 3}
-        if(percentage > .70){ star_rating = 4}
-        if(percentage > .90){ star_rating = 5}
+        //Determining the total number of Fennimals and the total number of Fennimals who liked the item givem
+        let totalFennimals = 0, Outcomes = [], totalpoints = 0
+        console.log(reward_matching)
+        console.log(Data.TestTrials)
+        for(let i =0;i<Data.TestTrials.length;i++){
+            totalFennimals++
 
-        //Calculating bonus start (from the category task)
-        let total_category_trials, correct_categories, percentage_category, bonus
+            let outcome
+            if(Data.TestTrials[i].outcome_observed === "unknown"){
+                outcome = Data.TestTrials[i].HiddenItemResponses[Data.TestTrials[i].selected_item]
+            }else{
+                outcome = Data.TestTrials[i].outcome_observed
+            }
+            Outcomes.push(outcome)
+            totalpoints = totalpoints + Param.OutcomesToPoints[outcome]
+        }
+        let average = totalpoints / totalFennimals
 
-        //Calculating USD reward (if given)
-        bonus =  ( (star_rating ) * Param.BonusEarnedPerStar.bonus_per_star).toFixed(2)
+        console.log(Outcomes)
+        let ScoreObj = {
+            num_total_Fennimals: totalFennimals,
+            Outcomes: Outcomes,
+            reward_type: reward_matching,
+        }
 
-        //Updating the completion code
-        completion_code = cc_word_1 + cc_word_2 + (star_rating )
+        if(reward_matching === "average"){
+            let star_rating = 1
+            if(average > .30){ star_rating = 2}
+            if(average > .50){ star_rating = 3}
+            if(average > .70){ star_rating = 4}
+            if(average > .90){ star_rating = 5}
 
-        return({
-            num_total_Fennimals: total,
-            num_liked_item: liked,
-            star_rating: star_rating,
-            token: completion_code,
-            earned_bonus: bonus
-        })
+            //Calculating USD reward (if given)
+            ScoreObj.star_rating = star_rating
+            ScoreObj.earned_bonus = ( (star_rating ) * Param.BonusEarnedPerStar.bonus_per_star).toFixed(2)
+
+            //Updating the completion code
+            ScoreObj.completion_code = cc_word_1 + cc_word_2 + (star_rating )
+        }else{
+            ScoreObj.earned_bonus = ( (totalpoints ) * Param.BonusEarnedPerStar.bonus_per_star).toFixed(2)
+            //Updating the completion code
+            ScoreObj.completion_code = cc_word_1 + cc_word_2 + (totalpoints )
+        }
+
+        return(ScoreObj)
     }
 
     //Call to record the open question answer
@@ -7706,6 +7179,15 @@ ExperimentController = function(Stimuli, DataController){
     //Check if we're doing a stimulus pilot, as this has a radically different experiment flow
     let that = this
 
+    //Once the stimuli are created, change the available locations in the Parameter object. This prevents subjects from having to (or being able to) travel to regions which simply do not exist
+    Param.Available_Location_Names = Stimuli.getLocationsVisited()
+
+    //After stimuli are defined, delete unused SVG layers to enhance performance
+    let GarbageCleaner = new SVGGarbageCollector()
+    GarbageCleaner.remove_unused_locations_from_SVG(Param.All_Possible_Locations, Param.Available_Location_Names)
+    GarbageCleaner.remove_unused_heads_from_SVG(Param.Available_Fennimal_Heads, Stimuli.getHeadsUsed())
+    GarbageCleaner.remove_unused_bodies_from_SVG(Param.Available_Fennimal_Bodies, Stimuli.getBodiesUsed())
+
     // At the start of the experiment, we first need to calibrate the Fennimal head similarities. Store the results of this calibration here.
     let StartingSimilarityResults
 
@@ -7713,7 +7195,7 @@ ExperimentController = function(Stimuli, DataController){
     let FennimalsPresentOnMap = {}
 
     //Create a location controller
-    let LocCont = new LocationController(this)
+    let LocCont = new LocationController(this, Stimuli.getRegionsVisited())
 
     //Create a controller to handle all the instructions
     let InstrCont = new InstructionsController(this,LocCont, DataController)
@@ -7737,8 +7219,8 @@ ExperimentController = function(Stimuli, DataController){
     //Call to reset the visition order object (resulting in it being reset to an object with one key for each location, with value equal to false
     function resetVisitionOrderObj(){
         LocationVisitationOrder = {}
-        for(let i = 0; i<Param.location_Names.length;i++){
-            LocationVisitationOrder[Param.location_Names[i]] = false
+        for(let i = 0; i<Param.Available_Location_Names.length; i++){
+            LocationVisitationOrder[Param.Available_Location_Names[i]] = false
         }
     }
 
@@ -7848,7 +7330,7 @@ ExperimentController = function(Stimuli, DataController){
             switch(current_training_subphase){
                 case("exploration"): {
                     HUDCont.changeHUD("exploration")
-                    HUDCont.update_HUD_exploration(number_of_locations_visited, 16, Fennimal_found_number, Stimuli.getTrainingSetFennimalsInArray().length)
+                    HUDCont.update_HUD_exploration(number_of_locations_visited, Param.Available_Location_Names.length, Fennimal_found_number, Stimuli.getTrainingSetFennimalsInArray().length)
                     break
                 }
                 case("delivery"): {
@@ -7874,27 +7356,7 @@ ExperimentController = function(Stimuli, DataController){
         LocCont.prevent_subject_from_leaving_location(true)
 
         if(current_phase_of_the_experiment === "training"){
-            //In the training phase, we sometimes show all items (most set to unavailable), with exception of the delivery phase (in which case only the correct item should be shown)
-            if(current_training_subphase === "delivery" || current_training_subphase === "remedial"){
 
-                //Displaying only one item on the screen
-                for(let i=0;i<Stimuli.getItemDetails().All_Items.length; i++){
-                    ItemAvailability[Stimuli.getItemDetails().All_Items[i]] = "invisible"
-                }
-
-                if(FennimalObj.item === current_item_in_inventory){
-                    ItemAvailability[FennimalObj.item] = "available"
-                }else{
-                    ItemAvailability[FennimalObj.item] = "unavailable"
-                }
-            }else{
-                //In the exploration and search subphases, show all items - but only the correct item should be set to available
-                for(let i=0;i<Stimuli.getItemDetails().All_Items.length; i++){
-                    ItemAvailability[Stimuli.getItemDetails().All_Items[i]] = "unavailable"
-                }
-                ItemAvailability[FennimalObj.item] = "available"
-
-            }
             if(current_training_subphase === "exploration"){
                 LocCont.prevent_subject_from_leaving_location(true)
             }
@@ -7907,24 +7369,16 @@ ExperimentController = function(Stimuli, DataController){
                     LocCont.prevent_subject_from_leaving_location(false)
                 },2500)
             }
-            FenCont = new TrainingPhaseFennimalController(FennimalObj,Stimuli.getItemDetails(),ItemAvailability, LocCont,this)
+            FenCont = new TrainingPhaseFennimalController(FennimalObj,Stimuli.getItemDetails(), LocCont,this)
         }
 
         if(current_phase_of_the_experiment === "test"){
-            for(let i=0;i<Stimuli.getItemDetails().All_Items.length; i++){
-                let item = Stimuli.getItemDetails().All_Items[i]
-                if(FennimalObj.items_available.includes(item)){
-                    ItemAvailability[item] = "available"
-                }else{
-                    ItemAvailability[item] = "unavailable"
-                }
-
-            }
+            console.log(FennimalObj)
             FenCont = new TestPhaseFennimalController(FennimalObj,Stimuli.getItemDetails(), LocCont,that, false, false)
         }
     }
 
-    //Call when the Fennimal interaction has been completed. Assumes that the FennimalObject now contains a property for "item_selected"
+    //Call when the Fennimal interaction has been completed. Assumes that the FennimalObject now contains a property for "item_selected" and "outcome_observed
     this.FennimalInteractionCompleted = function(FennimalObj){
         //Next steps depend on the phase of the experiment
         switch (current_training_subphase){
@@ -7935,7 +7389,7 @@ ExperimentController = function(Stimuli, DataController){
                 LocCont.prevent_subject_from_leaving_location(true)
                 break
             case("quiz"):
-                if(!FennimalObj.correct_answer) {number_of_quiz_errors++}
+                if(FennimalObj.outcome_observed === "incorrect") {number_of_quiz_errors++}
                 start_next_quiz_trial()
                 break
         }
@@ -7964,6 +7418,24 @@ ExperimentController = function(Stimuli, DataController){
         }
     }
 
+    //SLIDESHOW FUNCTIONS
+    let SlidesToShow
+    function show_next_Fennimal_as_slide(){
+        if(SlidesToShow.length > 0){
+            //Get the next slide
+            let NextSlide = SlidesToShow.splice(0,1)[0]
+            console.log(NextSlide)
+
+            //Show it on screen
+            LocCont.jump_to_static_location(NextSlide.location)
+            FenCont = new SlideShowFennimalController(NextSlide, LocCont)
+
+            //After a brief delay, recurse
+            setTimeout(function(){show_next_Fennimal_as_slide()},1000)
+
+        }
+    }
+
     // INSTRUCTION FUNCTIONS //
     //Call to show the first set of instructions
 
@@ -7978,7 +7450,14 @@ ExperimentController = function(Stimuli, DataController){
                 this.start_first_similarity_task()
 
             }else{
-                this.showConsentScreen()
+                console.log(Stimuli.get_experiment_code())
+                if(Stimuli.get_experiment_code() === "slideshow"){
+                    SlidesToShow = Stimuli.getTrainingSetFennimalsInArray()
+                    show_next_Fennimal_as_slide()
+
+                }else{
+                    this.showConsentScreen()
+                }
             }
         }else{
             InstrCont.show_completion_code_reloaded_screen(localStorage.getItem("experiment_completion_code"))
@@ -8053,8 +7532,8 @@ ExperimentController = function(Stimuli, DataController){
     //Sets the world to be empty
     function clearFennimalsFromMap(){
         FennimalsPresentOnMap = {}
-        for(let i = 0; i<Param.location_Names.length; i++){
-            FennimalsPresentOnMap[Param.location_Names[i]] = false
+        for(let i = 0; i<Param.Available_Location_Names.length; i++){
+            FennimalsPresentOnMap[Param.Available_Location_Names[i]] = false
         }
     }
 
@@ -8111,7 +7590,7 @@ ExperimentController = function(Stimuli, DataController){
     }
     //Call to check if the exploration subphase has been completed
     function check_if_exploration_subphase_completed(){
-        if(number_of_locations_visited === Param.location_Names.length && Fennimal_found_number === Stimuli.getTrainingSetFennimalsInArray().length){
+        if(number_of_locations_visited === Param.Available_Location_Names.length && Fennimal_found_number === Stimuli.getTrainingSetFennimalsInArray().length){
             LocCont.prevent_subject_from_leaving_location(true)
             setTimeout(function(){
                 exploration_subphase_completed()
@@ -8236,7 +7715,7 @@ ExperimentController = function(Stimuli, DataController){
     // However, now the participant can carry at most one item with them (selected in the Home screen)
     //  After the item is given to the Fennimal, jump back home.
     //// Clear the array that keeps track of which items have been taken during this trial
-    let current_item_in_inventory, ArrayOfFennimalsToBeDelivered,CurrentDeliveryTrial, Items_Taken_In_Backpack_During_Trial, Delivery_Locations_Visited
+    let current_item_in_inventory, ArrayOfFennimalsToBeDelivered,CurrentDeliveryTrial, Items_Taken_In_Backpack_During_Trial, Delivery_Locations_Visited, OriginalItemResponses
     //This counter will be zero for the first delivery round. Any higher numbers indicate a remedial round after failing a quiz
     let current_delivery_round =0
     //Call to start the delivery subphase
@@ -8285,15 +7764,31 @@ ExperimentController = function(Stimuli, DataController){
             //Reset the items in backpack and locations visited
             Items_Taken_In_Backpack_During_Trial = []
             Delivery_Locations_Visited = []
+
+            //Store the original Item Responses (these will be modified when the backpack screen is openened
+            OriginalItemResponses = JSON.parse(JSON.stringify(CurrentDeliveryTrial.Fennimal.ItemResponses))
         }else{
             delivery_subphase_completed()
         }
     }
     this.delivery_instruction_page_closed = function(item_selected){
+        console.log(item_selected)
         current_item_in_inventory = item_selected
         Items_Taken_In_Backpack_During_Trial.push(item_selected)
         updateHUD()
         LocCont.reset_map()
+
+        //Setting item responses
+        //Only the item in the backpack should be set to anyhthing other than unavailable. That is, if the item is not in the backpack it is not available
+        console.log(current_item_in_inventory)
+        console.log(CurrentDeliveryTrial)
+        CurrentDeliveryTrial.Fennimal.ItemResponses = JSON.parse(JSON.stringify(OriginalItemResponses))
+
+        for(let item in CurrentDeliveryTrial.Fennimal.ItemResponses){
+            if(item !== current_item_in_inventory){
+                CurrentDeliveryTrial.Fennimal.ItemResponses[item] = "unavailable"
+            }
+        }
     }
     function delivery_subphase_Fennimal_completed(DeliveryTrial){
         DataController.store_delivery_trial(DeliveryTrial.Fennimal,Items_Taken_In_Backpack_During_Trial,Delivery_Locations_Visited, DeliveryTrial.hint_type, current_delivery_round)
@@ -8341,12 +7836,10 @@ ExperimentController = function(Stimuli, DataController){
 
     }
     function start_next_quiz_trial(){
-
         //Check if we need to store a previous quiz trial and update the number of errors
         if(CurrentQuizTrial !== false){
             DataController.store_quiz_trial(CurrentQuizTrial)
         }
-
 
         //Check if there are more trials to be done. If yes, then show the next trial. If not, then the quiz has been completed
         if(QuizTrials.length > 0){
@@ -8358,8 +7851,6 @@ ExperimentController = function(Stimuli, DataController){
         }else{
             quizCompleted()
         }
-
-
     }
     this.show_next_quiz_Fennimal = function(){
         //Jump to the correct location. Note that we now jump to a static location, no movement needed nor allowed
@@ -8395,8 +7886,15 @@ ExperimentController = function(Stimuli, DataController){
         AllTestTrails = Stimuli.getTestPhaseData()
         total_number_of_blocks = JSON.parse(JSON.stringify(AllTestTrails.length))
 
-        //Show the quiz completed screen. After the continue button is pressed on this screen, start the first block of trials
-        InstrCont.showQuizPassedInstructions(start_next_test_phase_block)
+        //The number of total test phase blocks has an impoact on the instructions shown here. If there is only a single block, then we can skip the congrats page.
+        if(total_number_of_blocks === 1){
+            start_next_test_phase_block()
+        }else{
+            //Show the quiz completed screen. After the continue button is pressed on this screen, start the first block of trials
+            InstrCont.showQuizPassedInstructions(start_next_test_phase_block)
+        }
+
+
 
         current_phase_of_the_experiment = "test"
     }
@@ -8404,6 +7902,8 @@ ExperimentController = function(Stimuli, DataController){
         //Splice the next block of trials
         if(AllTestTrails.length >= 1){
             CurrentBlockData = AllTestTrails.splice(0,1)[0]
+            console.log(total_number_of_blocks)
+            console.log(CurrentBlockData.type)
 
             //Figure out what to do next. The "normal days" (everything but the category task) is controlled by this object.
             //  For the category task, create a subcontroller to handle all the interactions.
@@ -8428,6 +7928,11 @@ ExperimentController = function(Stimuli, DataController){
                     CurrentBlockTrials = CurrentBlockData.Trials
                     InstrCont.show_test_phase_instructions_final_block(CurrentBlockData.number, total_number_of_blocks, function(){that.start_next_test_trial()})
                     break
+                case("sole_block"):
+                    CurrentBlockTrials = CurrentBlockData.Trials
+                    console.log(CurrentBlockTrials)
+                    InstrCont.show_test_phase_instructions_sole_block()
+                    break;
             }
 
         }else{
@@ -8474,7 +7979,7 @@ ExperimentController = function(Stimuli, DataController){
         //In case of the final block, we need to teleport directly to the next Fennimal. Otherwise, show instructions and go to the map
         if(CurrentBlockData.type === "final_block"){
             //Start the trial
-            FenCont = new TestPhaseFennimalController(CurrentTestTrial,Stimuli.getItemDetails(), LocCont,that, CurrentTestTrial.max_decision_time, true)
+            FenCont = new TestPhaseFennimalController(CurrentTestTrial,Stimuli.getItemDetails(), LocCont,that, true)
 
         }else{
             //Populate the world with this Fennimal
@@ -8552,14 +8057,13 @@ let Instructions = {
         Exploration: {
             title: "EXPLORING THE ISLAND",
             text_top: "Hello Trainee, and welcome to your training. To get you started, let's first explore the island. " +
-                "There are 16 locations for you to discover. " +
-                "While you're out there, there are a number of Fennimals you need to be introduced to. " +
+                "There are various locations for you to discover, and Fennimals to be introduced to. " +
                 "Please find and interact with all of the Fennimals on the list below. You can visit all locations and Fennimals in any order.",
             text_bottom: "Click the continue button to start your training in Fenneland. You can always return to this screen by moving back to the center of the map through pressing on the Home (H) icon. "
         },
         Exploration_Completed: {
             title: "EXPLORATION COMPLETE",
-            text_top: "Congratulations, you have completed your first expedition across Fenneland! You have found all 16 locations and have interacted with 6 of the local Fennimals. ",
+            text_top: "Congratulations, you have completed your first expedition across Fenneland! You have found all locations and have interacted with a group of local Fennimals. ",
             text_bottom: "Click the continue button to continue with the next phase of your training. "
         },
         Search: {
@@ -8653,6 +8157,27 @@ let Instructions = {
                 "Some toys occasionally drop out of your bag as you make your way across the island. You will have to make do with whatever toys are available.<br>" +
                 "<br>" +
                 "<i>There is no time limit on your decision - you can take as long as you like. After you have selected an item, the Fennimal will return to its home and inspect the provided toy. </i>"
+        },
+        Sole_Block : {
+            title: "NEW FENNIMALS HAVE BEEN SPOTTED!",
+            text: "<br><br>  " +
+                "Congratulations! You have passed the exam and you're now a Novice Wildlife Ranger! All that stands " +
+                "between you and the title of 'Expert Wildlife Ranger' is one day of practical experience in Fenneland. " +
+                "During this day you will be sent across the island to interact with various Fennimals." +
+                "There will <u> not </u> be another exam at the end of the experiment. " +
+                "After you complete your practical experience you will automatically receive the title of Expert. <br>" +
+                "<br>" +
+                " A new group of Fennimals recently started to appear on the island. It is your task to travel to these Fennimals to hand them a toy. <br>" +
+                "<u> You can apply your previously learned knowledge to select a fitting toy for each of these Fennimals.</u> <br>" +
+                "<br>" +
+                "It seems that this group is a little bit shy though. " +
+                "After you give them a toy, the Fennimals will return to their homes and inspect the toys there. <u>You won't learn whether or not they liked the toys you gave them until the end of this experiment. </u>  <br>" +
+                "<br>" +
+                "Some toys occasionally drop out of your bag as you make your way across the island. You will have to make do with whatever toys are available.<br>" +
+                "<br>" +
+                "After the end of this experiment you will recieve one star for each Fennimal that liked their interactions with you. " +
+                "<i>There is no time limit on your decision - please take enough time to carefully consider each decision. </i>"
+
         }
     }
 }
@@ -8766,23 +8291,21 @@ if(Param.ExperimentRecruitmentMethod === "prolific"){
         participant_number = ProlificIDToSeed(PID)
         console.warn("SEEDED " + participant_number)
     }else{
-        participant_number =  draw_random_participant_seed() //6402
+        participant_number = draw_random_participant_seed() //17032024
         console.warn("NO PID FOUND. Defaulting to random seed " + participant_number)
     }
 }
 else{
-    participant_number = draw_random_participant_seed()
+    participant_number =  draw_random_participant_seed() //17032024
 }
 
-//participant_number = 19901
 let RNG = new RandomNumberGenerator(participant_number)
-let Stimuli = new STIMULUSDATA_STIMPILOT(participant_number);
-//let Stimuli = new STIMULUSDATA_SIMILARITY_ON_SEARCH()
+//let Stimuli = new STIMULUSDATA_STIMPILOT(participant_number);
+let Stimuli = new STIMULUSDATA(participant_number, "search_availability")
 
 // Creating controllers. NOTE THE LAST PARAMETER: set to false for the experiments, true for the stimulus pilot
 let DataCont = new DataController(participant_number, Stimuli)
 let EC = new ExperimentController(Stimuli, DataCont)
-
 
 EC.startExperiment()
 //EC.start_first_similarity_task()
@@ -8794,7 +8317,7 @@ EC.startExperiment()
 //EC.start_test_phase()
 
 
-console.log("Version: 30.01.23")
+console.log("Version: 18.04.23")
 
 // Instructions repeat block showing last panel too early
 // Instructios number of days
@@ -8807,3 +8330,19 @@ console.log("Version: 30.01.23")
 //localStorage.removeItem("experiment_completion_code")
 
 // Reintroduce spotlight to exploration phase
+
+//TODO: after experiment has started (and available locations can no longer be changed), delete all unused locations from the SVG
+// SAME for heads and bodies.
+// After quiz, delete unused instructions
+
+
+//Feedback types
+//  smile: Fennimal likes the item (smile + moving smiles)
+//  heart: Fennimal adores the item (heart + moving hearts)
+//  frown: Fennimal dislikes the item (frown + moving frowns)
+//  bites: The Fennimal bit you (teeth + moving teeth)
+//  unknown: Fennimal takes toy home (Fennimal disappears)
+//  incorrect: "Oops! Fennimal did not like this toy" (thumbs down)
+//  correct: "You selected the correct toy!"(thumbs up)
+
+// Repeat trials: thumbs up does not dissapear after trial

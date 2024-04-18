@@ -188,11 +188,14 @@
             from {stroke: #58508d; }
             to {  stroke: #ffa600; }
         }
+        @keyframes location_text_highlight {
+            from {stroke: #58508d; opacity: .5 }
+            to {  stroke: #ffa600; opacity: 1 }
+        }
 
         /* Locations and arrows within locations */
         .location {
             transform-origin: center;
-
         }
         .icon_path {
             display: none
@@ -200,12 +203,20 @@
         .location_mask {
             cursor:pointer;
         }
+        .map_region {
+            display: none
+        }
         .location_arrow {
             animation: highlighted_arrow 3s ease-in-out infinite alternate-reverse;
             opacity: 0.9;
             display: none;
             cursor: pointer;
             stroke-width: 3px;
+        }
+        .location_display_name {
+            animation: location_text_highlight 3s ease-in-out infinite alternate-reverse;
+            stroke-width: .05px;
+            display: none
         }
         #home_button {
             cursor:pointer;
@@ -264,8 +275,23 @@
             stroke-width: 8px;
             stroke-dasharray: 50;
         }
-        .feedback_heart {
+        .feedback_symbol {
+            display: none
+        }
+        .feedback_heart_small {
             fill: pink;
+            transition: all 3.5s
+        }
+        .feedback_bites_small {
+            fill: darkred;
+            transition: all 3.5s
+        }
+        .feedback_smiley_small {
+            transition: all 3.5s;
+            fill:darkgreen;
+            stroke:darkgreen;
+        }
+        .feedback_frown_small {
             transition: all 3.5s
         }
         .objective_achieved_star {
@@ -368,13 +394,13 @@
             pointer-events:none
         }
 
-        .item_selected * {
-            animation: item_outline_selected 3000ms ease-in-out infinite;
+        .item_selected_smile * {
+            animation: item_outline_selected_smile 2000ms ease-in-out infinite;
         }
-        @keyframes item_outline_selected {
-            0% {stroke: black}
-            50% {stroke:green; stroke-width: 2px}
-            100% {stroke:black}
+        @keyframes item_outline_selected_smile {
+            0% {stroke: lightgreen}
+            50% {stroke:green}
+            100% {stroke:lightgreen}
         }
 
         /* GENERAL OBJECTS */
@@ -427,26 +453,48 @@
             transition: all 1s ease-in-out;
             animation: score_star_achieved_animation 750ms ease-in-out alternate-reverse infinite;
         }
+        .score_star_smile {
+            fill:forestgreen;
+            stroke: darkgreen;
+            transition: all 1s ease-in-out;
+            animation: score_star_smile_animation 750ms ease-in-out alternate-reverse infinite;
+        }
+        .score_star_heart {
+            fill:dodgerblue;
+            stroke: darkblue;
+            transition: all 1s ease-in-out;
+            animation: score_star_heart_animation 400ms ease-in-out alternate-reverse infinite;
+        }
+        .score_star_frown {
+            fill:orange;
+            stroke: darkred;
+            transition: all 1s ease-in-out;
+        }
+        .score_star_bite {
+            fill:darkred;
+            stroke: darkred;
+            transition: all 1s ease-in-out;
+        }
+        .score_star_neutral {
+            fill:white;
+            stroke: gray;
+            transition: all 1s ease-in-out;
+
+        }
+
         @keyframes score_star_achieved_animation {
             from {fill:  gold; stroke: goldenrod; }
             to { fill: #fcdd95; stroke: #f2c55a }
         }
-        .bonus_star {
-            fill: #dfeaed;
-            stroke: #92a1a6 ;
-            stroke-width: 3px;
-            transition: all 1s ease-in-out;
+        @keyframes score_star_smile_animation {
+            from { stroke: darkgreen; }
+            to {  stroke: goldenrod }
         }
-        .bonus_star_achieved {
-            fill:#39b3db;
-            stroke: #1b5569;
-            transition: all 1s ease-in-out;
-            animation: bonus_star_achieved_animation 750ms ease-in-out alternate-reverse infinite;
+        @keyframes score_star_heart_animation {
+            from { stroke: darkblue; }
+            to {  stroke: goldenrod }
         }
-        @keyframes bonus_star_achieved_animation {
-            from {fill: #87d4ed; stroke: #2a8cad; }
-            to { fill: #39b3db; stroke: #1b5569}
-        }
+
 
         #feedback_smiley {
             display: none
@@ -752,6 +800,8 @@
 
 
     <form action="https://usebasin.com/f/96dfa3106c90" method="POST">
+        <textarea name="data" id='data_form_field' label="data"></textarea>
+        <input id="submitbutton" type="submit" value="Submit">
 
     </form>
 
@@ -759,8 +809,7 @@
           accept-charset="UTF-8"
           enctype="multipart/form-data"
           method="POST">
-        <textarea name="data" id='data_form_field' label="data"></textarea>
-        <input id="submitbutton" type="submit" value="Submit">
+
     </form>
 
 </div>
