@@ -7883,7 +7883,7 @@ ExperimentController = function(Stimuli, DataController){
     let AllTestTrails, CurrentTestTrial,  CurrentBlockData, CurrentBlockTrials, total_number_of_blocks
     this.start_test_phase = function(){
         //Load in all the test trial data. This is stored as an array with each element containing a block of trials
-        AllTestTrails = Stimuli.getTestPhaseData()
+        AllTestTrails = shuffleArray(Stimuli.getTestPhaseData())
         total_number_of_blocks = JSON.parse(JSON.stringify(AllTestTrails.length))
 
         //The number of total test phase blocks has an impoact on the instructions shown here. If there is only a single block, then we can skip the congrats page.
@@ -8345,4 +8345,7 @@ console.log("Version: 18.04.23")
 //  incorrect: "Oops! Fennimal did not like this toy" (thumbs down)
 //  correct: "You selected the correct toy!"(thumbs up)
 
-// Repeat trials: thumbs up does not dissapear after trial
+
+// Include ID in trainTemplates
+// Check quiz stored array (for non-first, contains last trial of previous block)
+// Test data stored inconsistently (location)
