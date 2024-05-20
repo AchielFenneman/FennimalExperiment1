@@ -324,7 +324,9 @@ function createFennimal(FennimalObj){
 
     //Then the head
     let HeadObj = document.getElementById("head_" + FennimalObj.head).cloneNode(true)
-    Container.appendChild(HeadObj)
+    let HeadTranslationContainer = document.createElementNS("http://www.w3.org/2000/svg", 'g')
+    Container.appendChild(HeadTranslationContainer)
+    HeadTranslationContainer.appendChild(HeadObj)
     HeadObj.style.display = "inherit"
 
     //Then the droptarget
@@ -376,11 +378,15 @@ function createFennimal(FennimalObj){
     }
 
     //Resizing head and bodies
-    HeadObj.style.transformOrigin = "50% 35%"
-    HeadObj.style.transform = "scale(0.8)"
+    HeadObj.style.transformOrigin = "50% 100%"
+    HeadObj.style.transform = "scale(1)"
 
-    BodyObj.style.transformOrigin = "50% 10%"
-    BodyObj.style.transform = "scale(.9)"
+    BodyObj.style.transformOrigin = "50% 50%"
+    BodyObj.style.transform = "scale(.7)"
+
+    console.log(HeadTranslationContainer)
+    HeadTranslationContainer.style.transformOrigin = "center"
+    HeadTranslationContainer.style.transform = "translate(0,12px)"
 
     // Returns SVG layer
     return(Container)
@@ -412,12 +418,12 @@ function createFennimalOutline(head,body, include_targets){
 
 
     //Resizing head and bodies
-    HeadObj.style.transformOrigin = "50% 35%"
-    HeadObj.style.transform = "scale(.8)"
+    HeadObj.style.transformOrigin = "50% 0%"
+    HeadObj.style.transform = "scale(1.1)"
     //HeadObj.style.transform = "scale(1.25)"
 
-    BodyObj.style.transformOrigin = "50% 10%"
-    BodyObj.style.transform = "scale(0.9)"
+    BodyObj.style.transformOrigin = "50% 50%"
+    BodyObj.style.transform = "scale(0.8)"
 
     //Return SVG layer
     return(Container)
@@ -592,13 +598,28 @@ STIMULUSDATA = function(participant_number, exp_code){
         }
 
         //If a colorscheme has been defined, add it to the object here. If not, default to the region-specific head and body color schemes
-        if(_optional_ColorScheme !== false){
-            FenObj.head_color_scheme = _optional_ColorScheme.Head
-            FenObj.body_color_scheme = _optional_ColorScheme.Body
+        if(_optional_ColorScheme.length === 2 ){
+            FenObj.head_color_scheme = _optional_ColorScheme[0]
+            if(_optional_ColorScheme[1] === "gray"){
+                FenObj.body_color_scheme = Param.GrayColorScheme
+            }else{
+                FenObj.body_color_scheme = JSON.parse(JSON.stringify(Param.RegionData[region].Fennimal_location_colors))
+                FenObj.body_color_scheme.tertiary_color = Param.RegionData[region].contrast_color
+            }
         }else{
-            FenObj.head_color_scheme = JSON.parse(JSON.stringify(Param.RegionData[region].Fennimal_location_colors))
-            FenObj.body_color_scheme = JSON.parse(JSON.stringify(Param.RegionData[region].Fennimal_location_colors))
-            FenObj.body_color_scheme.tertiary_color = Param.RegionData[region].contrast_color
+            if(_optional_ColorScheme === "gray"){
+                FenObj.head_color_scheme = Param.GrayColorScheme
+                FenObj.body_color_scheme = Param.GrayColorScheme
+            }else{
+                if(_optional_ColorScheme !== false){
+                    FenObj.head_color_scheme = _optional_ColorScheme.Head
+                    FenObj.body_color_scheme = _optional_ColorScheme.Body
+                }else{
+                    FenObj.head_color_scheme = JSON.parse(JSON.stringify(Param.RegionData[region].Fennimal_location_colors))
+                    FenObj.body_color_scheme = JSON.parse(JSON.stringify(Param.RegionData[region].Fennimal_location_colors))
+                    FenObj.body_color_scheme.tertiary_color = Param.RegionData[region].contrast_color
+                }
+            }
         }
 
         //If any item preferences are given, set them here. Otherwise, all items will default to unavailable
@@ -751,7 +772,7 @@ STIMULUSDATA = function(participant_number, exp_code){
 
             break
 
-        case("exp_sim_on_search") : {
+        case("exp_sim_on_search_old") : {
             //Drawing Regions
             let Visited_Regions = shuffleArray(Param.Preferred_Region_Selections["4"])
 
@@ -820,6 +841,277 @@ STIMULUSDATA = function(participant_number, exp_code){
 
         }
 
+        case("exp_sim_on_search_2") : {
+            //Drawing Regions
+            let Visited_Regions = shuffleArray(Param.Preferred_Region_Selections["4"])
+
+            //Shuffling locations for the regions
+            let Visited_Location_Arr = []
+            for(let i = 0; i<Visited_Regions.length;i++){
+                Visited_Location_Arr.push(shuffleArray( JSON.parse(JSON.stringify(Param.RegionData[Visited_Regions[i]].Locations))))
+            }
+
+            //Selecting one region as the main training region
+            //let main_training_region = Visited_Regions.splice(0,1)[0]
+            //let Main_Training_Locations = Visited_Location_Arr.splice(0,1)
+            //console.log(main_training_region, Main_Training_Locations)
+
+            //Drawing 3 pairs of heads.
+            let Used_Heads_Pairs  = shuffleArray(JSON.parse(JSON.stringify(Param.Heads_Semantic_Pairs))).splice(0,3)
+
+            //Selecting colorschemes for the heads.
+            let Distinct_Color_Schemes = shuffleArray([
+                {
+                    primary_color: "#f5a149",//"#665244",
+                    secondary_color: "#ffe6d5",//"#dedcdc",//"#f7cdbc",
+                    tertiary_color: "#ffd0b0",//"#f2e7df",
+                    eye_color: "#f6e8da",
+                },
+                {
+                    primary_color: "#953f05", //"#ded3d6",
+                    secondary_color: "#b09a90",//"#dedcdc",
+                    tertiary_color: "#502d16",
+                    eye_color: "#47230a",
+                },
+                {
+                    primary_color:  "#4d2f49",
+                    secondary_color: "#d3bfd9",
+                    tertiary_color: "#890fbd",
+                    eye_color: "#e8b3ff",
+                }
+            ])
+
+            //Creating Item details
+            Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 3, false ))
+            All_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
+
+            //Creating the training Fennimals (A1 and A2 share a semantic head pair, B and C do not)
+            TrainingFennimals = {
+                A: createFennimalObj(Visited_Regions[0], Visited_Location_Arr[0][0], Used_Heads_Pairs[0][0],false, [ [All_Items[0], "smile"]], [Distinct_Color_Schemes[0],false], All_Items[0] ),
+                B: createFennimalObj(Visited_Regions[0], Visited_Location_Arr[0][1], Used_Heads_Pairs[0][1],false, [ [All_Items[1], "smile"]], [Distinct_Color_Schemes[1],false], All_Items[1] ),
+                C: createFennimalObj(Visited_Regions[0], Visited_Location_Arr[0][2], Used_Heads_Pairs[1][0],false, [ [All_Items[2], "smile"]], [Distinct_Color_Schemes[2],false], All_Items[2] ),
+            }
+
+            //Creating the search stimuli templates
+            SearchPhaseTemplates = {
+                SA1: {ID: "SA1", head: TrainingFennimals.A.head, body: false, ColorScheme: [Distinct_Color_Schemes[0],false],  region: Visited_Regions[1], location: Visited_Location_Arr[1][0], cued_item: All_Items[0], search_item: All_Items[1]},
+                SB1: {ID: "SB1", head: TrainingFennimals.B.head, body: false, ColorScheme: [Distinct_Color_Schemes[1],false],  region: Visited_Regions[1], location: Visited_Location_Arr[1][0], cued_item: All_Items[1], search_item: All_Items[0]},
+                SC1: {ID: "SC1", head: TrainingFennimals.C.head, body: false, ColorScheme: [Distinct_Color_Schemes[2],false],  region: Visited_Regions[1], location: Visited_Location_Arr[1][0], cued_item: All_Items[2], search_item: All_Items[1]},
+
+                SA2: {ID: "SA2", head: TrainingFennimals.A.head, body: false, ColorScheme: [Distinct_Color_Schemes[0],false],  region: Visited_Regions[2], location: Visited_Location_Arr[2][0], cued_item: All_Items[0], search_item: All_Items[1]},
+                SB2: {ID: "SB2", head: TrainingFennimals.B.head, body: false, ColorScheme: [Distinct_Color_Schemes[1],false],  region: Visited_Regions[2], location: Visited_Location_Arr[2][0], cued_item: All_Items[1], search_item: All_Items[0]},
+                SC2: {ID: "SC2", head: TrainingFennimals.C.head, body: false, ColorScheme: [Distinct_Color_Schemes[2],false],  region: Visited_Regions[2], location: Visited_Location_Arr[2][0], cued_item: All_Items[2], search_item: All_Items[0]},
+
+                SA3: {ID: "SA3", head: TrainingFennimals.A.head, body: false, ColorScheme: [Distinct_Color_Schemes[0],false],  region: Visited_Regions[3], location: Visited_Location_Arr[3][0], cued_item: All_Items[0], search_item: All_Items[1]},
+                SB3: {ID: "SB3", head: TrainingFennimals.B.head, body: false, ColorScheme: [Distinct_Color_Schemes[1],false],  region: Visited_Regions[3], location: Visited_Location_Arr[3][0], cued_item: All_Items[1], search_item: All_Items[0]},
+                SC3: {ID: "SC3", head: TrainingFennimals.C.head, body: false, ColorScheme: [Distinct_Color_Schemes[2],false],  region: Visited_Regions[3], location: Visited_Location_Arr[3][0], cued_item: All_Items[2], search_item: All_Items[1]},
+            }
+
+            //Transforming the search stimuli into a block
+            let SearchPhaseTrials = [], CuedBlockTrials = [], SearchBlock1Trials = [], SearchBlock2Trials = [], SearchBlock3Trials = []
+            for(let key in SearchPhaseTemplates){
+                let FenObj = SearchPhaseTemplates[key]
+                let TestObj = createFennimalObj(FenObj.region,FenObj.location, FenObj.head, FenObj.body, FenObj.ColorScheme, false, false)
+                TestObj.ID = FenObj.ID
+                TestObj.cued_item = FenObj.cued_item
+                TestObj.search_item = FenObj.search_item
+                SearchPhaseTrials.push(TestObj)
+
+                if(["SA1","SB1","SC1"].includes(key)){
+                    SearchBlock1Trials.push(TestObj)
+                    CuedBlockTrials.push(TestObj)
+                }
+
+                if(["SA2","SB2","SC2"].includes(key)){ SearchBlock2Trials.push(TestObj) }
+                if(["SA3","SB3","SC3"].includes(key)){ SearchBlock3Trials.push(TestObj) }
+            }
+            //Creating the search phase trials here. For Fennimals A and B
+            let CuedTrials = shuffleArray( createBlockOfSearchTrials(CuedBlockTrials, true, true) )
+            let SearchTrials1 = shuffleArray( createBlockOfSearchTrials(SearchBlock1Trials, false, false))
+            let SearchTrials2 = shuffleArray( createBlockOfSearchTrials(SearchBlock2Trials, false, false))
+            let SearchTrials3 = shuffleArray(createBlockOfSearchTrials(SearchBlock3Trials, false, false))
+
+            //Creating the search phase setup
+            SearchPhaseSetup = [
+                {
+                    Trials: CuedTrials,
+                    type: "direct",
+                    hint_type: "text",
+                    number: 1
+                },
+                {
+                    Trials:  SearchTrials1,
+                    type: "indirect",
+                    hint_type: "text",
+                    number: 2
+                },
+                {
+                    Trials:  SearchTrials2,
+                    type: "indirect",
+                    hint_type: "text",
+                    number: 3
+                },
+                {
+                    Trials:  SearchTrials3,
+                    type: "indirect",
+                    hint_type: "text",
+                    number: 4
+                },
+                {
+                    Trials: createBlockOfRepeatTrainingTrials(true),
+                    type: "repeat_training",
+                    hint_type: "text",
+                    number: 5
+                }]
+            break;
+
+        }
+
+        case("exp_sim_on_search") : {
+            //Drawing Regions
+            let Training_Regions = shuffleArray(["Desert", "Jungle", "Beach"]) //"North", "Desert", "Village"
+            let Search_Regions = shuffleArray(["North", "Village", "Mountains"])// "Jungle", "Mountains", "Beach"
+
+
+            //Shuffling locations for the regions
+            let Training_Location_Arr = []
+            for(let i = 0; i<Training_Regions.length;i++){
+                Training_Location_Arr.push(shuffleArray( JSON.parse(JSON.stringify(Param.RegionData[Training_Regions[i]].Locations))))
+            }
+            let Search_Location_Arr = []
+            for(let i = 0; i<Search_Regions.length;i++){
+                Search_Location_Arr.push(shuffleArray( JSON.parse(JSON.stringify(Param.RegionData[Search_Regions[i]].Locations))))
+            }
+
+            //Selecting one region as the main training region
+            //let main_training_region = Visited_Regions.splice(0,1)[0]
+            //let Main_Training_Locations = Visited_Location_Arr.splice(0,1)
+            //console.log(main_training_region, Main_Training_Locations)
+
+            //Drawing 3 pairs of heads.
+            let Used_Heads_Pairs  = shuffleArray(JSON.parse(JSON.stringify(Param.Heads_Semantic_Pairs))).splice(0,3)
+
+            //Selecting colorschemes for the heads.
+            let Distinct_Color_Schemes = shuffleArray([
+                {
+                    primary_color: "#f5a149",//"#665244",
+                    secondary_color: "#ffe6d5",//"#dedcdc",//"#f7cdbc",
+                    tertiary_color: "#ffd0b0",//"#f2e7df",
+                    eye_color: "#f6e8da",
+                },
+                {
+                    primary_color: "#953f05", //"#ded3d6",
+                    secondary_color: "#b09a90",//"#dedcdc",
+                    tertiary_color: "#502d16",
+                    eye_color: "#47230a",
+                },
+                {
+                    primary_color:  "#4d2f49",
+                    secondary_color: "#d3bfd9",
+                    tertiary_color: "#890fbd",
+                    eye_color: "#e8b3ff",
+                }
+            ])
+
+            //Creating Item details
+            Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 3, false ))
+            All_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
+
+            //Creating the training Fennimals (A1 and A2 share a semantic head pair, B and C do not)
+            TrainingFennimals = {
+                A: createFennimalObj(Training_Regions[0], Training_Location_Arr[0][0], Used_Heads_Pairs[0][0],false, [ [All_Items[0], "smile"]], false, All_Items[0] ),
+                B: createFennimalObj(Training_Regions[1], Training_Location_Arr[1][0], Used_Heads_Pairs[0][1],false, [ [All_Items[1], "smile"]], false, All_Items[1] ),
+                C: createFennimalObj(Training_Regions[2], Training_Location_Arr[2][0], Used_Heads_Pairs[1][0],false, [ [All_Items[2], "smile"]], false, All_Items[2] ),
+            }
+
+            //Creating the search stimuli templates
+            SearchPhaseTemplates = {
+                SA1: {ID: "SA1", head: TrainingFennimals.A.head, body: TrainingFennimals.A.body, ColorScheme: false,  region: Search_Regions[0], location: Search_Location_Arr[0][0], cued_item: All_Items[0], search_item: All_Items[1]},
+                SB1: {ID: "SB1", head: TrainingFennimals.B.head, body: TrainingFennimals.B.body, ColorScheme: false,  region: Search_Regions[0], location: Search_Location_Arr[0][1], cued_item: All_Items[1], search_item: All_Items[0]},
+                SC1: {ID: "SC1", head: TrainingFennimals.C.head, body: TrainingFennimals.C.body, ColorScheme: false,  region: Search_Regions[0], location: Search_Location_Arr[0][2], cued_item: All_Items[2], search_item: All_Items[1]},
+
+                SA2: {ID: "SA2", head: TrainingFennimals.A.head, body: TrainingFennimals.A.body, ColorScheme: false,  region: Search_Regions[1], location: Search_Location_Arr[1][0], cued_item: All_Items[0], search_item: All_Items[1]},
+                SB2: {ID: "SB2", head: TrainingFennimals.B.head, body: TrainingFennimals.B.body, ColorScheme: false,  region: Search_Regions[1], location: Search_Location_Arr[1][1], cued_item: All_Items[1], search_item: All_Items[0]},
+                SC2: {ID: "SC2", head: TrainingFennimals.C.head, body: TrainingFennimals.C.body, ColorScheme: false,  region: Search_Regions[1], location: Search_Location_Arr[1][2], cued_item: All_Items[2], search_item: All_Items[0]},
+
+                SA3: {ID: "SA3", head: TrainingFennimals.A.head, body: TrainingFennimals.A.body, ColorScheme: false,  region: Search_Regions[2], location: Search_Location_Arr[2][0], cued_item: All_Items[0], search_item: All_Items[1]},
+                SB3: {ID: "SB3", head: TrainingFennimals.B.head, body: TrainingFennimals.B.body, ColorScheme: false,  region: Search_Regions[2], location: Search_Location_Arr[2][1], cued_item: All_Items[1], search_item: All_Items[0]},
+                SC3: {ID: "SC3", head: TrainingFennimals.C.head, body: TrainingFennimals.C.body, ColorScheme: false,  region: Search_Regions[2], location: Search_Location_Arr[2][2], cued_item: All_Items[2], search_item: All_Items[1]},
+            }
+
+            //Transforming the search stimuli into a block
+            let SearchPhaseTrials = [], CuedBlockTrials = [], SearchBlock1Trials = [], SearchBlock2Trials = [], SearchBlock3Trials = []
+            for(let key in SearchPhaseTemplates){
+                let FenObj = SearchPhaseTemplates[key]
+                let TestObj = createFennimalObj(FenObj.region,FenObj.location, FenObj.head, FenObj.body, FenObj.ColorScheme, false, false)
+                TestObj.ID = FenObj.ID
+                TestObj.cued_item = FenObj.cued_item
+                TestObj.search_item = FenObj.search_item
+                SearchPhaseTrials.push(TestObj)
+
+                if(["SA1","SB1","SC1"].includes(key)){
+                    SearchBlock1Trials.push(TestObj)
+                    CuedBlockTrials.push(TestObj)
+                }
+
+                if(["SA2","SB2","SC2"].includes(key)){ SearchBlock2Trials.push(TestObj) }
+                if(["SA3","SB3","SC3"].includes(key)){ SearchBlock3Trials.push(TestObj) }
+            }
+            //Creating the search phase trials here. For Fennimals A and B
+            let CuedTrials = shuffleArray( createBlockOfSearchTrials(CuedBlockTrials, true, true) )
+            let SearchTrials1 = shuffleArray( createBlockOfSearchTrials(SearchBlock1Trials, false, false))
+            let SearchTrials2 = shuffleArray( createBlockOfSearchTrials(SearchBlock2Trials, false, false))
+            let SearchTrials3 = shuffleArray(createBlockOfSearchTrials(SearchBlock3Trials, false, false))
+
+            //For the search trials, we want to tweak C to have direct items available (one other removed at random)
+            for(let i =0;i<SearchTrials2.length; i++){
+                if(SearchTrials2[i].ID === "SC2"){
+                    SearchTrials2[i].ItemResponses[SearchTrials2[i].cued_item] = "unknown"
+                    SearchTrials2[i].ItemResponses[SearchTrials2[i].search_item] = "unavailable"
+                    SearchTrials2[i].HiddenItemResponses[SearchTrials2[i].cued_item] = "smile"
+                    SearchTrials2[i].HiddenItemResponses[SearchTrials2[i].search_item] = "unavailable"
+                }
+            }
+
+            for(let i =0;i<SearchTrials3.length; i++){
+                if(SearchTrials3[i].ID === "SC3"){
+                    SearchTrials3[i].ItemResponses[SearchTrials3[i].cued_item] = "unknown"
+                    SearchTrials3[i].ItemResponses[SearchTrials3[i].search_item] = "unavailable"
+                    SearchTrials3[i].HiddenItemResponses[SearchTrials3[i].cued_item] = "smile"
+                    SearchTrials3[i].HiddenItemResponses[SearchTrials3[i].search_item] = "unavailable"
+                }
+            }
+
+            //Creating the search phase setup
+            SearchPhaseSetup = [
+                {
+                    Trials: CuedTrials,
+                    type: "direct",
+                    hint_type: "text",
+                    number: 1
+                },
+                {
+                    Trials:  SearchTrials2,
+                    type: "indirect",
+                    hint_type: "text",
+                    number: 3
+                },
+                {
+                    Trials:  SearchTrials3,
+                    type: "indirect",
+                    hint_type: "text",
+                    number: 4
+                },
+                {
+                    Trials: createBlockOfRepeatTrainingTrials(true),
+                    type: "repeat_training",
+                    hint_type: "text",
+                    number: 5
+                }]
+            break;
+
+        }
+
         case("exp_search_on_sim") : {
             //Drawing Regions. 2 for the training phase, 6 for the recall blocks.
             let Visited_Regions = shuffleArray(Param.Preferred_Region_Selections["8"])
@@ -852,14 +1144,29 @@ STIMULUSDATA = function(participant_number, exp_code){
 
             //Creating the search stimuli templates
             SearchPhaseTemplates = {
-                CAS: {ID: "CAS", head: TrainingFennimals.CA.head, body: false, ColorScheme: false,  region: Visited_Regions[2], location: Visited_Location_Arr[2][0], cued_item: All_Items[0], search_item: All_Items[1]},
-                CBS: {ID: "CBS", head: TrainingFennimals.CB.head, body: false, ColorScheme: false,  region: Visited_Regions[3], location: Visited_Location_Arr[3][0], cued_item: All_Items[1], search_item: All_Items[0]},
-                SAS: {ID: "SAS", head: TrainingFennimals.SA.head, body: false, ColorScheme: false,  region: Visited_Regions[4], location: Visited_Location_Arr[4][0], cued_item: All_Items[2], search_item: All_Items[3]},
-                SBS: {ID: "SBS", head: TrainingFennimals.SB.head, body: false, ColorScheme: false,  region: Visited_Regions[5], location: Visited_Location_Arr[5][0], cued_item: All_Items[3], search_item: All_Items[2]},
+                CAS1: {ID: "CAS1", head: TrainingFennimals.CA.head, body: false, ColorScheme: false,  region: Visited_Regions[2], location: Visited_Location_Arr[2][0], cued_item: All_Items[0], search_item: All_Items[1]},
+                CBS1: {ID: "CBS1", head: TrainingFennimals.CB.head, body: false, ColorScheme: false,  region: Visited_Regions[3], location: Visited_Location_Arr[3][0], cued_item: All_Items[1], search_item: All_Items[0]},
+                SAS1: {ID: "SAS1", head: TrainingFennimals.SA.head, body: false, ColorScheme: false,  region: Visited_Regions[2], location: Visited_Location_Arr[2][1], cued_item: All_Items[2], search_item: All_Items[3]},
+                SBS1: {ID: "SBS1", head: TrainingFennimals.SB.head, body: false, ColorScheme: false,  region: Visited_Regions[3], location: Visited_Location_Arr[3][1], cued_item: All_Items[3], search_item: All_Items[2]},
+
+                CAS2: {ID: "CAS2", head: TrainingFennimals.CA.head, body: false, ColorScheme: false,  region: Visited_Regions[4], location: Visited_Location_Arr[4][0], cued_item: All_Items[0], search_item: All_Items[1]},
+                CBS2: {ID: "CBS2", head: TrainingFennimals.CB.head, body: false, ColorScheme: false,  region: Visited_Regions[5], location: Visited_Location_Arr[5][0], cued_item: All_Items[1], search_item: All_Items[0]},
+                SAS2: {ID: "SAS2", head: TrainingFennimals.SA.head, body: false, ColorScheme: false,  region: Visited_Regions[4], location: Visited_Location_Arr[4][1], cued_item: All_Items[2], search_item: All_Items[3]},
+                SBS2: {ID: "SBS2", head: TrainingFennimals.SB.head, body: false, ColorScheme: false,  region: Visited_Regions[5], location: Visited_Location_Arr[5][1], cued_item: All_Items[3], search_item: All_Items[2]},
+
+                CAS3: {ID: "CAS3", head: TrainingFennimals.CA.head, body: false, ColorScheme: false,  region: Visited_Regions[6], location: Visited_Location_Arr[6][0], cued_item: All_Items[0], search_item: All_Items[1]},
+                CBS3: {ID: "CBS3", head: TrainingFennimals.CB.head, body: false, ColorScheme: false,  region: Visited_Regions[7], location: Visited_Location_Arr[7][0], cued_item: All_Items[1], search_item: All_Items[0]},
+                SAS3: {ID: "SAS3", head: TrainingFennimals.SA.head, body: false, ColorScheme: false,  region: Visited_Regions[6], location: Visited_Location_Arr[6][1], cued_item: All_Items[2], search_item: All_Items[3]},
+                SBS3: {ID: "SBS3", head: TrainingFennimals.SB.head, body: false, ColorScheme: false,  region: Visited_Regions[7], location: Visited_Location_Arr[7][1], cued_item: All_Items[3], search_item: All_Items[2]},
+
+                CAS4: {ID: "CAS4", head: TrainingFennimals.CA.head, body: false, ColorScheme: false,  region: Visited_Regions[5], location: Visited_Location_Arr[5][0], cued_item: All_Items[0], search_item: All_Items[1]},
+                CBS4: {ID: "CBS4", head: TrainingFennimals.CB.head, body: false, ColorScheme: false,  region: Visited_Regions[6], location: Visited_Location_Arr[6][0], cued_item: All_Items[1], search_item: All_Items[0]},
+                SAS4: {ID: "SAS4", head: TrainingFennimals.SA.head, body: false, ColorScheme: false,  region: Visited_Regions[5], location: Visited_Location_Arr[5][1], cued_item: All_Items[2], search_item: All_Items[3]},
+                SBS4: {ID: "SBS4", head: TrainingFennimals.SB.head, body: false, ColorScheme: false,  region: Visited_Regions[6], location: Visited_Location_Arr[6][1], cued_item: All_Items[3], search_item: All_Items[2]},
             }
 
-            //Transforming the search stimuli into a block
-            let SearchPhaseTrials = []
+            //Transforming the search stimuli into a block, and create 4 blocks of trials
+            let SearchPhaseTrials = [], CuedBlockTrials = [], SearchBlock1Trials = [], SearchBlock2Trials = [], SearchBlock3Trials = [], SearchBlock4Trials = []
             for(let key in SearchPhaseTemplates){
                 let FenObj = SearchPhaseTemplates[key]
                 let TestObj = createFennimalObj(FenObj.region,FenObj.location, FenObj.head, FenObj.body, false, false, false)
@@ -867,54 +1174,99 @@ STIMULUSDATA = function(participant_number, exp_code){
                 TestObj.cued_item = FenObj.cued_item
                 TestObj.search_item = FenObj.search_item
                 SearchPhaseTrials.push(TestObj)
+
+                if(["CAS1","CBS1","SAS1","SBS1"].includes(key)){
+                    SearchBlock1Trials.push(TestObj)
+                    CuedBlockTrials.push(TestObj)
+                }
+
+                if(["CAS2","CBS2","SAS2","SBS2"].includes(key)){ SearchBlock2Trials.push(TestObj) }
+                if(["CAS3","CBS3","SAS3","SBS3"].includes(key)){ SearchBlock3Trials.push(TestObj) }
+                if(["CAS4","CBS4","SAS4","SBS4"].includes(key)){ SearchBlock4Trials.push(TestObj) }
             }
 
             //Since the items available can differ within blocks, here we need to tweak the normal procesure for generating search phase trials
-            let SearchTrialsA = createBlockOfSearchTrials(SearchPhaseTrials, true, false)
-            let SearchTrialsB = createBlockOfSearchTrials(SearchPhaseTrials, true, false)
+            let CuedTrials1 = createBlockOfSearchTrials(CuedBlockTrials, true, true)
+            let SearchTrials1 = createBlockOfSearchTrials(SearchBlock1Trials, true, false)
+            let SearchTrials2 = createBlockOfSearchTrials(SearchBlock2Trials, true, false)
+            let SearchTrials3 = createBlockOfSearchTrials(SearchBlock3Trials, true, false)
+            let SearchTrials4 = createBlockOfSearchTrials(SearchBlock4Trials, true, false)
 
-            //For the A set, we only need to tweak the items
-            for(let i =0;i<SearchTrials.length; i++){
+            //For the search blocks, we need to tweak the available responses
+            for(let i =0;i<SearchTrials1.length; i++){
                 //If this trial is part of the search phase pair, then set the direct item to unavailable and the search item to unknown. Change the hidden responses too
-                if(SearchTrials[i].ID === "SAS" || SearchTrials[i].ID === "SBS"){
-                    SearchTrials[i].ItemResponses[SearchTrials[i].cued_item] = "unavailable"
-                    SearchTrials[i].ItemResponses[SearchTrials[i].search_item] = "unknown"
-                    SearchTrials[i].HiddenItemResponses[SearchTrials[i].cued_item] = "unavailable"
-                    SearchTrials[i].HiddenItemResponses[SearchTrials[i].search_item] = "smile"
+                if(SearchTrials1[i].ID === "SAS1" || SearchTrials1[i].ID === "SBS1"){
+                    SearchTrials1[i].ItemResponses[SearchTrials1[i].cued_item] = "unavailable"
+                    SearchTrials1[i].ItemResponses[SearchTrials1[i].search_item] = "unknown"
+                    SearchTrials1[i].HiddenItemResponses[SearchTrials1[i].cued_item] = "unavailable"
+                    SearchTrials1[i].HiddenItemResponses[SearchTrials1[i].search_item] = "smile"
                 }
             }
-            console.log(SearchTrials)
 
+            for(let i =0;i<SearchTrials2.length; i++){
+                //If this trial is part of the search phase pair, then set the direct item to unavailable and the search item to unknown. Change the hidden responses too
+                if(SearchTrials2[i].ID === "SAS2" || SearchTrials2[i].ID === "SBS2"){
+                    SearchTrials2[i].ItemResponses[SearchTrials2[i].cued_item] = "unavailable"
+                    SearchTrials2[i].ItemResponses[SearchTrials2[i].search_item] = "unknown"
+                    SearchTrials2[i].HiddenItemResponses[SearchTrials2[i].cued_item] = "unavailable"
+                    SearchTrials2[i].HiddenItemResponses[SearchTrials2[i].search_item] = "smile"
+                }
+            }
+
+            for(let i =0;i<SearchTrials3.length; i++){
+                //If this trial is part of the search phase pair, then set the direct item to unavailable and the search item to unknown. Change the hidden responses too
+                if(SearchTrials3[i].ID === "SAS3" || SearchTrials3[i].ID === "SBS3"){
+                    SearchTrials3[i].ItemResponses[SearchTrials3[i].cued_item] = "unavailable"
+                    SearchTrials3[i].ItemResponses[SearchTrials3[i].search_item] = "unknown"
+                    SearchTrials3[i].HiddenItemResponses[SearchTrials3[i].cued_item] = "unavailable"
+                    SearchTrials3[i].HiddenItemResponses[SearchTrials3[i].search_item] = "smile"
+                }
+            }
+
+            for(let i =0;i<SearchTrials4.length; i++){
+                //If this trial is part of the search phase pair, then set the direct item to unavailable and the search item to unknown. Change the hidden responses too
+                if(SearchTrials4[i].ID === "SAS4" || SearchTrials2[i].ID === "SBS4"){
+                    SearchTrials4[i].ItemResponses[SearchTrials4[i].cued_item] = "unavailable"
+                    SearchTrials4[i].ItemResponses[SearchTrials4[i].search_item] = "unknown"
+                    SearchTrials4[i].HiddenItemResponses[SearchTrials4[i].cued_item] = "unavailable"
+                    SearchTrials4[i].HiddenItemResponses[SearchTrials4[i].search_item] = "smile"
+                }
+            }
+
+            console.log(SearchTrials1)
+            console.log(SearchTrials2)
+            console.log(SearchTrials3)
+            console.log(SearchTrials4)
 
             //Creating the search phase setup
             SearchPhaseSetup = [
 
                 {
-                    Trials: createBlockOfSearchTrials(SearchPhaseTrials, true, true),
+                    Trials: CuedBlockTrials,
                     type: "direct",
                     hint_type: "text",
                     number: 1
                 },
                 {
-                    Trials:  shuffleArray(JSON.parse(JSON.stringify(SearchTrials))),
+                    Trials:  shuffleArray(SearchTrials1),
                     type: "indirect",
                     hint_type: "text",
                     number: 2
                 },
                 {
-                    Trials:  shuffleArray(JSON.parse(JSON.stringify(SearchTrials))),
+                    Trials:  shuffleArray(SearchTrials2),
                     type: "indirect",
                     hint_type: "text",
                     number: 3
                 },
                 {
-                    Trials:  shuffleArray(JSON.parse(JSON.stringify(SearchTrials))),
+                    Trials:  shuffleArray(SearchTrials3),
                     type: "indirect",
                     hint_type: "text",
                     number: 4
                 },
                 {
-                    Trials:  shuffleArray(JSON.parse(JSON.stringify(SearchTrials))),
+                    Trials:  shuffleArray(SearchTrials4),
                     type: "indirect",
                     hint_type: "text",
                     number: 5
@@ -1418,7 +1770,7 @@ PARAMETERS = function() {
 
     this.Heads_Set_A = ["C", "E", "G", "I", "K"]
     this.Heads_Set_B = ["D", "F", "H", "J", "L"]
-    this.Heads_Semantic_Pairs = [ ["I", "J"], ["C", "D"], ["K", "L"], ["E", "F"], ["G", "H"]]
+    this.Heads_Semantic_Pairs = [ ["I", "J"], ["C", "D"], ["K", "L"]]//[ ["I", "J"], ["C", "D"], ["K", "L"], ["E", "F"], ["G", "H"]]
 
     this.LocationTransitionData = {
         //This object holds all the location transitions.
@@ -4918,7 +5270,7 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
             //Setting the correct text
             Box.getElementsByTagName("text")[0].childNodes[0].innerHTML = Param.SubjectFacingLocationNames[keys[i]]
 
-            let region_color = Param.RegionData[Param.LocationTransitionData["location_"+keys[i]].region].color
+            //let region_color = Param.RegionData[Param.LocationTransitionData["location_"+keys[i]].region].color
             let region_color_light = Param.RegionData[Param.LocationTransitionData["location_"+keys[i]].region].lighter_color
             let region_color_dark = Param.RegionData[Param.LocationTransitionData["location_"+keys[i]].region].darker_color
 
@@ -8304,7 +8656,7 @@ EC.startExperiment()
 //EC.start_test_phase()
 
 
-console.log("Version: 16.05.23")
+console.log("Version: 20.05.23")
 
 // Instructions repeat block showing last panel too early
 // Instructios number of days
@@ -8341,3 +8693,11 @@ console.log("Version: 16.05.23")
 
 // TIMESTAMPS.
 // FILL COLORS FOR THE ITEMS ON THE BAR?
+
+// Gray color schemes
+// Only bugs or pigs
+
+
+// 3 different grayed out bodies. Heads in different colors.
+// During search: see head (and head color) of the training stimulus . Fade background more. Use colors of Flowerfields, Beach, Mountain
+// Unexplored regions at start: make foggy
