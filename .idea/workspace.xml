@@ -4,7 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="692ff53f-2388-44dc-9345-fa7fa40bdb5f" name="Changes" comment="" />
+    <list default="true" id="692ff53f-2388-44dc-9345-fa7fa40bdb5f" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scannimals2.js" beforeDir="false" afterPath="$PROJECT_DIR$/scannimals2.js" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -26,6 +29,7 @@
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
+    "JavaScript Debug.index.html.executor": "Run",
     "RunOnceActivity.OpenProjectViewOnStart": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "WebServerToolWindowFactoryState": "false",
@@ -103,6 +107,8 @@
       <workItem from="1713453779494" duration="704000" />
       <workItem from="1713462732948" duration="759000" />
       <workItem from="1715887878340" duration="688000" />
+      <workItem from="1716238410029" duration="325000" />
+      <workItem from="1716278516941" duration="2990000" />
     </task>
     <servers />
   </component>

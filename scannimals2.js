@@ -1770,7 +1770,7 @@ PARAMETERS = function() {
 
     this.Heads_Set_A = ["C", "E", "G", "I", "K"]
     this.Heads_Set_B = ["D", "F", "H", "J", "L"]
-    this.Heads_Semantic_Pairs = [ ["I", "J"], ["C", "D"], ["K", "L"]]//[ ["I", "J"], ["C", "D"], ["K", "L"], ["E", "F"], ["G", "H"]]
+    this.Heads_Semantic_Pairs = [ ["I", "J"], ["D", "C"], ["K", "L"]]//[ ["I", "J"], ["C", "D"], ["K", "L"], ["E", "F"], ["G", "H"]]
 
     this.LocationTransitionData = {
         //This object holds all the location transitions.
@@ -5070,7 +5070,7 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
                 break
             case("prolific"):
                 Container.appendChild(createInstructionTitleElem("DURATION AND PAYMENT"))
-                Container.appendChild(createTextField(30, 80, 508-2*30,250, "This experiment is expected to last around 20-25 minutes. <br>" +
+                Container.appendChild(createTextField(30, 80, 508-2*30,250, "This experiment is expected to last around 25-30 minutes. <br>" +
                     "<br>" +
                     "Based on your decisions in the last part of the experiment you can earn up to three stars for your performance. " +
                     "You will earn a bonus of " + Param.BonusEarnedPerStar.currency_symbol+ Param.BonusEarnedPerStar.bonus_per_star + " per star that you obtain. <br>" ))
@@ -7222,6 +7222,7 @@ DataController = function(seed_number, Stimuli){
             ScoreObj.completion_code = cc_word_1 + cc_word_2 + (totalpoints )
         }
 
+        completion_code = ScoreObj.completion_code
         return(ScoreObj)
     }
 
@@ -7808,7 +7809,9 @@ ExperimentController = function(Stimuli, DataController){
         //If there is no exp completion code, then start the experiment.
         //If there is an exp completion code, then the experiment has already been completed and we just show this code to the subject.
 
-        if(localStorage.getItem("experiment_completion_code") === null){
+       //localStorage.getItem("experiment_completion_code") === null
+
+        if(true){
             //Start the experiment
             if(Stimuli.is_stimulus_pilot){
                 this.start_first_similarity_task()
@@ -8656,23 +8659,17 @@ EC.startExperiment()
 //EC.start_test_phase()
 
 
-console.log("Version: 20.05.23")
+console.log("Version: 21.05.23")
 
 // Instructions repeat block showing last panel too early
 // Instructios number of days
 // No repeat block for second experiemnt
 
-//TODO: add selected pairs for experiment 3
 
 
 //localStorage.setItem("experiment_completion_code", completion_code )
 //localStorage.removeItem("experiment_completion_code")
 
-// Reintroduce spotlight to exploration phase
-
-//TODO: after experiment has started (and available locations can no longer be changed), delete all unused locations from the SVG
-// SAME for heads and bodies.
-// After quiz, delete unused instructions
 
 
 //Feedback types
