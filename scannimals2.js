@@ -8492,7 +8492,7 @@ let Instructions = {
                 "<br>" +
                 "After you give them a toy, the Fennimals will return to their homes and inspect the toys there. <u>You won't learn whether or not they liked the toys you gave them until the end of this experiment. </u>  <br>" +
                 "<br>" +
-                "Some toys occasionally drop out of your bag as you make your way across the island. You will have to make do with whatever toys are available. If the toy that you want to give to the Fennimal is not available, then maybe you can think of another toy that this Fennimal wil like. " +
+                "Some toys occasionally drop out of your bag as you make your way across the island. You will have to make do with whatever toys are available. If the toy that you want to give to the Fennimal is not available, then maybe you can think of another toy that this Fennimal will like. " +
                 "<b>Hint: Fennimals that live on the same part of the island also like the same toys...</b><br>" +
                 "<br>" +
                 "<i>There is no time limit on your decision - you can take as long as you like. After you have selected an item, the Fennimal will return to its home and inspect the provided toy. </i>"
