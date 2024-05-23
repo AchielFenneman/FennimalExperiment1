@@ -713,6 +713,67 @@ STIMULUSDATA = function(participant_number, exp_code){
         return(shuffleArray(Block))
     }
 
+    //Returns a block of induced-search trials. Provide with array of IDs denoting trials in which the search item is available (all others willbe assumed search trials)
+    function createBlockOfInducedSearchTrials(TrialsArr, _IDs_search, show_feedback){
+        let Block = []
+
+        for(let ind = 0; ind<TrialsArr.length; ind++){
+            let FenObj = JSON.parse(JSON.stringify(TrialsArr[ind]))
+
+            //Finding which items should be available. If cued_items_allowed it true, then remove the search item. If its false, remove the cued item
+            let available_items = JSON.parse(JSON.stringify(All_Items))
+            if(_IDs_search.includes(FenObj.ID)){
+                available_items = available_items.filter(x => x !== FenObj.cued_item)
+            }else{
+                available_items = available_items.filter(x => x !== FenObj.search_item)
+            }
+
+            //Creating the valenced feedback object. This may or may not be shown (depending on feedback setting) but always determines the outcomes at the end
+            let ValencedFeedbackResponses  = {}
+            for(let item_ind =0; item_ind < All_Items.length; item_ind++){
+                let item = All_Items[item_ind]
+                let valence
+
+                if(available_items.includes(item)){
+                    if(item === FenObj.cued_item || item === FenObj.search_item){
+                        valence = "correct"
+                    }else{
+                        valence = "incorrect"
+                    }
+                }else{
+                    valence = "unavailable"
+                }
+
+                ValencedFeedbackResponses[item] = valence
+            }
+
+            if(show_feedback){
+                FenObj.ItemResponses = ValencedFeedbackResponses
+            }else{
+                //If feedback is not shown, create a participant-facing response object
+                let ParticipantFacingItemResponses = {}
+                for(let item_ind =0; item_ind < All_Items.length; item_ind++){
+                    let item = All_Items[item_ind]
+                    if(available_items.includes(item)){
+                        ParticipantFacingItemResponses[item] = "unknown"
+                    }else{
+                        ParticipantFacingItemResponses[item] = "unavailable"
+                    }
+
+                }
+
+                FenObj.ItemResponses = ParticipantFacingItemResponses
+                FenObj.HiddenItemResponses = ValencedFeedbackResponses
+
+            }
+
+            //Pushing to the DirectTestBlock
+            Block.push(FenObj)
+        }
+
+        return(shuffleArray(Block))
+    }
+
     //Returns a block of the original training trials with all items available (no feedback provided)
     function createBlockOfRepeatTrainingTrials(shuffle_trials){
         let Block = []
@@ -744,7 +805,7 @@ STIMULUSDATA = function(participant_number, exp_code){
     }
 
     //Here we define the different experiment structures
-    let TrainingFennimals, SearchPhaseTemplates, SearchPhaseSetup, Item_Details, All_Items
+    let TrainingFennimals,InducedRecallTemplates, SearchPhaseTemplates, SearchPhaseSetup, Item_Details, All_Items
     let Available_Regions = shuffleArray(["North","Desert","Village","Jungle","Flowerfields","Swamp", "Beach", "Mountains"])
 
     //Use this to store experiment-specific variables
@@ -1133,7 +1194,7 @@ STIMULUSDATA = function(participant_number, exp_code){
             //console.log(main_training_region, Main_Training_Locations)
 
             //Drawing 4 heads
-            let Used_Heads  = shuffleArray(JSON.parse(JSON.stringify(Param.Heads_Set_A))).splice(0,4)
+            let Used_Heads  = shuffleArray([ "E", "G", "I", "K"])
 
             //Creating Item details
             Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 4, false ))
@@ -1152,12 +1213,42 @@ STIMULUSDATA = function(participant_number, exp_code){
                 TrainingFennimals[key].ID = key
             }
 
+            //Creating the trials for the induced recall phase
+            InducedRecallTemplates = {
+                IA1_1: {ID: "IA1_1", head: TrainingFennimals.A1.head, body: false, ColorScheme: false,  region: Search_Regions[0], location: Search_Location_Arr[0][0], cued_item: All_Items[0], search_item: All_Items[1]},
+                IB1_1: {ID: "IB1_1", head: TrainingFennimals.B1.head, body: false, ColorScheme: false,  region: Search_Regions[0], location: Search_Location_Arr[0][0], cued_item: All_Items[2], search_item: All_Items[3]},
+
+                IA1_2: {ID: "IA1_2", head: TrainingFennimals.A1.head, body: false, ColorScheme: false,  region: Search_Regions[1], location: Search_Location_Arr[1][0], cued_item: All_Items[0], search_item: All_Items[1]},
+                IB1_2: {ID: "IB1_2", head: TrainingFennimals.B1.head, body: false, ColorScheme: false,  region: Search_Regions[1], location: Search_Location_Arr[1][0], cued_item: All_Items[2], search_item: All_Items[3]},
+
+                IA1_3: {ID: "IA1_3", head: TrainingFennimals.A1.head, body: false, ColorScheme: false,  region: Search_Regions[2], location: Search_Location_Arr[2][0], cued_item: All_Items[0], search_item: All_Items[1]},
+                IB1_3: {ID: "IB1_3", head: TrainingFennimals.B1.head, body: false, ColorScheme: false,  region: Search_Regions[2], location: Search_Location_Arr[2][0], cued_item: All_Items[2], search_item: All_Items[3]},
+            }
+
+            //Transforming the induction templates to Trials
+            let InductionPhaseTrials = []
+            for(let key in InducedRecallTemplates){
+                let FenObj = InducedRecallTemplates[key]
+                let TestObj = createFennimalObj(FenObj.region,FenObj.location, FenObj.head, FenObj.body, false, false, false)
+                TestObj.ID = FenObj.ID
+                TestObj.cued_item = FenObj.cued_item
+                TestObj.search_item = FenObj.search_item
+                InductionPhaseTrials.push(TestObj)
+            }
+
+            //Transforming into an array of trials
+            let InductionPhaseBlock = createBlockOfInducedSearchTrials(InductionPhaseTrials, ["IA1_1","IA1_2","IA1_3"], true)
+
             //Creating the search stimuli templates
             SearchPhaseTemplates = {
-                SA1: {ID: "SA1", head: TrainingFennimals.A1.head, body: false, ColorScheme: false,  region: Search_Regions[0], location: Search_Location_Arr[0][0], cued_item: All_Items[0], search_item: All_Items[1]},
-                SA2: {ID: "SA2", head: TrainingFennimals.A2.head, body: false, ColorScheme: false,  region: Search_Regions[1], location: Search_Location_Arr[1][0], cued_item: All_Items[1], search_item: All_Items[0]},
-                SB1: {ID: "SB1", head: TrainingFennimals.B1.head, body: false, ColorScheme: false,  region: Search_Regions[2], location: Search_Location_Arr[2][0], cued_item: All_Items[2], search_item: All_Items[3]},
-                SB2: {ID: "SB2", head: TrainingFennimals.B2.head, body: false, ColorScheme: false,  region: Search_Regions[3], location: Search_Location_Arr[3][0], cued_item: All_Items[3], search_item: All_Items[2]},
+                SA2_1: {ID: "SA2_1", head: TrainingFennimals.A2.head, body: false, ColorScheme: false,  region: Search_Regions[3], location: Search_Location_Arr[3][0], cued_item: All_Items[1], search_item: All_Items[0]},
+                SB2_1: {ID: "SB2_1", head: TrainingFennimals.B2.head, body: false, ColorScheme: false,  region: Search_Regions[3], location: Search_Location_Arr[3][0], cued_item: All_Items[3], search_item: All_Items[2]},
+
+                SA2_2: {ID: "SA2_2", head: TrainingFennimals.A2.head, body: false, ColorScheme: false,  region: Search_Regions[4], location: Search_Location_Arr[4][0], cued_item: All_Items[1], search_item: All_Items[0]},
+                SB2_2: {ID: "SB2_2", head: TrainingFennimals.B2.head, body: false, ColorScheme: false,  region: Search_Regions[4], location: Search_Location_Arr[4][0], cued_item: All_Items[3], search_item: All_Items[2]},
+
+                SA2_3: {ID: "SA2_3", head: TrainingFennimals.A2.head, body: false, ColorScheme: false,  region: Search_Regions[5], location: Search_Location_Arr[5][0], cued_item: All_Items[1], search_item: All_Items[0]},
+                SB2_3: {ID: "SB2_3", head: TrainingFennimals.B2.head, body: false, ColorScheme: false,  region: Search_Regions[5], location: Search_Location_Arr[5][0], cued_item: All_Items[3], search_item: All_Items[2]},
             }
 
             //Transforming the search stimuli into a block, and create 4 blocks of trials
@@ -1172,131 +1263,46 @@ STIMULUSDATA = function(participant_number, exp_code){
             }
 
             //Since the items available can differ within blocks, here we need to tweak the normal procesure for generating search phase trials
-            let CuedTrials = shuffleArray(createBlockOfSearchTrials(SearchPhaseTrials, true, true))
-            let SearchTrials1 = shuffleArray(createBlockOfSearchTrials(SearchPhaseTrials, true, false))
-            let SearchTrials2 = shuffleArray(createBlockOfSearchTrials(SearchPhaseTrials, true, false))
-            let SearchTrials3 = shuffleArray(createBlockOfSearchTrials(SearchPhaseTrials, true, false))
-
-            //For the search blocks, we need to tweak the available responses
-            for(let i =0;i<SearchTrials1.length; i++){
-                //If this trial is part of the search phase pair, then set the direct item to unavailable and the search item to unknown. Change the hidden responses too
-                if(SearchTrials1[i].ID === "SA1" || SearchTrials1[i].ID === "SA2"){
-                    SearchTrials1[i].ItemResponses[SearchTrials1[i].cued_item] = "unavailable"
-                    SearchTrials1[i].ItemResponses[SearchTrials1[i].search_item] = "unknown"
-                    SearchTrials1[i].HiddenItemResponses[SearchTrials1[i].cued_item] = "unavailable"
-                    SearchTrials1[i].HiddenItemResponses[SearchTrials1[i].search_item] = "smile"
-                }
-            }
-
-            for(let i =0;i<SearchTrials2.length; i++){
-                //If this trial is part of the search phase pair, then set the direct item to unavailable and the search item to unknown. Change the hidden responses too
-                if(SearchTrials2[i].ID === "SA1" || SearchTrials2[i].ID === "SA2"){
-                    SearchTrials2[i].ItemResponses[SearchTrials2[i].cued_item] = "unavailable"
-                    SearchTrials2[i].ItemResponses[SearchTrials2[i].search_item] = "unknown"
-                    SearchTrials2[i].HiddenItemResponses[SearchTrials2[i].cued_item] = "unavailable"
-                    SearchTrials2[i].HiddenItemResponses[SearchTrials2[i].search_item] = "smile"
-                }
-            }
-
-            for(let i =0;i<SearchTrials3.length; i++){
-                //If this trial is part of the search phase pair, then set the direct item to unavailable and the search item to unknown. Change the hidden responses too
-                if(SearchTrials3[i].ID === "SA1" || SearchTrials3[i].ID === "SA2"){
-                    SearchTrials3[i].ItemResponses[SearchTrials3[i].cued_item] = "unavailable"
-                    SearchTrials3[i].ItemResponses[SearchTrials3[i].search_item] = "unknown"
-                    SearchTrials3[i].HiddenItemResponses[SearchTrials3[i].cued_item] = "unavailable"
-                    SearchTrials3[i].HiddenItemResponses[SearchTrials3[i].search_item] = "smile"
-                }
-            }
+            let SearchTrials = shuffleArray(createBlockOfSearchTrials(SearchPhaseTrials, false, false))
 
             //Creating the search phase setup
             SearchPhaseSetup = [
-
                 {
-                    Trials: CuedTrials,
-                    type: "direct",
+                    Trials:  shuffleArray(JSON.parse(JSON.stringify(InductionPhaseBlock) )),
+                    type: "induced",
                     hint_type: "text",
                     number: 1
                 },
                 {
-                    Trials:  shuffleArray(SearchTrials1),
-                    type: "indirect",
+                    Trials:  shuffleArray(JSON.parse(JSON.stringify(InductionPhaseBlock) )),
+                    type: "induced",
                     hint_type: "text",
                     number: 2
                 },
                 {
-                    Trials:  shuffleArray(SearchTrials2),
+                    Trials:  shuffleArray(JSON.parse(JSON.stringify(SearchTrials))),
                     type: "indirect",
                     hint_type: "text",
                     number: 3
                 },
                 {
-                    Trials:  shuffleArray(SearchTrials3),
+                    Trials:  shuffleArray(JSON.parse(JSON.stringify(SearchTrials))),
                     type: "indirect",
                     hint_type: "text",
                     number: 4
                 },
 
                 {
-                    type: "similarity",
-                    Heads: shuffleArray(JSON.parse(JSON.stringify(Param.Heads_Set_A))),
-                    number: 5
-                },
-                {
-                    type: "additional_similarity",
-                    Heads: shuffleArray(JSON.parse(JSON.stringify(Param.Heads_Set_B))),
-                    number: 6
-                },
-                {
                     Trials: createBlockOfRepeatTrainingTrials(true),
                     type: "repeat_training",
                     hint_type: "text",
-                    number: 7
-                }]
-            /*
-            SearchPhaseSetup = [
-
-                {
-                    Trials: CuedTrials,
-                    type: "direct",
-                    hint_type: "text",
-                    number: 1
-                },
-                {
-                    Trials:  shuffleArray(SearchTrials1),
-                    type: "indirect",
-                    hint_type: "text",
-                    number: 2
-                },
-                {
-                    Trials:  shuffleArray(SearchTrials2),
-                    type: "indirect",
-                    hint_type: "text",
-                    number: 3
-                },
-                {
-                    Trials:  shuffleArray(SearchTrials3),
-                    type: "indirect",
-                    hint_type: "text",
-                    number: 4
-                },
-
-                {
-                    type: "similarity",
-                    Heads: shuffleArray(JSON.parse(JSON.stringify(Param.Heads_Set_A))),
                     number: 5
-                },
-                {
-                    type: "additional_similarity",
-                    Heads: shuffleArray(JSON.parse(JSON.stringify(Param.Heads_Set_B))),
-                    number: 6
-                },
-                {
-                    Trials: createBlockOfRepeatTrainingTrials(true),
-                    type: "repeat_training",
-                    hint_type: "text",
-                    number: 7
                 }]
-             */
+
+            //Updating the Searchtrials for the garbage collector
+            for(let i=0;i<InductionPhaseTrials.length; i++){
+                SearchTrials.push(InductionPhaseBlock[i])
+            }
 
             break;
 
@@ -1593,6 +1599,12 @@ STIMULUSDATA = function(participant_number, exp_code){
             Regions_Visited_During_Experiment.push(SearchPhaseTemplates[key].region)
         }
 
+        if(exp_code === "exp_search_on_sim"){
+            for(let key in InducedRecallTemplates){
+                Regions_Visited_During_Experiment.push(InducedRecallTemplates[key].region)
+            }
+        }
+
         return([... new Set(Regions_Visited_During_Experiment)])
 
     }
@@ -1607,6 +1619,12 @@ STIMULUSDATA = function(participant_number, exp_code){
             Locations_Visited_During_Experiment.push(SearchPhaseTemplates[key].location)
         }
 
+        if(exp_code === "exp_search_on_sim"){
+            for(let key in InducedRecallTemplates){
+                Locations_Visited_During_Experiment.push(InducedRecallTemplates[key].location)
+            }
+        }
+
         return([... new Set(Locations_Visited_During_Experiment)])
 
     }
@@ -1619,6 +1637,11 @@ STIMULUSDATA = function(participant_number, exp_code){
         }
         for(let key in SearchPhaseTemplates){
             Heads_Used_During_Experiment.push(SearchPhaseTemplates[key].head)
+        }
+        if(exp_code === "exp_search_on_sim"){
+            for(let key in InducedRecallTemplates){
+                Heads_Used_During_Experiment.push(InducedRecallTemplates[key].head)
+            }
         }
 
         return(Heads_Used_During_Experiment)
@@ -1638,6 +1661,14 @@ STIMULUSDATA = function(participant_number, exp_code){
                 Bodies_Used_During_Experiment.push(Param.RegionData[SearchPhaseTemplates[key].region].preferredBodyType)
             }
         }
+
+        if(exp_code === "exp_search_on_sim"){
+            for(let key in InducedRecallTemplates){
+                Bodies_Used_During_Experiment.push(InducedRecallTemplates[key].body)
+                console.log(InducedRecallTemplates[key].body)
+            }
+        }
+
         return(Bodies_Used_During_Experiment)
     }
 
@@ -5809,6 +5840,7 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
         Container.appendChild(Button)
         if(next_screen === "direct_block"){  Button.onclick = function(){showTestPhaseDirectBlockText(passthrough_buttonfunction)} }
         if(next_screen === "indirect_block"){  Button.onclick = function(){showTestPhaseIndirectBlockText(passthrough_buttonfunction)} }
+        if(next_screen === "induced_block"){  Button.onclick = function(){showTestPhaseInducedBlockText(passthrough_buttonfunction)} }
         if(next_screen === "repeat_block"){  Button.onclick = function(){showTestPhaseRepeatBlockText(passthrough_buttonfunction)} }
         if(next_screen === "final_block"){  Button.onclick = function(){showTestPhaseFinalBlockText(passthrough_buttonfunction)} }
 
@@ -5843,6 +5875,25 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
         Container.appendChild(createBackgroundElem())
         Container.appendChild(createInstructionTitleElem(Instructions.Test_Phase.Indirect.title))
         let TextField = createTextField(30, 15, 508-2*30,220, Instructions.Test_Phase.Indirect.text)
+        Container.appendChild(TextField)
+
+        setTimeout(function(){
+            let Button = createSVGButtonElem((508-150)/2,245,160,30,"CONTINUE")
+            Container.appendChild(Button)
+            Button.onclick = buttonfunction
+        },1000)
+    }
+
+    function showTestPhaseInducedBlockText(buttonfunction){
+        showNewInstructionsPage()
+
+        //Creating the container to hold all elements
+        let Container = createInstructionContainer()
+        SVGObjects.Instructions.Layer.appendChild(Container)
+
+        Container.appendChild(createBackgroundElem())
+        Container.appendChild(createInstructionTitleElem(Instructions.Test_Phase.Induced.title))
+        let TextField = createTextField(30, 15, 508-2*30,220, Instructions.Test_Phase.Induced.text)
         Container.appendChild(TextField)
 
         setTimeout(function(){
@@ -5898,6 +5949,9 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
     }
     this.show_test_phase_instructions_indirect_block = function(current_day, total_days, button_function){
         showTestPhaseDayScreen(current_day,total_days,"indirect_block", button_function)
+    }
+    this.show_test_phase_instructions_induced_block = function(current_day, total_days, button_function){
+        showTestPhaseDayScreen(current_day,total_days,"induced_block", button_function)
     }
     this.show_test_phase_instructions_repeat_block = function(current_day, total_days, button_function){
         showTestPhaseDayScreen(current_day,total_days,"repeat_block", button_function)
@@ -5977,7 +6031,7 @@ InstructionsController = function(ExpCont, LocCont, DataCont){
             if(block_type === "training"){
                 Container.appendChild(createFennimalIcon(Fennimal,150, 120,0.4,false, true))
             }
-            if(block_type === "direct" || block_type === "indirect" || block_type === "final_block" || block_type ==="sole_block" ){
+            if(block_type === "direct" || block_type === "indirect" || block_type === "final_block" || block_type ==="sole_block" || block_type ==="induced" ){
                 text = "A new Fennimal has been spotted at " + Param.SubjectFacingLocationNames[Fennimal.location]
                 let LocationText = createTextField((508/2)-200, 150, 400,55, text)
                 LocationText.style.fontSize = "20px"
@@ -6447,6 +6501,7 @@ SVGGarbageCollector = function(){
     //Call to delete unused locations.
     this.remove_unused_locations_from_SVG = function(All_Location_Names, Used_Location_Names){
         let To_Remove = []
+        console.log(Used_Location_Names)
 
         //Add any locations that are not used
         for(let i=0;i<All_Location_Names.length; i++){
@@ -6456,7 +6511,7 @@ SVGGarbageCollector = function(){
         }
 
         //Add any intersections that we do not need (using Param.RegionData)
-        for(key in Param.RegionData){
+        for(let key in Param.RegionData){
             if(key !== "Home" && key!=="Neutral"){
                 let locations_in_region_used = Param.RegionData[key].Locations.filter(v => Used_Location_Names.includes(v))
                 if(locations_in_region_used.length <= 1){
@@ -6491,6 +6546,7 @@ SVGGarbageCollector = function(){
 
     //Call to delete all unused bodies from the SVG
     this.remove_unused_bodies_from_SVG = function(All_bodies,Used_bodies){
+
         let To_Remove = []
 
         for(let i =0;i< All_bodies.length;i++){
@@ -7560,14 +7616,15 @@ ExperimentController = function(Stimuli, DataController){
 
     //Once the stimuli are created, change the available locations in the Parameter object. This prevents subjects from having to (or being able to) travel to regions which simply do not exist
     Param.Available_Location_Names = Stimuli.getLocationsVisited()
+    console.log(Param.Available_Location_Names)
 
     //After stimuli are defined, delete unused SVG layers to enhance performance
     let GarbageCleaner = new SVGGarbageCollector()
     GarbageCleaner.remove_unused_locations_from_SVG(Param.All_Possible_Locations, Param.Available_Location_Names)
-    GarbageCleaner.remove_unused_bodies_from_SVG(Param.Available_Fennimal_Bodies, Stimuli.getBodiesUsed())
     //One exception for the heads: we want to preserve them in the Search-on-sim experiment
     if(Stimuli.get_experiment_code() !== "exp_search_on_sim"){
         GarbageCleaner.remove_unused_heads_from_SVG(Param.Available_Fennimal_Heads, Stimuli.getHeadsUsed())
+        GarbageCleaner.remove_unused_bodies_from_SVG(Param.Available_Fennimal_Bodies, Stimuli.getBodiesUsed())
     }
 
     // At the start of the experiment, we first need to calibrate the Fennimal head similarities. Store the results of this calibration here.
@@ -8260,6 +8317,10 @@ ExperimentController = function(Stimuli, DataController){
                     CurrentBlockTrials = CurrentBlockData.Trials
                     InstrCont.show_test_phase_instructions_direct_block(CurrentBlockData.number, total_number_of_blocks,function(){that.start_next_test_trial()})
                     break
+                case("induced"):
+                    CurrentBlockTrials = shuffleArray( CurrentBlockData.Trials)
+                    InstrCont.show_test_phase_instructions_induced_block(CurrentBlockData.number, total_number_of_blocks,function(){that.start_next_test_trial()})
+                    break
                 case("indirect"):
                     CurrentBlockTrials = shuffleArray( CurrentBlockData.Trials)
                     InstrCont.show_test_phase_instructions_indirect_block(CurrentBlockData.number, total_number_of_blocks,function(){that.start_next_test_trial()})
@@ -8484,16 +8545,30 @@ let Instructions = {
                 "<br>" +
                 "<i>There is no time limit on your decision - you can take as long as you like. After you have selected an item, the Fennimal will either approve of the toy or reject it. </i>"
         },
+        Induced: {
+            title: "APPLYING YOUR KNOWLEDGE",
+            text: "<br><br> Now it's time to apply your knowledge to some new situations. <br>" +
+                "<br>" +
+                "In this part of your training, we will guide you to find some new Fennimals. These Fennimals are similar (but different) from the Fennimals you've encountered thus far. " +
+                "Your task is to give these Fennimals a toy they like. <br>" +
+                "<br>" +
+                "<b>Please select the toys in the following way: </b> <br>" +
+                "<br>" +
+                "First you have to remember which previous Fennimal was similar to this new Fennimal. Visualize what this Fennimal looked like, where it lived and which toy it liked.<br>" +
+                "<br>" +
+                "If this toy is available, then give this toy to the Fennimal. <br>" +
+                "<br>" +
+                "If this toy is not available, then you have to remember which other Fennimal could be found in the same region of Fenneland. Again, visualize what this other Fennimal looked like, where it lived and which toy it liked. Then give the new Fennimal the toy that this previous Fennimal liked."
+        },
         Indirect: {
             title: "NEW FENNIMALS HAVE BEEN SPOTTED!",
-            text: "<br><br> A new group of Fennimals recently started to appear on the island. <br>" +
+            text: "<br><br> A new group of Fennimals have recently started to appear on the island. <br>" +
                 "<br>" +
                 "<u> You can apply your previously learned knowledge to select a fitting toy for these Fennimals.</u> <br>" +
                 "<br>" +
                 "After you give them a toy, the Fennimals will return to their homes and inspect the toys there. <u>You won't learn whether or not they liked the toys you gave them until the end of this experiment. </u>  <br>" +
                 "<br>" +
                 "Some toys occasionally drop out of your bag as you make your way across the island. You will have to make do with whatever toys are available. If the toy that you want to give to the Fennimal is not available, then maybe you can think of another toy that this Fennimal will like. " +
-                "<b>Hint: Fennimals that live on the same part of the island also like the same toys...</b><br>" +
                 "<br>" +
                 "<i>There is no time limit on your decision - you can take as long as you like. After you have selected an item, the Fennimal will return to its home and inspect the provided toy. </i>"
         },
@@ -8674,7 +8749,7 @@ EC.startExperiment()
 //EC.start_test_phase()
 
 
-console.log("Version: 22.05.23 Search Sim")
+console.log("Version: 22.05.23 B")
 
 // Instructions repeat block showing last panel too early
 // Instructios number of days
