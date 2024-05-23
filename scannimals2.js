@@ -8749,7 +8749,7 @@ EC.startExperiment()
 //EC.start_test_phase()
 
 
-console.log("Version: 22.05.23 B")
+console.log("Version: 23.05.23")
 
 // Instructions repeat block showing last panel too early
 // Instructios number of days
