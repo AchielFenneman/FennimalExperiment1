@@ -630,3 +630,9 @@ SVGGarbageCollector = function(){
 
 
 }
+
+function draw_random_participant_seed(){
+    //Draws a random integer between 1100 and 2000
+    return Math.floor(Math.random() * (2000 - 1100 + 1) + 1100)
+
+}
