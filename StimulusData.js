@@ -409,9 +409,9 @@ STIMULUSDATA = function(exp_code){
             SearchPhaseSetup = [
                 {
                     Trials: [
-                       createTestFennimalObj("TestA1", Training_Regions[1], Training_Location_Arr[1][1],  Used_Heads[0],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "heart"] ], false, false, false,SearchPhaseRules),
+                        createTestFennimalObj("TestA1", Training_Regions[1], Training_Location_Arr[1][1],  Used_Heads[0],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "heart"] ], false, false, false,SearchPhaseRules),
                         createTestFennimalObj("TestA1", Training_Regions[1], Training_Location_Arr[1][2],  Used_Heads[0],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "heart"] ], false, false, false,SearchPhaseRules),
-                       //createTestFennimalObj("TestA2", Search_Regions[1], Search_Location_Arr[1][0],  Used_Heads[0],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "heart"] ],false, false, false,SearchPhaseRules),
+                        //createTestFennimalObj("TestA2", Search_Regions[1], Search_Location_Arr[1][0],  Used_Heads[0],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "heart"] ],false, false, false,SearchPhaseRules),
 
                     ],
                     hint_type: "location",
@@ -479,7 +479,7 @@ STIMULUSDATA = function(exp_code){
                     Trials: [
                         createTestFennimalObj("Test_Key", Search_Regions[0], Search_Location_Arr[0][0],  TrainingFennimals.A.head,false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "heart"],[All_Items[3],"neutral"] ], false, false, false,SearchPhaseRules_search),
                         createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
-                        createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
+                        //createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
                     ],
                     hint_type: "location",
                     type: "search",
@@ -489,7 +489,7 @@ STIMULUSDATA = function(exp_code){
                     Trials: [
                         createTestFennimalObj("Test_Key", Search_Regions[0], Search_Location_Arr[0][0],  TrainingFennimals.A.head,false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "heart"],[All_Items[3],"neutral"] ], false, false, false,SearchPhaseRules_search),
                         createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
-                        createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
+                        // createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
                     ],
                     hint_type: "location",
                     type: "search",
@@ -499,7 +499,7 @@ STIMULUSDATA = function(exp_code){
                     Trials: [
                         createTestFennimalObj("Test_Key", Search_Regions[0], Search_Location_Arr[0][0],  TrainingFennimals.A.head,false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "heart"],[All_Items[3],"neutral"] ], false, false, false,SearchPhaseRules_search),
                         createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
-                        createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
+                        //createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
                     ],
                     hint_type: "location",
                     type: "search",
@@ -509,7 +509,7 @@ STIMULUSDATA = function(exp_code){
                     Trials: [
                         createTestFennimalObj("Test_Key", Search_Regions[0], Search_Location_Arr[0][0],  TrainingFennimals.A.head,false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "heart"],[All_Items[3],"neutral"] ], false, false, false,SearchPhaseRules_search),
                         createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
-                        createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
+                        // createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
                     ],
                     hint_type: "location",
                     type: "search",

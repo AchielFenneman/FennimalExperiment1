@@ -271,7 +271,7 @@ FeedbackController = function(FennimalObject, FennimalSVGContainer, show_icon_on
                         let ItemViewBox = getViewBoxCenterPoint(ItemObj)
                         let BBox = ItemObj.getBoundingClientRect()
 
-                        let NewSymbol = new SmallFeedbackSymbol(ItemViewBox.x + 0.5*BBox.width + random_x + 0, ItemViewBox.y + 0.5*BBox.height + random_y - 20 , "heart")
+                        let NewSymbol = new SmallFeedbackSymbol(ItemViewBox.x + 0.5*BBox.width + random_x + -40, ItemViewBox.y + 0.5*BBox.height + random_y - 20 , "heart")
                     },75)
                 },50)
 
@@ -306,7 +306,7 @@ FeedbackController = function(FennimalObject, FennimalSVGContainer, show_icon_on
                         let ItemViewBox = getViewBoxCenterPoint(ItemObj)
                         let BBox = ItemObj.getBoundingClientRect()
 
-                        let NewSymbol = new SmallFeedbackSymbol(ItemViewBox.x + 0.5*BBox.width + random_x + 40, ItemViewBox.y -80 + random_y , "frown")
+                        let NewSymbol = new SmallFeedbackSymbol(ItemViewBox.x + 0.5*BBox.width + random_x + 0, ItemViewBox.y -80 + random_y , "frown")
                     },150)
                 },50)
 
@@ -431,12 +431,12 @@ FeedbackController = function(FennimalObject, FennimalSVGContainer, show_icon_on
                 flag_can_play_sound = true
 
                 setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.16 * animation_duration)
-               // setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.60 * animation_duration)
+                // setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.60 * animation_duration)
 
 
                 ItemSoundInterval = setInterval(function(){
                     setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.16 * animation_duration)
-                   // setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.60 * animation_duration)
+                    // setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.60 * animation_duration)
 
                 }, animation_duration)
                 break;
@@ -1359,16 +1359,16 @@ FennimalController = function(FennimalObj, LocCont, limited_backpack_item_array)
         FennimalObj.selected_item = selected_item
         FennimalObj.outcome_observed = FennimalObj.ItemResponses[selected_item]
 
-       if(limited_backpack_item_array !== false){
-           limited_backpack_item_given(selected_item)
-       }
+        if(limited_backpack_item_array !== false){
+            limited_backpack_item_given(selected_item)
+        }
 
 
         FeedbackCont = new FeedbackController(FennimalObj,Container, true)
 
         //After a brief delay the interaction is completed.
         setTimeout(function(){
-           LocCont.Fennimal_interaction_completed(FennimalObj)
+            LocCont.Fennimal_interaction_completed(FennimalObj)
 
         },3000)
 
