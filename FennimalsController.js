@@ -271,7 +271,7 @@ FeedbackController = function(FennimalObject, FennimalSVGContainer, show_icon_on
                         let ItemViewBox = getViewBoxCenterPoint(ItemObj)
                         let BBox = ItemObj.getBoundingClientRect()
 
-                        let NewSymbol = new SmallFeedbackSymbol(ItemViewBox.x + 0.5*BBox.width + random_x + -40, ItemViewBox.y + 0.5*BBox.height + random_y - 20 , "heart")
+                        let NewSymbol = new SmallFeedbackSymbol(ItemViewBox.x + 0.5*BBox.width + random_x + 0, ItemViewBox.y + 0.5*BBox.height + random_y - 30 , "heart")
                     },75)
                 },50)
 
@@ -306,7 +306,7 @@ FeedbackController = function(FennimalObject, FennimalSVGContainer, show_icon_on
                         let ItemViewBox = getViewBoxCenterPoint(ItemObj)
                         let BBox = ItemObj.getBoundingClientRect()
 
-                        let NewSymbol = new SmallFeedbackSymbol(ItemViewBox.x + 0.5*BBox.width + random_x + 0, ItemViewBox.y -80 + random_y , "frown")
+                        let NewSymbol = new SmallFeedbackSymbol(ItemViewBox.x + 0.5*BBox.width + random_x + -20, ItemViewBox.y -80 + random_y , "frown")
                     },150)
                 },50)
 
