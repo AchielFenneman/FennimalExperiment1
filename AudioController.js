@@ -1,27 +1,21 @@
 AudioControllerObject = function(){
     //Creates soundcontrollers for the files in the Audio subfolder
     let RegionSoundScapes = {
-        North : new Audio("/Audio/Regions/North.wav", loop=true),
-        Jungle: new Audio("/Audio/Regions/Jungle.mp3", loop=true),
-        Desert: new Audio("/Audio/Regions/Desert.mp3", loop=true),
-        Mountains: new Audio("/Audio/Regions/Mountains.wav", loop=true),
-        Beach: new Audio("/Audio/Regions/Beach.wav", loop=true),
-        Flowerfields: new Audio("/Audio/Regions/Flowerfields.mp3", loop=true),
-        Village: new Audio("/Audio/Regions/Village.mp3", loop=true),
-        Swamp: new Audio("/Audio/Regions/Swamp.wav", loop=true),
+        North : new Audio("North.wav", loop=true),
+        Jungle: new Audio("Jungle.mp3", loop=true),
+        Desert: new Audio("Desert.mp3", loop=true),
+        Mountains: new Audio("Mountains.wav", loop=true),
+        Beach: new Audio("Beach.wav", loop=true),
+        Flowerfields: new Audio("Flowerfields.mp3", loop=true),
+        Village: new Audio("Village.mp3", loop=true),
+        Swamp: new Audio("Swamp.wav", loop=true),
     }
 
     let SoundEffects = {
-       //honk: new Audio("/Audio/honk.wav"),
-        //success: new Audio("/Audio/success.wav"),
-        //duck_squeeze: new Audio("/Audio/duck.wav"),
-       // ball_bounce: new Audio("/Audio/bounce.mp3"),
-       // trumpet: new Audio("/Audio/trumpet.mp3"),
-       // kite: new Audio("/Audio/kite.wav"),
-        rejected: new Audio("/Audio/rejected.wav"),
-        positive: new Audio("/Audio/positive.wav"),
-        mystery: new Audio("/Audio/mystery.wav"),
-        //zipper: new Audio("/Audio/zipper.wav"),
+        rejected: new Audio("rejected.wav"),
+        positive: new Audio("positive.wav"),
+        mystery: new Audio("mystery.wav"),
+
     }
 
 
