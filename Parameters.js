@@ -614,6 +614,11 @@ ParameterObject = function() {
     this.RegionData = {
         North : {
             Locations : ["Pineforest", "Iceberg", "Igloo"],
+            Location_selection_order: {
+                1: ["Igloo"],
+                2: ["Iceberg", "Igloo"],
+                3: ["Pineforest", "Iceberg", "Igloo"]
+            },
             lighter_color: "#a2b2fc",
             color: "#0020ac",
             darker_color: "#001987",
@@ -630,6 +635,11 @@ ParameterObject = function() {
         },
         Jungle: {
             Locations : ["Bush", "Jungleforest", "Lake"],
+            Location_selection_order: {
+                1: ["Bush"],
+                2: ["Jungleforest", "Lake"],
+                3: ["Bush", "Jungleforest", "Lake"]
+            },
             lighter_color: "#b5e092",
             color: "#588b1e",
             darker_color: "#235412",
@@ -646,6 +656,11 @@ ParameterObject = function() {
         },
         Desert: {
             Locations : ["Oasis", "Cactus", "Camp"],
+            Location_selection_order: {
+                1: ["Oasis"],
+                2: ["Cactus", "Camp"],
+                3: ["Oasis", "Cactus", "Camp"]
+            },
             lighter_color: "#f5f55b",
             color: "#c7c602", //#fffe03
             darker_color: "#757500",
@@ -662,6 +677,11 @@ ParameterObject = function() {
         },
         Mountains: {
             Locations : ["Waterfall", "Mine", "Cliff"],
+            Location_selection_order: {
+                1: ["Cliff"],
+                2: ["Waterfall", "Mine"],
+                3: ["Waterfall", "Mine", "Cliff"]
+            },
             lighter_color: "#d6bba9",
             color: "#502d16",
             darker_color: "#26150a",
@@ -678,6 +698,11 @@ ParameterObject = function() {
         },
         Beach: {
             Locations : ["Beachbar", "Port", "Dunes"],
+            Location_selection_order: {
+                1: ["Port"],
+                2: ["Port", "Dunes"],
+                3: ["Beachbar", "Port", "Dunes"]
+            },
             lighter_color: "#ffd0b0",
             color: "#ffe6d5",
             darker_color: "#615c58",
@@ -694,6 +719,11 @@ ParameterObject = function() {
         },
         Flowerfields: {
             Locations : ["Windmill", "Garden", "Orchard"],
+            Location_selection_order: {
+                1: ["Windmill", ],
+                2: ["Windmill", "Garden"],
+                3: ["Windmill", "Garden", "Orchard"]
+            },
             lighter_color: "#ffcffa",
             color: "#f472e6",
             darker_color: "#783771",
@@ -711,6 +741,11 @@ ParameterObject = function() {
         },
         Village: {
             Locations : ["Church", "Farm", "Manor"],
+            Location_selection_order: {
+                1: ["Church"],
+                2: ["Farm", "Manor"],
+                3: ["Church", "Farm", "Manor"],
+            },
             lighter_color: "#fcb1b1",
             color: "#f20000",
             darker_color: "#7d0101",
@@ -728,6 +763,11 @@ ParameterObject = function() {
         },
         Swamp: {
             Locations : ["Marsh", "Cottage", "Creek"],
+            Location_selection_order: {
+                1: ["Marsh"],
+                2: ["Marsh", "Cottage"],
+                3: ["Marsh", "Cottage", "Creek"]
+            },
             lighter_color: "#adffef",
             color: "#00fdcc",
             darker_color: "#025e4c",
@@ -896,6 +936,33 @@ ParameterObject = function() {
         Village: "Domestic",
         Swamp: "Swamp",
     }
+    this.NamePrefixes_Location = {
+        Pineforest: "Pine",
+        Iceberg: "Iceberg",
+        Igloo: "Igloo",
+        Windmill: "Windmill",
+        Garden: "Garden",
+        Orchard: "Orchard",
+        Waterfall: "Waterfall",
+        Mine: "Subterranean",
+        Cliff: "Cliff",
+        Church: "Church",
+        Farm: "Farm",
+        Manor: "Household",
+        Marsh: "Marsh",
+        Cottage: "Cottage",
+        Creek: "Creek",
+        Oasis: "Oasis",
+        Cactus: "Cactus",
+        Camp: "Camp",
+        Beachbar: "Bar",
+        Port: "Port",
+        Dunes: "Dune",
+        Bush: "Bush",
+        Jungleforest: "Tree",
+        Lake: "Freshwater"
+    }
+
     // Description of the head
     this.Names_Head = {
         A: "Kitty",
@@ -913,6 +980,7 @@ ParameterObject = function() {
         M: "Squeaky",
         N: "Nibbler",
     }
+
 
     //The bonus earned per star. If set to false, then no bonus is mentioned throughout the instructions
     this.BonusEarnedPerStar = {

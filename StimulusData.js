@@ -1,7 +1,6 @@
 console.warn("RUNNING STIMULUS DATA")
 
 STIMULUSDATA = function(exp_code){
-
     // SUPPORTING FUNCTIONS
     ////////////////////////
     function generate_item_details(Items_Used){
@@ -105,13 +104,20 @@ STIMULUSDATA = function(exp_code){
         FenObj.search_item = search_item
         FenObj.TestPhaseRules = TestPhaseRules
 
-        //For the test phase, all items may be set to available (changes will be made by the FennimalController later on). If no valence assigned, assume neutral
+        //If requested, change the name of these Fennimals to be based on their location
+        if(typeof TestPhaseRules.name_based_on_location !== "undefined"){
+            if(TestPhaseRules.name_based_on_location){
+                FenObj.name = createConjunctiveNameLocationHead(FenObj.location, FenObj.head)
+            }
+        }
+
+        //For the test phase, all items may be set to available (changes will be made by the FennimalController later on). If no valence assigned, assume unavailable
         if(ItemResponseArr !== false){
             let special_item_candidates = []
             if(Array.isArray(ItemResponseArr)){
                 let ItemResponseMap = {}
                 for(let i=0;i<All_Items.length; i++){
-                    ItemResponseMap[All_Items[i]] = "neutral"
+                    ItemResponseMap[All_Items[i]] = "unavailable"
                 }
 
                 for(let i=0;i<ItemResponseArr.length;i++){
@@ -130,165 +136,229 @@ STIMULUSDATA = function(exp_code){
         return(FenObj)
     }
 
-
-    //Returns a block of inference-phase trials. items_allowed_... can be "direct" or "indirect.
-    function createBlockOfSearchTrials(TrialsArr, cued_items_allowed, show_feedback, feedback_always_smile){
-        let Block = []
-
-        for(let ind = 0; ind<TrialsArr.length; ind++){
-            let FenObj = JSON.parse(JSON.stringify(TrialsArr[ind]))
-
-            //Finding which items should be available. If cued_items_allowed it true, then remove the search item. If its false, remove the cued item
-            let available_items = JSON.parse(JSON.stringify(All_Items))
-            if(cued_items_allowed){available_items = available_items.filter(x => x !== FenObj.search_item)} else{available_items = available_items.filter(x => x !== FenObj.cued_item)}
-
-            //Creating the valenced feedback object. This may or may not be shown (depending on feedback setting) but always determines the outcomes at the end
-            let ValencedFeedbackResponses  = {}
-            for(let item_ind =0; item_ind < All_Items.length; item_ind++){
-                let item = All_Items[item_ind]
-                let valence
-
-                if(available_items.includes(item)){
-                    if(feedback_always_smile){
-                        valence = "smile"
-                    }else{
-                        if(item === FenObj.cued_item || item === FenObj.search_item){
-                            valence = "smile"
-                        }else{
-                            valence = "frown"
-                        }
-                    }
-                }else{
-                    valence = "unavailable"
-                }
-
-                ValencedFeedbackResponses[item] = valence
-            }
-
-            if(show_feedback){
-                FenObj.ItemResponses = ValencedFeedbackResponses
-            }else{
-                //If feedback is not shown, create a participant-facing response object
-                let ParticipantFacingItemResponses = {}
-                for(let item_ind =0; item_ind < All_Items.length; item_ind++){
-                    let item = All_Items[item_ind]
-                    if(available_items.includes(item)){
-                        ParticipantFacingItemResponses[item] = "unknown"
-                    }else{
-                        ParticipantFacingItemResponses[item] = "unavailable"
-                    }
-
-                }
-
-                FenObj.ItemResponses = ParticipantFacingItemResponses
-                FenObj.HiddenItemResponses = ValencedFeedbackResponses
-
-            }
-
-            //Pushing to the DirectTestBlock
-            Block.push(FenObj)
-        }
-
-        return(shuffleArray(Block))
-    }
-
-    //Returns a block of induced-search trials. Provide with array of IDs denoting trials in which the search item is available (all others willbe assumed search trials)
-    function createBlockOfInducedSearchTrials(TrialsArr, _IDs_search, show_feedback){
-        let Block = []
-
-        for(let ind = 0; ind<TrialsArr.length; ind++){
-            let FenObj = JSON.parse(JSON.stringify(TrialsArr[ind]))
-
-            //Finding which items should be available. If cued_items_allowed it true, then remove the search item. If its false, remove the cued item
-            let available_items = JSON.parse(JSON.stringify(All_Items))
-            if(_IDs_search.includes(FenObj.ID)){
-                available_items = available_items.filter(x => x !== FenObj.cued_item)
-            }else{
-                available_items = available_items.filter(x => x !== FenObj.search_item)
-            }
-
-            //Creating the valenced feedback object. This may or may not be shown (depending on feedback setting) but always determines the outcomes at the end
-            let ValencedFeedbackResponses  = {}
-            for(let item_ind =0; item_ind < All_Items.length; item_ind++){
-                let item = All_Items[item_ind]
-                let valence
-
-                if(available_items.includes(item)){
-                    if(item === FenObj.cued_item || item === FenObj.search_item){
-                        valence = "correct"
-                    }else{
-                        valence = "incorrect"
-                    }
-                }else{
-                    valence = "unavailable"
-                }
-
-                ValencedFeedbackResponses[item] = valence
-            }
-
-            if(show_feedback){
-                FenObj.ItemResponses = ValencedFeedbackResponses
-            }else{
-                //If feedback is not shown, create a participant-facing response object
-                let ParticipantFacingItemResponses = {}
-                for(let item_ind =0; item_ind < All_Items.length; item_ind++){
-                    let item = All_Items[item_ind]
-                    if(available_items.includes(item)){
-                        ParticipantFacingItemResponses[item] = "unknown"
-                    }else{
-                        ParticipantFacingItemResponses[item] = "unavailable"
-                    }
-
-                }
-
-                FenObj.ItemResponses = ParticipantFacingItemResponses
-                FenObj.HiddenItemResponses = ValencedFeedbackResponses
-
-            }
-
-            //Pushing to the DirectTestBlock
-            Block.push(FenObj)
-        }
-
-        return(shuffleArray(Block))
-    }
-
-    //Returns a block of the original training trials with all items available (no feedback provided)
-    function createBlockOfRepeatTrainingTrials(shuffle_trials){
-        let Block = []
-        for(let key in TrainingFennimals){
-            let NewFenObj = JSON.parse(JSON.stringify(TrainingFennimals[key]))
-
-            //Note that here only the special item should be listed as correct, all the other items are incorrect
-            let ItemResponseMap = {}, HiddenItemResponseMap = {}
-            for(let i=0;i<All_Items.length; i++){
-                if(NewFenObj.special_item === All_Items[i]){
-                    HiddenItemResponseMap[All_Items[i]] = "correct"
-                }else{
-                    HiddenItemResponseMap[All_Items[i]] = "incorrect"
-                }
-                ItemResponseMap[All_Items[i]] = "unknown"
-            }
-            NewFenObj.ItemResponses = ItemResponseMap
-            NewFenObj.HiddenItemResponses = HiddenItemResponseMap
-
-            NewFenObj.ID = key
-            Block.push(NewFenObj)
-        }
-
-        if(shuffle_trials){
-            return(shuffleArray(Block))
-        }else{
-            return(Block)
-        }
-    }
-
     //Here we define the different experiment structures
-    let TrainingFennimals,InducedRecallTemplates, SearchPhaseTemplates, SearchPhaseSetup, Item_Details, All_Items
-    let Available_Regions = shuffleArray(["North","Desert","Village","Jungle","Flowerfields","Swamp", "Beach", "Mountains"])
+    let TrainingFennimals, SearchPhaseSetup, Item_Details, All_Items
 
-    //Use this to store experiment-specific variables
-    let AuxData = false
+    //Given Training and SearchBlock Templates and a number of repeated search phase blocks, sets the TrainingFennimals and the SearchPhaseSetup (defining the experiment)
+    let set_stimuli_for_basic_experiment = function(TrainingTemplates,SearchPhaseBlockTemplates, number_search_blocks){
+        // If set to true, then the test phase Fennimals have names based on their LOCATION (not region)
+        let search_phase_Fennimals_name_based_on_location = true
+
+        //ASSIGNING REGIONS AND LOCATIONS
+        //////////////////////////////////
+        let AvailableRegions = [shuffleArray(["Desert", "North", "Village", "Jungle"]), shuffleArray(["Mountains", "Beach", "Flowerfields", "Swamp"])].flat()
+
+        //Finding out the count by which there are different locations within each region during the training phase
+        let RegionLocationCodes = {}
+        for(let i =0;i<TrainingTemplates.length;i++){
+            if(typeof RegionLocationCodes[TrainingTemplates[i].region] === "undefined"){
+                RegionLocationCodes[TrainingTemplates[i].region] = {region: AvailableRegions.shift(), training_phase_count: 1}
+            }else{
+                RegionLocationCodes[TrainingTemplates[i].region].training_phase_count++
+            }
+        }
+
+        //Assigning regions and figuring out the number of locations visited in each region
+        for(let i =0;i<SearchPhaseBlockTemplates.length;i++){
+            let region = SearchPhaseBlockTemplates[i].region
+            if(typeof RegionLocationCodes[region] === "undefined"){
+                //This region has not been used in the training phase.
+                RegionLocationCodes[region] = {region: AvailableRegions.shift(), search_phase_count: 1}
+            }else{
+                //This region has been used in the training phase.
+                if(typeof RegionLocationCodes[region].search_phase_count === "undefined"){
+                    RegionLocationCodes[region].search_phase_count = 1
+                }else{
+                    RegionLocationCodes[region].search_phase_count++
+                }
+            }
+        }
+
+        //Now that we have a count, we can start adding in locations. This takes a bit of logic.... Once these are determined, we have two arrays (one for training, one for test), which can be shifted when assigning later.
+        for(let key in RegionLocationCodes){
+            let region = RegionLocationCodes[key].region
+
+            if(typeof RegionLocationCodes[key].training_phase_count === "undefined"){
+                // No training phase locations used
+                if(typeof RegionLocationCodes[key].search_phase_count !== "undefined"){
+                    if(RegionLocationCodes[key].search_phase_count === 1){
+                        //Use preferred for search
+                        RegionLocationCodes[key].search_locations = JSON.parse(JSON.stringify(Param.RegionData[region].Location_selection_order[1]))
+                    }
+                    if(RegionLocationCodes[key].search_phase_count === 2){
+                        RegionLocationCodes[key].search_locations = shuffleArray(JSON.parse(JSON.stringify(Param.RegionData[region].Location_selection_order[2])))
+                    }
+                    if(RegionLocationCodes[key].search_phase_count === 3){
+                        // Use all three locations for search
+                        RegionLocationCodes[key].search_locations = shuffleArray(JSON.parse(JSON.stringify(Param.RegionData[region].Location_selection_order[3])))
+                    }
+                }
+
+            }else{
+                if(RegionLocationCodes[key].training_phase_count === 1){
+                    //Only a single training-phase location
+                    if(typeof RegionLocationCodes[key].search_phase_count !== "undefined"){
+                        if(RegionLocationCodes[key].search_phase_count === 1){
+                            //Use the same (preferred) location for both training and search
+                            RegionLocationCodes[key].training_locations = JSON.parse(JSON.stringify(Param.RegionData[region].Location_selection_order[1]))
+                            RegionLocationCodes[key].search_locations = JSON.parse(JSON.stringify(Param.RegionData[region].Location_selection_order[1]))
+                        }
+                        if(RegionLocationCodes[key].search_phase_count === 2){
+                            //Center location for training, both sides for search
+                            RegionLocationCodes[key].search_locations = shuffleArray( JSON.parse(JSON.stringify(Param.RegionData[region].Location_selection_order[2] )))
+                            RegionLocationCodes[key].training_locations = JSON.parse(JSON.stringify(Param.RegionData[region].Location_selection_order[3])).filter(x => !RegionLocationCodes[key].search_locations.includes(x))
+                        }
+                        if(RegionLocationCodes[key].search_phase_count === 3){
+                            //Center location for training, random allocation for search. This is not optimal and will need to be hardcoded...
+                            console.error("WARNING: WEIRD SPECIFICATION FOR THE TRAINING AND SEARCH REGIONS. RETHINK DESIGN OR HARDCODE...")
+                        }
+                    }else{
+                        //Only used during training phase.
+                        RegionLocationCodes[key].training_locations = JSON.parse(JSON.stringify(Param.RegionData[region].Location_selection_order[1]))
+                    }
+                }else{
+                    if(RegionLocationCodes[key].training_phase_count === 2){
+                        //Two training phase locations: use the sides for the training phase, center for the search phase.
+                        RegionLocationCodes[key].training_locations = shuffleArray( JSON.parse(JSON.stringify(Param.RegionData[region].Location_selection_order[2])) )
+                        RegionLocationCodes[key].search_locations = JSON.parse(JSON.stringify(Param.RegionData[region].Location_selection_order[3])).filter(x => !RegionLocationCodes[key].training_locations.includes(x))
+                    }else{
+                        // Three training phase locations for one region. Select search regions at random... This really only works if there are no search locations here...
+                        RegionLocationCodes[key].training_locations = shuffleArray( JSON.parse(JSON.stringify(Param.RegionData[region].Location_selection_order[3] )))
+                        RegionLocationCodes[key].search_locations = shuffleArray( JSON.parse(JSON.stringify(Param.RegionData[region].Location_selection_order[3] )))
+                    }
+                }
+            }
+        }
+
+        //ASSIGNING HEADS
+        //////////////////
+        //Shuffle heads
+        let Available_Heads  = shuffleArray(["C", "E", "I",  "B", "N"]) //"K", "G", "D
+        let HeadCodes = {}
+        for(let i =0;i<TrainingTemplates.length;i++){
+            let headcode = TrainingTemplates[i].head
+            if(typeof HeadCodes[headcode] === "undefined"){
+                HeadCodes[headcode] = Available_Heads.shift()
+            }
+        }
+        for(let i =0;i<SearchPhaseBlockTemplates.length;i++){
+            let headcode = SearchPhaseBlockTemplates[i].head
+            if(typeof HeadCodes[headcode] === "undefined"){
+                HeadCodes[headcode] = Available_Heads.shift()
+            }
+        }
+
+        //ASSIGNING ITEMS
+        //////////////////
+        //Searching for all item codes
+        let ItemCodes= {}
+        for(let i =0;i<TrainingTemplates.length;i++){
+            let itemcode = TrainingTemplates[i].special_item
+            if(typeof ItemCodes[itemcode] === "undefined"){
+                ItemCodes[itemcode] = false
+            }
+        }
+        for(let i =0;i<SearchPhaseBlockTemplates.length;i++){
+            let itemresponses = SearchPhaseBlockTemplates[i].ItemResponses
+            for(let item in itemresponses){
+                if(typeof ItemCodes[item] === "undefined"){
+                    ItemCodes[item] = false
+                    console.warn("WARNING: some items only used during search, not training. Double check if this is correct")
+                }
+            }
+        }
+
+        //Creating Item details and defining All_Items
+        Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, Object.keys(ItemCodes).length, false ))
+        All_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
+
+        //Assigning to keys
+        for(let i=0;i<Object.keys(ItemCodes).length;i++){
+            ItemCodes[Object.keys(ItemCodes)[i]] = All_Items[i]
+        }
+
+        //CREATING TRAINING PHASE OBJECTS
+        //////////////////////////////////
+        TrainingFennimals = {}
+        for(let i=0; i<TrainingTemplates.length;i++){
+            let Temp = TrainingTemplates[i]
+
+            //Create item response array with the correct items
+            let IRA = [ [ItemCodes[Temp.special_item], Temp.outcome]]
+            TrainingFennimals[Temp.ID] = createTrainingFennimalObj(Temp.ID, RegionLocationCodes[Temp.region].region, RegionLocationCodes[Temp.region].training_locations.shift(), HeadCodes[Temp.head], false, IRA,false)
+        }
+
+        //DEFINING SEARCH PHASE STIMULI
+        //////////////////////////////////
+        //Setting the search phase rules
+        let SearchPhaseRules_search = {
+            hidden_feedback: true,
+            cued_item_allowed: true,
+            search_item_allowed: true,
+            name_based_on_location: search_phase_Fennimals_name_based_on_location
+        }
+        let SearchPhaseRules_repeat = {
+            hidden_feedback: true,
+            cued_item_allowed: true,
+            search_item_allowed: true,
+            is_repeat_trial: true
+        }
+
+        let SearchPhaseBlockTrials = []
+        for(let i =0;i<SearchPhaseBlockTemplates.length;i++){
+            let Temp = SearchPhaseBlockTemplates[i]
+            let IRA = []
+            for(let item in Temp.ItemResponses){
+                IRA.push(  [ItemCodes[item], Temp.ItemResponses[item]] )
+            }
+
+            SearchPhaseBlockTrials.push(createTestFennimalObj(Temp.ID, RegionLocationCodes[Temp.region]. region, RegionLocationCodes[Temp.region].search_locations.shift(), HeadCodes[Temp.head], false, IRA,false, false, false,SearchPhaseRules_search))
+        }
+
+        let RepeatBlockTrials = []
+        for(let i = 0;i<TrainingTemplates.length;i++){
+            let Temp = TrainingTemplates[i]
+            let FenObj = TrainingFennimals[Temp.ID]
+
+            //Create item response array with the correct items
+            let IRA = []
+            let special_item
+            for(let itemcode in ItemCodes){
+                if(itemcode === Temp.special_item){
+                    special_item = [ItemCodes[itemcode]][0]
+                    IRA.push(  [ItemCodes[itemcode], "correct"] )
+                }else{
+                    IRA.push(  [ItemCodes[itemcode], "incorrect"] )
+                }
+
+
+            }
+            RepeatBlockTrials.push(createTestFennimalObj("Repeat" + Temp.ID, FenObj.region, FenObj.location,FenObj.head,FenObj.body,IRA, false,special_item,false,SearchPhaseRules_repeat ))
+        }
+
+        SearchPhaseSetup = []
+        //Adding the search blocks
+        for(let blocknum = 0; blocknum<number_search_blocks; blocknum++){
+            let NewBlock = {
+                Trials: shuffleArray(JSON.parse(JSON.stringify(SearchPhaseBlockTrials))),
+                hint_type: "location",
+                type: "search",
+                Rules: SearchPhaseRules_search
+            }
+            SearchPhaseSetup.push(NewBlock)
+        }
+
+        //Adding the repeat trials at the end
+        SearchPhaseSetup.push({
+            Trials:shuffleArray(JSON.parse(JSON.stringify(RepeatBlockTrials))),
+            hint_type: "location",
+            type: "repeat",
+            Rules: SearchPhaseRules_repeat
+        })
+
+
+    }
+
 
     //Test phase block types:
     //  cued_recall: shows search phase template Fennimals, allows cued item
@@ -297,66 +367,9 @@ STIMULUSDATA = function(exp_code){
     //Determine the exact experiment contents here
     switch(exp_code){
 
-        case("test") : {
+        case("baseline") : {
             //Drawing Regions
-            let Training_Regions = shuffleArray(["Desert", "North", "Village","Jungle"]) //"North", "Desert", "Village"
-            let Search_Regions = shuffleArray([ "Mountains", "Beach", "Flowerfields", "Swamp"])// "Jungle", "Mountains", "Beach"
-
-            //Shuffling locations for the regions
-            let Training_Location_Arr = []
-            for(let i = 0; i<Training_Regions.length;i++){
-                Training_Location_Arr.push(shuffleArray( JSON.parse(JSON.stringify(Param.RegionData[Training_Regions[i]].Locations))))
-            }
-            let Search_Location_Arr = []
-            for(let i = 0; i<Search_Regions.length;i++){
-                Search_Location_Arr.push(shuffleArray( JSON.parse(JSON.stringify(Param.RegionData[Search_Regions[i]].Locations))))
-            }
-
-            //Drawing 4 heads
-            let Used_Heads  = shuffleArray(["E", "G", "I", "K"]) // ["D", "E", "G", "I", "K"]
-
-            //Creating Item details
-            Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 3, false ))
-            All_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
-
-            //Creating the training Fennimals (A1 and A2 share a semantic head pair, B and C do not)
-            TrainingFennimals = {
-                A: createTrainingFennimalObj("A", Training_Regions[0], Training_Location_Arr[0][0], Used_Heads[0],false, [ [All_Items[0], "frown"]], false),
-                B: createTrainingFennimalObj("B",Training_Regions[0], Training_Location_Arr[0][1], Used_Heads[1],false, [ [All_Items[1], "heart"]], false),
-                C1: createTrainingFennimalObj("C1",Training_Regions[1], Training_Location_Arr[1][0], Used_Heads[2],false, [ [All_Items[2], "heart"]], false ),
-                C2: createTrainingFennimalObj("C2",Training_Regions[2], Training_Location_Arr[2][0], Used_Heads[3],false, [ [All_Items[2], "heart"]], false ),
-            }
-
-            //Setting the search phase rules
-            let SearchPhaseRules = {
-                hidden_feedback: true,
-                cued_item_allowed: true,
-                search_item_allowed: true
-            }
-
-            // TODO: add IDs and actual outcomes
-            SearchPhaseSetup = [
-                {
-                    Trials: [
-                        createTestFennimalObj("TestA", Search_Regions[0], Search_Location_Arr[0][0], TrainingFennimals.A.head,false, [[All_Items[0], "frown"],[All_Items[1], "heart"]], false, TrainingFennimals.A.special_item, TrainingFennimals.B.special_item,SearchPhaseRules),
-                        createTestFennimalObj("TestB", Search_Regions[0], Search_Location_Arr[0][1], TrainingFennimals.B.head,false, [[All_Items[0], "frown"],[All_Items[1], "heart"]], false, TrainingFennimals.B.special_item, TrainingFennimals.A.special_item,SearchPhaseRules),
-                        createTestFennimalObj("TestC", Search_Regions[0], Search_Location_Arr[0][2], TrainingFennimals.C1.head,false, [[All_Items[2], "heart"]], false, TrainingFennimals.C1.special_item, false,SearchPhaseRules)
-                    ],
-                    hint_type: "location",
-                    type: "search"
-                },
-
-            ]
-
-            console.log(JSON.parse(JSON.stringify(SearchPhaseSetup)))
-
-            break;
-
-        }
-
-        case("test2") : {
-            //Drawing Regions
-            let Training_Regions = shuffleArray(["Desert", "North", "Village","Jungle"]) //"North", "Desert", "Village"
+            let Training_Regions = shuffleArray(["Desert", "North", "Village", "Jungle"]) //"North", "Desert", "Village"
             let Search_Regions = shuffleArray(["Mountains", "Beach", "Flowerfields", "Swamp"])// "Jungle", "Mountains", "Beach"
 
             //Shuffling locations for the regions
@@ -370,63 +383,170 @@ STIMULUSDATA = function(exp_code){
             }
 
             //Shuffle heads
-            let Used_Heads  = shuffleArray(["D", "E", "G", "I", "K"])
+            let Used_Heads  = shuffleArray(["D", "E", "G", "I", "K", "B", "N"])
 
             //Creating Item details
             Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 3, false ))
             All_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
 
-            //Drawing base color schemes
-            let BaseCols = shuffleArray(Param.getColorSchemeArray(4, "baseline"))
-            let UniqueCol = shuffleArray(Param.SpecialColorSchemes)
-            console.log(BaseCols[0])
-
             //Creating the training Fennimals (A1 and A2 share a semantic head pair, B and C do not)
             TrainingFennimals = {
-                A1: createTrainingFennimalObj("A1", Training_Regions[0], Training_Location_Arr[0][0], Used_Heads[0],false, [ [All_Items[0], "frown"]], false),
-                A2: createTrainingFennimalObj("A2", Training_Regions[1], Training_Location_Arr[1][0], Used_Heads[1],false, [ [All_Items[0], "frown"]], false),
-                B:  createTrainingFennimalObj("B",Training_Regions[0], Training_Location_Arr[0][1], Used_Heads[1],false, [ [All_Items[1], "heart"]], false),
-                C:  createTrainingFennimalObj("C",Training_Regions[2], Training_Location_Arr[2][0], Used_Heads[2],false, [ [All_Items[2], "heart"]], false),
+                A: createTrainingFennimalObj("A", Training_Regions[0], Training_Location_Arr[0][0], Used_Heads[0],false, [ [All_Items[0], "frown"]], false),
+                //B: createTrainingFennimalObj("B", Training_Regions[1], Training_Location_Arr[1][0], Used_Heads[2],false, [ [All_Items[1], "frown"]], false),
+                C:  createTrainingFennimalObj("C",Training_Regions[0], Training_Location_Arr[0][1], Used_Heads[1],false, [ [All_Items[1], "heart"]], false),
+                D:  createTrainingFennimalObj("D",Training_Regions[2], Training_Location_Arr[2][0], Used_Heads[3],false, [ [All_Items[2], "heart"]], false),
+                E:  createTrainingFennimalObj("E",Training_Regions[3], Training_Location_Arr[3][0], Used_Heads[4],false, [ [All_Items[2], "heart"]], false),
             }
 
-            console.log(TrainingFennimals)
-
-            // Give some of the Fennimals the adjective "Vivid"
-            TrainingFennimals.A1.name = "Vivid " + TrainingFennimals.A1.name
-            TrainingFennimals.C.name = "Vivid " + TrainingFennimals.C.name
-
             //Tell the param object that we want to see colors for the training phase hitns
-            Param.show_colors_with_icon_hints = true
+            Param.show_colors_with_icon_hints = false
 
             //Setting the search phase rules
-            let SearchPhaseRules = {
+            let SearchPhaseRules_search = {
                 hidden_feedback: true,
                 cued_item_allowed: true,
-                search_item_allowed: true
+                search_item_allowed: true,
+            }
+            let SearchPhaseRules_repeat = {
+                hidden_feedback: true,
+                cued_item_allowed: true,
+                search_item_allowed: true,
+                is_repeat_trial: true
             }
 
             // TODO: add IDs and actual outcomes
             SearchPhaseSetup = [
                 {
                     Trials: [
-                        createTestFennimalObj("TestA1", Training_Regions[1], Training_Location_Arr[1][1],  Used_Heads[0],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "heart"] ], false, false, false,SearchPhaseRules),
-                        createTestFennimalObj("TestA1", Training_Regions[1], Training_Location_Arr[1][2],  Used_Heads[0],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "heart"] ], false, false, false,SearchPhaseRules),
-                        //createTestFennimalObj("TestA2", Search_Regions[1], Search_Location_Arr[1][0],  Used_Heads[0],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "heart"] ],false, false, false,SearchPhaseRules),
-
+                        createTestFennimalObj("Test_Key", Search_Regions[0], Search_Location_Arr[0][0],  TrainingFennimals.A.head,false, [[All_Items[1], "heart"],[All_Items[2], "neutral"] ], false, false, All_Items[1],SearchPhaseRules_search),
+                        createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[1], "neutral"],[All_Items[2], "heart"] ], false, All_Items[2], false,SearchPhaseRules_search),
+                        //createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
                     ],
                     hint_type: "location",
-                    type: "search"
+                    type: "search",
+                    Rules: SearchPhaseRules_search
                 },
+                {
+                    Trials: [
+                        createTestFennimalObj("Test_Key", Search_Regions[0], Search_Location_Arr[0][0],  TrainingFennimals.A.head,false, [[All_Items[1], "heart"],[All_Items[2], "neutral"] ], false, false, All_Items[1],SearchPhaseRules_search),
+                        createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[1], "neutral"],[All_Items[2], "heart"] ], false, All_Items[2], false,SearchPhaseRules_search),
+                       // createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
+                    ],
+                    hint_type: "location",
+                    type: "search",
+                    Rules: SearchPhaseRules_search
+                },
+                {
+                    Trials: [
+                        createTestFennimalObj("Test_Key", Search_Regions[0], Search_Location_Arr[0][0],  TrainingFennimals.A.head,false, [[All_Items[1], "heart"],[All_Items[2], "neutral"] ], false, false, All_Items[1],SearchPhaseRules_search),
+                        createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[1], "neutral"],[All_Items[2], "heart"] ], false, All_Items[2], false,SearchPhaseRules_search),
+                        //createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
+                    ],
+                    hint_type: "location",
+                    type: "search",
+                    Rules: SearchPhaseRules_search
+                },
+                {
+                    Trials: [
+                        createTestFennimalObj("Test_Key", Search_Regions[0], Search_Location_Arr[0][0],  TrainingFennimals.A.head,false, [[All_Items[1], "heart"],[All_Items[2], "neutral"] ], false, false, All_Items[1],SearchPhaseRules_search),
+                        createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[1], "neutral"],[All_Items[2], "heart"] ], false, All_Items[2], false,SearchPhaseRules_search),
+                       // createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
+                    ],
+                    hint_type: "location",
+                    type: "search",
+                    Rules: SearchPhaseRules_search
+                },
+
+                {
+                    Trials: [
+                        createTestFennimalObj("RepeatA", TrainingFennimals.A.region, TrainingFennimals.A.location,  TrainingFennimals.A.head,false, [[All_Items[0], "correct"],[All_Items[1], "incorrect"],[All_Items[2], "incorrect"] ], false, All_Items[0], false,SearchPhaseRules_repeat),
+                        //createTestFennimalObj("RepeatB", TrainingFennimals.B.region, TrainingFennimals.B.location,  TrainingFennimals.B.head,false, [[All_Items[0], "incorrect"],[All_Items[1], "correct"],[All_Items[2], "incorrect"],[All_Items[3], "incorrect"] ], false, All_Items[1], false,SearchPhaseRules_repeat),
+                        createTestFennimalObj("RepeatC", TrainingFennimals.C.region, TrainingFennimals.C.location,  TrainingFennimals.C.head,false, [[All_Items[0], "incorrect"],[All_Items[1], "correct"],[All_Items[2], "incorrect"] ], false, All_Items[1], false,SearchPhaseRules_repeat),
+                        createTestFennimalObj("RepeatD", TrainingFennimals.D.region, TrainingFennimals.D.location,  TrainingFennimals.D.head,false, [[All_Items[0], "incorrect"],[All_Items[1], "incorrect"],[All_Items[2], "correct"] ], false, All_Items[2], false,SearchPhaseRules_repeat),
+                        createTestFennimalObj("RepeatE", TrainingFennimals.E.region, TrainingFennimals.E.location,  TrainingFennimals.E.head,false, [[All_Items[0], "incorrect"],[All_Items[1], "incorrect"],[All_Items[2], "correct"] ], false, All_Items[2], false,SearchPhaseRules_repeat),
+                    ],
+                    hint_type: "location",
+                    type: "repeat",
+                    Rules: SearchPhaseRules_repeat
+                },
+
+
+
+
+
+
+
+
+
+
+
+
+
 
             ]
 
-            console.log(JSON.parse(JSON.stringify(SearchPhaseSetup)))
 
             break;
 
         }
 
-        case("baseline") : {
+        case("convergence") : {
+            //Tell the param object that we want to see colors for the training phase hints
+            Param.show_colors_with_icon_hints = true
+
+            // GENERAL STIMULI TEMPLATES
+            //////////////////////////////
+            let TrainingTemplates = [
+                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown"},
+                {ID: "B", region: "B", head: "B", special_item: "a", outcome: "frown"},
+                {ID: "C", region: "A", head: "B", special_item: "b", outcome: "heart"},
+                {ID: "D", region: "D", head: "D", special_item: "c", outcome: "heart"},
+            ]
+
+            let SearchPhaseBlockTemplates = [
+                {ID: "key", region: "B", head: "A", ItemResponses: {b: "heart", c: "neutral"} },
+                {ID: "key2", region: "B", head: "A", ItemResponses: {b: "heart", c: "neutral"} },
+                {ID: "distr", region: "F", head: "D", ItemResponses: {b: "neutral", c: "heart"} },
+                {ID: "distr2", region: "G", head: "D", ItemResponses: {b: "neutral", c: "heart"} },
+            ]
+
+            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
+            //SearchPhaseSetup = [SearchPhaseSetup[0]]
+            //SearchPhaseSetup = []
+
+            break;
+
+        }
+
+        case("divergence") : {
+            //Tell the param object that we want to see colors for the training phase hints
+            Param.show_colors_with_icon_hints = true
+
+            // GENERAL STIMULI TEMPLATES
+            //////////////////////////////
+            let TrainingTemplates = [
+                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown"},
+                {ID: "B", region: "B", head: "B", special_item: "a", outcome: "frown"},
+                {ID: "C", region: "A", head: "C", special_item: "b", outcome: "heart"},
+                {ID: "D", region: "D", head: "D", special_item: "c", outcome: "heart"},
+            ]
+
+            let SearchPhaseBlockTemplates = [
+                {ID: "key", region: "B", head: "A", ItemResponses: {b: "heart", c: "neutral"} },
+                {ID: "key2", region: "B", head: "A", ItemResponses: {b: "heart", c: "neutral"} },
+                {ID: "distr", region: "F", head: "D", ItemResponses: {b: "neutral", c: "heart"} },
+                {ID: "distr2", region: "G", head: "D", ItemResponses: {b: "neutral", c: "heart"} },
+            ]
+
+            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
+            //SearchPhaseSetup = [SearchPhaseSetup[0]]
+            //SearchPhaseSetup = []
+
+            break;
+
+        }
+
+        case("convergence_base") : {
             //Drawing Regions
             let Training_Regions = shuffleArray(["Desert", "North", "Village", "Jungle"]) //"North", "Desert", "Village"
             let Search_Regions = shuffleArray(["Mountains", "Beach", "Flowerfields", "Swamp"])// "Jungle", "Mountains", "Beach"
@@ -451,7 +571,7 @@ STIMULUSDATA = function(exp_code){
             //Creating the training Fennimals (A1 and A2 share a semantic head pair, B and C do not)
             TrainingFennimals = {
                 A: createTrainingFennimalObj("A", Training_Regions[0], Training_Location_Arr[0][0], Used_Heads[0],false, [ [All_Items[0], "frown"]], false),
-                B: createTrainingFennimalObj("B", Training_Regions[1], Training_Location_Arr[1][0], Used_Heads[2],false, [ [All_Items[1], "frown"]], false),
+                B: createTrainingFennimalObj("B", Training_Regions[1], Training_Location_Arr[1][0], Used_Heads[1],false, [ [All_Items[1], "frown"]], false),
                 C:  createTrainingFennimalObj("C",Training_Regions[0], Training_Location_Arr[0][1], Used_Heads[1],false, [ [All_Items[2], "heart"]], false),
                 D:  createTrainingFennimalObj("D",Training_Regions[2], Training_Location_Arr[2][0], Used_Heads[3],false, [ [All_Items[3], "heart"]], false),
                 E:  createTrainingFennimalObj("E",Training_Regions[3], Training_Location_Arr[3][0], Used_Heads[4],false, [ [All_Items[3], "heart"]], false),
@@ -477,8 +597,8 @@ STIMULUSDATA = function(exp_code){
             SearchPhaseSetup = [
                 {
                     Trials: [
-                        createTestFennimalObj("Test_Key", Search_Regions[0], Search_Location_Arr[0][0],  TrainingFennimals.A.head,false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "heart"],[All_Items[3],"neutral"] ], false, false, All_Items[2],SearchPhaseRules_search),
-                        createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, All_Items[3], false,SearchPhaseRules_search),
+                        createTestFennimalObj("Test_Key", Training_Regions[1], Training_Location_Arr[1][0],  TrainingFennimals.A.head,false, [[All_Items[2], "heart"],[All_Items[3], "neutral"] ], false, false, All_Items[2],SearchPhaseRules_search),
+                        createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[2], "neutral"],[All_Items[3], "heart"] ], false, All_Items[3], false,SearchPhaseRules_search),
                         //createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
                     ],
                     hint_type: "location",
@@ -487,8 +607,8 @@ STIMULUSDATA = function(exp_code){
                 },
                 {
                     Trials: [
-                        createTestFennimalObj("Test_Key", Search_Regions[0], Search_Location_Arr[0][0],  TrainingFennimals.A.head,false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "heart"],[All_Items[3],"neutral"] ], false, false, All_Items[2],SearchPhaseRules_search),
-                        createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, All_Items[3], false,SearchPhaseRules_search),
+                        createTestFennimalObj("Test_Key", Training_Regions[1], Training_Location_Arr[1][0],  TrainingFennimals.A.head,false, [[All_Items[2], "heart"],[All_Items[3], "neutral"] ], false, false, All_Items[2],SearchPhaseRules_search),
+                        createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[2], "neutral"],[All_Items[3], "heart"] ], false, All_Items[3], false,SearchPhaseRules_search),
                         // createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
                     ],
                     hint_type: "location",
@@ -497,8 +617,8 @@ STIMULUSDATA = function(exp_code){
                 },
                 {
                     Trials: [
-                        createTestFennimalObj("Test_Key", Search_Regions[0], Search_Location_Arr[0][0],  TrainingFennimals.A.head,false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "heart"],[All_Items[3],"neutral"] ], false, false, All_Items[2],SearchPhaseRules_search),
-                        createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, All_Items[3], false,SearchPhaseRules_search),
+                        createTestFennimalObj("Test_Key", Training_Regions[1], Training_Location_Arr[1][0],  TrainingFennimals.A.head,false, [[All_Items[2], "heart"],[All_Items[3], "neutral"] ], false, false, All_Items[2],SearchPhaseRules_search),
+                        createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[2], "neutral"],[All_Items[3], "heart"] ], false, All_Items[3], false,SearchPhaseRules_search),
                         //createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
                     ],
                     hint_type: "location",
@@ -507,8 +627,8 @@ STIMULUSDATA = function(exp_code){
                 },
                 {
                     Trials: [
-                        createTestFennimalObj("Test_Key", Search_Regions[0], Search_Location_Arr[0][0],  TrainingFennimals.A.head,false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "heart"],[All_Items[3],"neutral"] ], false, false, All_Items[2],SearchPhaseRules_search),
-                        createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
+                        createTestFennimalObj("Test_Key", Training_Regions[1], Training_Location_Arr[1][0],  TrainingFennimals.A.head,false, [[All_Items[2], "heart"],[All_Items[3], "neutral"] ], false, false, All_Items[2],SearchPhaseRules_search),
+                        createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[2], "neutral"],[All_Items[3], "heart"] ], false, All_Items[3], false,SearchPhaseRules_search),
                         // createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
                     ],
                     hint_type: "location",
@@ -544,9 +664,6 @@ STIMULUSDATA = function(exp_code){
 
             ]
 
-            console.log(TrainingFennimals)
-            console.log(JSON.parse(JSON.stringify(SearchPhaseSetup)))
-
             break;
 
         }
@@ -557,27 +674,6 @@ STIMULUSDATA = function(exp_code){
     //Call to get return a deepcopy of the training set Fennimals, keyed on location.
     this.get_experiment_code = function(){
         return(exp_code)
-    }
-
-    this.getTrainingSetFennimalsKeyedOnLocation = function(){
-        //Creating an object to hold all the Fennimals based on location. Empty locations should have a value of false, taken locations should have the Fennimal object.
-        //Here we can rely on the assumption that each location will have been used only once.
-        let FennimalLocations = {}
-
-        //First retrieving all location names and setting their value in FennimalLocations to false. Note, here we cannot rely on Available_Regions!
-        let LocationNames = Param.Available_Location_Names
-        for(let i=0;i<LocationNames.length;i++){
-            FennimalLocations[LocationNames[i]] = false
-        }
-
-        //Now we can go through all the Training set Fennimals and add them to the Fennimal locations
-        let Training_Stimuli_In_Array = this.getTrainingSetFennimalsInArray()
-        for(let i = 0;i<Training_Stimuli_In_Array.length;i++){
-            FennimalLocations[Training_Stimuli_In_Array[i].location] = Training_Stimuli_In_Array[i]
-        }
-
-
-        return(JSON.parse(JSON.stringify(FennimalLocations)))
     }
 
     //Call to return a deepcopy of the training set Fennimals, in an array. Each element is an object containing a single Fennimal. Order is not randomized!
@@ -696,10 +792,84 @@ STIMULUSDATA = function(exp_code){
 
     }
 
-    //Returns the aux data (returns false if no aux data declared)
-    this.getAuxData = function(){
-        return(JSON.parse(JSON.stringify(AuxData)))
+    //Returns an array of all valences observed during the training phase
+    this.getTrainingPhaseNames = function(){
+        let Arr = []
+        for(let key in TrainingFennimals){
+            Arr.push(TrainingFennimals[key].name)
+        }
+        return([... new Set(Arr)])
     }
+    //Returns an array containing names of all Fennimals (both training and test)
+    this.getAllNames = function(){
+        //Getting the training phase names
+        let Arr = this.getTrainingPhaseNames()
+
+        //Adding names for the test phase
+        for(let blocknum =0;blocknum<SearchPhaseSetup.length; blocknum++){
+            if(typeof SearchPhaseSetup[blocknum].Trials !== "undefined"){
+                for(let trialnum =0;trialnum< SearchPhaseSetup[blocknum].Trials.length; trialnum++ ){
+                    Arr.push(SearchPhaseSetup[blocknum].Trials[trialnum].name)
+                }
+            }
+        }
+
+        return([... new Set(Arr)])
+    }
+
+    //Returns an object with a key ID and a property name for ALL Fennimals in the experiment
+    this.getObjectOfIDsAndNames = function(){
+        let Obj = {}
+
+        for(let key in TrainingFennimals){
+            if(typeof Obj[TrainingFennimals[key].ID] === "undefined"){
+                Obj[TrainingFennimals[key].ID] = TrainingFennimals[key].name
+            }
+        }
+
+        for(let blocknum =0;blocknum<SearchPhaseSetup.length; blocknum++){
+            if(typeof SearchPhaseSetup[blocknum].Trials !== "undefined"){
+                for(let trialnum =0;trialnum< SearchPhaseSetup[blocknum].Trials.length; trialnum++ ){
+                    if(typeof Obj[SearchPhaseSetup[blocknum].Trials[trialnum].ID] === "undefined"){
+                        Obj[SearchPhaseSetup[blocknum].Trials[trialnum].ID] = SearchPhaseSetup[blocknum].Trials[trialnum].name
+                    }
+                }
+            }
+        }
+
+        return(JSON.parse(JSON.stringify(Obj)))
+    }
+
+
+    //Returns an array of all Training-phase Fennimal names
+    this.getTrainingPhaseValences = function(){
+        let Arr = []
+        for(let key in TrainingFennimals){
+            let ItemResponses = TrainingFennimals[key].ItemResponses
+            for(let item in ItemResponses){
+                if(ItemResponses[item] !== "unavailable" ){
+                    Arr.push(ItemResponses[item])
+                }
+            }
+        }
+        return([... new Set(Arr)])
+    }
+
+    //Returns a search-phase Fennimal object with the given name. NOTE: if multiple exist, returns the first encounter! If none encountered, returns false
+    this.getSearchPhaseFennimalByID = function(ID){
+        for(let blocknum =0;blocknum<SearchPhaseSetup.length; blocknum++){
+            if(typeof SearchPhaseSetup[blocknum].Trials !== "undefined"){
+               for(let i =0;i<SearchPhaseSetup[blocknum].Trials.length;i++){
+                   if(SearchPhaseSetup[blocknum].Trials[i].ID === ID){
+                       return(JSON.parse(JSON.stringify(SearchPhaseSetup[blocknum].Trials[i])))
+                   }
+               }
+            }
+        }
+        return(false)
+    }
+
+
 
 
 

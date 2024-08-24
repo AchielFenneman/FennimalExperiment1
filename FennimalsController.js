@@ -26,8 +26,10 @@ FeedbackController = function(FennimalObject, FennimalSVGContainer, show_icon_on
         FeedbackLayer.appendChild(NewObject)
         NewObject.style.display="none"
 
+        let BBox = NewObject.getBBox()
 
-        MoveElemToCoords(NewObject, start_x,start_y)
+
+        MoveElemToCoords(NewObject, start_x -  BBox.width ,start_y - BBox.height)
         NewObject.style.opacity = .75
 
         setTimeout(function(){
@@ -269,9 +271,9 @@ FeedbackController = function(FennimalObject, FennimalSVGContainer, show_icon_on
                         let random_y = randomIntFromInterval(-20,20)
 
                         let ItemViewBox = getViewBoxCenterPoint(ItemObj)
-                        let BBox = ItemObj.getBoundingClientRect()
+                        let BBox = ItemObj.getBBox()//ItemObj.getBoundingClientRect()
 
-                        let NewSymbol = new SmallFeedbackSymbol(ItemViewBox.x + 0.5*BBox.width + random_x + 0, ItemViewBox.y + 0.5*BBox.height + random_y - 30 , "heart")
+                        let NewSymbol = new SmallFeedbackSymbol(ItemViewBox.x +  random_x , ItemViewBox.y +  random_y  , "heart") //new SmallFeedbackSymbol(ItemViewBox.x + 0.5*BBox.width + random_x , ItemViewBox.y + 0.5*BBox.height + random_y  , "heart")
                     },75)
                 },50)
 
@@ -287,9 +289,9 @@ FeedbackController = function(FennimalObject, FennimalSVGContainer, show_icon_on
                         let random_y = randomIntFromInterval(-20,20)
 
                         let ItemViewBox = getViewBoxCenterPoint(ItemObj)
-                        let BBox = ItemObj.getBoundingClientRect()
+                        let BBox = ItemObj.getBBox()//ItemObj.getBoundingClientRect()
 
-                        let NewSymbol = new SmallFeedbackSymbol(ItemViewBox.x + 0.5*BBox.width + random_x + 30, ItemViewBox.y + 0.5*BBox.height + random_y - 60 , "smiley")
+                        let NewSymbol = new SmallFeedbackSymbol(ItemViewBox.x + random_x , ItemViewBox.y +  random_y  , "smiley")
                     },150)
                 },50)
 
@@ -306,7 +308,7 @@ FeedbackController = function(FennimalObject, FennimalSVGContainer, show_icon_on
                         let ItemViewBox = getViewBoxCenterPoint(ItemObj)
                         let BBox = ItemObj.getBoundingClientRect()
 
-                        let NewSymbol = new SmallFeedbackSymbol(ItemViewBox.x + 0.5*BBox.width + random_x + -20, ItemViewBox.y -80 + random_y , "frown")
+                        let NewSymbol = new SmallFeedbackSymbol(ItemViewBox.x + random_x , ItemViewBox.y  + random_y , "frown")
                     },150)
                 },50)
 
@@ -336,7 +338,7 @@ FeedbackController = function(FennimalObject, FennimalSVGContainer, show_icon_on
                         let ItemViewBox = getViewBoxCenterPoint(ItemObj)
                         let BBox = ItemObj.getBoundingClientRect()
 
-                        let NewSymbol = new SmallFeedbackSymbol(ItemViewBox.x + 0.5*BBox.width + random_x + 30, ItemViewBox.y + 0.5*BBox.height + random_y - 140 , "neutral")
+                        let NewSymbol = new SmallFeedbackSymbol(ItemViewBox.x + random_x , ItemViewBox.y+ random_y  , "neutral")
                     },500)
                 },50)
                 break;
@@ -431,12 +433,12 @@ FeedbackController = function(FennimalObject, FennimalSVGContainer, show_icon_on
                 flag_can_play_sound = true
 
                 setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.16 * animation_duration)
-                // setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.60 * animation_duration)
+               // setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.60 * animation_duration)
 
 
                 ItemSoundInterval = setInterval(function(){
                     setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.16 * animation_duration)
-                    // setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.60 * animation_duration)
+                   // setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.60 * animation_duration)
 
                 }, animation_duration)
                 break;
@@ -860,7 +862,7 @@ ItemController = function(FennimalObj,LocCont, FenCont, limited_backpack_item_ar
     let starting_time
 
     //Timeout function for the prompt message
-    let promptTimeout = false
+    let promptTimeout = false, flag_item_selected = false
 
     //Controls the interactions for a single button. Create with an item name and the relative X location on the item bar
     ItemIcon = function (item_name, index, background_color, Controller){
@@ -928,7 +930,7 @@ ItemController = function(FennimalObj,LocCont, FenCont, limited_backpack_item_ar
 
     // DRAGGING STATE //
     //Keeps track of the dragging state, which determines whether (and which) items are being dragged by the subject
-    let dragging_state = false
+    let dragging_state = false, objectivemessagetext
 
     //Dragging state functions
     function stoppedDragging(mouse_x,mouse_y){
@@ -961,8 +963,22 @@ ItemController = function(FennimalObj,LocCont, FenCont, limited_backpack_item_ar
             showIconButtons();
             document.getElementById("item_bar_circular").style.display = "inherit"
 
-            promptTimeout = setTimeout(function(){Prompt.show_message(prompt_message)}, 300)
+            Prompt.minimize()
+            //If the prompt was about to show a message, then cancel it
+            if(promptTimeout !== false){
+                clearTimeout(promptTimeout)
+                promptTimeout = false
+            }
+
+            promptTimeout = setTimeout(function(){
+                if(!flag_item_selected ){
+                    Prompt.show_message(prompt_message)
+                }
+            }, 500)
+
         }
+
+
 
     }
     function resetDraggedItem(){
@@ -1104,6 +1120,13 @@ ItemController = function(FennimalObj,LocCont, FenCont, limited_backpack_item_ar
             promptTimeout = false
         }
 
+        //Set a new timeout for a message
+        promptTimeout = setTimeout(function(){
+            if(!flag_item_selected){
+                Prompt.show_message("Drop the toy in the circle to give it to the Fennimal")
+            }
+        },500)
+
 
     }
 
@@ -1126,6 +1149,8 @@ ItemController = function(FennimalObj,LocCont, FenCont, limited_backpack_item_ar
 
     //Call after feedback to resolve the Fennimal interaction.
     function Fennimal_interaction_completed(selected_item){
+        flag_item_selected = true
+
         //Store the RT
         FennimalObj.rt = Date.now() - starting_time
 
@@ -1359,16 +1384,16 @@ FennimalController = function(FennimalObj, LocCont, limited_backpack_item_array)
         FennimalObj.selected_item = selected_item
         FennimalObj.outcome_observed = FennimalObj.ItemResponses[selected_item]
 
-        if(limited_backpack_item_array !== false){
-            limited_backpack_item_given(selected_item)
-        }
+       if(limited_backpack_item_array !== false){
+           limited_backpack_item_given(selected_item)
+       }
 
 
         FeedbackCont = new FeedbackController(FennimalObj,Container, true)
 
         //After a brief delay the interaction is completed.
         setTimeout(function(){
-            LocCont.Fennimal_interaction_completed(FennimalObj)
+           LocCont.Fennimal_interaction_completed(FennimalObj)
 
         },3000)
 

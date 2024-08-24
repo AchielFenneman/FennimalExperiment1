@@ -194,6 +194,15 @@ function deleteClassNamesFromElement(Element, Classname){
 
 }
 
+//Deletes all the elements with the given class tag from the given element
+function deleteTagNamesFromElement(Element, tagname){
+    let Objects = Element.getElementsByTagName(tagname)
+    while(Objects.length > 0){
+        Objects[0].remove();
+    }
+
+}
+
 //Returns an SVG group object with the requested Fennimal (all set to visible). Also includes the target.
 function createFennimal(FennimalObj){
     //Create a new group to hold the Fennimal
@@ -318,7 +327,9 @@ function createConjunctiveNameHeadBody(body, head){
 function createConjunctiveNameRegionHead(region, head){
     return( Param.NamePrefixes_Region[region] + " " + Param.Names_Head[head])
 }
-
+function createConjunctiveNameLocationHead(location, head){
+    return( Param.NamePrefixes_Location[location] + " " + Param.Names_Head[head])
+}
 
 //Returns an SVG button object with the specified dimensions, position and text.
 function createSVGButtonElem(x,y,width,height,text){
@@ -366,6 +377,24 @@ function createSVGButtonElem(x,y,width,height,text){
     ButtonContainer.appendChild(Text)
     return(ButtonContainer)
 }
+
+function createElemWithDims(elem_name, x, y, w, h){
+    let Elem = document.createElement(elem_name)
+    Elem.setAttribute("x", x)
+    Elem.setAttribute("y", y)
+    Elem.setAttribute("width", w)
+    Elem.setAttribute("height", h)
+    return(Elem)
+}
+function createNSElemWithDims(namespace,elem_name, x, y, w, h){
+    let Elem = document.createElementNS(namespace,elem_name);
+    Elem.setAttribute("x", x)
+    Elem.setAttribute("y", y)
+    Elem.setAttribute("width", w)
+    Elem.setAttribute("height", h)
+    return(Elem)
+}
+
 
 //Returns a title at the top of the instruction screens
 function createInstructionTitleElem(text){
@@ -636,3 +665,24 @@ function draw_random_participant_seed(){
     return Math.floor(Math.random() * (2000 - 1100 + 1) + 1100)
 
 }
+
+//Calculates the Levenshtein distance between two strings (s,t). That is, the number of alterations needed for s to reach t. Taken from https://www.30secondsofcode.org/js/s/levenshtein-distance/
+const LevenshteinDistance = (s, t) => {
+    if (!s.length) return t.length;
+    if (!t.length) return s.length;
+    const arr = [];
+    for (let i = 0; i <= t.length; i++) {
+        arr[i] = [i];
+        for (let j = 1; j <= s.length; j++) {
+            arr[i][j] =
+                i === 0
+                    ? j
+                    : Math.min(
+                        arr[i - 1][j] + 1,
+                        arr[i][j - 1] + 1,
+                        arr[i - 1][j - 1] + (s[j - 1] === t[i - 1] ? 0 : 1)
+                    );
+        }
+    }
+    return arr[t.length][s.length];
+};

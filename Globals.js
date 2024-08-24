@@ -90,6 +90,7 @@ PromptController = function(){
     let collapse_style = "center"
     let margin = 10
     let max_opacity = 0.9
+    let currentmessagetext
 
     let currentTimeout = false
 
@@ -274,6 +275,7 @@ PromptController = function(){
     function change_text(new_text){
         //Cancel any previous timeouts
         cancelTimeout()
+        currentmessagetext = new_text
 
         if(state === "minimized"){
             //Sneakily change the text (while still hidden)
@@ -328,6 +330,10 @@ PromptController = function(){
 
     //On constructions
     this.hide()
+
+    this.get_current_message_text = function(){
+        return(currentmessagetext)
+    }
 
 }
 

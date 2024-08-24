@@ -420,6 +420,12 @@ foreignObject {
     transition: all 1s ease-in-out;
     animation: score_star_achieved_animation 750ms ease-in-out alternate-reverse infinite;
 }
+.bonus_star_achieved {
+    fill:lightskyblue;
+    stroke: darkslateblue;
+    transition: all 1s ease-in-out;
+    animation: bonus_star_achieved_animation 750ms ease-in-out alternate-reverse infinite;
+}
 .score_star_smile {
     fill:forestgreen;
     stroke: darkgreen;
@@ -452,6 +458,10 @@ foreignObject {
 @keyframes score_star_achieved_animation {
     from {fill:  gold; stroke: goldenrod; }
     to { fill: #fcdd95; stroke: #f2c55a }
+}
+@keyframes bonus_star_achieved_animation {
+    from {fill:  lightskyblue; stroke: darkslateblue; }
+    to { fill: #e7f5fe; stroke: #b5b1d0 }
 }
 @keyframes score_star_smile_animation {
     from { stroke: darkgreen; }
@@ -494,15 +504,6 @@ foreignObject {
 
 /* Category phase */
 
-
-.category_screen_top {
-    opacity: 0;
-    transition: all 500ms ease-in-out;
-}
-.category_screen_bottom{
-    opacity:0;
-    transition: all 500ms ease-in-out;
-}
 
 @keyframes category_box_error_blinking {
 
@@ -573,172 +574,21 @@ foreignObject {
     99.5%{opacity: 0}
 }
 
+/* CARD QUIZ */
+select {
+    width: 100%;
+    height: 100%;
+    pointer-events: auto;
+    font-size: 13px;
+    resize: none;
+    border: 1px solid black;
+    border-radius: 5px;
+    font-family:  "Myriad Pro", "Gill Sans",  "Archivo Narrow", "PT Sans Narrow","Arial Narrow","Calibri", "Arial","sans-serif";
+    padding-left: 10px;
+}
+select option {
+    font-size: 8px;
 
-/* ARENA SIMILARITY */
-#Category_Layer{
-    display: none
-}
-.similarity_arena {
-    fill: #e7edf5;
-    stroke: steelblue;
-    stroke-width: 1;
-    stroke-linecap:round;
-    stroke-linejoin:bevel;
-    stroke-dasharray:1.03075004, 1.03075004;
-    stroke-dashoffset:0
-}
-.similarity_card_background {
-    fill: #EEEEEE;
-    stroke: black;
-    stroke-width:  1px;
-}
-#similarity_arena_bottom_text{
-    opacity: 0;
-    transition: all 500ms ease-in-out;
-}
-/*instruction animations*/
-.sim_instructions_group{
-    opacity: 0;
-    transition: all 700ms ease-in-out;
-}
-.sim_instructions_cursor_move{
-    animation: sim_instructions_cursor_move 10s linear infinite;
-}
-@keyframes sim_instructions_cursor_move{
-    0%{ transform: translate(0, 0) ; opacity: 1}
-    10%{ transform: translate(0, -7%) }
-    13%{ transform: translate(0, -7%) } /*pickup*/
-    23%{ transform: translate(-6%, -18%) } /*move*/
-    26%{ transform: translate(-6%, -18%) }
-    29%{ transform: translate(-3%, -18%) }
-    33%{ transform: translate(-6%, -18%) }
-    36%{ transform: translate(-6%, -18%) } /*pickup*/
-    53%{ transform: translate(6%, -18%) } /*move*/
-    56%{ transform: translate(6%, -18%) }
-    59%{ transform: translate(3%, -15%) }
-    63%{ transform: translate(3%, -15%) }
-    66%{ transform: translate(6%, -18%) }
-    69%{ transform: translate(6%, -18%) } /*pickup*/
-    82%{ transform: translate(0%, 2%) } /*move*/
-    85%{ transform: translate(0%, 2%) } /*pickup*/
-    92%{ transform: translate(0%, 2%); opacity:1 }
-    95%{ transform: translate(0%, 2%); opacity: 0 }
-    100% {opacity: 0}
-}
-.sim_instructions_card_move{
-    animation: sim_instructions_card_move 10s linear infinite;
-}
-@keyframes sim_instructions_card_move{
-    0%{ transform: translate(0, 0) ; opacity: 1}
-    13%{ transform: translate(0, 0%) } /*pickup*/
-    23%{ transform: translate(-6%, -11%) } /*move*/
-
-    36%{ transform: translate(-6%, -11%) } /*pickup*/
-    53%{ transform: translate(6%, -11%) } /*move*/
-
-    69%{ transform: translate(6%, -11%) } /*pickup*/
-    82%{ transform: translate(0%, 9%) } /*move*/
-    85%{ transform: translate(0%, 9%) } /*pickup*/
-    92%{ transform: translate(0%, 9%) ; opacity: 1 } /*move*/
-    95%{ transform: translate(0%, 9%) ; opacity: 0}
-    100% {opacity: 0}
-}
-.sim_instructions_cursor_move .cursor_fill{
-    animation: sim_instructions_cursor_fill_move 10s linear infinite;
-}
-@keyframes sim_instructions_cursor_fill_move{
-    0%{ fill: #b3b3b3 }
-    10%{ fill: #b3b3b3 } /*pickup*/
-    13%{ fill: red } /*pickup*/
-    23%{ fill: red } /*move*/
-    25%{ fill: #b3b3b3 }
-    33%{ fill: #b3b3b3}
-    35%{ fill: red } /*pickup*/
-    53%{ fill: red } /*move*/
-    55%{ fill: #b3b3b3 }
-    66%{ fill: #b3b3b3 }
-    68%{ fill: red} /*pickup*/
-    85%{ fill: red } /*move*/
-    87%{ fill: #b3b3b3 } /*move*/
-}
-
-.sim_instructions_cursor_closer{
-    animation: sim_instructions_cursor_closer 4s linear infinite;
-}
-@keyframes sim_instructions_cursor_closer{
-    0%{ transform: translate(0, 0) ; opacity: 1}
-    35%{ transform: translate(11%, 0) }
-    42%{ transform: translate(11%, 0) }
-    70%{ transform: translate(5%,-11%) }
-    90%{ transform: translate(5%,-11%); opacity: 1 }
-    95%{ transform: translate(5%,-11%) ; opacity: 0}
-    99%{ transform: translate(0,0) ; opacity: 0}
-}
-.sim_instructions_card_closer{
-    animation: sim_instructions_card_closer 4s linear infinite;
-}
-@keyframes sim_instructions_card_closer{
-    0%{ transform: translate(0, 0); opacity: 1 }
-    42%{ transform: translate(0, 0) }
-    70%{ transform: translate(-6%,-11%) }
-    90%{ transform: translate(-6%,-11%) ; opacity: 1 }
-    95%{ transform: translate(-6%,-11%) ; opacity: 0 }
-    99%{ transform: translate(0,0) ; opacity: 0 }
-}
-.sim_instructions_cursor_closer .cursor_fill{
-    animation: sim_instructions_cursor_fill_closer 4s linear infinite;
-}
-@keyframes sim_instructions_cursor_fill_closer{
-    0%{ fill: #b3b3b3 }
-    36%{ fill: #b3b3b3 }
-    40%{ fill: red }
-    72%{ fill: red}
-    76%{fill: #b3b3b3}
-}
-
-.sim_instructions_cursor_further{
-    animation: sim_instructions_cursor_further 4s linear infinite 2s;
-}
-@keyframes sim_instructions_cursor_further{
-    0%{ transform: translate(0, 0); opacity: 1 }
-    35%{ transform: translate(7.5%, -6%) }
-    42%{ transform: translate(7.5%, -6%) }
-    70%{ transform: translate(1.25%,-17%) }
-    90%{ transform: translate(1.25%,-17%) ;opacity: 1 }
-    95%{ transform: translate(1.25%,-17%) ;opacity: 0 }
-    99%{ transform: translate(0,0) ;opacity: 0 }
-}
-.sim_instructions_card_further{
-    animation: sim_instructions_card_closer 4s linear infinite 2s;
-}
-.sim_instructions_cursor_further .cursor_fill{
-    animation: sim_instructions_cursor_fill_closer 4s linear infinite 2s;
-}
-
-.sim_instructions_cursor_overlap{
-    animation: sim_instructions_cursor_overlap 3s linear infinite ;
-}
-.sim_instructions_card_overlap{
-    animation: sim_instructions_cursor_overlap 3s linear infinite ;
-}
-@keyframes sim_instructions_cursor_overlap{
-    0%{ transform: translate(0, 0); opacity: 1 }
-    15%{ transform: translate(0, 0) }
-    60%{ transform: translate(0, -16%) }
-    85%{ transform: translate(0, -16%); opacity: 1 }
-    95%{ transform: translate(0, -16%); opacity: 0 }
-    99%{ transform: translate(0, 0); opacity: 0 }
-}
-.sim_instructions_cursor_overlap .cursor_fill{
-    animation: sim_instructions_cursor_fill_overlap 3s linear infinite;
-}
-@keyframes sim_instructions_cursor_fill_overlap{
-    0%{ fill: #b3b3b3 }
-    5%{ fill: #b3b3b3 }
-    10%{ fill: red }
-    70%{ fill: red}
-    75%{fill: #b3b3b3}
-    99%{fill: #b3b3b3}
 }
 
 /* Questionnaire */
@@ -753,7 +603,67 @@ foreignObject {
     padding: 1%;
     font-family:  "Myriad Pro", "Gill Sans",  "Archivo Narrow", "PT Sans Narrow","Arial Narrow","Calibri", "Arial","sans-serif";
 }
+.recall_input_answerbox_start {
+    width: 100%;
+    height: 100%;
+    border: 1px solid black;
+    border-radius: 5px;
+    background: #CCCCCC33;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+.recall_input_answerbox_active {
+    width: 100%;
+    height: 100%;
+    pointer-events: auto;
+    border: 1px solid black;
+    border-radius: 5px;
+    display: flex;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    background: #CCCCCC33;
+}
+.recall_input_box_placeholder {
+    font-family:  "Myriad Pro", "Gill Sans",  "Archivo Narrow", "PT Sans Narrow","Arial Narrow","Calibri", "Arial","sans-serif";
+    font-size: 15px;
+    color: gray;
+    font-style: italic;
+}
+.recall_input_line {
+    width: 85%;
+    height: 65%;
+    pointer-events: auto;
+    font-size: 13px;
+    resize: none;
+    font-family:  "Myriad Pro", "Gill Sans",  "Archivo Narrow", "PT Sans Narrow","Arial Narrow","Calibri", "Arial","sans-serif";
+}
+.recall_input_answer_div {
+    height: 20px;
+    background: #FFFFFF55;
+    border: 1px solid #CCCCCC99;
+    margin: 2px;
+    padding-left: 1px;
+    padding-right: 2px;
+    padding-bottom: 1px;
+    padding-top: 1px;
+    display: flex;
+    align-items: center;
+    border-radius: 5px;
+}
+.recall_input_answer_text {
+    font-size: 13px;
+    font-family:  "Myriad Pro", "Gill Sans",  "Archivo Narrow", "PT Sans Narrow","Arial Narrow","Calibri", "Arial","sans-serif";
+    padding: 0;
+    margin: 0;
+    margin-left: 3px
+}
+.recall_input_answer_remove {
+    padding-left: 3px;
+    color: firebrick;
+    cursor: pointer;
 
+}
 
 /* ITEM ANIMATIONS */
 .item_evaluation {

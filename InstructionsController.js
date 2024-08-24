@@ -16,8 +16,10 @@ InstructionsController = function(ExpCont, LocCont){
             Search: document.getElementById("instructions_search"),
             Test: document.getElementById("instructions_test_phase"),
             Finished: document.getElementById("instructions_finished"),
+            FinishedBonus: document.getElementById("instructions_finished_bonus"),
             Test_Target: document.getElementById("instructions_test_target"),
             Final_Block: document.getElementById("instructions_final_timed"),
+            CardQuiz: document.getElementById("instructions_cardquiz")
         }
     }
 
@@ -43,9 +45,8 @@ InstructionsController = function(ExpCont, LocCont){
             },
             Delivery: {
                 title: "DELIVER TOYS TO THE FENNIMALS",
-                text: "You're doing great! Let's kick it up a notch. As before, I will give you a hint. However, now your backpack only fits a single item, and you have to select which item to bring." +
-                    " <b>You have to bring the item that you have previously given to this Fennimal. </b> <br>" +
-                    "If you pick the wrong item, you can come back to Home to pick a different one. You can select which item to bring by clicking on the icons below."
+                text: "You're doing great! Let's kick it up a notch. As before, I will give you a hint. However, now your backpack only fits a single toy, and you have to select which toy to bring." +
+                    " <b>You have to bring the toy that you have previously given to this Fennimal </b> "
             },
             Quiz: {
                 title_first_attempt: "Quiz time!",
@@ -64,11 +65,6 @@ InstructionsController = function(ExpCont, LocCont){
 
     //Keeps track of which instructions state we are currently in. Valid calls include "welcome", "exploration", "search"
     let current_instructions_state
-
-    //Shows the map in the background TODO
-    function show_map_background(){
-        //LocCont.show_passive_map()
-    }
 
     //Clears all instruction subpages
     function hide_all_instruction_pages(){
@@ -131,8 +127,6 @@ InstructionsController = function(ExpCont, LocCont){
         //Show the instructions layer and the welcome screen
         SVG_references.Layer.style.display = "inherit"
 
-        //Show the map background
-        show_map_background()
 
         //Set event listener for the fullscreen button
         // document.getElementById("button_instructions_fullscreen").addEventListener("mousedown", startScreenCompleted )
@@ -189,7 +183,7 @@ InstructionsController = function(ExpCont, LocCont){
         Container.appendChild(createInstructionTitleElem("DURATION AND PAYMENT"))
         Container.appendChild(createTextField(30, 80, 508-2*30,250, "This experiment is expected to last around 25-30 minutes. <br>" +
             "<br>" +
-            "Based on your decisions in the last part of the experiment you can earn up to five stars for your performance. " +
+            "Based on your decisions in the last part of the experiment you can earn up to six stars for your performance. " +
             "You will earn a bonus of " + Param.BonusEarnedPerStar.currency_symbol+ Param.BonusEarnedPerStar.bonus_per_star + " per star that you obtain. <br>" ))
 
         let Button = createSVGButtonElem((508-150)/2,245,160,30,"CONTINUE")
@@ -210,9 +204,6 @@ InstructionsController = function(ExpCont, LocCont){
         //Show the instructions layer and the welcome screen
         SVG_references.Layer.style.display = "inherit"
         SVG_references.Pages.Welcome.style.display = "inherit"
-
-        //Show the map background
-        show_map_background()
 
         //Check whether or not we need to run through the instructions step-by-step
         if(! basic_instructions_screen_completed){
@@ -268,9 +259,6 @@ InstructionsController = function(ExpCont, LocCont){
         hide_all_instruction_pages()
         SVG_references.Layer.style.display = "inherit"
         SVG_references.Pages.Exploration.style.display = "inherit"
-
-        //Show the map background
-        show_map_background()
 
         //Set the correct state for the button.
         current_instructions_state = "welcome"
@@ -422,9 +410,6 @@ InstructionsController = function(ExpCont, LocCont){
         SVG_references.Layer.style.display = "inherit"
         SVG_references.Pages.Search.style.display = "inherit"
 
-        //Show the map background
-        show_map_background()
-
         //Clear all the previous elements
         let Page = SVG_references.Pages.Search
         deleteClassNamesFromElement(Page, "instruction_title")
@@ -497,7 +482,7 @@ InstructionsController = function(ExpCont, LocCont){
 
     // ITEM DELIVERY
     //Subcontroller and variables for the backpack item selection
-    let ItemDetails, BackpackItemButtonControllers
+    let ItemDetails, BackpackItemButtonControllers, delivery_text_updated = false
     let current_item_in_backpack = false
 
     BackpackItemButtonController = function(item_name, position, backgroundcolor, xpos,  InstrCon){
@@ -566,14 +551,22 @@ InstructionsController = function(ExpCont, LocCont){
         document.getElementById("DeliveryContinueButton").style.display = "inherit"
 
     }
-    this.showDeliveryInstructions = function(Fennimal, hint_type, _ItemDetails){
+    this.showDeliveryInstructions = function(Fennimal, hint_type, _ItemDetails, negative_valenced_items_encountered){
         CurrentTrial = Fennimal
         current_hint_type = hint_type
         ItemDetails = _ItemDetails
 
         //Set the correct state for the button.
         current_instructions_state = "delivery"
-
+        //If negative items are allowed, then we need to slighly modify the instructions
+        if(!delivery_text_updated){
+            if(negative_valenced_items_encountered){
+                Instructions.Training_Phase.Delivery.text = Instructions.Training_Phase.Delivery.text + " (this could be a toy that the Fennimal did not like!)"
+            }else{
+                Instructions.Training_Phase.Delivery.text = Instructions.Training_Phase.Delivery.text + "<br><br>If you pick the wrong toy, you can come back to Home to pick a different one. You can select which toy to bring by clicking on the icons below."
+            }
+            delivery_text_updated = true
+        }
         showDeliveryPage()
     }
     this.reset_backpack_menu = function(){
@@ -588,9 +581,6 @@ InstructionsController = function(ExpCont, LocCont){
         hide_all_instruction_pages()
         SVG_references.Layer.style.display = "inherit"
         SVG_references.Hint_and_pack_item_boxes.style.display = "inherit"
-
-        //Show the map background
-        show_map_background()
 
         //Clear all the previous elements
         let Page = SVG_references.Hint_and_pack_item_boxes
@@ -662,7 +652,6 @@ InstructionsController = function(ExpCont, LocCont){
     /////////
     let quiz_first_attempt = true
     this.show_quiz_block_instructions = function(repeat_until_perfect, array_of_observed_outcomes){
-        console.log(array_of_observed_outcomes)
         hide_all_instruction_pages()
         showNewInstructionsPage()
         SVG_references.Layer.style.display = "inherit"
@@ -715,6 +704,480 @@ InstructionsController = function(ExpCont, LocCont){
         quiz_first_attempt = false
     }
 
+    //CARD QUIZ
+    ///////////////
+    let CurrentQuizCardFennimal // Check if needed
+    this.show_cardquiz_instructions = function(){
+        hide_all_instruction_pages()
+        showNewInstructionsPage()
+        SVG_references.Layer.style.display = "inherit"
+
+
+        //Creating the container to hold all elements
+        let Container = createInstructionContainer()
+        SVG_references.Layer.appendChild(Container)
+        Container.appendChild(createBackgroundElem())
+        Container.appendChild(createInstructionTitleElem("Time for a quiz!"))
+
+        let TextField = createTextField(30, 35, 508-2*30,200, "Well done, Trainee! You're well on your way to becoming an Expert Wildlife Ranger. " +
+            "Before we continue, we will first give you a quiz to review what you've learned so far. <br>" +
+            "<br>" +
+            "The quiz will consist of multiple pages, each containing a few questions. You can select an answer to each question from the drop-down menu next to the question. If you make any mistakes on a page, then this page will come back up again later. The quiz is finished once you have succesfully answered all the questions on all the pages." +
+            "<br><br>" +
+            "<b>Tip: </b>if your memory needs some refreshing, you can freely travel across the island to take another look at all the Fennimals you have so far encountered. You can do this by clicking on the 'Go to map' button and travelling to the location of each Fennimal. <br>" +
+            "")
+        TextField.style.fontSize = "12px"
+        TextField.style.textAlign = "left"
+        Container.appendChild(TextField)
+
+        let Button = createSVGButtonElem((508-150)/2,230,150,30,"START QUIZ")
+        Container.appendChild(Button)
+        Button.onclick = function(){ExpCont.quiz_card_instructions_completed()}
+
+    }
+    this.create_cardquiz_card_Fennimal = function(FennimalObj, array_of_all_locations, array_of_all_names, array_of_all_items, array_of_valences){
+        //Keeping track of which questions still need to be answered
+        let Questions_To_Be_answered = ["name", "location", "toy"]
+        CurrentQuizCardFennimal = FennimalObj
+        let MapButton, CheckButton, ContinueButton
+        let checked_map = false
+
+        //Show only the correct page (and the layer)
+        hide_all_instruction_pages()
+        SVG_references.Layer.style.display = "inherit"
+        SVG_references.Pages.CardQuiz.style.display = "inherit"
+        document.getElementById("card_Fennimal").style.display = "inherit"
+        document.getElementById("card_location").style.display = "none"
+
+        //Clear all the previous elements
+        let Page = SVG_references.Pages.CardQuiz
+        deleteClassNamesFromElement(Page, "instruction_title")
+        deleteClassNamesFromElement(Page, "basic_instructions_text")
+        deleteClassNamesFromElement(Page, "instructions_button")
+        deleteClassNamesFromElement(Page, "Fennimal_Icon")
+
+        //Set the title
+        Page.appendChild(createInstructionTitleElem("Questions about a Fennimal"))
+        Page.appendChild(createTextField(15, 35, 508 - 2*15,30, "Please answer the questions below. <b>Tip:</b> When in doubt, you can freely go to the map to visit the Fennimals."))
+
+        //Show the icon
+        Page.appendChild(createFennimalIcon(FennimalObj,-58, 58,0.55,false, ! Param.show_colors_with_icon_hints))
+
+        //Some parameters for all the answer boxes
+        let box_x = 320
+        let box_w = 160
+        let box_h = 20
+
+        //Adding the dropdown box for the name question
+        let NameContainer = document.createElementNS('http://www.w3.org/2000/svg',"foreignObject");
+        NameContainer.setAttribute("x", box_x)
+        NameContainer.setAttribute("y", 71)
+        NameContainer.setAttribute("width", box_w)
+        NameContainer.setAttribute("height", box_h)
+        NameContainer.classList.add("cardquiz_box")
+        Page.appendChild(NameContainer)
+
+        //Adding the elements
+        let NameList = document.createElement("select");
+        NameContainer.appendChild(NameList)
+        for(let namenum in array_of_all_names){
+            let option = document.createElement("option");
+            option.value = array_of_all_names[namenum]
+            option.text = array_of_all_names[namenum]
+            NameList.appendChild(option)
+        }
+        //Adding a hidden default
+        NameList.value = ""
+
+        //Adding the location question
+        let LocationContainer = document.createElementNS('http://www.w3.org/2000/svg',"foreignObject");
+        LocationContainer.setAttribute("x", box_x)
+        LocationContainer.setAttribute("y", 101)
+        LocationContainer.setAttribute("width", box_w)
+        LocationContainer.setAttribute("height", box_h)
+        LocationContainer.classList.add("cardquiz_box")
+        Page.appendChild(LocationContainer)
+
+        //Adding the elements
+        let LocList = document.createElement("select");
+        LocationContainer.appendChild(LocList)
+        for(let locnum in array_of_all_locations){
+            let option = document.createElement("option");
+            option.value = array_of_all_locations[locnum]
+            option.text = Param.SubjectFacingLocationNames[array_of_all_locations[locnum]]
+            LocList.appendChild(option)
+        }
+        //Adding a hidden default
+        LocList.value = ""
+
+        //Adding the toy question
+        let ToyContainer = document.createElementNS('http://www.w3.org/2000/svg',"foreignObject");
+        ToyContainer.setAttribute("x", box_x)
+        ToyContainer.setAttribute("y", 131)
+        ToyContainer.setAttribute("width", box_w)
+        ToyContainer.setAttribute("height", box_h)
+        ToyContainer.classList.add("cardquiz_box")
+        Page.appendChild(ToyContainer)
+
+        //Adding the elements
+        let ToyList = document.createElement("select");
+        ToyContainer.appendChild(ToyList)
+        for(let toynum in array_of_all_items){
+            let option = document.createElement("option");
+            option.value =array_of_all_items[toynum]
+            option.text = "The "+ array_of_all_items[toynum]
+            ToyList.appendChild(option)
+        }
+        //Adding a hidden default
+        ToyList.value = ""
+
+        //Setting event listeners for the selects
+        function question_answered(question){
+            Questions_To_Be_answered = Questions_To_Be_answered.filter(function(e) { return e !== question })
+            if(Questions_To_Be_answered.length === 0){
+                CheckButton.style.display = "inherit"
+            }
+
+        }
+        NameList.onchange = function(){question_answered("name")}
+        LocList.onchange = function(){question_answered("location")}
+        ToyList.onchange = function(){question_answered("toy")}
+
+        //Optionally adding the valence question
+        let ValenceList
+        if(array_of_valences !== false){
+            Questions_To_Be_answered.push("valence")
+            let ValenceContainer = document.createElementNS('http://www.w3.org/2000/svg',"foreignObject");
+            ValenceContainer.setAttribute("x", box_x)
+            ValenceContainer.setAttribute("y", 161)
+            ValenceContainer.setAttribute("width", box_w)
+            ValenceContainer.setAttribute("height", box_h)
+            ValenceContainer.classList.add("cardquiz_box")
+            Page.appendChild(ValenceContainer)
+
+            //Adding the elements
+            let ValenceDisplayTexts = {
+                bites: "Hated it",
+                frown: "Did not like it",
+                neutral: "Was indifferent",
+                smiley: "Liked it",
+                heart: "Loved it"
+            }
+            ValenceList = document.createElement("select");
+            ValenceContainer.appendChild(ValenceList)
+            for(let valnum in array_of_valences){
+                let option = document.createElement("option");
+                option.value = array_of_valences[valnum]
+                option.text = ValenceDisplayTexts[array_of_valences[valnum]]
+                ValenceList.appendChild(option)
+            }
+            //Adding a hidden default
+            ValenceList.value = ""
+
+            //Adding eventlistener
+            ValenceList.onchange = function(){question_answered("valence")}
+
+        }else{
+            //Hide the valence box
+            document.getElementById("cardquiz_valence").style.display = "none"
+        }
+
+        //Adding the two buttons: one to check the results and one to go to the map to recheck the Fennimals
+        MapButton = createSVGButtonElem(40,250,150,22,"Go to map")
+        CheckButton = createSVGButtonElem(320,250,150,22,"Check answers")
+        ContinueButton = createSVGButtonElem(0.5*508 - 75,250,150,22,"Continue")
+        Page.appendChild(MapButton)
+        Page.appendChild(CheckButton)
+        Page.appendChild(ContinueButton)
+        CheckButton.style.display = "none"
+        ContinueButton.style.display = "none"
+
+        //Set the event handlers for the two buttons.
+        let Errors = []
+        CheckButton.onclick = function(){
+            CheckButton.style.display = "none"
+            MapButton.style.display = "none"
+
+            if(NameList.value !== FennimalObj.name){
+                Errors.push("name")
+                NameList.style.backgroundColor = "#f2d0d0"
+                NameList.style.color = "#B22222"
+            }
+            if(LocList.value !== FennimalObj.location){
+                Errors.push("location")
+                LocList.style.backgroundColor = "#f2d0d0"
+                LocList.style.color = "#B22222"
+            }
+            if(ToyList.value !== FennimalObj.special_item){
+                Errors.push("toy")
+                ToyList.style.backgroundColor = "#f2d0d0"
+                ToyList.style.color = "#B22222"
+            }
+
+            NameList.disabled = true
+            LocList.disabled = true
+            ToyList.disabled = true
+
+            if(array_of_valences !== false){
+                ValenceList.disabled = true
+                if(ValenceList.value !== FennimalObj.ItemResponses[FennimalObj.special_item]){
+                    Errors.push("valence")
+                    ValenceList.style.backgroundColor = "#f2d0d0"
+                    ValenceList.style.color = "#B22222"
+                }
+            }
+
+            let TextField
+            if(Errors.length === 0){
+                TextField = createTextField((0.5*508-150),200 , 300,50, "Perfect!")
+                TextField.style.color = "green"
+
+            }else{
+                let text = "Oops, you've made a mistake!"
+                if(Errors.length > 1){text = "Oops, you've made multiple mistakes!"}
+                TextField = createTextField((0.5*508-250),200 , 500,50, text)
+                TextField.style.color = "#B22222"
+            }
+            TextField.style.fontSize = "25px"
+            TextField.style.fontWeight = "bold"
+            TextField.style.textAlign = "center"
+
+            Page.appendChild(TextField)
+            ContinueButton.style.display = "inherit"
+
+
+        }
+        MapButton.onclick = function(){
+            checked_map = true
+            block_instructions_page_closed()
+        }
+        ContinueButton.onclick = function(){
+            clear_quizcard()
+            ExpCont.quiz_card_answered(Errors, checked_map)
+        }
+
+
+    }
+    this.create_cardquiz_card_location= function(FennimalObj, array_of_all_locations, array_of_all_names, array_of_all_items, array_of_valences){
+        //Keeping track of which questions still need to be answered
+        let Questions_To_Be_answered = ["name", "toy"]
+        CurrentQuizCardFennimal = FennimalObj
+        let MapButton, CheckButton, ContinueButton
+        let checked_map = false
+
+        //Show only the correct page (and the layer)
+        hide_all_instruction_pages()
+        SVG_references.Layer.style.display = "inherit"
+        SVG_references.Pages.CardQuiz.style.display = "inherit"
+        document.getElementById("card_Fennimal").style.display = "none"
+        document.getElementById("card_location").style.display = "inherit"
+
+
+        //Clear all the previous elements
+        let Page = SVG_references.Pages.CardQuiz
+        deleteClassNamesFromElement(Page, "instruction_title")
+        deleteClassNamesFromElement(Page, "basic_instructions_text")
+        deleteClassNamesFromElement(Page, "instructions_button")
+        deleteClassNamesFromElement(Page, "Fennimal_Icon")
+
+        //Set the title
+        Page.appendChild(createInstructionTitleElem("Questions about a location"))
+        Page.appendChild(createTextField(15, 35, 508 - 2*15,30, "Please answer the questions below.  <b>Tip: </b>When in doubt, you can freely go to the map to visit the Fennimals."))
+
+        //Add the location text
+        let QuestionText = createTextField(155, 62, 300,30, Param.SubjectFacingLocationNames[FennimalObj.location])
+        QuestionText.style.fontSize = "20px"
+        QuestionText.style.fontWeight = "bold"
+        Page.appendChild(QuestionText)
+
+        //Some parameters for all the answer boxes
+        let box_x = 270
+        let box_w = 160
+        let box_h = 20
+
+        //Adding the dropdown box for the name question
+        let NameContainer = document.createElementNS('http://www.w3.org/2000/svg',"foreignObject");
+        NameContainer.setAttribute("x", box_x)
+        NameContainer.setAttribute("y", 101)
+        NameContainer.setAttribute("width", box_w)
+        NameContainer.setAttribute("height", box_h)
+        NameContainer.classList.add("cardquiz_box")
+        Page.appendChild(NameContainer)
+
+        //Adding the elements
+        let NameList = document.createElement("select");
+        NameContainer.appendChild(NameList)
+        for(let namenum in array_of_all_names){
+            let option = document.createElement("option");
+            option.value = array_of_all_names[namenum]
+            option.text = array_of_all_names[namenum]
+            NameList.appendChild(option)
+        }
+        //Adding a hidden default
+        NameList.value = ""
+
+        //Adding the toy question
+        let ToyContainer = document.createElementNS('http://www.w3.org/2000/svg',"foreignObject");
+        ToyContainer.setAttribute("x", box_x)
+        ToyContainer.setAttribute("y", 129)
+        ToyContainer.setAttribute("width", box_w)
+        ToyContainer.setAttribute("height", box_h)
+        ToyContainer.classList.add("cardquiz_box")
+        Page.appendChild(ToyContainer)
+
+        //Adding the elements
+        let ToyList = document.createElement("select");
+        ToyContainer.appendChild(ToyList)
+        for(let toynum in array_of_all_items){
+            let option = document.createElement("option");
+            option.value =array_of_all_items[toynum]
+            option.text = "The "+ array_of_all_items[toynum]
+            ToyList.appendChild(option)
+        }
+        //Adding a hidden default
+        ToyList.value = ""
+
+        //Setting event listeners for the selects
+        function question_answered(question){
+            Questions_To_Be_answered = Questions_To_Be_answered.filter(function(e) { return e !== question })
+            if(Questions_To_Be_answered.length === 0){
+                CheckButton.style.display = "inherit"
+            }
+
+        }
+        NameList.onchange = function(){question_answered("name")}
+        ToyList.onchange = function(){question_answered("toy")}
+
+        //Optionally adding the valence question
+        let ValenceList
+        if(array_of_valences !== false){
+            Questions_To_Be_answered.push("valence")
+            let ValenceContainer = document.createElementNS('http://www.w3.org/2000/svg',"foreignObject");
+            ValenceContainer.setAttribute("x", box_x)
+            ValenceContainer.setAttribute("y", 159)
+            ValenceContainer.setAttribute("width", box_w)
+            ValenceContainer.setAttribute("height", box_h)
+            ValenceContainer.classList.add("cardquiz_box")
+            Page.appendChild(ValenceContainer)
+
+            //Adding the elements
+            let ValenceDisplayTexts = {
+                bites: "Hated it",
+                frown: "Did not like it",
+                neutral: "Was indifferent",
+                smiley: "Liked it",
+                heart: "Loved it"
+            }
+            ValenceList = document.createElement("select");
+            ValenceContainer.appendChild(ValenceList)
+            for(let valnum in array_of_valences){
+                let option = document.createElement("option");
+                option.value = array_of_valences[valnum]
+                option.text = ValenceDisplayTexts[array_of_valences[valnum]]
+                ValenceList.appendChild(option)
+            }
+            //Adding a hidden default
+            ValenceList.value = ""
+
+            //Adding eventlistener
+            ValenceList.onchange = function(){question_answered("valence")}
+
+        }else{
+            //Hide the valence box
+            document.getElementById("cardquiz_valence").style.display = "none"
+        }
+
+        //Adding the two buttons: one to check the results and one to go to the map to recheck the Fennimals
+        MapButton = createSVGButtonElem(40,250,150,22,"Go to map")
+        CheckButton = createSVGButtonElem(320,250,150,22,"Check answers")
+        ContinueButton = createSVGButtonElem(0.5*508 - 75,250,150,22,"Continue")
+        Page.appendChild(MapButton)
+        Page.appendChild(CheckButton)
+        Page.appendChild(ContinueButton)
+        CheckButton.style.display = "none"
+        ContinueButton.style.display = "none"
+
+        //Set the event handlers for the two buttons.
+        let Errors = []
+        CheckButton.onclick = function(){
+            CheckButton.style.display = "none"
+            MapButton.style.display = "none"
+
+            if(NameList.value !== FennimalObj.name){
+                Errors.push("name")
+                NameList.style.backgroundColor = "#f2d0d0"
+                NameList.style.color = "#B22222"
+            }
+            if(ToyList.value !== FennimalObj.special_item){
+                Errors.push("toy")
+                ToyList.style.backgroundColor = "#f2d0d0"
+                ToyList.style.color = "#B22222"
+            }
+
+            NameList.disabled = true
+            ToyList.disabled = true
+
+            if(array_of_valences !== false){
+                ValenceList.disabled = true
+                if(ValenceList.value !== FennimalObj.ItemResponses[FennimalObj.special_item]){
+                    Errors.push("valence")
+                    ValenceList.style.backgroundColor = "#f2d0d0"
+                    ValenceList.style.color = "#B22222"
+                }
+            }
+
+            let TextField
+            if(Errors.length === 0){
+                TextField = createTextField((0.5*508-150),200 , 300,50, "Perfect!")
+                TextField.style.color = "green"
+
+            }else{
+                let text = "Oops, you've made a mistake!"
+                if(Errors.length > 1){text = "Oops, you've made multiple mistakes!"}
+                TextField = createTextField((0.5*508-250),200 , 500,50, text)
+                TextField.style.color = "#B22222"
+            }
+            TextField.style.fontSize = "25px"
+            TextField.style.fontWeight = "bold"
+            TextField.style.textAlign = "center"
+
+            Page.appendChild(TextField)
+            ContinueButton.style.display = "inherit"
+
+
+        }
+        MapButton.onclick = function(){
+            checked_map = true
+            block_instructions_page_closed()
+        }
+        ContinueButton.onclick = function(){
+            clear_quizcard()
+            ExpCont.quiz_card_answered(Errors, checked_map)
+        }
+
+
+    }
+
+    //Shows the current quiz card
+    this.showCurrentQuizCard = function(){
+        SVG_references.Layer.style.display = "inherit"
+        SVG_references.Pages.CardQuiz.style.display = "inherit"
+
+    }
+
+    //Deletes the current quiz card
+    function clear_quizcard(){
+        let Page = SVG_references.Pages.CardQuiz
+        deleteClassNamesFromElement(Page, "instruction_title")
+        deleteClassNamesFromElement(Page, "basic_instructions_text")
+        deleteClassNamesFromElement(Page, "instructions_button")
+        deleteClassNamesFromElement(Page, "Fennimal_Icon")
+        deleteTagNamesFromElement(Page,"select")
+        deleteTagNamesFromElement(Page,"foreignObject")
+
+
+    }
+
     //TEST PHASE
     //////////////
     this.show_test_phase_start_instructions = function(total_number_of_test_phase_days, array_of_observed_outcomes){
@@ -728,12 +1191,12 @@ InstructionsController = function(ExpCont, LocCont){
         Container.appendChild(createBackgroundElem())
         Container.appendChild(createInstructionTitleElem("BASIC TRAINING COMPLETED!"))
 
-        let instruction_text = "Congratulations! You have completed your basic training. You're almost an Expert Wildlife ranger, but first you need to complete " + total_number_of_test_phase_days + " days of practical experience. <br>" +
+        let instruction_text = "Congratulations! You have passed the quiz and now completed your basic training. You're almost an Expert Wildlife ranger, but first you need to complete " + total_number_of_test_phase_days + " days of practical experience. <br>" +
         "<br>" +
         "A new group of Fennimals have recently been spotted all over the island. Your task is to visit these new Fennimals and give them a toy that they may like. You have rely on your past experiences to select toys for these Fennimals. " +
             "<b> As a tip: similar Fennimals tend to like the same toys.  </b> <br><br>" +
             "After you complete your practical experience you will automatically receive the title of Expert. " +
-            "In addition, you will recieve between 0 and 5 stars based on how well the Fennimals liked their interactions with you during this practical experience. Therefore, your earnings for this experiment depend on your performance on this part of the task! "
+            "In addition, you can earn up to 5 stars, based on how well the Fennimals liked their interactions with you during this practical experience. Therefore, your earnings for this experiment depend on your performance on this part of the task! "
 
         let TextField = createTextField(30, 35, 508-2*30,200, instruction_text)
         TextField.style.fontSize = "12px"
@@ -850,9 +1313,6 @@ InstructionsController = function(ExpCont, LocCont){
         SVG_references.Layer.style.display = "inherit"
         Page.style.display = "inherit"
 
-        //Show the map background
-        show_map_background()
-
         let Container = createInstructionContainer()
         Container.appendChild(createInstructionTitleElem("A new Fennimal has been spotted!"))
         Page.appendChild(Container)
@@ -967,6 +1427,7 @@ InstructionsController = function(ExpCont, LocCont){
     }
 
     //QUESTIONNAIRE
+    ////////////////////
     this.show_questionnaire_start_page = function(){
         hide_all_instruction_pages()
         showNewInstructionsPage()
@@ -1001,10 +1462,42 @@ InstructionsController = function(ExpCont, LocCont){
             case("age"): show_questionnaire_age(); break;
             case("open"): show_questionnaire_open(); break
             case("colorblindness"): show_questionnaire_colorblindness(); break;
+            case("recall"): show_recall_page(); break;
             default: console.warn("INCORRECT QUESTIONNAIRE ITEM REQUESTED, SKIPPING")
                 EC.record_questionnaire_response(false,false);
             break
         }
+    }
+
+    function show_recall_page(){
+        hide_all_instruction_pages()
+        showNewInstructionsPage()
+        SVG_references.Layer.style.display = "inherit"
+
+        let Page = createInstructionContainer()
+        SVG_references.Layer.appendChild(Page)
+
+        //Now we need to hide the map (don't want to provide accidental hints)
+        document.getElementById("instructions_mask").style.opacity = 1
+
+        //Retrieving the rules from the expcont
+        let Rules = ExpCont.get_recall_question_bonus_rules()
+
+        let errorplural = "s"
+        if(Rules.allowed_errors === 1){ errorplural = ""}
+
+        let text = "During your time in Fenneland, you encountered many different Fennimals. " +
+            "Do you still remember their names? Please add all the names of the Fennimals below. " +
+            "You can enter a name by typing in the box and clicking on the 'Add' button. " +
+            "If you made a mistake, you can click on <span style='color:firebrick'> [x] </span> to remove an answer. " +
+            "If you think you have listed all names, then you can click on the 'Done' button to continue (you will not be able to return after pressing the button!) <br><br>" +
+            "Each incorrect answer or for each Fennimal that you could not name count as errors." +
+            " <b>You will earn a bonus star if you do not make more than " +  Rules.allowed_errors + " error" + errorplural + "</b> " +
+            "(Repeated names do not count as errors. The names are not case-sensitve, but watch out for typos!) "
+        Page.appendChild(createTextField(30, 15, 508-2*30,100, text))
+
+        let RBC = new RecallBoxController(Page, ExpCont)
+
     }
     function show_questionnaire_gender(){
         hide_all_instruction_pages()
@@ -1087,6 +1580,7 @@ InstructionsController = function(ExpCont, LocCont){
 
     }
     function show_questionnaire_open(){
+        let special_name = ExpCont.get_open_question_special_Fennimal_name()
         hide_all_instruction_pages()
         showNewInstructionsPage()
         SVG_references.Layer.style.display = "inherit"
@@ -1094,7 +1588,12 @@ InstructionsController = function(ExpCont, LocCont){
         let Container = createInstructionContainer()
         SVG_references.Layer.appendChild(Container)
         Container.appendChild(createInstructionTitleElem("How did you decide on a toy?"))
-        Container.appendChild(createTextField(30, 40, 508-2*30,100, "During the the last part of your training to become an Wildlife Ranger, you could freely decide between different toys to give to a Fennimal. How did you decide which toy to give to the Fennimals?"))
+
+        let text = "During the last part of your training to become an Wildlife Ranger, you could freely decide between different toys to give to a Fennimal. How did you decide which toy to give to the Fennimals?"
+        if(special_name !== false){
+            text = "During your practical experience, there were several times that you encountered a <b>" + special_name + "</b>. How did you decide on which toy to give to this Fennimal?"
+        }
+        Container.appendChild(createTextField(30, 40, 508-2*30,100, text))
 
         //Create a text area as a foreign object
         let TextBoxContainer = document.createElementNS('http://www.w3.org/2000/svg',"foreignObject");
@@ -1145,21 +1644,48 @@ InstructionsController = function(ExpCont, LocCont){
     let ScoreObj
     this.show_payment_screen = function(ScoreObject){
         ScoreObj = ScoreObject
-        console.log(ScoreObject)
         hide_all_instruction_pages()
         showNewInstructionsPage()
         SVG_references.Layer.style.display = "inherit"
-        SVG_references.Pages.Finished.style.display = "inherit"
+
 
         let Container = createInstructionContainer()
         SVG_references.Layer.appendChild(Container)
         Container.appendChild(createInstructionTitleElem("You are now an Expert Wildlife Ranger!"))
 
-        for(let i = 1; i<=5;i++){
-            if(ScoreObject.stars_obtained >= i){
-                setTimeout(function(){
-                    document.getElementById("score_star_" + i + "x").classList.add("score_star_achieved")
-                }, i*300)
+        //Showing the stars (depends on whether a bonus star is in play or not)
+        let show_bonus_page = typeof ScoreObject.bonus_star !== "undefined"
+        if(show_bonus_page){
+            SVG_references.Pages.FinishedBonus.style.display = "inherit"
+            //Showing the obtained normal stars
+            let bonus_delay_time = 0
+            for(let i = 1; i<=5;i++){
+                if(ScoreObject.stars_obtained >= i){
+                    setTimeout(function(){
+                        document.getElementById("score_star_" + i + "x_bonus").classList.add("score_star_achieved")
+                        bonus_delay_time = bonus_delay_time + 300
+                    }, i*300)
+                }
+            }
+
+            //After a delay, show the bonus star
+            setTimeout(function(){
+                if(ScoreObject.bonus_star === 1){
+                    document.getElementById("score_star_bonus").classList.add("bonus_star_achieved")
+                }
+            },bonus_delay_time + 1000)
+
+
+        }else{
+            SVG_references.Pages.Finished.style.display = "inherit"
+
+            //Showing the obtained normal stars
+            for(let i = 1; i<=5;i++){
+                if(ScoreObject.stars_obtained >= i){
+                    setTimeout(function(){
+                        document.getElementById("score_star_" + i + "x").classList.add("score_star_achieved")
+                    }, i*300)
+                }
             }
         }
 
@@ -1232,17 +1758,32 @@ InstructionsController = function(ExpCont, LocCont){
             text = text + "<br>"
         }
 
+        //Adding optional bonus star text.
+        if(show_bonus_page){
+            let errorplural = "s"
+            if(ScoreObject.bonus_star_errors_made === 1){errorplural=""}
+            text = text + "<br>In addition, you made " + ScoreObject.bonus_star_errors_made + " error" + errorplural+" when entering the Fennimals' names. "
+            if(ScoreObject.bonus_star === 0){
+                text = text + "Unfortunately, you therefore did not earn the bonus star."
+            }else{
+                text = text + "You therefore won the bonus star!"
+            }
+        }
+
         text = text + "<br>Based on this performance, you earned the "
-        if(ScoreObject.stars_obtained > 1) { text = text + "distinguished "}
-        text = text + ScoreObject.stars_obtained + "-star Fennimal expert!"
+        if(ScoreObject.total_stars > 1) { text = text + "distinguished "}
+        text = text + ScoreObject.total_stars + "-star Fennimal expert!"
 
         //Set the text to the screen
         Container.appendChild(createTextField(30, 35, 508-2*30,500, text))
 
         //Modify the position of the stars
-        document.getElementById("instructions_finished").style.transform = "translate(0px,30px)"
+        if(show_bonus_page){
+            document.getElementById("instructions_finished_bonus").style.transform = "translate(0px,40px)"
+        }else{
+            document.getElementById("instructions_finished").style.transform = "translate(0px,30px)"
+        }
         document.getElementById("instructions_finished").style.transition = "all 500ms ease-in-out"
-
 
         //Creating a button at the end
         let Button = createSVGButtonElem((508-150)/2,245,160,30,"Continue")
@@ -1254,19 +1795,19 @@ InstructionsController = function(ExpCont, LocCont){
         hide_all_instruction_pages()
         showNewInstructionsPage()
         //SVG_references.Layer.style.display = "inherit"
-        SVG_references.Pages.Finished.style.display = "inherit"
+        SVG_references.Pages.Finished.style.display = "none"
 
         let Container = createInstructionContainer()
         SVG_references.Layer.appendChild(Container)
         Container.appendChild(createInstructionTitleElem("Experiment finished!"))
 
-        let text = "You have now completed the experiment."
-        if(ScoreObj.stars_obtained > 0){
+        let text = "You have now completed the experiment. "
+        if(ScoreObj.total_stars > 0){
             let plural = "s"
-            if(ScoreObj.stars_obtained === 1) { plural = ""}
+            if(ScoreObj.total_stars === 1) { plural = ""}
 
-            text = text + "Because you obtained " + ScoreObj.stars_obtained + " star" + plural + ", you have earned a bonus of " +
-                Param.BonusEarnedPerStar.currency_symbol + (Param.BonusEarnedPerStar.bonus_per_star * ScoreObj.stars_obtained).toFixed(2)
+            text = text + "Because you obtained " + ScoreObj.total_stars+ " star" + plural + ", you have earned a bonus of " +
+                Param.BonusEarnedPerStar.currency_symbol + (Param.BonusEarnedPerStar.bonus_per_star * ScoreObj.total_stars).toFixed(2)
         }
 
         text = text + "<br><br> Do NOT close or refresh this window before submitting your code to Prolific. Your completion code is: <b> " + ScoreObj.completion_code + " </b>. <br><br>"
@@ -1277,7 +1818,7 @@ InstructionsController = function(ExpCont, LocCont){
         Container.appendChild(createTextField(30, 120, 508-2*30,500, text))
 
         //Modify the position of the stars
-        document.getElementById("instructions_finished").style.transform = "translate(0px,-70px)"
+        //document.getElementById("instructions_finished").style.transform = "translate(0px,-70px)"
 
 
         //Creating a button at the end
@@ -1286,80 +1827,6 @@ InstructionsController = function(ExpCont, LocCont){
         Container.appendChild(Button)
 
     }
-
-
-
-/*
-let Text2 = createTextField(30, 100, 508-2*30,250, "")
-        Text2.style.textAlign = "center"
-        Text2.style.fontSize = "15px"
-        Container.appendChild(Text2)
-
-        let Text3 = createTextField(30, 175, 508-2*30,250, "After you have submitted this code to Prolific, it is safe to close this window. Thank you for participating!")
-        Text3.style.textAlign = "center"
-        Text3.style.fontSize = "15px"
-        Container.appendChild(Text3)
- */
-
-
-
-
-
-
-
-
-
-
-
-    //Call when the exploration phase is completed to show the all the found locations and Fennimals. Assumes that the exploration phase has been started
-    this.showExplorationCompletedPage = function(ContinueButtonFunc){
-        //Show only the correct page (and the layer)
-        hide_all_instruction_pages()
-        SVGObjects.Instructions.Layer.style.display = "inherit"
-        SVGObjects.Instructions.Pages.Exploration.style.display = "inherit"
-
-        //Show the map background
-        show_map_background()
-
-        //Clear all the previous elements
-        let Page = SVGObjects.Instructions.Pages.Exploration
-        deleteClassNamesFromElement(Page, "instruction_title")
-        deleteClassNamesFromElement(Page, "basic_instructions_text")
-        deleteClassNamesFromElement(Page, "instructions_button")
-
-        // Show the title and text
-        Page.appendChild(createInstructionTitleElem(Instructions.Training_Phase.Exploration_Completed.title))
-        Page.appendChild(createTextField(10, 38, 508-2*10,200, Instructions.Training_Phase.Exploration_Completed.text_top))
-        let BottomText = createTextField(40, 220, 508-2*40,100, Instructions.Training_Phase.Exploration_Completed.text_bottom)
-        BottomText.style.textAlign = "center"
-        BottomText.style.fontStyle = "italic"
-        Page.appendChild(BottomText)
-
-        //Showing the progress
-        showExplorationPhaseProgressPage()
-
-        //Creating the buttons at the bottom of the page
-        let ContinueButton = createSVGButtonElem((508-150)/2,250,150,22,"Continue")
-        Page.appendChild(ContinueButton)
-
-        //Set the event handlers for the two buttons. Continue should go to the map, Instructions should go to the welcome page.
-        ContinueButton.onclick = ContinueButtonFunc
-
-    }
-
-    // SEARCH PHASE //
-    //////////////////
-    //Search hint can either be "icon" (showing a small icon) or "name" (showing the name)
-
-    // DELIVERY PHASE //
-    ////////////////////
-
-
-
-    // QUIZ //
-    //////////
-
-
 
 
     // BASE INSTRUCTION ELEMENTS
@@ -1380,13 +1847,172 @@ let Text2 = createTextField(30, 100, 508-2*30,250, "")
         //Show the instructions layer
         SVG_references.Layer.style.display = "inherit"
 
-        // Background and title
-        show_map_background()
     }
 
 
 
 
 
+
+}
+
+RecallBoxController = function(Page, ExpCont){
+    let StartTime = Date.now()
+    let Dims = {
+        Field: {
+            x: 50,
+            y: 110,
+            h: 120,
+            w: 408
+        },
+        Answer: {
+            min_w: 50,
+            max_w: 200,
+            h: 20
+        },
+        InputLine: {
+            x: 52,
+            y: 238,
+            h:30,
+            w:145,
+
+        },
+        InputButton: {
+            x: 200,
+            y: 240,
+            h:22,
+            w:50
+        },
+        ContinueButton: {
+            x: 350,
+            y: 240,
+            h:22,
+            w:100
+        }
+
+    }
+    Dims.number_of_lines = Math.floor( Dims.Field.h / Dims.Answer.h )
+    let max_input_length  = 30
+
+    let ForObjBox, Box, BoxPlaceholderText, ForObjInput, InputText, InputButton, ContinueButton, AnswerArray = [], box_active, answer_id =0
+
+    //Creates the elements
+    function initialize_elements(){
+        //CREATING MAIN COMPONENTS
+        ForObjBox = createNSElemWithDims('http://www.w3.org/2000/svg',"foreignObject",  Dims.Field.x, Dims.Field.y, Dims.Field.w, Dims.Field.h)
+        ForObjBox.style.padding = "1%"
+        Page.appendChild(ForObjBox)
+
+        //The Box contains all the answers
+        Box = document.createElement("div")
+        Box.classList.add("recall_input_answerbox_start")
+        ForObjBox.appendChild(Box)
+
+        //Adding a placeholder for the box
+        BoxPlaceholderText = document.createElement("p")
+        BoxPlaceholderText.innerHTML = "Your answers will be shown here"
+        BoxPlaceholderText.classList.add("recall_input_box_placeholder")
+        Box.appendChild(BoxPlaceholderText)
+        box_active = false
+
+        //Adding input line
+        ForObjInput = createNSElemWithDims('http://www.w3.org/2000/svg',"foreignObject",  Dims.InputLine.x, Dims.InputLine.y, Dims.InputLine.w, Dims.InputLine.h)
+        ForObjInput.style.padding = "1%"
+        Page.appendChild(ForObjInput)
+
+        InputText = document.createElement("input")
+        InputText.maxLength = max_input_length
+        InputText.placeholder = "Enter name here"
+        InputText.classList.add("recall_input_line")
+        ForObjInput.appendChild(InputText)
+
+        InputButton = createSVGButtonElem(Dims.InputButton.x, Dims.InputButton.y, Dims.InputButton.w, Dims.InputButton.h, "Add")
+        InputButton.onclick = add_answer_button_pressed
+        Page.appendChild(InputButton)
+
+        ContinueButton = createSVGButtonElem(Dims.ContinueButton.x, Dims.ContinueButton.y, Dims.ContinueButton.w, Dims.ContinueButton.h, "Done")
+        ContinueButton.onclick = finish_question
+        Page.appendChild(ContinueButton)
+        ContinueButton.style.display = "none"
+    }
+
+    //Call then a first answer is submitted to remove the placeholder text in the box
+    function activate_box(){
+        box_active = true
+        BoxPlaceholderText.remove()
+        Box.classList.remove("recall_input_answerbox_start")
+        Box.classList.add("recall_input_answerbox_active")
+        ContinueButton.style.display = "inherit"
+    }
+
+    //Call when the add answer button is pressed
+    function add_answer_button_pressed(){
+        if(!box_active){
+            activate_box()
+        }
+
+        let inputval = InputText.value
+        if(inputval!== ""){
+            answer_added(InputText.value)
+            InputText.value = ""
+        }
+
+    }
+
+    //Call when an answer has been entered
+    function answer_added(answertext){
+        AnswerArray.push(new Answer(answertext, answer_id, Date.now() - StartTime))
+        answer_id++
+    }
+
+    //Object for the answer displayed in the box
+    Answer = function(text, id, time){
+        let removed_by_user = false
+        let AnswerDiv = document.createElement("div")
+        AnswerDiv.classList.add("recall_input_answer_div")
+
+        let AnswerText = document.createElement("p")
+        AnswerText.classList.add("recall_input_answer_text")
+        AnswerText.innerHTML = text
+        AnswerDiv.appendChild(AnswerText)
+
+        let RemoveAnswerMark = document.createElement("p")
+        RemoveAnswerMark.classList.add("recall_input_answer_remove")
+        RemoveAnswerMark.innerHTML = "[x]"
+        RemoveAnswerMark.onclick = delete_answer_from_screen
+        AnswerDiv.appendChild(RemoveAnswerMark)
+
+        Box.appendChild(AnswerDiv)
+
+        function delete_answer_from_screen(){
+            AnswerDiv.remove()
+            removed_by_user = true
+        }
+
+        this.get_value_obj = function(){
+            return({
+                ans: text,
+                id: id,
+                time:time,
+                removed_by_user: removed_by_user
+            })
+        }
+
+    }
+
+    //Call when the question has been finished
+    function finish_question(){
+        let GivenAnswers = []
+        for(let i =0;i<AnswerArray.length;i++){
+            let An = AnswerArray[i]
+            GivenAnswers.push(An.get_value_obj())
+        }
+        //Show the map again
+        document.getElementById("instructions_mask").style.opacity = 0.94
+
+        ExpCont.recall_questionnaire_completed(GivenAnswers)
+
+    }
+    initialize_elements()
 
 }

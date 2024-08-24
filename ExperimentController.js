@@ -42,18 +42,23 @@ DataController = function(){
     }
 
     this.block_completed = function(){
+        let ReducedTrialBuffer = []
+
+        for(let i=0;i<TrialBuffer.length;i++){
+            //Storing a reduced version of the trial object
+            ReducedTrialBuffer.push(reduce_trial_data_object(TrialBuffer[i], current_block_phase === "training"))
+
+
+        }
+
+
         if(current_block_phase === "training"){
-            DataObj.Training_Phase.push({type: current_block_type, Trials: JSON.parse(JSON.stringify(TrialBuffer))})
+            DataObj.Training_Phase.push({type: current_block_type, Trials: JSON.parse(JSON.stringify(ReducedTrialBuffer))})
             DataObj.Timestamps.push(["training phase " + current_block_type + " completed", Date.now() - experiment_start_time])
         }
 
         if(current_block_phase === "test"){
-            let ReducedTrialBuffer = []
-
             for(let i=0;i<TrialBuffer.length;i++){
-                //Storing a reduced version of the trial object
-                ReducedTrialBuffer.push(reduce_trial_data_object(TrialBuffer[i]))
-
                 //Keeping track of which outcomes are observed, organized by type of block
                 if(typeof Test_Phase_Outcomes[current_block_type] === "undefined"){
                     Test_Phase_Outcomes[current_block_type] = []
@@ -66,6 +71,8 @@ DataController = function(){
                 }
 
             }
+
+
             DataObj.Test_Phase.push({type: current_block_type, Trials: JSON.parse(JSON.stringify(ReducedTrialBuffer))})
             DataObj.Timestamps.push(["Test phase block completed", Date.now() - experiment_start_time])
         }
@@ -74,12 +81,28 @@ DataController = function(){
     }
 
     this.store_quiz_results = function(state_of_the_world){
-        DataObj.Training_Phase.push({type: "quiz", world: JSON.parse(JSON.stringify(state_of_the_world)) })
+        let NewState = JSON.parse(JSON.stringify(state_of_the_world))
+
+        for(let location in NewState){
+            if(NewState[location] !== false){
+                NewState[location] = reduce_trial_data_object(NewState[location], true)
+            }
+        }
+
+        DataObj.Training_Phase.push({type: "quiz", world: JSON.parse(JSON.stringify(NewState)) })
         DataObj.Timestamps.push(["quiz complete", Date.now() - experiment_start_time])
     }
 
+    this.store_card_quiz_array = function(CardErrorsArray){
+        if(typeof DataObj.Training_Phase.CardQuiz === "undefined"){
+            DataObj.Training_Phase.CardQuiz = [CardErrorsArray]
+        }else{
+            DataObj.push(CardErrorsArray)
+        }
+    }
+
     //Reduces the contents of the test trial to minimize the data stores (lots of internal variables are not needed for further analysis)
-    function reduce_trial_data_object(FennimalObj){
+    function reduce_trial_data_object(FennimalObj, absolute_minimum){
         let Available_Items_Arr = []
         for(let key = 0; key< Object.keys(FennimalObj.ItemResponses).length; key++){
             if(FennimalObj.ItemResponses[Object.keys(FennimalObj.ItemResponses)[key]] !== "unavailable"){
@@ -87,23 +110,37 @@ DataController = function(){
             }
         }
 
-        let NewObj = {
-            ID: FennimalObj.ID,
-            b: FennimalObj.body,
-            h: FennimalObj.head,
-            r: FennimalObj.region,
-            l: FennimalObj.location,
-            n: FennimalObj.name,
-            num_in_block: FennimalObj.encounter_order_in_block,
-            rt: FennimalObj.rt,
+        let NewObj = {}
+        if(absolute_minimum){
+            NewObj = {
+                ID: FennimalObj.ID,
+                num_in_block: FennimalObj.encounter_order_in_block,
+                rt: FennimalObj.rt,
+                selected: FennimalObj.selected_item,
+                out_obs: FennimalObj.outcome_observed,
+                out_hid: FennimalObj.hidden_outcome_observed,
+            }
 
-            c_toy: FennimalObj.cued_item,
-            s_toy: FennimalObj.search_item,
-            avail: Available_Items_Arr,
-            selected: FennimalObj.selected_item,
+        }else{
+            NewObj = {
+                ID: FennimalObj.ID,
+                b: FennimalObj.body,
+                h: FennimalObj.head,
+                r: FennimalObj.region,
+                l: FennimalObj.location,
+                n: FennimalObj.name,
+                num_in_block: FennimalObj.encounter_order_in_block,
+                rt: FennimalObj.rt,
 
-            out_obs: FennimalObj.outcome_observed,
-            out_hid: FennimalObj.hidden_outcome_observed,
+                c_toy: FennimalObj.cued_item,
+                s_toy: FennimalObj.search_item,
+                avail: Available_Items_Arr,
+                selected: FennimalObj.selected_item,
+
+                out_obs: FennimalObj.outcome_observed,
+                out_hid: FennimalObj.hidden_outcome_observed,
+
+            }
 
         }
 
@@ -139,13 +176,13 @@ DataController = function(){
         }
     }
 
+
     //Stores the participant's score
     this.storeScoreObject = function(ScoreObj){
         DataObj.Score = JSON.parse(JSON.stringify(ScoreObj))
     }
 
     this.updateForm = function(){
-        console.log(DataObj)
         DataObj.Timestamps.push(["experiment_completed", Date.now() - experiment_start_time])
         document.getElementById("data_form_field").innerHTML = JSON.stringify(DataObj)
     }
@@ -155,9 +192,18 @@ DataController = function(){
 ExperimentController = function(){
     let that = this
     let participant_number, Stimuli
-    let experiment_design = "baseline"
+    let experiment_design = "convergence"
     let retake_quiz_until_perfect = true
+    let open_question_special_Fennimal_ID = "key" // Set to false to have a general open question. If not set to false, then the open question specificially asks about this Fennimal.
 
+    //Set to false if not used.
+    let Recall_Question_Payment = {
+        allowed_errors: 2, //This is how many mistakes (omission and commission the participant is allowed to make)
+        max_allowed_Levenshtein_distance: 3, //For each answer given, this determines maximum amount of errors (typos) allowed before an answer cannot be tied to a Fennimal
+        max_allowed_distance_to_count_error: 7 //To make it a bit easier on subjects, we give them the benefit of the doubt: if an answer vaguely resembles a Fennimal name, then its not counted as an error-by-commission (although still as ommision!)
+
+    }
+    this.get_recall_question_bonus_rules = function(){return Recall_Question_Payment}
     //Subcontrollers
     let InstrCont, LocCont, DC, GarbageCleaner
 
@@ -165,10 +211,10 @@ ExperimentController = function(){
     let current_experiment_stage = "starting_instructions"
 
     let ExperimentStages = {
-        Instructions: ["consent", "full_screen_prompt", "payment_info", "basic_instructions"], //["consent", "full_screen_prompt", "payment_info", "basic_instructions"]
-        Training: ["exploration", "search_location", "search_name",  "delivery_icon", "quiz" ], // "exploration", "search_name",  "delivery_icon", "delivery_location", "quiz"      "exploration", "search_icon",  "delivery_icon", "delivery_location", "quiz"    "exploration", "search_icon", "search_name", "delivery_icon", "delivery_name"
+        Instructions: [ "consent", "full_screen_prompt", "payment_info", "basic_instructions" ], // "consent", "full_screen_prompt", "payment_info", "basic_instructions"
+        Training: [ "exploration", "search_location", "search_name",  "delivery_icon", "delivery_location", "cardquiz"  ],  //
         Test: [], //Updated on initialization, defined by the Stimuli.
-        Questionnaire: ["open","gender", "age", "colorblindness"], //"open","gender", "age", "colorblindness"
+        Questionnaire: ["recall", "open","gender", "age", "colorblindness"], //"open","gender", "age", "colorblindness"
     }
 
     //Retrieve participant number
@@ -310,13 +356,18 @@ ExperimentController = function(){
             case("search"): InstrCont.showSearchInstructions(CurrentTrial,block_hint_type); break;
             case("delivery"):
                 LocCont.change_item_in_backpack(false, false)
-                InstrCont.showDeliveryInstructions(CurrentTrial,block_hint_type, Stimuli.getItemDetails());
+                InstrCont.showDeliveryInstructions(CurrentTrial,block_hint_type, Stimuli.getItemDetails(), check_if_negative_valences_during_training());
                 InstrCont.reset_backpack_menu();
                 break;
             case("quiz"):
                 InstrCont.show_quiz_block_instructions(retake_quiz_until_perfect, Stimuli.getAllOutcomesObservedDuringTrainingPhase()); break;
+            case("cardquiz"):
+                InstrCont.showCurrentQuizCard()
+                break;
             case("test"):
                 InstrCont.show_test_phase_trial_instructions(CurrentTrial, CurrentTestBlockObject.type, CurrentTestBlockObject.hint_type)
+                break
+
 
         }
     }
@@ -349,6 +400,7 @@ ExperimentController = function(){
                 case("delivery_name"): start_delivery_block("name"); break
                 case("delivery_location"): start_delivery_block("location"); break
                 case("quiz"): start_training_quiz_block("location"); break
+                case("cardquiz"): start_training_cardquiz_block(); break
             }
 
         }else{
@@ -503,6 +555,99 @@ ExperimentController = function(){
         start_next_block();
     }
 
+    //TRAINING PHASE: CARD QUIZ
+    ///////////////////////////
+    let CurrentQuizCard, CardQuizResultArr
+    function start_training_cardquiz_block(){
+        //Determine the different cards. Theres one card for each training phase Fennimal. Should have a reference to the FennimalObj and to the
+        current_experiment_stage = "cardquiz"
+        DC.start_next_block("cardquiz", "training");
+
+        LocCont.change_experiment_phase("cardquiz")
+
+        //Create all trials. Starting with the Fennimal types
+        RemainingTrialsInBlock = []
+        let TrainingFennimals = shuffleArray( Stimuli.getTrainingSetFennimalsInArray() )
+        for(let i =0;i<TrainingFennimals.length;i++){
+            //if(TrainingFennimals[i].ID === "A"){ RemainingTrialsInBlock.push({type: "Fennimal", FenObj: TrainingFennimals[i]}) }
+            RemainingTrialsInBlock.push({type: "Fennimal", FenObj: TrainingFennimals[i]})
+        }
+
+        //Now adding location types
+        TrainingFennimals = shuffleArray( Stimuli.getTrainingSetFennimalsInArray() )
+        for(let i =0;i<TrainingFennimals.length;i++){
+            RemainingTrialsInBlock.push({type: "location", FenObj: TrainingFennimals[i]})
+        }
+
+
+        //Fill the world with completed Fennimals
+        Worldstate.reset_locations_visited()
+        for(let i =0; i<Stimuli.getTrainingSetFennimalsInArray().length; i++){
+            let Fen = Stimuli.getTrainingSetFennimalsInArray()[i]
+            Fen.selected_item = Fen.special_item
+            Fen.outcome_observed = Fen.ItemResponses[Fen.special_item]
+            populate_world_with_Fennimal(Fen)
+        }
+
+        //Initialzing our results array
+        CardQuizResultArr = []
+
+        //Show general quiz instructions
+        InstrCont.show_cardquiz_instructions()
+    }
+    function next_quiz_card(){
+        if(RemainingTrialsInBlock.length > 0){
+            CurrentQuizCard = RemainingTrialsInBlock.shift()
+            switch(CurrentQuizCard.type){
+                case("Fennimal"): InstrCont.create_cardquiz_card_Fennimal(CurrentQuizCard.FenObj, Stimuli.getLocationsVisited(), shuffleArray(Stimuli.getTrainingPhaseNames()), Stimuli.getItemDetails().All_Items, Stimuli.getTrainingPhaseValences()); break
+                case("location"): InstrCont.create_cardquiz_card_location(CurrentQuizCard.FenObj, Stimuli.getLocationsVisited(), shuffleArray(Stimuli.getTrainingPhaseNames()), Stimuli.getItemDetails().All_Items, Stimuli.getTrainingPhaseValences()); break// TODO
+            }
+        }else{
+            //Quiz completed
+
+            //Store data
+            DC.store_card_quiz_array(CardQuizResultArr)
+
+            //Continue experiment after a brief timeout
+            start_next_block()
+
+        }
+    }
+
+    this.quiz_card_answered = function(error_array, checked_map){
+        //Store the data
+        let Obj = {
+            type: CurrentQuizCard.type,
+            checked_map: checked_map
+        }
+        switch (CurrentQuizCard.type){
+            case("Fennimal"):
+                Obj.target= CurrentQuizCard.FenObj.ID
+                break
+            case("location"):
+                break
+
+        }
+        Obj.errors = error_array
+        CardQuizResultArr.push(JSON.parse(JSON.stringify(Obj)))
+
+        //If mistakes have been made AND the we set the quiz to repeat until perfect, then move this card back to the bottom of the stack
+        if(error_array.length > 0 && retake_quiz_until_perfect){
+            RemainingTrialsInBlock.push(JSON.parse(JSON.stringify(CurrentQuizCard)))
+        }
+
+        //Try for the next quiz card
+        next_quiz_card()
+
+    }
+    this.quiz_card_instructions_completed = function(){
+        next_quiz_card()
+    }
+    function check_if_negative_valences_during_training(){
+        let Observed = Stimuli.getTrainingPhaseValences()
+        return(Observed.includes("frown") || Observed.includes("bites"))
+    }
+
     // TEST PHASE
     ////////////////
     let CurrentTestBlockObject, current_test_day_num = 0, total_number_of_test_days
@@ -542,6 +687,9 @@ ExperimentController = function(){
         start_next_trial()
     }
     this.Fennimal_trial_completed = function(FenObj){
+        Worldstate.clear_all_Fennimals()
+        Worldstate.reset_locations_visited()
+
         //Store data
         DC.storeTrialData(FenObj)
 
@@ -585,6 +733,137 @@ ExperimentController = function(){
     }
 
     //QUESTIONAIRE AND PAYMENT
+    /////////////////////////////
+
+    //Logs the results of the recall questionnaire, computes the number of correct answers.
+    this.recall_questionnaire_completed = function(AnswerArray){
+        let ProcessedData = process_recall_data(AnswerArray)
+
+        // For payment: keep track of the number of errors made
+        Recall_Question_Payment.errors_made = ProcessedData.errors_made
+
+        //Record data and go to the next question
+        this.record_questionnaire_response("recall", ProcessedData.Answers)
+
+
+
+    }
+
+    //Call with the answers of the recall questionnaire to compute errors. Also stores the data and the erros
+    function process_recall_data(AnswerArray){
+        //Use only lower-case for the correct answers
+        let IDNames = Stimuli.getObjectOfIDsAndNames()
+        for(let key in IDNames){
+            IDNames[key] = IDNames[key].toLowerCase()
+        }
+
+        //Now find all the names that where input by the participant.
+        // Here we also use lower-case only, and remove potential starter string "the " and "a "
+        // We can also start keeping track of the errors-by-commission (invalid inputs)
+        let errors = 0
+        let Fennimals_matched = []
+        let Names_matched = []
+
+        for(let i =0;i<AnswerArray.length;i++){
+            if(! AnswerArray[i].removed_by_user){
+                //First: add a new property for the modified name
+                let newans = AnswerArray[i].ans.toLowerCase()
+
+                if(newans.startsWith("the ")){newans = newans.slice(4)}
+                if(newans.startsWith("a ")){newans = newans.slice(2)}
+
+                AnswerArray[i].ans_mod = newans
+
+                //Now we need to figure out which Fennimal the participant probably had in mind.
+                // We do this by calculating the Levenshtein distance between the provided answer.
+                // We then select the name with the lowest Leven-distance.
+                // If this Leven-distance is below a given threshold, then we have a correct placement. If not, then we have an error.
+                let LevenDistances = []
+                let IDs = []
+                for(let key in IDNames){
+                    IDs.push(key)
+                    LevenDistances.push( LevenshteinDistance(IDNames[key], newans))
+                }
+
+                //Get the ID with the lowest distance
+                let lowest_ID = IDs[LevenDistances.indexOf(Math.min(...LevenDistances))]
+                let lowest_distance_val = Math.min(...LevenDistances)
+
+                if(lowest_distance_val <= Recall_Question_Payment.max_allowed_Levenshtein_distance ){
+                    AnswerArray[i].matchedID = lowest_ID
+                    Fennimals_matched.push(lowest_ID)
+                    Names_matched.push(IDNames[lowest_ID])
+                }else{
+                    AnswerArray[i].matchedID = false
+                    if(lowest_distance_val > Recall_Question_Payment.max_allowed_distance_to_count_error){
+                        //This is so far off, count it as an error of commission too
+                        errors++
+                    }
+                }
+
+            }
+        }
+
+        //Now we start calculating the errors made by omission (that is, Fennimals which did not have their IDS assigned in any of the answers
+        for(let key in IDNames){
+            if(! Names_matched.includes(IDNames[key])){
+                errors++
+            }
+        }
+
+        //Returning
+        return({
+            errors_made: errors,
+            Answers: AnswerArray
+        })
+
+    }
+
+    //Call to start the questionnaire
+    function start_questionnaire(){
+        //Show the general questionnaire intro page
+        if(ExperimentStages.Questionnaire.length > 0){
+            InstrCont.show_questionnaire_start_page()
+        }else{
+            //This triggers the program to go to the payment screen instead
+            show_next_questionnaire_item()
+        }
+    }
+
+    //Logs the response to a questionnaire page and moves to the next page. If there are no more pages, then it moves to the final payment screen
+    function show_next_questionnaire_item(){
+        if(ExperimentStages.Questionnaire.length > 0){
+            //Go to the next questionnaire item
+            let upcoming_questionnaire_item = ExperimentStages.Questionnaire.shift()
+            InstrCont.show_questionnaire_page(upcoming_questionnaire_item)
+        }else{
+            //The questionnaire has been completed, time to finish the experiment!
+            show_payment_screen()
+        }
+    }
+
+    //Call to fetch a special Fennimal (if one exists) for the open question.
+    this.get_open_question_special_Fennimal_name = function(){
+        if(open_question_special_Fennimal_ID !== false){
+            return(Stimuli.getSearchPhaseFennimalByID(open_question_special_Fennimal_ID).name)
+        }
+    }
+
+    //If variable is set to false, then no response is recorded (for instruction pages)
+    this.record_questionnaire_response = function(variable, value){
+        //Record the value
+        if(variable !== false){
+            DC.record_questionnaire_answer(variable,value)
+        }
+
+        //Go to the next questionnaire item
+        show_next_questionnaire_item()
+    }
+
+    // PAYMENT
+    //Last page of the experiment: show the payment screen
+    let ScoreObject
+
     // Creates an object containing all the payment-relevant information for the participants
     function create_score_object(){
         let OutcomeObject = DC.get_test_phase_outcomes()
@@ -618,7 +897,7 @@ ExperimentController = function(){
         }
 
         //Calculating a score
-        let star_rating
+        let star_rating, total_stars
         let max_possible_points = total_number_of_test_phase_encounters
 
         if(total_points <= 0){
@@ -632,58 +911,42 @@ ExperimentController = function(){
             if(relative_score >= .80){ star_rating = 5}
         }
 
-        //Create a Token / completion code here
-        let cc_word_1 = shuffleArray(["Happy", "Bright", "Clean","Soft", "Funny", "Warm", "Sharp", "Small", "Kind", "Sweet", "Young", "White", "Tall"])[0]
-        let cc_word_2 = shuffleArray(["Cat", "Rabbit", "Owl","Fox","Koala", "Frog", "Shark", "Zebra", "Bat", "Flower", "Panda", "Rose", "Poppy", "Lily", "Tulip"  ])[0]
-        let completion_code = cc_word_1 + cc_word_2 + star_rating
+        total_stars = star_rating
+
+        //Figuring out if a bonus star was included
+        let bonus_star = false
+        if(Recall_Question_Payment !== false){
+            if(Recall_Question_Payment.errors_made > Recall_Question_Payment.allowed_errors){
+                bonus_star = 0
+            }else{
+                bonus_star = 1
+                total_stars++
+            }
+        }
+
+
 
         let ScoreObj = {
             total_number_of_test_phase_Fennimals: total_number_of_test_phase_encounters,
             Outcomes: SummaryOutcomes,
             NumberEncountersPerPhase: NumberEncountersPerPhase,
             stars_obtained: star_rating,
-            completion_code: completion_code
-
+            total_stars: total_stars
         }
+
+        if(bonus_star!== false){
+            ScoreObj.bonus_star= bonus_star
+            ScoreObj.bonus_star_errors_made = Recall_Question_Payment.errors_made
+        }
+
+        //Create a Token / completion code here
+        let cc_word_1 = shuffleArray(["Happy", "Bright", "Clean","Soft", "Funny", "Warm", "Sharp", "Small", "Kind", "Sweet", "Young", "White", "Tall"])[0]
+        let cc_word_2 = shuffleArray(["Cat", "Rabbit", "Owl","Fox","Koala", "Frog", "Shark", "Zebra", "Bat", "Flower", "Panda", "Rose", "Poppy", "Lily", "Tulip"  ])[0]
+        ScoreObj.completion_code = cc_word_1 + cc_word_2 + total_stars
+
         return(ScoreObj)
     }
 
-    //Call to start the questionnaire
-    function start_questionnaire(){
-        //Show the general questionnaire intro page
-        if(ExperimentStages.Questionnaire.length > 0){
-            InstrCont.show_questionnaire_start_page()
-        }else{
-            //This triggers the program to go to the payment screen instead
-            show_next_questionnaire_item()
-        }
-    }
-
-    //Logs the response to a questionnaire page and moves to the next page. If there are no more pages, then it moves to the final payment screen
-    function show_next_questionnaire_item(){
-        if(ExperimentStages.Questionnaire.length > 0){
-            //Go to the next questionnaire item
-            let upcoming_questionnaire_item = ExperimentStages.Questionnaire.shift()
-            InstrCont.show_questionnaire_page(upcoming_questionnaire_item)
-        }else{
-            //The questionnaire has been completed, time to finish the experiment!
-            show_payment_screen()
-        }
-    }
-
-    //If variable is set to false, then no response is recorded (for instruction pages)
-    this.record_questionnaire_response = function(variable, value){
-        //Record the value
-        if(variable !== false){
-            DC.record_questionnaire_answer(variable,value)
-        }
-
-        //Go to the next questionnaire item
-        show_next_questionnaire_item()
-    }
-
-    //Last page of the experiment: show the payment screen
-    let ScoreObject
     function show_payment_screen(){
         ScoreObject = create_score_object()
         DC.storeScoreObject(ScoreObject)
@@ -716,3 +979,5 @@ let EC = new ExperimentController()
 // Add loading screen
 
 // Consent
+
+// FREE RECALL BLOCK IN S PHASE (BEFORE REPEAT)
