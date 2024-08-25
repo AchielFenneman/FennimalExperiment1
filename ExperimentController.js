@@ -94,11 +94,8 @@ DataController = function(){
     }
 
     this.store_card_quiz_array = function(CardErrorsArray){
-        if(typeof DataObj.Training_Phase.CardQuiz === "undefined"){
-            DataObj.Training_Phase.CardQuiz = [CardErrorsArray]
-        }else{
-            DataObj.push(CardErrorsArray)
-        }
+        DataObj.Training_Phase.push({type: "cardquiz", results: JSON.parse(JSON.stringify(CardErrorsArray))})
+        DataObj.Timestamps.push(["card quiz complete", Date.now() - experiment_start_time])
     }
 
     //Reduces the contents of the test trial to minimize the data stores (lots of internal variables are not needed for further analysis)
@@ -183,6 +180,7 @@ DataController = function(){
     }
 
     this.updateForm = function(){
+        console.log(DataObj)
         DataObj.Timestamps.push(["experiment_completed", Date.now() - experiment_start_time])
         document.getElementById("data_form_field").innerHTML = JSON.stringify(DataObj)
     }
@@ -192,7 +190,7 @@ DataController = function(){
 ExperimentController = function(){
     let that = this
     let participant_number, Stimuli
-    let experiment_design = "convergence"
+    let experiment_design = "divergence"
     let retake_quiz_until_perfect = true
     let open_question_special_Fennimal_ID = "key" // Set to false to have a general open question. If not set to false, then the open question specificially asks about this Fennimal.
 
@@ -212,7 +210,7 @@ ExperimentController = function(){
 
     let ExperimentStages = {
         Instructions: [ "consent", "full_screen_prompt", "payment_info", "basic_instructions" ], // "consent", "full_screen_prompt", "payment_info", "basic_instructions"
-        Training: [ "exploration", "search_location", "search_name",  "delivery_icon", "delivery_location", "cardquiz"  ],  //
+        Training: ["exploration", "search_location", "search_name",  "delivery_icon", "delivery_location", "cardquiz" ],  //"exploration", "search_location", "search_name",  "delivery_icon", "delivery_location", "cardquiz"
         Test: [], //Updated on initialization, defined by the Stimuli.
         Questionnaire: ["recall", "open","gender", "age", "colorblindness"], //"open","gender", "age", "colorblindness"
     }
@@ -389,7 +387,6 @@ ExperimentController = function(){
             }
 
             current_experiment_stage = ExperimentStages.Training.shift()
-            console.log(current_experiment_stage)
 
             switch (current_experiment_stage){
                 case("exploration"): start_exploration_block(); break
@@ -738,6 +735,7 @@ ExperimentController = function(){
     //Logs the results of the recall questionnaire, computes the number of correct answers.
     this.recall_questionnaire_completed = function(AnswerArray){
         let ProcessedData = process_recall_data(AnswerArray)
+        console.log(ProcessedData)
 
         // For payment: keep track of the number of errors made
         Recall_Question_Payment.errors_made = ProcessedData.errors_made
@@ -805,6 +803,7 @@ ExperimentController = function(){
         }
 
         //Now we start calculating the errors made by omission (that is, Fennimals which did not have their IDS assigned in any of the answers
+
         for(let key in IDNames){
             if(! Names_matched.includes(IDNames[key])){
                 errors++
@@ -981,5 +980,3 @@ let EC = new ExperimentController()
 // Consent
 
 // FREE RECALL BLOCK IN S PHASE (BEFORE REPEAT)
-
-console.log("CURRENT VERSION")

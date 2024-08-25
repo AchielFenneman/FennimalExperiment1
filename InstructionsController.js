@@ -1697,9 +1697,6 @@ InstructionsController = function(ExpCont, LocCont){
             let phase = encountered_phases[phasenum]
             let number_encounters = ScoreObject.NumberEncountersPerPhase[phase]
             let OutcomesObtained = Object.keys(ScoreObject.Outcomes[phase])
-            console.log(phase)
-            console.log(number_encounters)
-            console.log(OutcomesObtained)
             switch(phase){
                 case("test_search"):
                     text = text + "Had " + number_encounters + " encounters with new Fennimals, where you had to predict which toy they would like. "
@@ -1761,8 +1758,10 @@ InstructionsController = function(ExpCont, LocCont){
         //Adding optional bonus star text.
         if(show_bonus_page){
             let errorplural = "s"
+            let onlytext = ""
+            if(ScoreObject.bonus_star === 1){ onlytext = "only"}
             if(ScoreObject.bonus_star_errors_made === 1){errorplural=""}
-            text = text + "<br>In addition, you made " + ScoreObject.bonus_star_errors_made + " error" + errorplural+" when entering the Fennimals' names. "
+            text = text + "<br>In addition, you " +onlytext +" made " + ScoreObject.bonus_star_errors_made + " error" + errorplural+" when entering the Fennimals' names. "
             if(ScoreObject.bonus_star === 0){
                 text = text + "Unfortunately, you therefore did not earn the bonus star."
             }else{
@@ -1771,7 +1770,7 @@ InstructionsController = function(ExpCont, LocCont){
         }
 
         text = text + "<br>Based on this performance, you earned the "
-        if(ScoreObject.total_stars > 1) { text = text + "distinguished "}
+        if(ScoreObject.total_stars > 1) { text = text + "distinguished title of "}
         text = text + ScoreObject.total_stars + "-star Fennimal expert!"
 
         //Set the text to the screen

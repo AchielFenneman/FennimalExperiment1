@@ -356,7 +356,6 @@ STIMULUSDATA = function(exp_code){
             Rules: SearchPhaseRules_repeat
         })
 
-
     }
 
 
@@ -366,129 +365,6 @@ STIMULUSDATA = function(exp_code){
 
     //Determine the exact experiment contents here
     switch(exp_code){
-
-        case("baseline") : {
-            //Drawing Regions
-            let Training_Regions = shuffleArray(["Desert", "North", "Village", "Jungle"]) //"North", "Desert", "Village"
-            let Search_Regions = shuffleArray(["Mountains", "Beach", "Flowerfields", "Swamp"])// "Jungle", "Mountains", "Beach"
-
-            //Shuffling locations for the regions
-            let Training_Location_Arr = []
-            for(let i = 0; i<Training_Regions.length;i++){
-                Training_Location_Arr.push(shuffleArray( JSON.parse(JSON.stringify(Param.RegionData[Training_Regions[i]].Locations))))
-            }
-            let Search_Location_Arr = []
-            for(let i = 0; i<Search_Regions.length;i++){
-                Search_Location_Arr.push(shuffleArray( JSON.parse(JSON.stringify(Param.RegionData[Search_Regions[i]].Locations))))
-            }
-
-            //Shuffle heads
-            let Used_Heads  = shuffleArray(["D", "E", "G", "I", "K", "B", "N"])
-
-            //Creating Item details
-            Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 3, false ))
-            All_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
-
-            //Creating the training Fennimals (A1 and A2 share a semantic head pair, B and C do not)
-            TrainingFennimals = {
-                A: createTrainingFennimalObj("A", Training_Regions[0], Training_Location_Arr[0][0], Used_Heads[0],false, [ [All_Items[0], "frown"]], false),
-                //B: createTrainingFennimalObj("B", Training_Regions[1], Training_Location_Arr[1][0], Used_Heads[2],false, [ [All_Items[1], "frown"]], false),
-                C:  createTrainingFennimalObj("C",Training_Regions[0], Training_Location_Arr[0][1], Used_Heads[1],false, [ [All_Items[1], "heart"]], false),
-                D:  createTrainingFennimalObj("D",Training_Regions[2], Training_Location_Arr[2][0], Used_Heads[3],false, [ [All_Items[2], "heart"]], false),
-                E:  createTrainingFennimalObj("E",Training_Regions[3], Training_Location_Arr[3][0], Used_Heads[4],false, [ [All_Items[2], "heart"]], false),
-            }
-
-            //Tell the param object that we want to see colors for the training phase hitns
-            Param.show_colors_with_icon_hints = false
-
-            //Setting the search phase rules
-            let SearchPhaseRules_search = {
-                hidden_feedback: true,
-                cued_item_allowed: true,
-                search_item_allowed: true,
-            }
-            let SearchPhaseRules_repeat = {
-                hidden_feedback: true,
-                cued_item_allowed: true,
-                search_item_allowed: true,
-                is_repeat_trial: true
-            }
-
-            // TODO: add IDs and actual outcomes
-            SearchPhaseSetup = [
-                {
-                    Trials: [
-                        createTestFennimalObj("Test_Key", Search_Regions[0], Search_Location_Arr[0][0],  TrainingFennimals.A.head,false, [[All_Items[1], "heart"],[All_Items[2], "neutral"] ], false, false, All_Items[1],SearchPhaseRules_search),
-                        createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[1], "neutral"],[All_Items[2], "heart"] ], false, All_Items[2], false,SearchPhaseRules_search),
-                        //createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
-                    ],
-                    hint_type: "location",
-                    type: "search",
-                    Rules: SearchPhaseRules_search
-                },
-                {
-                    Trials: [
-                        createTestFennimalObj("Test_Key", Search_Regions[0], Search_Location_Arr[0][0],  TrainingFennimals.A.head,false, [[All_Items[1], "heart"],[All_Items[2], "neutral"] ], false, false, All_Items[1],SearchPhaseRules_search),
-                        createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[1], "neutral"],[All_Items[2], "heart"] ], false, All_Items[2], false,SearchPhaseRules_search),
-                       // createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
-                    ],
-                    hint_type: "location",
-                    type: "search",
-                    Rules: SearchPhaseRules_search
-                },
-                {
-                    Trials: [
-                        createTestFennimalObj("Test_Key", Search_Regions[0], Search_Location_Arr[0][0],  TrainingFennimals.A.head,false, [[All_Items[1], "heart"],[All_Items[2], "neutral"] ], false, false, All_Items[1],SearchPhaseRules_search),
-                        createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[1], "neutral"],[All_Items[2], "heart"] ], false, All_Items[2], false,SearchPhaseRules_search),
-                        //createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
-                    ],
-                    hint_type: "location",
-                    type: "search",
-                    Rules: SearchPhaseRules_search
-                },
-                {
-                    Trials: [
-                        createTestFennimalObj("Test_Key", Search_Regions[0], Search_Location_Arr[0][0],  TrainingFennimals.A.head,false, [[All_Items[1], "heart"],[All_Items[2], "neutral"] ], false, false, All_Items[1],SearchPhaseRules_search),
-                        createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[1], "neutral"],[All_Items[2], "heart"] ], false, All_Items[2], false,SearchPhaseRules_search),
-                       // createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
-                    ],
-                    hint_type: "location",
-                    type: "search",
-                    Rules: SearchPhaseRules_search
-                },
-
-                {
-                    Trials: [
-                        createTestFennimalObj("RepeatA", TrainingFennimals.A.region, TrainingFennimals.A.location,  TrainingFennimals.A.head,false, [[All_Items[0], "correct"],[All_Items[1], "incorrect"],[All_Items[2], "incorrect"] ], false, All_Items[0], false,SearchPhaseRules_repeat),
-                        //createTestFennimalObj("RepeatB", TrainingFennimals.B.region, TrainingFennimals.B.location,  TrainingFennimals.B.head,false, [[All_Items[0], "incorrect"],[All_Items[1], "correct"],[All_Items[2], "incorrect"],[All_Items[3], "incorrect"] ], false, All_Items[1], false,SearchPhaseRules_repeat),
-                        createTestFennimalObj("RepeatC", TrainingFennimals.C.region, TrainingFennimals.C.location,  TrainingFennimals.C.head,false, [[All_Items[0], "incorrect"],[All_Items[1], "correct"],[All_Items[2], "incorrect"] ], false, All_Items[1], false,SearchPhaseRules_repeat),
-                        createTestFennimalObj("RepeatD", TrainingFennimals.D.region, TrainingFennimals.D.location,  TrainingFennimals.D.head,false, [[All_Items[0], "incorrect"],[All_Items[1], "incorrect"],[All_Items[2], "correct"] ], false, All_Items[2], false,SearchPhaseRules_repeat),
-                        createTestFennimalObj("RepeatE", TrainingFennimals.E.region, TrainingFennimals.E.location,  TrainingFennimals.E.head,false, [[All_Items[0], "incorrect"],[All_Items[1], "incorrect"],[All_Items[2], "correct"] ], false, All_Items[2], false,SearchPhaseRules_repeat),
-                    ],
-                    hint_type: "location",
-                    type: "repeat",
-                    Rules: SearchPhaseRules_repeat
-                },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            ]
-
-
-            break;
-
-        }
 
         case("convergence") : {
             //Tell the param object that we want to see colors for the training phase hints
@@ -536,6 +412,35 @@ STIMULUSDATA = function(exp_code){
                 {ID: "key2", region: "B", head: "A", ItemResponses: {b: "heart", c: "neutral"} },
                 {ID: "distr", region: "F", head: "D", ItemResponses: {b: "neutral", c: "heart"} },
                 {ID: "distr2", region: "G", head: "D", ItemResponses: {b: "neutral", c: "heart"} },
+            ]
+
+            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
+            //SearchPhaseSetup = [SearchPhaseSetup[0]]
+            //SearchPhaseSetup = []
+
+            break;
+
+        }
+
+        case("centrality") : {
+            //Tell the param object that we want to see colors for the training phase hints
+            Param.show_colors_with_icon_hints = true
+
+            // GENERAL STIMULI TEMPLATES
+            //////////////////////////////
+            let TrainingTemplates = [
+                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown"},
+                {ID: "B", region: "B", head: "B", special_item: "a", outcome: "frown"},
+                {ID: "C", region: "B", head: "A", special_item: "c", outcome: "heart"},
+                {ID: "D", region: "D", head: "A", special_item: "d", outcome: "heart"},
+                {ID: "E", region: "B", head: "E", special_item: "e", outcome: "heart"},
+            ]
+
+            let SearchPhaseBlockTemplates = [
+                {ID: "key_A1", region: "A", head: "F", ItemResponses: { c: "heart",d: "heart", e:"neutral"} },
+                {ID: "key_A2", region: "A", head: "G", ItemResponses: { c: "heart",d: "heart", e:"neutral"} },
+                {ID: "key_B1", region: "E", head: "B", ItemResponses: { c: "neutral",d: "heart", e:"heart"} },
+                {ID: "key_B2", region: "E", head: "B", ItemResponses: { c: "neutral",d: "heart", e:"heart"} },
             ]
 
             set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)

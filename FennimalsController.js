@@ -1171,7 +1171,9 @@ ItemController = function(FennimalObj,LocCont, FenCont, limited_backpack_item_ar
 
         //Set and show the prompt text
         if(number_of_available_items_on_screen=== 0){
-            prompt_message = "Oops! You did not bring the correct toy with you"
+            //prompt_message = "Oops! You did not bring the correct toy with you"
+            prompt_message = "Oops! You should bring the " + FennimalObj.special_item + " to the " + FennimalObj.name
+            console.log(FennimalObj)
             ItemBar.style.opacity = 0.1
             LocCont.Fennimal_interaction_completed(FennimalObj)
         }else{
