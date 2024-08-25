@@ -173,6 +173,16 @@ DataController = function(){
         }
     }
 
+    this.record_recallled_Fennimals = function(Array){
+        if(typeof DataObj.RecalledNames === "undefined"){
+            DataObj.RecalledNames = [Array]
+        }else{
+            DataObj.RecalledNames.push(Array)
+        }
+        DataObj.Timestamps.push(["recalled names complete", Date.now() - experiment_start_time])
+        console.log(DataObj)
+    }
+
 
     //Stores the participant's score
     this.storeScoreObject = function(ScoreObj){
@@ -210,9 +220,9 @@ ExperimentController = function(){
 
     let ExperimentStages = {
         Instructions: [ "consent", "full_screen_prompt", "payment_info", "basic_instructions" ], // "consent", "full_screen_prompt", "payment_info", "basic_instructions"
-        Training: ["exploration", "search_location", "search_name",  "delivery_icon", "delivery_location", "cardquiz" ],  //"exploration", "search_location", "search_name",  "delivery_icon", "delivery_location", "cardquiz"
+        Training: ["exploration", "search_location", "search_name",  "delivery_icon", "delivery_location", "cardquiz"   ],  //             "exploration", "search_location", "search_name",  "delivery_icon", "delivery_location", "cardquiz"
         Test: [], //Updated on initialization, defined by the Stimuli.
-        Questionnaire: ["recall", "open","gender", "age", "colorblindness"], //"open","gender", "age", "colorblindness"
+        Questionnaire: ["open","gender", "age", "colorblindness"], //"open","gender", "age", "colorblindness"
     }
 
     //Retrieve participant number
@@ -667,18 +677,27 @@ ExperimentController = function(){
     function start_test_phase_block(){
         Worldstate.clear_all_Fennimals()
         Worldstate.reset_locations_visited()
+
         LocCont.change_experiment_phase("test")
         current_test_day_num++
 
         CurrentTestBlockObject = ExperimentStages.Test.shift()
 
-        RemainingTrialsInBlock = shuffleArray(CurrentTestBlockObject.Trials)
+        if(CurrentTestBlockObject.type === "recall_task"){
+            RemainingTrialsInBlock = []
+            InstrCont.show_recall_task()
 
-        DC.start_next_block("test_" + CurrentTestBlockObject.type, "test");
-        block_hint_type = CurrentTestBlockObject.hint_type
+        }else{
 
-        //Showing the block-specific instructions
-        InstrCont.show_test_phase_block_instructions(CurrentTestBlockObject.type,CurrentTestBlockObject.Rules,Stimuli.getAllOutcomesObservedDuringTrainingPhase(), current_test_day_num, total_number_of_test_days)
+
+            RemainingTrialsInBlock = shuffleArray(CurrentTestBlockObject.Trials)
+
+            DC.start_next_block("test_" + CurrentTestBlockObject.type, "test");
+            block_hint_type = CurrentTestBlockObject.hint_type
+
+            //Showing the block-specific instructions
+            InstrCont.show_test_phase_block_instructions(CurrentTestBlockObject.type,CurrentTestBlockObject.Rules,Stimuli.getAllOutcomesObservedDuringTrainingPhase(), current_test_day_num, total_number_of_test_days)
+        }
     }
     this.test_phase_block_instructions_read = function(){
         start_next_trial()
@@ -729,23 +748,35 @@ ExperimentController = function(){
         start_questionnaire()
     }
 
-    //QUESTIONAIRE AND PAYMENT
-    /////////////////////////////
+    // RECALL TASK
+    /////////////////
 
     //Logs the results of the recall questionnaire, computes the number of correct answers.
-    this.recall_questionnaire_completed = function(AnswerArray){
+    this.recall_task_completed = function(AnswerArray){
         let ProcessedData = process_recall_data(AnswerArray)
         console.log(ProcessedData)
 
         // For payment: keep track of the number of errors made
         Recall_Question_Payment.errors_made = ProcessedData.errors_made
 
-        //Record data and go to the next question
-        this.record_questionnaire_response("recall", ProcessedData.Answers)
+        //Record data
+        DC.record_recallled_Fennimals(ProcessedData.Answers)
+
+        // Go to the next part of the experiment. Note: since the recall task can take place in either the test phase or the questionnaire, check for this first
+        //this.record_questionnaire_response("recall", ProcessedData.Answers)
+        switch(current_experiment_stage){
+            case("questionnaire"): show_next_questionnaire_item(); break
+            case("test"):start_next_block(); break;
+        }
 
 
 
     }
+
+    //QUESTIONAIRE AND PAYMENT
+    /////////////////////////////
+
+
 
     //Call with the answers of the recall questionnaire to compute errors. Also stores the data and the erros
     function process_recall_data(AnswerArray){
@@ -820,6 +851,7 @@ ExperimentController = function(){
 
     //Call to start the questionnaire
     function start_questionnaire(){
+        current_experiment_stage = "questionnaire"
         //Show the general questionnaire intro page
         if(ExperimentStages.Questionnaire.length > 0){
             InstrCont.show_questionnaire_start_page()
@@ -980,4 +1012,4 @@ let EC = new ExperimentController()
 // Consent
 
 // FREE RECALL BLOCK IN S PHASE (BEFORE REPEAT)
-console.log("updated")
+console.log("Most recent version")

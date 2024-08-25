@@ -1426,6 +1426,10 @@ InstructionsController = function(ExpCont, LocCont){
 
     }
 
+    this.show_recall_task = function(){
+        show_recall_page()
+    }
+
     //QUESTIONNAIRE
     ////////////////////
     this.show_questionnaire_start_page = function(){
@@ -2009,7 +2013,7 @@ RecallBoxController = function(Page, ExpCont){
         //Show the map again
         document.getElementById("instructions_mask").style.opacity = 0.94
 
-        ExpCont.recall_questionnaire_completed(GivenAnswers)
+        ExpCont.recall_task_completed(GivenAnswers)
 
     }
     initialize_elements()

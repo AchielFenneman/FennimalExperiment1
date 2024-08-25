@@ -337,6 +337,7 @@ STIMULUSDATA = function(exp_code){
         }
 
         SearchPhaseSetup = []
+
         //Adding the search blocks
         for(let blocknum = 0; blocknum<number_search_blocks; blocknum++){
             let NewBlock = {
@@ -347,6 +348,9 @@ STIMULUSDATA = function(exp_code){
             }
             SearchPhaseSetup.push(NewBlock)
         }
+
+        //Adding the recall question
+        SearchPhaseSetup.push({type:"recall_task"})
 
         //Adding the repeat trials at the end
         SearchPhaseSetup.push({
@@ -395,6 +399,34 @@ STIMULUSDATA = function(exp_code){
         }
 
         case("divergence") : {
+            //Tell the param object that we want to see colors for the training phase hints
+            Param.show_colors_with_icon_hints = true
+
+            // GENERAL STIMULI TEMPLATES
+            //////////////////////////////
+            let TrainingTemplates = [
+                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown"},
+                {ID: "B", region: "B", head: "B", special_item: "a", outcome: "frown"},
+                {ID: "C", region: "A", head: "C", special_item: "b", outcome: "heart"},
+                {ID: "D", region: "D", head: "C", special_item: "c", outcome: "heart"},
+            ]
+
+            let SearchPhaseBlockTemplates = [
+                {ID: "key", region: "B", head: "A", ItemResponses: {b: "heart", c: "neutral"} },
+                {ID: "key2", region: "B", head: "A", ItemResponses: {b: "heart", c: "neutral"} },
+                {ID: "distr", region: "D", head: "E", ItemResponses: {b: "neutral", c: "heart"} },
+                {ID: "distr2", region: "D", head: "F", ItemResponses: {b: "neutral", c: "heart"} },
+            ]
+
+            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
+            //SearchPhaseSetup = [SearchPhaseSetup[0]]
+            //SearchPhaseSetup = []
+
+            break;
+
+        }
+
+        case("divergence_min") : {
             //Tell the param object that we want to see colors for the training phase hints
             Param.show_colors_with_icon_hints = true
 
