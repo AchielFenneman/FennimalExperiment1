@@ -1020,4 +1020,4 @@ let EC = new ExperimentController()
 //      Hide answers during retrieval?
 //      Collapse test trials to region
 
-console.log("LATEST")
+console.log("LATEST VERSION")
