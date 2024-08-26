@@ -222,8 +222,9 @@ STIMULUSDATA = function(exp_code){
                         RegionLocationCodes[key].training_locations = shuffleArray( JSON.parse(JSON.stringify(Param.RegionData[region].Location_selection_order[2])) )
                         RegionLocationCodes[key].search_locations = JSON.parse(JSON.stringify(Param.RegionData[region].Location_selection_order[3])).filter(x => !RegionLocationCodes[key].training_locations.includes(x))
                     }else{
-                        // Three training phase locations for one region. Select search regions at random... This really only works if there are no search locations here...
-                        RegionLocationCodes[key].training_locations = shuffleArray( JSON.parse(JSON.stringify(Param.RegionData[region].Location_selection_order[3] )))
+                        // Three training phase locations for one region. For the CENTRALITY experiment, we have an additional requirement here: the first listed template should be in the MIDDLE position. So we don't need to shuffle the Regiondata
+                        RegionLocationCodes[key].training_locations =  JSON.parse(JSON.stringify(Param.RegionData[region].Location_selection_order[3] ))
+                        //RegionLocationCodes[key].training_locations = shuffleArray( JSON.parse(JSON.stringify(Param.RegionData[region].Location_selection_order[3] )))
                         RegionLocationCodes[key].search_locations = shuffleArray( JSON.parse(JSON.stringify(Param.RegionData[region].Location_selection_order[3] )))
                     }
                 }
@@ -462,7 +463,8 @@ STIMULUSDATA = function(exp_code){
             //////////////////////////////
             let TrainingTemplates = [
                 {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown"},
-                {ID: "B", region: "B", head: "B", special_item: "a", outcome: "frown"},
+
+                {ID: "B", region: "B", head: "B", special_item: "a", outcome: "frown"}, // B should be listed first, so that its in the middle of the location (making C and E equally distant)
                 {ID: "C", region: "B", head: "A", special_item: "c", outcome: "heart"},
                 {ID: "D", region: "D", head: "A", special_item: "d", outcome: "heart"},
                 {ID: "E", region: "B", head: "E", special_item: "e", outcome: "heart"},
@@ -471,13 +473,14 @@ STIMULUSDATA = function(exp_code){
             let SearchPhaseBlockTemplates = [
                 {ID: "key_A1", region: "A", head: "F", ItemResponses: { c: "heart",d: "heart", e:"neutral"} },
                 {ID: "key_A2", region: "A", head: "G", ItemResponses: { c: "heart",d: "heart", e:"neutral"} },
-                {ID: "key_B1", region: "E", head: "B", ItemResponses: { c: "neutral",d: "heart", e:"heart"} },
-                {ID: "key_B2", region: "E", head: "B", ItemResponses: { c: "neutral",d: "heart", e:"heart"} },
+                {ID: "key_B1", region: "E", head: "B", ItemResponses: { c: "heart",d: "neutral", e:"heart"} },
+                {ID: "key_B2", region: "F", head: "B", ItemResponses: { c: "heart",d: "neutral", e:"heart"} },
             ]
 
             set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
             //SearchPhaseSetup = [SearchPhaseSetup[0]]
             //SearchPhaseSetup = []
+            console.log(SearchPhaseSetup)
 
             break;
 

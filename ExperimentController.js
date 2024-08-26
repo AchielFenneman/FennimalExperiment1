@@ -200,9 +200,9 @@ DataController = function(){
 ExperimentController = function(){
     let that = this
     let participant_number, Stimuli
-    let experiment_design = "divergence"
+    let experiment_design = "centrality"
     let retake_quiz_until_perfect = true
-    let open_question_special_Fennimal_ID = "key" // Set to false to have a general open question. If not set to false, then the open question specificially asks about this Fennimal.
+    let open_question_special_Fennimal_ID = false // "key" // Set to false to have a general open question. If not set to false, then the open question specificially asks about this Fennimal.
 
     //Set to false if not used.
     let Recall_Question_Payment = {
@@ -877,6 +877,8 @@ ExperimentController = function(){
     this.get_open_question_special_Fennimal_name = function(){
         if(open_question_special_Fennimal_ID !== false){
             return(Stimuli.getSearchPhaseFennimalByID(open_question_special_Fennimal_ID).name)
+        }else{
+            return false
         }
     }
 
@@ -1012,4 +1014,10 @@ let EC = new ExperimentController()
 // Consent
 
 // FREE RECALL BLOCK IN S PHASE (BEFORE REPEAT)
-console.log("Most recent version")
+
+// OPEN QUESTIONS
+//      ALL names based on location? (retrieval stage)
+//      Hide answers during retrieval?
+//      Collapse test trials to region
+
+console.log("LATEST")

@@ -181,7 +181,7 @@ InstructionsController = function(ExpCont, LocCont){
         SVG_references.Layer.style.display = "inherit"
 
         Container.appendChild(createInstructionTitleElem("DURATION AND PAYMENT"))
-        Container.appendChild(createTextField(30, 80, 508-2*30,250, "This experiment is expected to last around 25-30 minutes. <br>" +
+        Container.appendChild(createTextField(30, 80, 508-2*30,250, "This experiment is expected to last around 30-35 minutes. <br>" +
             "<br>" +
             "Based on your decisions in the last part of the experiment you can earn up to six stars for your performance. " +
             "You will earn a bonus of " + Param.BonusEarnedPerStar.currency_symbol+ Param.BonusEarnedPerStar.bonus_per_star + " per star that you obtain. <br>" ))
@@ -1593,7 +1593,7 @@ InstructionsController = function(ExpCont, LocCont){
         SVG_references.Layer.appendChild(Container)
         Container.appendChild(createInstructionTitleElem("How did you decide on a toy?"))
 
-        let text = "During the last part of your training to become an Wildlife Ranger, you could freely decide between different toys to give to a Fennimal. How did you decide which toy to give to the Fennimals?"
+        let text = "During the last part of your training to become an Wildlife Ranger, you could freely decide between different toys to give to a Fennimal. How did you decide on which toy to give to the Fennimals?"
         if(special_name !== false){
             text = "During your practical experience, there were several times that you encountered a <b>" + special_name + "</b>. How did you decide on which toy to give to this Fennimal?"
         }

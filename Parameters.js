@@ -680,7 +680,7 @@ ParameterObject = function() {
             Location_selection_order: {
                 1: ["Cliff"],
                 2: ["Waterfall", "Mine"],
-                3: ["Waterfall", "Mine", "Cliff"]
+                3: ["Cliff", "Mine", "Waterfall"]
             },
             lighter_color: "#d6bba9",
             color: "#502d16",
@@ -722,7 +722,7 @@ ParameterObject = function() {
             Location_selection_order: {
                 1: ["Windmill", ],
                 2: ["Windmill", "Garden"],
-                3: ["Windmill", "Garden", "Orchard"]
+                3: ["Orchard", "Garden", "Windmill"]
             },
             lighter_color: "#ffcffa",
             color: "#f472e6",
