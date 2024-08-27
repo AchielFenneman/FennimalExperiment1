@@ -486,6 +486,35 @@ STIMULUSDATA = function(exp_code){
 
         }
 
+        case("centrality_4") : {
+            //Tell the param object that we want to see colors for the training phase hints
+            Param.show_colors_with_icon_hints = true
+
+            // GENERAL STIMULI TEMPLATES
+            //////////////////////////////
+            let TrainingTemplates = [
+                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown"},
+                {ID: "B", region: "B", head: "B", special_item: "a", outcome: "frown"}, // B should be listed first, so that its in the middle of the location (making C and E equally distant)
+                {ID: "C", region: "B", head: "A", special_item: "c", outcome: "heart"},
+                {ID: "D", region: "B", head: "D", special_item: "d", outcome: "heart"},
+            ]
+
+            let SearchPhaseBlockTemplates = [
+                {ID: "key_p_length", region: "A", head: "F", ItemResponses: { c: "heart",d: "neutral"} },
+                {ID: "key_p_num", region: "A", head: "B", ItemResponses: { c: "heart",d: "neutral"} },
+                {ID: "cntrl", region: "E", head: "B", ItemResponses: { c: "heart",d: "heart"} },
+
+            ]
+
+            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
+            //SearchPhaseSetup = [SearchPhaseSetup[0]]
+            //SearchPhaseSetup = []
+            console.log(SearchPhaseSetup)
+
+            break;
+
+        }
+
         case("convergence_base") : {
             //Drawing Regions
             let Training_Regions = shuffleArray(["Desert", "North", "Village", "Jungle"]) //"North", "Desert", "Village"
