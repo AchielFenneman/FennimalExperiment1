@@ -181,7 +181,7 @@ InstructionsController = function(ExpCont, LocCont){
         SVG_references.Layer.style.display = "inherit"
 
         Container.appendChild(createInstructionTitleElem("DURATION AND PAYMENT"))
-        Container.appendChild(createTextField(30, 80, 508-2*30,250, "This experiment is expected to last around 30-35 minutes. <br>" +
+        Container.appendChild(createTextField(30, 80, 508-2*30,250, "This experiment is expected to last around 25 minutes. <br>" +
             "<br>" +
             "Based on your decisions in the last part of the experiment you can earn up to six stars for your performance. " +
             "You will earn a bonus of " + Param.BonusEarnedPerStar.currency_symbol+ Param.BonusEarnedPerStar.bonus_per_star + " per star that you obtain. <br>" ))
