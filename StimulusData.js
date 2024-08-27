@@ -506,7 +506,7 @@ STIMULUSDATA = function(exp_code){
 
             ]
 
-            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
+            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,4)
             //SearchPhaseSetup = [SearchPhaseSetup[0]]
             //SearchPhaseSetup = []
             console.log(SearchPhaseSetup)
