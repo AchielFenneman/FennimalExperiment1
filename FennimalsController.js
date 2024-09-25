@@ -105,22 +105,52 @@ FeedbackController = function(FennimalObject, FennimalSVGContainer, show_icon_on
         } else {
             switch (outcome_observed) {
                 case("heart"):
-                    Prompt.show_feedback_message("The " + fennimal_name + " LOVES the " + item_given, "heart")
+
+                    if(Param.get_used_unique_names().includes(FennimalObject.name) ){
+                        Prompt.show_feedback_message(fennimal_name + " LOVES the " + item_given, "heart")
+                    }else{
+                        Prompt.show_feedback_message("The " + fennimal_name + " LOVES the " + item_given, "heart")
+                    }
                     break;
                 case("smile"):
-                    Prompt.show_feedback_message("The " + fennimal_name + " likes the " + item_given, "smile")
+                    if(Param.get_used_unique_names().includes(FennimalObject.name) ){
+                        Prompt.show_feedback_message( fennimal_name + " likes the " + item_given, "smile")
+                    }else{
+                        Prompt.show_feedback_message("The " + fennimal_name + " likes the " + item_given, "smile")
+                    }
+
                     break
                 case("frown"):
-                    Prompt.show_feedback_message("The " + fennimal_name + " does not like the " + item_given, "frown")
+                    if(Param.get_used_unique_names().includes(FennimalObject.name) ){
+                        Prompt.show_feedback_message( fennimal_name + " does not like the " + item_given, "frown")
+                    }else{
+                        Prompt.show_feedback_message("The " + fennimal_name + " does not like the " + item_given, "frown")
+                    }
+
                     break;
                 case("bites"):
-                    Prompt.show_feedback_message("Auch! The " + fennimal_name + " bites you!", "bites")
+                    if(Param.get_used_unique_names().includes(FennimalObject.name) ){
+                        Prompt.show_feedback_message("Auch! " + fennimal_name + " bites you!", "bites")
+                    }else{
+                        Prompt.show_feedback_message("Auch! The " + fennimal_name + " bites you!", "bites")
+                    }
+
                     break;
                 case("neutral"):
-                    Prompt.show_feedback_message("The " + fennimal_name + " feels indifferent about the " + item_given, "neutral")
+                    if(Param.get_used_unique_names().includes(FennimalObject.name) ){
+                        Prompt.show_feedback_message( fennimal_name + " feels indifferent about the " + item_given, "neutral")
+                    }else{
+                        Prompt.show_feedback_message("The " + fennimal_name + " feels indifferent about the " + item_given, "neutral")
+                    }
+
                     break;
                 case("unknown"):
-                    Prompt.show_feedback_message("The " + fennimal_name + " takes the toy to its home", "unknown")
+                    if(Param.get_used_unique_names().includes(FennimalObject.name) ){
+                        Prompt.show_feedback_message(fennimal_name + " takes the toy to its home", "unknown")
+                    }else{
+                        Prompt.show_feedback_message("The " + fennimal_name + " takes the toy to its home", "unknown")
+                    }
+
                     break;
                 case("incorrect"):
                     Prompt.show_feedback_message("Oops! You picked the wrong toy!", "incorrect")
@@ -372,6 +402,34 @@ FeedbackController = function(FennimalObject, FennimalSVGContainer, show_icon_on
         }
 
         show_prompt_text(outcome)
+
+        check_if_need_to_hide_outcome_after_delay()
+    }
+
+    function check_if_need_to_hide_outcome_after_delay(){
+        let need_to_hide_after_delay = false
+        if(typeof FennimalObject.test_phase_trial !== "undefined"){
+            if(typeof FennimalObject.TestPhaseRules !== "undefined"){
+                if(FennimalObject.TestPhaseRules.ask_confidence){
+                    need_to_hide_after_delay = true
+                }
+            }
+        }
+
+        if(need_to_hide_after_delay){
+            setTimeout(function(){
+                clearInterval(SmallIconGenerator)
+                clearInterval(animation_interval)
+                Item.style.transition = original_transition_style
+                Item.style.display = "none"
+
+                //Clear all remaining hearts
+                let Feedback_Symbols = document.getElementsByClassName("feedback_symbol")
+                for(let i=0; i<Feedback_Symbols.length ; i++){
+                    Feedback_Symbols[i].style.display = "none"
+                }
+            }, 4000)
+        }
     }
 
     function check_if_test_trial_with_hidden_feedback(){
@@ -433,12 +491,12 @@ FeedbackController = function(FennimalObject, FennimalSVGContainer, show_icon_on
                 flag_can_play_sound = true
 
                 setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.16 * animation_duration)
-               // setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.60 * animation_duration)
+                // setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.60 * animation_duration)
 
 
                 ItemSoundInterval = setInterval(function(){
                     setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.16 * animation_duration)
-                   // setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.60 * animation_duration)
+                    // setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.60 * animation_duration)
 
                 }, animation_duration)
                 break;
@@ -549,25 +607,25 @@ Flashlight_Controller = function(FennimalObj, LocCont){
     ///////////////////
     //Once the flashlight is active, we need to listen for mouseup and mouse leave events all over the documents.
     // Leaving the document or lifting the mouse should trigger the flashlight off (if it is on)
-    document.onmouseup = function(){
+    document.onpointerup = function(){
         if(flashlight_state_on){
             toggleFlashlight(false)
         }
     }
-    document.onmouseleave = function(){
+    document.onpointerleave = function(){
         if(flashlight_state_on){
             toggleFlashlight(false)
         }
     }
 
     //The flashlight should be triggered to active once the icon has been pressed
-    FlashlightIcon.onmousedown = function(){
+    FlashlightIcon.onpointerdown = function(){
         toggleFlashlight(true)
     }
 
     //If the mouse moves anywhere on the document AND the flashlight is active, then the gradient of the outline needs to be adjusted
     // (This gives the splotlight effect!)
-    document.onmousemove = function(event){
+    document.onpointermove = function(event){
         if(flashlight_state_on){
             //Get the correct mouse position in the SVG coordinates
             let mouse_pos = getMousePosition(event)
@@ -897,7 +955,7 @@ ItemController = function(FennimalObj,LocCont, FenCont, limited_backpack_item_ar
         }
 
         //Set an event listener for when the icon is pressed. If so, then let the subcontroller know
-        IconElem.onmousedown = function(event){
+        IconElem.onpointerdown = function(event){
             let mouse_pos = getMousePosition(event)
             Controller.buttonSelected(item_name, mouse_pos.x,mouse_pos.y)
         }
@@ -994,19 +1052,19 @@ ItemController = function(FennimalObj,LocCont, FenCont, limited_backpack_item_ar
     }
 
 
-    document.onmouseup = function(event){
+    document.onpointerup = function(event){
         if(dragging_state !== false && dragging_state!== "frozen"){
             let mouse_pos = getMousePosition(event)
             stoppedDragging(mouse_pos.x,mouse_pos.y)
         }
     }
-    document.onmouseleave = function(event){
+    document.onpointerleave = function(event){
         if(dragging_state !== false && dragging_state!== "frozen"){
             let mouse_pos = getMousePosition(event)
             stoppedDragging(mouse_pos.x,mouse_pos.y)
         }
     }
-    document.onmousemove = function(event){
+    document.onpointermove = function(event){
         if(dragging_state!==false && dragging_state!== "frozen"){
             //Get the correct mouse position in the SVG coordinates
             let mouse_pos = getMousePosition(event)
@@ -1172,21 +1230,43 @@ ItemController = function(FennimalObj,LocCont, FenCont, limited_backpack_item_ar
         //Set and show the prompt text
         if(number_of_available_items_on_screen=== 0){
             //prompt_message = "Oops! You did not bring the correct toy with you"
-            prompt_message = "Oops! You should bring the " + FennimalObj.special_item + " to the " + FennimalObj.name
+            if(Param.get_used_unique_names().includes(FennimalObj.name) ){
+                prompt_message = "Oops! You should bring the " + FennimalObj.special_item + " to " + FennimalObj.name
+            }else{
+                prompt_message = "Oops! You should bring the " + FennimalObj.special_item + " to the " + FennimalObj.name
+            }
+
             ItemBar.style.opacity = 0.1
             LocCont.Fennimal_interaction_completed(FennimalObj)
         }else{
             if(number_of_available_items_on_screen === 1){
                 //One item is not unavailable, so find the name
                 let available_item_name = Object.keys(FennimalObj.ItemResponses).find(x=>FennimalObj.ItemResponses[x]!=="unavailable");
-                prompt_message = "Give the " + available_item_name + " to the " + FennimalObj.name
+
+
+                if(Param.get_used_unique_names().includes(FennimalObj.name) ){
+                    prompt_message = "Give the " + available_item_name + " to " + FennimalObj.name
+                }else{
+                    prompt_message = "Give the " + available_item_name + " to the " + FennimalObj.name
+                }
 
 
             }else{
                 if(is_quiz_trial){
-                    prompt_message = "Which toy did you PREVIOUSLY GIVE to the " + FennimalObj.name + "?"
+
+                    if(Param.get_used_unique_names().includes(FennimalObj.name) ){
+                        prompt_message = "Which toy did you PREVIOUSLY GIVE to " + FennimalObj.name + "?"
+                    }else{
+                        prompt_message = "Which toy did you PREVIOUSLY GIVE to the " + FennimalObj.name + "?"
+                    }
+
                 }else{
-                    prompt_message = "Give one of the available toys to " + FennimalObj.name
+                    if(Param.get_used_unique_names().includes(FennimalObj.name) ){
+                        prompt_message = "Give one of the available toys to " + FennimalObj.name
+                    }else{
+                        prompt_message = "Give one of the available toys to the " + FennimalObj.name
+                    }
+
                 }
             }
         }
@@ -1385,20 +1465,42 @@ FennimalController = function(FennimalObj, LocCont, limited_backpack_item_array)
         FennimalObj.selected_item = selected_item
         FennimalObj.outcome_observed = FennimalObj.ItemResponses[selected_item]
 
-       if(limited_backpack_item_array !== false){
-           limited_backpack_item_given(selected_item)
-       }
+        if(limited_backpack_item_array !== false){
+            limited_backpack_item_given(selected_item)
+        }
 
 
         FeedbackCont = new FeedbackController(FennimalObj,Container, true)
 
-        //After a brief delay the interaction is completed.
+        //After a brief delay the interaction is completed. Nowe we can either continue, OR we first need to ask the confidence rating
         setTimeout(function(){
-           LocCont.Fennimal_interaction_completed(FennimalObj)
+            let need_to_elicit_confidence = false
+            if(typeof FennimalObj.test_phase_trial !== "undefined"){
+                if(typeof FennimalObj.TestPhaseRules !== "undefined"){
+                    if(FennimalObj.TestPhaseRules.ask_confidence){
+                        need_to_elicit_confidence = true
+                    }
+                }
+            }
+
+            if(! need_to_elicit_confidence){
+                LocCont.Fennimal_interaction_completed(FennimalObj)
+            }else{
+                setTimeout(function(){
+                    let ConfSlider = new ConfidenceSlider(FennimalObj, that.confidence_slider_answered )
+                },1000)
+            }
+
+            console.log(FennimalObj)
+
 
         },3000)
 
 
+    }
+
+    this.confidence_slider_answered = function(){
+        LocCont.Fennimal_interaction_completed(FennimalObj)
     }
 
 
@@ -1420,7 +1522,12 @@ FennimalController = function(FennimalObj, LocCont, limited_backpack_item_array)
         //Set and show the prompt text
         document.getElementById("item_bar_circular").style.display = "none"
         SVG_references.Item_Bar.style.display = "inherit"
-        Prompt.show_message("You have found a "+ FennimalObj.name)
+
+        if(Param.get_used_unique_names().includes(FennimalObj.name) ){
+            Prompt.show_message("This Fennimal is called "+ FennimalObj.name)
+        }else{
+            Prompt.show_message("You have found a "+ FennimalObj.name)
+        }
 
 
     }
@@ -1464,3 +1571,200 @@ FennimalController = function(FennimalObj, LocCont, limited_backpack_item_array)
 
 }
 
+//Assumes that FennimalObject has a name and a selected_item attribute. Adds a "confidence_rating" to this object
+ConfidenceSlider = function(FennimalObj, returnfunction){
+    console.log(FennimalObj)
+    let inactive_color = "lightgray"
+    let that = this
+    let current_value = false
+    let angle_of_minimum = -175
+    let angle_of_maximum = -6
+    let inital_angle = -190
+    let animation_step_time = 150
+    let currently_selected = false
+    let pointer_baseline_color = "lightgray"
+    let ConfirmButton = false
+
+    //Handles the interactions for a single segment
+    Segment = function(Element, value, Controller ){
+        //Extracting the active color
+        let active_color = Element.getAttribute("fill")
+        let muted_color = hslToHex(hexToHSL(active_color).h, 40,70)
+        let current_state_active = false
+
+        //Updates the visual appearance based on the current state.
+        function update_appearance(){
+            if(current_state_active){
+                if(currently_selected){
+                    Element.setAttribute("fill", active_color)
+                    Element.setAttribute("stroke", "black")
+                }else{
+                    Element.setAttribute("fill", muted_color)
+                    Element.setAttribute("stroke", "")
+                }
+            }else{
+                Element.setAttribute("fill", inactive_color)
+                Element.setAttribute("stroke", "")
+            }
+        }
+
+        //Call with the currently active value. Will set the visual appearance to visible if the active value is lower or equal to the segment's own value
+        this.new_value_has_been_set = function(new_value){
+            current_state_active = value <= new_value
+            currently_selected = value === new_value
+            update_appearance()
+        }
+
+        this.restore_segment_to_original = function(){
+            Element.setAttribute("fill", active_color)
+            Element.setAttribute("stroke", "")
+            Element.style.transition =  ""
+        }
+
+        //Set eventlistener
+        Element.onclick = function(){ Controller.segment_clicked_on(value, active_color)}
+
+        //Initialization
+        update_appearance()
+        Element.style.cursor = "pointer"
+        Element.style.transition =  "all " + animation_step_time + "ms ease-in-out"
+
+    }
+
+    //Create all the SVG elements
+    let SVGlayer = document.getElementById("ConfidenceSlider")
+    let BackgroundRect = document.getElementById("confidence_background_rect")
+    let Pointer = document.getElementById("confidence_pointer")
+    let SegmentsGroup = document.getElementById("confidence_segments")
+    let SegmentLabels = document.getElementById("confidence_labels")
+    let PlaceholderText = document.getElementById("confidence_placeholder_text")
+    let QuestionText = document.getElementById("confidence_name")
+    let SegmentControllers
+
+    Pointer.style.transition = "all " + animation_step_time + "ms ease-in-out"
+    Pointer.setAttribute("stroke", "black")
+    Pointer.style.strokeWidth = 1
+    // Shows the question and sets the text
+    function showQuestion(){
+        SVGlayer.style.display = "inherit"
+        QuestionText.childNodes[1].innerHTML = FennimalObj.name + " will like the " + FennimalObj.selected_item + "?"
+        BackgroundRect.style.opacity = 0.7
+        BackgroundRect.style.transform = "scale(1,1)"
+
+        setTimeout(function(){
+            SegmentsGroup.style.opacity = 1
+            SegmentLabels.style.opacity = 1
+            Pointer.style.opacity = 1
+            PlaceholderText.style.opacity = 1
+            QuestionText.style.opacity = 1
+
+        },500)
+
+    }
+
+    //Initializes all the segments
+    function createSegments(){
+        SegmentControllers = []
+        //Find the number of segments on the slider
+        let Segments = SegmentsGroup.childNodes
+        for(let i =0;i<Segments.length;i++){
+            console.log(i, i * (1/(Segments.length-1)), Segments.length)
+            SegmentControllers.push(new Segment(Segments[i], i * (1/(Segments.length-1)), that))
+        }
+    }
+
+    function update_all_segments(){
+        for(let i = 0; i<SegmentControllers.length;i++){
+            SegmentControllers[i].new_value_has_been_set(current_value)
+        }
+    }
+
+    //Call when a segment has been clicked on
+    this.segment_clicked_on = function(value, color_of_selected_box){
+        current_value = value
+        update_all_segments()
+        update_pointer_position()
+        update_pointer_color(color_of_selected_box)
+
+        //Hide the bottom text, and create a button to confirm
+        PlaceholderText.style.display = "none"
+        create_confirm_button()
+
+    }
+
+    //Changes the angle of the pointer. Pass an argument between 0 and 1 to point to the active slice. Call with false to set the value to inactive
+    function update_pointer_angle(angle){
+        Pointer.style.transform = "rotate(" + angle + "deg)"
+    }
+    function update_pointer_position(){
+        if(current_value === false){
+            update_pointer_angle(inital_angle)
+        }else{
+            update_pointer_angle(angle_of_minimum - ( current_value * (angle_of_minimum  - angle_of_maximum) ))
+        }
+    }
+    function update_pointer_color(color){
+        if(color === false){
+            Pointer.setAttribute("fill", pointer_baseline_color)
+        }else{
+            Pointer.setAttribute("fill", color)
+        }
+    }
+
+    function create_confirm_button(){
+        if(ConfirmButton === false){
+            ConfirmButton = createSVGButtonElem((508-75)/2,180,75,22,"Confirm")
+            SVGlayer.appendChild(ConfirmButton)
+            ConfirmButton.onclick = input_confirmed
+        }
+
+    }
+
+    function input_confirmed(){
+        // Store the confidence rating in the FennimalObj
+        FennimalObj.confidence_rating = JSON.parse(JSON.stringify(Number(current_value.toFixed(4))))
+        restore_all_elements()
+        returnfunction()
+
+    }
+
+    //Restores the SVG elements to their original state
+    function restore_all_elements(){
+        SVGlayer.style.display = "none"
+        Pointer.style.transition = ""
+
+        // Remove the Confirm Button and re-show the placeholder text
+        ConfirmButton.remove()
+        ConfirmButton = false
+        PlaceholderText.style.display = "inherit"
+
+        // Restore all the original colors of the segments
+        for(let i = 0; i<SegmentControllers.length;i++){
+            SegmentControllers[i].restore_segment_to_original()
+        }
+
+        // Reposition the pointer
+        update_pointer_color(false)
+        update_pointer_angle(inital_angle)
+
+        // Reset opacities
+        SegmentsGroup.style.opacity = 0
+        SegmentLabels.style.opacity = 0
+        Pointer.style.opacity = 0
+        PlaceholderText.style.opacity = 0
+        QuestionText.style.opacity = 0
+        BackgroundRect.style.opacity = 0
+        BackgroundRect.style.transform = "scale(.1,.1)"
+
+
+    }
+
+
+    function initialize(){
+        showQuestion()
+        createSegments()
+        update_pointer_position()
+    }
+
+    initialize()
+}

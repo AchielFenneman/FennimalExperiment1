@@ -33,15 +33,15 @@ Map_movement_controller = function(LocCont){
         }
 
         //Sets button-press event
-        Marker.onmouseleave= function(){
+        Marker.onpointerleave= function(){
             mouse_pressed_state = false
             clearInterval(mouse_check_interval)
         }
-        Marker.onmouseup= function(){
+        Marker.onpointerup= function(){
             mouse_pressed_state = false
             clearInterval(mouse_check_interval)
         }
-        Marker.onmousedown = function(){
+        Marker.onpointerdown = function(){
             if(state === "active"){
                 mouse_pressed_state = true
                 mouse_check_interval = setInterval(function (){
@@ -905,12 +905,31 @@ LocationController = function(ExpCont){
                     check_if_quiz_complete()
                 }
 
+
                 if(FennimalObj.end_of_interaction_event === "continue"){
                     allow_subject_to_leave()
                 }
                 if(FennimalObj.end_of_interaction_event === "end_trial"){
-                    //Show a button allowing the participant to end the trial
-                    show_return_to_home_button(FennimalObj)
+
+                    //If we just came from a confidence slider, then go straight to the next trial
+                    let jump_to_next = false
+                    if(typeof FennimalObj.test_phase_trial !== "undefined"){
+                        if(typeof FennimalObj.TestPhaseRules !== "undefined"){
+                            if(FennimalObj.TestPhaseRules.ask_confidence){
+                                jump_to_next = true
+                            }
+                        }
+                    }
+
+                    if(jump_to_next){
+                        end_trial_button_pressed(FennimalObj)
+                    }else{
+                        //Show a button allowing the participant to end the trial
+                        show_return_to_home_button(FennimalObj)
+
+                    }
+
+
                 }
             }else{
                 //If not, then the participant could not complete the interaction.
