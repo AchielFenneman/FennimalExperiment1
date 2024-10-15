@@ -234,7 +234,7 @@ ExperimentController = function(){
             participant_number = ProlificIDToSeed(PID)
             console.warn("SEEDED RNG " + participant_number)
         }else{
-            participant_number = 9123456789 // draw_random_participant_seed() //17032024
+            participant_number = 97123456789 // draw_random_participant_seed() //17032024
             console.warn("NO PID FOUND. Defaulting to random seed " + participant_number)
         }
     }
