@@ -428,7 +428,15 @@ InstructionsController = function(ExpCont, LocCont){
             let HintText = createTextField((508/2)-25, 130, 50,40, "<b> Hint: </b>")
             HintText.style.textAlign = "center"
             Page.appendChild(HintText)
-            let NameText = createTextField((508/2)-125, 150, 250,55, "This Fennimal is a " + CurrentTrial.name)
+
+
+            let NameText
+            if(Param.get_used_unique_names().includes(CurrentTrial.name) ){
+                NameText = createTextField((508/2)-125, 150, 250,55, "This Fennimal is named " + CurrentTrial.name)
+            }else{
+                NameText = createTextField((508/2)-125, 150, 250,55, "This Fennimal is a " + CurrentTrial.name)
+            }
+
             NameText.style.fontSize = "20px"
             NameText.style.textAlign = "center"
             Page.appendChild(NameText)
@@ -598,7 +606,13 @@ InstructionsController = function(ExpCont, LocCont){
             Page.appendChild(createFennimalIcon(CurrentTrial,-38, 120,0.47,false, ! Param.show_colors_with_icon_hints))
         }
         if(current_hint_type === "name"){
-            let NameText = createTextField(22, 140, 125,90, "This Fennimal is a <br> " + CurrentTrial.name)
+            let NameText
+            if(Param.get_used_unique_names().includes(CurrentTrial.name) ){
+                NameText = createTextField(22, 140, 125,90, "This Fennimal is named <br> " + CurrentTrial.name)
+            }else{
+                NameText = createTextField(22, 140, 125,90, "This Fennimal is a <br> " + CurrentTrial.name)
+            }
+
             NameText.style.fontSize = "20px"
             NameText.style.textAlign = "center"
             Page.appendChild(NameText)
@@ -1595,7 +1609,12 @@ InstructionsController = function(ExpCont, LocCont){
 
         let text = "During the last part of your training to become an Wildlife Ranger, you could freely decide between different toys to give to a Fennimal. How did you decide on which toy to give to the Fennimals?"
         if(special_name !== false){
-            text = "During your practical experience, there were several times that you encountered a <b>" + special_name + "</b>. How did you decide on which toy to give to this Fennimal?"
+            if(Param.get_used_unique_names().includes(CurrentTrial.name) ){
+                text = "During your practical experience, there were several times that you encountered a Fennimal named <b>" + special_name + "</b>. How did you decide on which toy to give to this Fennimal?"
+            }else{
+                text = "During your practical experience, there were several times that you encountered a <b>" + special_name + "</b>. How did you decide on which toy to give to this Fennimal?"
+            }
+
         }
         Container.appendChild(createTextField(30, 40, 508-2*30,100, text))
 

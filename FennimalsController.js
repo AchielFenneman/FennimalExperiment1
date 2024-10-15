@@ -491,12 +491,12 @@ FeedbackController = function(FennimalObject, FennimalSVGContainer, show_icon_on
                 flag_can_play_sound = true
 
                 setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.16 * animation_duration)
-                // setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.60 * animation_duration)
+               // setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.60 * animation_duration)
 
 
                 ItemSoundInterval = setInterval(function(){
                     setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.16 * animation_duration)
-                    // setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.60 * animation_duration)
+                   // setTimeout(function(){if(flag_can_play_sound){AudioController.play_sound_effect("honk")}}, 0.60 * animation_duration)
 
                 }, animation_duration)
                 break;
@@ -1465,9 +1465,9 @@ FennimalController = function(FennimalObj, LocCont, limited_backpack_item_array)
         FennimalObj.selected_item = selected_item
         FennimalObj.outcome_observed = FennimalObj.ItemResponses[selected_item]
 
-        if(limited_backpack_item_array !== false){
-            limited_backpack_item_given(selected_item)
-        }
+       if(limited_backpack_item_array !== false){
+           limited_backpack_item_given(selected_item)
+       }
 
 
         FeedbackCont = new FeedbackController(FennimalObj,Container, true)

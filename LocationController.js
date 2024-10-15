@@ -916,7 +916,7 @@ LocationController = function(ExpCont){
                     if(typeof FennimalObj.test_phase_trial !== "undefined"){
                         if(typeof FennimalObj.TestPhaseRules !== "undefined"){
                             if(FennimalObj.TestPhaseRules.ask_confidence){
-                                jump_to_next = true
+                               jump_to_next = true
                             }
                         }
                     }

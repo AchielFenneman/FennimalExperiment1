@@ -200,15 +200,15 @@ DataController = function(){
 ExperimentController = function(){
     let that = this
     let participant_number, Stimuli
-    let experiment_design = "hm3"
+    let experiment_design = "baseline"
     let retake_quiz_until_perfect = true
     let open_question_special_Fennimal_ID = false // "key" // Set to false to have a general open question. If not set to false, then the open question specificially asks about this Fennimal.
 
     //Set to false if not used.
     let Recall_Question_Payment = {
-        allowed_errors: 2, //This is how many mistakes (omission and commission the participant is allowed to make)
-        max_allowed_Levenshtein_distance: 3, //For each answer given, this determines maximum amount of errors (typos) allowed before an answer cannot be tied to a Fennimal
-        max_allowed_distance_to_count_error: 7 //To make it a bit easier on subjects, we give them the benefit of the doubt: if an answer vaguely resembles a Fennimal name, then its not counted as an error-by-commission (although still as ommision!)
+        allowed_errors: 1, //This is how many mistakes (omission and commission the participant is allowed to make)
+        max_allowed_Levenshtein_distance: 2, //For each answer given, this determines maximum amount of errors (typos) allowed before an answer cannot be tied to a Fennimal
+        max_allowed_distance_to_count_error: 4 //To make it a bit easier on subjects, we give them the benefit of the doubt: if an answer vaguely resembles a Fennimal name, then its not counted as an error-by-commission (although still as ommision!)
 
     }
     this.get_recall_question_bonus_rules = function(){return Recall_Question_Payment}
@@ -219,8 +219,8 @@ ExperimentController = function(){
     let current_experiment_stage = "starting_instructions"
 
     let ExperimentStages = {
-        Instructions: [ "consent", "full_screen_prompt", "payment_info", "basic_instructions" ], // "consent", "full_screen_prompt", "payment_info", "basic_instructions"
-        Training: ["exploration", "search_location", "search_name",  "delivery_icon", "delivery_location", "cardquiz"   ],  //             "exploration", "search_location", "search_name",  "delivery_icon", "delivery_location", "cardquiz"
+        Instructions: [ "payment_info" ], //"consent", "full_screen_prompt", "payment_info", "basic_instructions"      "consent", "full_screen_prompt", "payment_info", "basic_instructions"
+        Training: [ "exploration", "search_icon", "search_location",  "delivery_icon", "delivery_name", "cardquiz"  ],  //  "exploration", "search_location", "search_name",  "delivery_icon", "delivery_location", "cardquiz"           "exploration", "search_location", "search_name",  "delivery_icon", "delivery_location", "cardquiz"
         Test: [], //Updated on initialization, defined by the Stimuli.
         Questionnaire: ["open","gender", "age", "colorblindness"], //"open","gender", "age", "colorblindness"
     }
@@ -234,7 +234,7 @@ ExperimentController = function(){
             participant_number = ProlificIDToSeed(PID)
             console.warn("SEEDED RNG " + participant_number)
         }else{
-            participant_number = draw_random_participant_seed() //17032024
+            participant_number = 9123456789 // draw_random_participant_seed() //17032024
             console.warn("NO PID FOUND. Defaulting to random seed " + participant_number)
         }
     }
@@ -1019,5 +1019,3 @@ let EC = new ExperimentController()
 //      ALL names based on location? (retrieval stage)
 //      Hide answers during retrieval?
 //      Collapse test trials to region
-
-console.log("hm")

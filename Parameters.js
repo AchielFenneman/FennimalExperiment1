@@ -142,7 +142,6 @@ ParameterObject = function() {
     }]
 
 
-
     // WORLD INFORMATION
     //////////////////////
     this.LocationTransitionData = {
@@ -903,12 +902,10 @@ ParameterObject = function() {
         }
     }
 
-
-
     //NAMES
     // Adjective of a name based on the body
     // Determines the naming scheme. Options include: "region-head", "body-head"
-    this.namingscheme = 'region_head'
+    this.namingscheme = 'unique' //region_head
 
     this.NamePrefixes_Body = {
         A: "Striped",
@@ -981,6 +978,20 @@ ParameterObject = function() {
         N: "Nibbler",
     }
 
+    // UNIQUE NAMES (if names are not based on the Fennimal's features)
+    let Unique_Fennimal_Names = ["Zylo", "Tarka", "Jorren", "Farlin", "Nerina", "Rylor", "Elvan", "Grana", "Dorril", "Lera","Ardy" ] // "Cyrin", "Ardelis"
+    let Used_Unique_Fennimal_Names = []
+    this.draw_unique_name = function(){
+        let newname = Unique_Fennimal_Names.shift()
+        Used_Unique_Fennimal_Names.push(newname)
+        return(newname)
+    }
+    this.shuffle_unique_names = function(){
+        shuffleArray(Unique_Fennimal_Names)
+    }
+    this.get_used_unique_names = function(){
+        return(JSON.parse(JSON.stringify(Used_Unique_Fennimal_Names)))
+    }
 
     //The bonus earned per star. If set to false, then no bonus is mentioned throughout the instructions
     this.BonusEarnedPerStar = {
