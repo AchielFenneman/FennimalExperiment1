@@ -219,7 +219,7 @@ ExperimentController = function(){
     let current_experiment_stage = "starting_instructions"
 
     let ExperimentStages = {
-        Instructions: [ "payment_info" ], //"consent", "full_screen_prompt", "payment_info", "basic_instructions"      "consent", "full_screen_prompt", "payment_info", "basic_instructions"
+        Instructions: ["consent", "full_screen_prompt", "payment_info", "basic_instructions" ], //"consent", "full_screen_prompt", "payment_info", "basic_instructions"      "consent", "full_screen_prompt", "payment_info", "basic_instructions"
         Training: [ "exploration", "search_icon", "search_location",  "delivery_icon", "delivery_name", "cardquiz"  ],  //  "exploration", "search_location", "search_name",  "delivery_icon", "delivery_location", "cardquiz"           "exploration", "search_location", "search_name",  "delivery_icon", "delivery_location", "cardquiz"
         Test: [], //Updated on initialization, defined by the Stimuli.
         Questionnaire: ["open","gender", "age", "colorblindness"], //"open","gender", "age", "colorblindness"
@@ -234,7 +234,7 @@ ExperimentController = function(){
             participant_number = ProlificIDToSeed(PID)
             console.warn("SEEDED RNG " + participant_number)
         }else{
-            participant_number = 97123456789 // draw_random_participant_seed() //17032024
+            participant_number = 9123456789 // draw_random_participant_seed() //17032024
             console.warn("NO PID FOUND. Defaulting to random seed " + participant_number)
         }
     }
