@@ -322,6 +322,7 @@ foreignObject {
 .item_icon {
     display: none;
     cursor: pointer;
+    touch-action: none;
 }
 #item_bar {
     display: none;
