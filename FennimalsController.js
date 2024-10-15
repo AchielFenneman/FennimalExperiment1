@@ -1055,7 +1055,7 @@ ItemController = function(FennimalObj,LocCont, FenCont, limited_backpack_item_ar
     document.onpointerup = function(event){
         if(dragging_state !== false && dragging_state!== "frozen"){
             let mouse_pos = getMousePosition(event)
-            stoppedDragging(mouse_pos.x,mouse_pos.y)
+            //stoppedDragging(mouse_pos.x,mouse_pos.y)
         }
     }
     document.onpointerleave = function(event){
