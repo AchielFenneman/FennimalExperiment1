@@ -815,15 +815,15 @@ LocationController = function(ExpCont){
     function show_Fennimal(FenObj){
         if(current_phase_of_the_experiment === "delivery"){
             if(items_in_backpack_array === false){
-                FenC = new FennimalController(FenObj, that, [])
+                FenC = new FennimalController(FenObj,  that, ExpCont,[])
             }else{
-                FenC = new FennimalController(FenObj, that, items_in_backpack_array)
+                FenC = new FennimalController(FenObj, that, ExpCont, items_in_backpack_array)
             }
         }else{
             if(current_phase_of_the_experiment === "test"){
                 FenObj.test_phase_trial = true
             }
-            FenC = new FennimalController(FenObj, that, false)
+            FenC = new FennimalController(FenObj, that, ExpCont, false)
         }
 
     }

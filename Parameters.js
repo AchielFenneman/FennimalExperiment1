@@ -35,7 +35,7 @@ ParameterObject = function() {
     // FENNIMAL FEATURE PARAMETERS //
     /////////////////////////////////
     this.Available_Fennimal_Heads = [ "C", "D", "E", "F","G","H","I","J", "K", "L"]
-    this.Available_Fennimal_Bodies = ["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M", "N"] // ["A", "B", "C", "D", "F","G","H", "I","J","K"] //["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M","N"]
+    this.Available_Fennimal_Bodies = ["B", "C", "D", "E", "G", "I","J","L", "N"] // ["A", "B", "C", "D", "F","G","H", "I","J","K"] //["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M","N"]
     this.Regionfree_Fennimal_Bodies = ["A", "E", "F","H","K","M"] // ["A", "B", "C", "D", "F","G","H", "I","J","K"] //["A", "B", "C", "D", "E", "F","G","H", "I","J","K","L","M","N"]
 
     this.Heads_Set_A = ["D", "E", "G", "I", "K"]
@@ -735,7 +735,7 @@ ParameterObject = function() {
                 eye_color: "#e8b3ff",
             },
             contrast_color: "#799742",
-            preferredBodyType: "G",
+            preferredBodyType: "E",
 
         },
         Village: {
@@ -905,7 +905,8 @@ ParameterObject = function() {
     //NAMES
     // Adjective of a name based on the body
     // Determines the naming scheme. Options include: "region-head", "body-head"
-    this.namingscheme = 'unique' //region_head
+    this.namingscheme = 'unique_per_head' // 'unique': random names. 'unique_per_head' creates names based on the Fennimal's head, with each Fennimal having a different name. 'unique_combo" draws a unique prefix (region-based) and head name.
+    // 'region_head' and 'location_head' create conjunctive names.
 
     this.NamePrefixes_Body = {
         A: "Striped",
@@ -978,6 +979,63 @@ ParameterObject = function() {
         N: "Nibbler",
     }
 
+    let Multiple_Names_Head = {
+        A: ["Whiskers","Kitty", "Purrcy"],
+        B: ["Leo","Aslan", "Simba"],
+        C: ["Bugsy","Marcher", "Chompo"],
+        D: ["Buzzer","Whizz", "Zoomba"],
+        E: ["Chirpo","Tweeter", "Beaky"],
+        F: ["Hoot", "Echo", "Peeper"],
+        G: ["Finny","Mako", "Bubbles"],
+        H: ["Hammer", "Cutter", "Broad-face"],
+        I: ["Piggy", "Oinkers", "Squeala"],
+        J: ["Boar", "Tusker", "Hogzilla"],
+        K: ["Hisser","Slinky","Fango"],
+        L: ["Cobra", "Venom", "Serpenty"],
+        M: ["Squeaky", "Fidget", "Jerry"],
+        N: ["Nibbles", "Rascal", "Chipper"]
+    }
+    let Multiple_Names_Region = {
+        North : ["Arctica", "Winter", "Snowy"],
+        Jungle:  ["Jungler", "Leafy", "Tropicala"],
+        Desert: ["Sahara", "Mirage", "Scaley"],
+        Mountains: ["Boulder", "Spindly", "Climbo"],
+        Beach:  ["Waverly","Ocean", "Surfer"],
+        Flowerfields: ["Moo","Angus", "Grazer"],
+        Village: ["Cozy","Roundo", "Chunker"],
+        Swamp: ["Toad","Muddy", "Laguna"],
+    }
+
+    let Multiple_Prefixes_Region= {
+        North : ["Arctic", "Winter", "Snowy"],
+        Jungle:  ["Jungle", "Leafy", "Tropical"],
+        Desert: ["Desert", "Arid", "Scaley"],
+        Mountains: ["Mountain", "Spindly", "Climbing"],
+        Beach:  ["Beach","Ocean", "Surfing"],
+        Flowerfields: ["Mooing","Spotted", "Grazing"],
+        Village: ["Cozy","Domestic", "Village"],
+        Swamp: ["Swamp","Muddy", "Marshland"],
+    }
+    this.draw_unique_name_by_head = function(head){
+        let newname =  shuffleArray(Multiple_Names_Head[head]).shift()
+        Used_Unique_Fennimal_Names.push(newname)
+        return(newname)
+    }
+
+    this.draw_unique_name_by_region = function(region){
+        let newname =  shuffleArray(Multiple_Names_Region[region]).shift()
+        Used_Unique_Fennimal_Names.push(newname)
+        return(newname)
+    }
+
+    this.draw_unique_compound_name = function(region, head){
+        let regionname = shuffleArray(Multiple_Prefixes_Region[region]).shift()
+        let headname =  shuffleArray(Multiple_Names_Head[head]).shift()
+        let newname = regionname + " " + headname
+        //Used_Unique_Fennimal_Names.push(newname)
+        return(newname)
+    }
+
     // UNIQUE NAMES (if names are not based on the Fennimal's features)
     let Unique_Fennimal_Names = ["Zylo", "Tarka", "Jorren", "Farlin", "Nerina", "Rylor", "Elvan", "Grana", "Dorril", "Lera","Ardy" ] // "Cyrin", "Ardelis"
     let Used_Unique_Fennimal_Names = []
@@ -996,7 +1054,7 @@ ParameterObject = function() {
     //The bonus earned per star. If set to false, then no bonus is mentioned throughout the instructions
     this.BonusEarnedPerStar = {
         currency_symbol: "$",
-        bonus_per_star: "0.25"
+        bonus_per_star: "0.20"
     }
 
     this.flashlight_radius = 50

@@ -1394,7 +1394,7 @@ ItemController = function(FennimalObj,LocCont, FenCont, limited_backpack_item_ar
 
 }
 
-FennimalController = function(FennimalObj, LocCont, limited_backpack_item_array){
+FennimalController = function(FennimalObj, LocCont, ExpCont, limited_backpack_item_array){
     let that = this
     //ItemAvailability: should contain an object with one key for each element in ItemDetails.All_Items. Each key should be set to either invisible (item not displayed on the bar), "available" (present and availalbe) or "unavailable" (present, but grayed out).
     //The FennimalController gets created AFTER the subject has uncovered the Fennimal outline.
@@ -1461,6 +1461,7 @@ FennimalController = function(FennimalObj, LocCont, limited_backpack_item_array)
         LocCont.remove_item_from_backpack(given_item)
     }
 
+    let need_to_elicit_confidence, need_to_ask_recalled_Fennimals, need_to_ask_decision_style
     this.interactionCompleted = function(selected_item){
         FennimalObj.selected_item = selected_item
         FennimalObj.outcome_observed = FennimalObj.ItemResponses[selected_item]
@@ -1469,29 +1470,60 @@ FennimalController = function(FennimalObj, LocCont, limited_backpack_item_array)
            limited_backpack_item_given(selected_item)
        }
 
+       //Figure out whats next
+        need_to_elicit_confidence = false
+        need_to_ask_recalled_Fennimals = false
+        need_to_ask_decision_style = false
+        if(typeof FennimalObj.test_phase_trial !== "undefined"){
+            if(typeof FennimalObj.TestPhaseRules !== "undefined"){
 
-        FeedbackCont = new FeedbackController(FennimalObj,Container, true)
-
-        //After a brief delay the interaction is completed. Nowe we can either continue, OR we first need to ask the confidence rating
-        setTimeout(function(){
-            let need_to_elicit_confidence = false
-            if(typeof FennimalObj.test_phase_trial !== "undefined"){
-                if(typeof FennimalObj.TestPhaseRules !== "undefined"){
+                if(typeof FennimalObj.TestPhaseRules.ask_confidence !== "undefined"){
                     if(FennimalObj.TestPhaseRules.ask_confidence){
                         need_to_elicit_confidence = true
                     }
                 }
+                if(typeof FennimalObj.TestPhaseRules.ask_open_question !== "undefined"){
+                    if(FennimalObj.TestPhaseRules.ask_open_question){
+                        need_to_ask_recalled_Fennimals = true
+                    }
+                }
+                if(typeof FennimalObj.TestPhaseRules.ask_decision_style !== "undefined"){
+                    if(FennimalObj.TestPhaseRules.ask_decision_style){
+                        need_to_ask_decision_style = true
+                    }
+                }
+
+
             }
+        }
+
+        // Show feedback
+        FeedbackCont = new FeedbackController(FennimalObj,Container, true)
+
+        //After a brief delay the interaction is completed. Nowe we can either continue, OR we first need to ask the confidence rating and/or open question
+        setTimeout(function(){
+            Prompt.hide()
 
             if(! need_to_elicit_confidence){
-                LocCont.Fennimal_interaction_completed(FennimalObj)
+                if(need_to_ask_recalled_Fennimals){
+                    setTimeout(function(){
+                        let OpenQ = new TrialRecallQuestion(FennimalObj, ExpCont.get_all_training_phase_Fennimal_names(), that.open_question_answered )
+                    },1000)
+
+                }else{
+                    if(need_to_ask_decision_style){
+                        let DecisionStyleQ = new TrialDescriptionQuestion(FennimalObj, that.decision_style_question_answered )
+                    }else{
+                        //No further questions, your honor!
+                        LocCont.Fennimal_interaction_completed(FennimalObj)
+                    }
+
+                }
             }else{
                 setTimeout(function(){
                     let ConfSlider = new ConfidenceSlider(FennimalObj, that.confidence_slider_answered )
                 },1000)
             }
-
-            console.log(FennimalObj)
 
 
         },3000)
@@ -1500,6 +1532,31 @@ FennimalController = function(FennimalObj, LocCont, limited_backpack_item_array)
     }
 
     this.confidence_slider_answered = function(){
+        //Figure out if we need to ask the open question
+        if(need_to_ask_recalled_Fennimals){
+            let OpenQ = new TrialRecallQuestion(FennimalObj,ExpCont.get_all_training_phase_Fennimal_names(),that.open_question_answered )
+        }else{
+            if(need_to_ask_decision_style){
+                let DecisionStyleQ = new TrialDescriptionQuestion(FennimalObj, that.decision_style_question_answered )
+            }else{
+                LocCont.Fennimal_interaction_completed(FennimalObj)
+            }
+        }
+
+
+
+
+    }
+
+    this.open_question_answered = function(){
+        if(need_to_ask_decision_style){
+            let DecisionStyleQ = new TrialDescriptionQuestion(FennimalObj, that.decision_style_question_answered )
+        }else{
+            LocCont.Fennimal_interaction_completed(FennimalObj)
+        }
+    }
+
+    this.decision_style_question_answered = function(){
         LocCont.Fennimal_interaction_completed(FennimalObj)
     }
 
@@ -1573,7 +1630,6 @@ FennimalController = function(FennimalObj, LocCont, limited_backpack_item_array)
 
 //Assumes that FennimalObject has a name and a selected_item attribute. Adds a "confidence_rating" to this object
 ConfidenceSlider = function(FennimalObj, returnfunction){
-    console.log(FennimalObj)
     let inactive_color = "lightgray"
     let that = this
     let current_value = false
@@ -1668,7 +1724,6 @@ ConfidenceSlider = function(FennimalObj, returnfunction){
         //Find the number of segments on the slider
         let Segments = SegmentsGroup.childNodes
         for(let i =0;i<Segments.length;i++){
-            console.log(i, i * (1/(Segments.length-1)), Segments.length)
             SegmentControllers.push(new Segment(Segments[i], i * (1/(Segments.length-1)), that))
         }
     }
@@ -1767,4 +1822,536 @@ ConfidenceSlider = function(FennimalObj, returnfunction){
     }
 
     initialize()
+}
+
+TrialRecallQuestion = function(FennimalObj, All_Fennimal_Names,  returnfunction){
+    let that = this
+
+    //Create all the SVG elements
+    let SVGlayer = document.getElementById("OpenQuestion")
+    let BackgroundRect = document.getElementById("open_question_background_rect")
+
+    let RemovableSVGObjects = []
+    let RBC // Entry box controller
+
+    let ask_thought_about_Fennimals = function(){
+        SVGlayer.style.display = "inherit"
+
+        BackgroundRect.style.opacity = 0.7
+        BackgroundRect.style.transform = "scale(1.23,1.2)"
+
+        setTimeout(function(){
+            let NewTitle = createTextField(30, 18, 508-2*30,100, "Did you remember any Fennimals when you decided to give the " +  FennimalObj.selected_item + " to the " + FennimalObj.name + "?")
+            NewTitle.style.fontSize = "15px"
+            NewTitle.style.textAlign = "center"
+            NewTitle.style.fontWeight = "bold"
+            NewTitle.style.letterSpacing = "-.75px"
+
+            RemovableSVGObjects.push(NewTitle)
+            SVGlayer.appendChild(NewTitle)
+
+            //Adding the instructions
+            let InstructionText = createTextField(20, 62, 508-2*20,200, "Please write down the names of any Fennimals you thought about when you decided to give the " +
+                FennimalObj.selected_item  + " to the " + FennimalObj.name + ". <br> " +
+                "You can enter a name by typing in the box and clicking on the 'Add' button. " +
+                "If you made a mistake, you can click on <span style='color:firebrick'> [x] </span> to remove an answer. " +
+                "If you have entered all the Fennimals you thought about, then you can click on the 'Done' button to continue (you will not be able to return after pressing the button!) ")
+            InstructionText.style.fontStyle = "italic"
+            InstructionText.style.fontSize = "12px"
+
+            RemovableSVGObjects.push(InstructionText)
+            SVGlayer.appendChild(InstructionText)
+
+            RBC = new RecallBoxController(SVGlayer, 130, 70, false,true, "I did <span style='color: darkred'> not </span> think about any Fennimal", that.return_function_names_written_down)
+        }, 400)
+    }
+
+    function clear_elements(){
+        for(let i =0;i<RemovableSVGObjects.length;i++){
+            RemovableSVGObjects[i].remove()
+        }
+        RemovableSVGObjects = []
+
+    }
+    this.return_function_names_written_down = function(arr){
+        //Creating a function that takes a participant-input value and attempts to match it to the most likely trainnig-phase Fennimal
+        // We allow for a little bit of distance between a supplied string and an actual name, to allow for typos.
+        // Note that the rules here are may be a bit more relaxed than the rules used during the recall task.
+        let maximum_Leven_distance_for_full_names = 7
+        let maximum_Leven_distance_for_partial_compound_names = 2
+
+        //Switching the allowed Leven distance for different naming schemes
+        switch(Param.namingscheme){
+            case("unique_per_head"): maximum_Leven_distance_for_full_names = 2; break
+            case("unique_per_region"): maximum_Leven_distance_for_full_names = 2; break
+        }
+
+        //Filling an array with the training-phase Fennimals. These are in an array, with each element containing [name, ID, max_distance]
+        let Names_And_IDs = []
+        for(let ID in All_Fennimal_Names){
+            Names_And_IDs.push([All_Fennimal_Names[ID].toLowerCase(), ID, maximum_Leven_distance_for_full_names ])
+
+            //If we use a unique combo, then add both parts of this name as well (but with lower thresholds)
+            if(Param.namingscheme === "unique_combo"){
+                let Partials = All_Fennimal_Names[ID].split(" ")
+                for(let i=0; i<Partials.length;i++){
+                    Names_And_IDs.push([Partials[i].toLowerCase(), ID, maximum_Leven_distance_for_partial_compound_names] )
+                }
+            }
+        }
+
+        function try_to_match_input_to_ID(raw_input){
+            let Dist_arr = []
+
+            //First, find the Leven-distance from the raw_input to each of the elements in Names_and_IDs
+            for(let i =0; i<Names_And_IDs.length;i++){
+                let TargetName = Names_And_IDs[i][0]
+                let max_distance = Names_And_IDs[i][2]
+
+                let LevenDist = LevenshteinDistance(raw_input.toLowerCase(), TargetName)
+                if(LevenDist <= max_distance){
+                    Dist_arr.push(LevenDist)
+                }else{
+                    Dist_arr.push(99)
+                }
+            }
+
+            //Find the index with the lowest distance
+            let min_index = Dist_arr.indexOf(Math.min(...Dist_arr))
+
+            if(Dist_arr[min_index] < 99){
+                return({
+                    closest: Names_And_IDs[min_index][1],
+                    dist: Dist_arr[min_index]
+                })
+            }else{
+                return({
+                    closest: "NA",
+                    dist: Dist_arr[min_index]
+                })
+            }
+        }
+
+        //Now we can start the processing
+        let Names_Listed = []
+        for(let i =0;i<arr.length;i++){
+            //First, we discard any inputs removed by the participant, as well as their speed (but maintain their ordering!)
+            if(arr[i].removed_by_user === false){
+                let ClosestMatch = try_to_match_input_to_ID(arr[i].ans)
+                Names_Listed.push({raw: arr[i].ans, match: ClosestMatch.closest, Ld: ClosestMatch.dist })
+            }
+        }
+
+        console.log(Names_Listed)
+        console.log(All_Fennimal_Names)
+
+        //Now we have an array of remembered Fennimals. Store these in the FennimalObject
+        FennimalObj.remembered_Fennimals = JSON.parse(JSON.stringify(Names_Listed))
+
+        //Finish the question
+        end_questions()
+
+    }
+
+    let end_questions = function(){
+        clear_elements()
+        BackgroundRect.style.transform = "scale(.1,.1)"
+        setTimeout(function(){
+            SVGlayer.style.display = "none"
+            returnfunction()
+        },500)
+
+    }
+
+    ask_thought_about_Fennimals()
+
+
+
+
+}
+
+TrialDescriptionQuestion = function(FennimalObj, returnfunction){
+    let that = this
+
+    //Create all the SVG elements
+    let SVGlayer = document.getElementById("OpenQuestion")
+    let BackgroundRect = document.getElementById("open_question_background_rect")
+    let RemovableSVGObjects = []
+
+    //Show the background
+    SVGlayer.style.display = "inherit"
+    BackgroundRect.style.opacity = 0.60
+    BackgroundRect.style.transform = "scale(1.23,.5)"
+
+    let Title, AnswerContainer, AnswerBox, ContinueButton = false
+
+    //Some parameters for all the answer boxes
+    let Options = [
+        {
+            text: "I had a specific previous Fennimal in mind",
+            value: "specific"
+        },
+        {
+            text: "I picked a toy at random",
+            value: "random"
+        },
+        {
+            text: "I followed a different decision strategy",
+            value: "other"
+        },
+    ]
+
+    let box_w = 250
+    let box_x = (508 - box_w) /2
+    let box_h = 30
+    let box_y = (285 - box_h) /2
+
+    //Create the elements (question text, dropdown menu and continue button)
+    function createElements(){
+        //Creating the question title
+        Title = createTextField(30, 100, 508-2*30,100, "Which of the following <b>best</b> describes your decision to give the " +  FennimalObj.selected_item + " to the " + FennimalObj.name + "?")
+        Title.style.fontSize = "15px"
+        Title.style.textAlign = "center"
+        //Title.style.letterSpacing = "-.25px"
+
+        RemovableSVGObjects.push(Title)
+        SVGlayer.appendChild(Title)
+
+        //Adding the dropdown box for the name question
+        AnswerContainer = document.createElementNS('http://www.w3.org/2000/svg',"foreignObject");
+        AnswerContainer.setAttribute("x", box_x)
+        AnswerContainer.setAttribute("y", box_y)
+        AnswerContainer.setAttribute("width", box_w)
+        AnswerContainer.setAttribute("height", box_h)
+        AnswerContainer.classList.add("cardquiz_box")
+        SVGlayer.appendChild(AnswerContainer)
+        RemovableSVGObjects.push(AnswerContainer)
+
+        //Adding the elements
+        AnswerBox = document.createElement("select");
+        AnswerContainer.appendChild(AnswerBox)
+        for(let i=0;i<Options.length;i++){
+            let option = document.createElement("option");
+            option.value = Options[i].value
+            option.text = Options[i].text
+            AnswerBox.appendChild(option)
+        }
+        //Adding a hidden default
+        AnswerBox.value = "Pick the best fit"
+
+        AnswerContainer.onchange = answer_changed
+
+    }
+
+    function answer_changed(){
+        console.log(AnswerBox)
+        console.log(AnswerBox.value)
+        FennimalObj.decision_style = AnswerBox.value
+
+        //If there is no continue button yet, then create it
+        if(ContinueButton === false){
+            //Adding the continue button
+            ContinueButton = createSVGButtonElem((508-75)/2,165,75,22,"Confirm")
+            SVGlayer.appendChild(ContinueButton)
+            RemovableSVGObjects.push(ContinueButton)
+            ContinueButton.onclick = answer_selected
+        }
+
+    }
+
+    function clear_elements(){
+        for(let i =0;i<RemovableSVGObjects.length;i++){
+            RemovableSVGObjects[i].remove()
+        }
+        RemovableSVGObjects = []
+    }
+
+    function answer_selected(){
+        //Remove all SVG elements
+        clear_elements()
+
+        //Execute the return function
+        BackgroundRect.style.transform = "scale(.1,.1)"
+        setTimeout(function(){
+            SVGlayer.style.display = "none"
+            returnfunction()
+        },500)
+    }
+
+    //On shart
+    setTimeout(function(){
+        createElements()
+    }, 500)
+
+
+
+
+}
+
+OpenQuestionOLD = function(FennimalObj,All_Fennimal_Names, ask_detailed_followup, returnfunction){
+    console.log(All_Fennimal_Names)
+    console.log("STARTING OPEN QUESTION")
+    console.log(FennimalObj)
+    let that = this
+
+    //Create all the SVG elements
+    let SVGlayer = document.getElementById("OpenQuestion")
+    let BackgroundRect = document.getElementById("open_question_background_rect")
+    let FirstQuestion, Title
+
+    let ConfirmButton = false
+    let FirstQuestionYesButton = false
+    let FirstQuestionNoButton = false
+
+    let RemovableSVGObjects = []
+    let RBC // Entry box controller
+
+    let first_question_text
+    if(ask_detailed_followup){
+        first_question_text = "Did you remember any Fennimals when you decided to give the " +  FennimalObj.selected_item + " to the " + FennimalObj.name + "?"
+    }else{
+        first_question_text = "Did you have a specific Fennimal in mind when you decided to give the " +  FennimalObj.selected_item + " to the " + FennimalObj.name + "?"
+    }
+
+    //Call on construction to animate in the box and show the question (also sets the correct title
+    function showFirstQuestion(){
+        SVGlayer.style.display = "inherit"
+
+        BackgroundRect.style.opacity = 0.75
+        BackgroundRect.style.transform = "scale(1.2,0.4)"
+
+        setTimeout(function(){
+            let NewTitle = createTextField(30, 100, 508-2*30,200, first_question_text)
+            NewTitle.style.fontSize = "15px"
+            NewTitle.style.textAlign = "center"
+            NewTitle.style.fontWeight = "bold"
+            NewTitle.style.letterSpacing = "-.75px"
+
+            RemovableSVGObjects.push(NewTitle)
+            SVGlayer.appendChild(NewTitle)
+
+            //Adding the two answer buttons
+            FirstQuestionYesButton = createSVGButtonElem((508-75)/2 + 50,150,75,22,"Yes")
+            FirstQuestionNoButton = createSVGButtonElem((508-75)/2 - 50,150,75,22,"No")
+            SVGlayer.appendChild(FirstQuestionYesButton)
+            SVGlayer.appendChild(FirstQuestionNoButton)
+            FirstQuestionYesButton.onclick = first_question_yes_pressed
+            FirstQuestionNoButton.onclick = first_question_no_pressed
+            RemovableSVGObjects.push(FirstQuestionYesButton)
+            RemovableSVGObjects.push(FirstQuestionNoButton)
+        },500)
+
+    }
+
+    let first_question_yes_pressed = function(){ first_question_answer_given("Yes")}
+    let first_question_no_pressed = function(){first_question_answer_given("No")}
+    let first_question_answer_given = function(ans){
+        //Record this answer in the Fennimals object
+        FennimalObj.used_memory = ans
+
+        //Clear the first question and expand the box
+        clear_elements()
+
+        if(ask_detailed_followup){
+            switch(ans){
+                case("Yes"): ask_thought_about_Fennimals(); break
+                case("No"): ask_about_open_strategy(); break
+            }
+        }else{
+            end_questions()
+        }
+
+
+
+    }
+
+    function clear_elements(){
+        for(let i =0;i<RemovableSVGObjects.length;i++){
+            RemovableSVGObjects[i].remove()
+        }
+        RemovableSVGObjects = []
+
+        //If there is a RBC, then also remove these items
+
+    }
+
+    //FUNCTIONS FOR ENTERING THOUGHT-ABOUT FENNIMALS
+    //TODO: redundant with the free recall question
+    let ask_thought_about_Fennimals = function(){
+        BackgroundRect.style.transform = "scale(1.2,1.05)"
+
+        setTimeout(function(){
+            let NewTitle = createTextField(30, 30, 508-2*30,200, "Please write down which Fennimals you thought about")
+            NewTitle.style.fontSize = "15px"
+            NewTitle.style.textAlign = "center"
+            NewTitle.style.fontWeight = "bold"
+            NewTitle.style.letterSpacing = "-.75px"
+
+            RemovableSVGObjects.push(NewTitle)
+            SVGlayer.appendChild(NewTitle)
+
+            //Adding the instructions
+            let InstructionText = createTextField(20, 58, 508-2*30,200, "Please write down the names of any Fennimals you thought about when you decided to give the " +
+                FennimalObj.selected_item  + " to the " + FennimalObj.name + ". <br> " +
+                "You can enter a name by typing in the box and clicking on the 'Add' button. " +
+                "If you made a mistake, you can click on <span style='color:firebrick'> [x] </span> to remove an answer. " +
+                "If you have entered all the Fennimals you thought about, then you can click on the 'Done' button to continue (you will not be able to return after pressing the button!) ")
+            InstructionText.style.fontStyle = "italic"
+            InstructionText.style.fontSize = "12px"
+
+            RemovableSVGObjects.push(InstructionText)
+            SVGlayer.appendChild(InstructionText)
+
+            RBC = new RecallBoxController(SVGlayer, 140, 70,  that.return_function_names_written_down)
+        }, 400)
+
+
+
+    }
+
+    let ask_about_open_strategy = function(){
+
+        BackgroundRect.style.transform = "scale(1.2,1.05)"
+
+        setTimeout(function(){
+            let NewTitle = createTextField(30, 30, 508-2*30,200, "How did you decide to give the " + FennimalObj.selected_item + " to the " + FennimalObj.name + "?")
+            NewTitle.style.fontSize = "15px"
+            NewTitle.style.textAlign = "center"
+            NewTitle.style.fontWeight = "bold"
+            NewTitle.style.letterSpacing = "-.75px"
+
+            RemovableSVGObjects.push(NewTitle)
+            SVGlayer.appendChild(NewTitle)
+
+            //Adding the instructions
+            let InstructionText = createTextField(50, 58, 508-2*30,200, "Please write why you decided to give the " +
+                FennimalObj.selected_item  + " to the " + FennimalObj.name + ". <br> " +
+                "After you have finished, you can click on the 'Done' button to continue (you will not be able to return after pressing the button!) ")
+            InstructionText.style.fontStyle = "italic"
+            InstructionText.style.fontSize = "12px"
+
+            RemovableSVGObjects.push(InstructionText)
+            SVGlayer.appendChild(InstructionText)
+
+            //Create a text area as a foreign object
+            let TextBoxContainer = document.createElementNS('http://www.w3.org/2000/svg',"foreignObject");
+            TextBoxContainer.setAttribute("x", 50)
+            TextBoxContainer.setAttribute("y", 100)
+            TextBoxContainer.setAttribute("width", 408)
+            TextBoxContainer.setAttribute("height", 100)
+            TextBoxContainer.style.padding = "10px"
+            SVGlayer.appendChild(TextBoxContainer)
+            RemovableSVGObjects.push(TextBoxContainer)
+
+            let TextAreaObj = document.createElement('textarea');
+            TextAreaObj.cols = 80;
+            TextAreaObj.rows = 30;
+            TextAreaObj.id = "open_question_area"
+            TextAreaObj.classList.add("open_question_area")
+            TextBoxContainer.appendChild(TextAreaObj)
+
+            //Creating a button at the end
+            let Button =  createSVGButtonElem((508-150)/2,215,160,22,"Done")
+            Button.onclick = function(){
+                end_questions()
+                FennimalObj.alt_strategy = TextAreaObj.value
+            }
+            SVGlayer.appendChild(Button)
+            RemovableSVGObjects.push(Button)
+
+
+        }, 400)
+
+
+    }
+
+    this.return_function_names_written_down = function(arr){
+        //Creating a function that takes a participant-input value and attempts to match it to the most likely trainnig-phase Fennimal
+        // We allow for a little bit of distance between a supplied string and an actual name, to allow for typos.
+        // Note that the rules here are may be a bit more relaxed than the rules used during the recall task.
+        let maximum_Leven_distance_for_full_names = 7
+        let maximum_Leven_distance_for_partial_compound_names = 2
+
+        //Filling an array with the training-phase Fennimals. These are in an array, with each element containing [name, ID, max_distance]
+        let Names_And_IDs = []
+        for(let ID in All_Fennimal_Names){
+            Names_And_IDs.push([All_Fennimal_Names[ID].toLowerCase(), ID, maximum_Leven_distance_for_full_names ])
+
+            //If we use a unique combo, then add both parts of this name as well (but with lower thresholds)
+            if(Param.namingscheme === "unique_combo"){
+                let Partials = All_Fennimal_Names[ID].split(" ")
+                for(let i=0; i<Partials.length;i++){
+                    Names_And_IDs.push([Partials[i].toLowerCase(), ID, maximum_Leven_distance_for_partial_compound_names] )
+                }
+            }
+        }
+
+        function try_to_match_input_to_ID(raw_input){
+            let Dist_arr = []
+
+            //First, find the Leven-distance from the raw_input to each of the elements in Names_and_IDs
+            for(let i =0; i<Names_And_IDs.length;i++){
+                let TargetName = Names_And_IDs[i][0]
+                let max_distance = Names_And_IDs[i][2]
+
+                let LevenDist = LevenshteinDistance(raw_input.toLowerCase(), TargetName)
+                if(LevenDist <= max_distance){
+                    Dist_arr.push(LevenDist)
+                }else{
+                    Dist_arr.push(99)
+                }
+            }
+
+            //Find the index with the lowest distance
+            let min_index = Dist_arr.indexOf(Math.min(...Dist_arr))
+
+            if(Dist_arr[min_index] < 99){
+                return({
+                    closest: Names_And_IDs[min_index][1],
+                    dist: Dist_arr[min_index]
+                })
+            }else{
+                return({
+                    closest: "NA",
+                    dist: Dist_arr[min_index]
+                })
+            }
+        }
+
+        //Now we can start the processing
+        let Names_Listed = []
+        for(let i =0;i<arr.length;i++){
+            //First, we discard any inputs removed by the participant, as well as their speed (but maintain their ordering!)
+            if(arr[i].removed_by_user === false){
+                let ClosestMatch = try_to_match_input_to_ID(arr[i].ans)
+                Names_Listed.push({raw: arr[i].ans, match: ClosestMatch.closest, Ld: ClosestMatch.dist })
+            }
+        }
+
+        console.log(Names_Listed)
+        console.log(All_Fennimal_Names)
+
+        //Now we have an array of remembered Fennimals. Store these in the FennimalObject
+        FennimalObj.remembered_Fennimals = JSON.parse(JSON.stringify(Names_Listed))
+
+        //Finish the question
+        end_questions()
+
+    }
+
+    let end_questions = function(){
+        clear_elements()
+        BackgroundRect.style.transform = "scale(.1,.1)"
+        setTimeout(function(){
+            SVGlayer.style.display = "none"
+            returnfunction()
+        },500)
+
+    }
+
+    showFirstQuestion()
+
+
+
+
 }

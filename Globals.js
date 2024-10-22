@@ -170,7 +170,7 @@ PromptController = function(){
     function expand_box_to_contain_text(){
         Box.setAttribute("x", TextElem.getBBox().x  - margin)
         Box.setAttribute("width", TextElem.getBBox().width + 2*margin)
-        Box.style.opacity = 1
+        Box.style.opacity = max_opacity
     }
 
     //Changes the current color-scheme of the prompt. Note that this will be reset after the prompt is hidden

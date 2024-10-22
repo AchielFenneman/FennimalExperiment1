@@ -42,8 +42,8 @@ STIMULUSDATA = function(exp_code){
             //No custom color scheme requested. Use the region-based color scheme instead.
             FenObj.head_color_scheme = JSON.parse(JSON.stringify(Param.RegionData[region].Fennimal_location_colors))
             FenObj.body_color_scheme = JSON.parse(JSON.stringify(Param.RegionData[region].Fennimal_location_colors))
-            FenObj.head_color_scheme.tertiary_color = Param.RegionData[region].contrast_color
-            FenObj.body_color_scheme.tertiary_color = Param.RegionData[region].contrast_color
+
+
         }else{
             if(_optional_ColorScheme.length === 2){
                 //Different colorschemes for head and body
@@ -93,6 +93,14 @@ STIMULUSDATA = function(exp_code){
             case("unique"):
                 FenObj.name = Param.draw_unique_name()
                 break
+            case("unique_per_head"):
+                FenObj.name = Param.draw_unique_name_by_head(head)
+                break
+            case("unique_per_region"):
+                FenObj.name = Param.draw_unique_name_by_region(region)
+                break
+            case("unique_combo"):
+                FenObj.name = Param.draw_unique_compound_name(region,head)
         }
 
         return(FenObj)
@@ -140,7 +148,7 @@ STIMULUSDATA = function(exp_code){
     let TrainingFennimals, SearchPhaseSetup, Item_Details, All_Items
 
     //Given Training and SearchBlock Templates and a number of repeated search phase blocks, sets the TrainingFennimals and the SearchPhaseSetup (defining the experiment)
-    let set_stimuli_for_basic_experiment = function(TrainingTemplates,SearchPhaseBlockTemplates, number_search_blocks){
+    let set_stimuli_for_basic_experiment = function(TrainingTemplates,SearchPhaseBlockTemplates, number_search_blocks, open_question_asked_in_blocks){
         // If set to true, then the test phase Fennimals have names based on their LOCATION (not region)
         let search_phase_Fennimals_name_based_on_location = false
 
@@ -294,6 +302,53 @@ STIMULUSDATA = function(exp_code){
             TrainingFennimals[Temp.ID] = createTrainingFennimalObj(Temp.ID, RegionLocationCodes[Temp.region].region, RegionLocationCodes[Temp.region].training_locations.shift(), HeadCodes[Temp.head], false, IRA,false)
         }
 
+        //If specified in param, we may need to change the tertiary colors of some Fennimals.
+        //  Specifically: if the templates contain the property "borrowed_tertiary_color", then:
+        //      If this is set to false, use the normal tertiary (NOT CONTRAST) color of the region.
+        //      If this has a value equal to the ID of a Fennimal, then take the normal tertiary (NOT CONTRAST) color of this Fennimal's region
+        let Unused_Regions_Used_For_Drawing_Unassigned_Colors = JSON.parse(JSON.stringify(AvailableRegions))
+        let find_head_color = function(IDcode){
+            //First figure out if the target color is an actual training-phase Fennimal. If it is, select these colors.
+            //If it is not, then select the colors from an empty region (if available) or set to gray otherwise.
+            if(typeof TrainingFennimals[IDcode] !== "undefined"){
+                return(Param.RegionData[TrainingFennimals[IDcode].region].Fennimal_location_colors.tertiary_color)
+            }else{
+                //If the current code is not a Fennimal, then try to check if its a valid color string.
+                if(isColor(IDcode)){
+                    return(IDcode)
+                }else{
+                    //So we want to have a special color here, but the target is not defined and the input is not a color name.
+                    //  In this case, we first try to select a tertiary color from one of the unused regions.
+                    //      If these are not available (or have been used for other Fennimals with an unspecified color-scheme already), then make this region gray.
+                    //      Also throw a warning, as this may or may not be intended
+                    if(Unused_Regions_Used_For_Drawing_Unassigned_Colors.length > 0){
+                        return(Param.RegionData[Unused_Regions_Used_For_Drawing_Unassigned_Colors.shift()].Fennimal_location_colors.tertiary_color)
+                    }else{
+                        //Set to gray and throw a warning
+                        console.warn("WARNING: ASSIGNING GRAY AS TERTIARY COLOR TO FENNIMAL HEAD. IS THIS INTENDED BEHAVIOR?")
+                        return("gray")
+                    }
+                }
+            }
+        }
+
+        for(let i=0; i<TrainingTemplates.length;i++){
+            let Template = TrainingTemplates[i]
+
+            //Find the contrast color for this Fennimal, and use it to define the tertiary color of the body.
+            let contrast_color = Param.RegionData[TrainingFennimals[Template.ID].region].contrast_color
+            TrainingFennimals[Template.ID].body_color_scheme.tertiary_color = contrast_color
+
+            if(typeof Template.borrowed_tertiary_color !== "undefined"){
+                //For the head: take the tertiary color of the target Fennimal. If the value is false, then just keep it as the original color-scheme.
+                if(Template.borrowed_tertiary_color !== false){
+                    TrainingFennimals[Template.ID].head_color_scheme.tertiary_color = find_head_color(Template.borrowed_tertiary_color)
+                }
+            }else{
+                TrainingFennimals[Template.ID].head_color_scheme.tertiary_color = contrast_color
+            }
+        }
+
         //DEFINING SEARCH PHASE STIMULI
         //////////////////////////////////
         //Setting the search phase rules
@@ -302,7 +357,8 @@ STIMULUSDATA = function(exp_code){
             cued_item_allowed: true,
             search_item_allowed: true,
             name_based_on_location: search_phase_Fennimals_name_based_on_location,
-            ask_confidence: true
+            ask_confidence: true,
+            ask_decision_style: true
         }
         let SearchPhaseRules_repeat = {
             hidden_feedback: true,
@@ -319,8 +375,30 @@ STIMULUSDATA = function(exp_code){
                 IRA.push(  [ItemCodes[item], Temp.ItemResponses[item]] )
             }
 
+
             SearchPhaseBlockTrials.push(createTestFennimalObj(Temp.ID, RegionLocationCodes[Temp.region]. region, RegionLocationCodes[Temp.region].search_locations.shift(), HeadCodes[Temp.head], false, IRA,false, false, false,SearchPhaseRules_search))
         }
+
+        // CHANGING THE CONTRAST / TERTIARY COLOR FOR THE SEARCH PHASE STIMULI
+        for(let i =0;i<SearchPhaseBlockTemplates.length;i++){
+            let Template = SearchPhaseBlockTemplates[i]
+
+            //Find the contrast color for this Fennimal, and use it to define the tertiary color of the body.
+            let contrast_color = Param.RegionData[SearchPhaseBlockTrials[i].region].contrast_color
+            SearchPhaseBlockTrials[i].body_color_scheme.tertiary_color = contrast_color
+
+            if(typeof Template.borrowed_tertiary_color !== "undefined"){
+                //For the head: take the tertiary color of the target Fennimal. If the value is false, then just keep it as the original color-scheme.
+                if(Template.borrowed_tertiary_color !== false){
+                    SearchPhaseBlockTrials[i].head_color_scheme.tertiary_color = find_head_color(Template.borrowed_tertiary_color)
+                }
+            }else{
+                SearchPhaseBlockTrials[i].head_color_scheme.tertiary_color = contrast_color
+            }
+
+        }
+
+
 
         let RepeatBlockTrials = []
         for(let i = 0;i<TrainingTemplates.length;i++){
@@ -340,20 +418,47 @@ STIMULUSDATA = function(exp_code){
 
 
             }
-            RepeatBlockTrials.push(createTestFennimalObj("Repeat" + Temp.ID, FenObj.region, FenObj.location,FenObj.head,FenObj.body,IRA, false,special_item,false,SearchPhaseRules_repeat ))
+
+            let NewFen = createTestFennimalObj("Repeat" + Temp.ID, FenObj.region, FenObj.location,FenObj.head,FenObj.body,IRA, false,special_item,false,SearchPhaseRules_repeat )
+
+            //Copy the name from the original Fennimal
+            NewFen.name = FenObj.name
+
+            //Copy the color-schemes from the original Fennimal
+            NewFen.body_color_scheme = FenObj.body_color_scheme
+            NewFen.head_color_scheme = FenObj.head_color_scheme
+
+            RepeatBlockTrials.push(NewFen)
+
         }
 
         SearchPhaseSetup = []
 
         //Adding the search blocks
         for(let blocknum = 0; blocknum<number_search_blocks; blocknum++){
+            //TODO: This is a bit redunant coding...
+            let BlockRules = JSON.parse(JSON.stringify(SearchPhaseRules_search))
+            let need_to_modify_trial_rules = false
+            if(open_question_asked_in_blocks.includes(blocknum+1)){
+                BlockRules.ask_open_question = true
+                need_to_modify_trial_rules = true
+            }
+
             let NewBlock = {
                 Trials: shuffleArray(JSON.parse(JSON.stringify(SearchPhaseBlockTrials))),
                 hint_type: "location",
                 type: "search",
-                Rules: SearchPhaseRules_search
+                Rules: BlockRules
             }
+
+            if(need_to_modify_trial_rules){
+                for(let i = 0;i<NewBlock.Trials.length;i++){
+                    NewBlock.Trials[i].TestPhaseRules = BlockRules
+                }
+            }
+
             SearchPhaseSetup.push(NewBlock)
+
         }
 
         //Adding the recall question
@@ -380,146 +485,6 @@ STIMULUSDATA = function(exp_code){
     //Determine the exact experiment contents here
     switch(exp_code){
 
-        case("convergence") : {
-            //Tell the param object that we want to see colors for the training phase hints
-            Param.show_colors_with_icon_hints = true
-
-            // GENERAL STIMULI TEMPLATES
-            //////////////////////////////
-            let TrainingTemplates = [
-                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown"},
-                {ID: "B", region: "B", head: "B", special_item: "a", outcome: "frown"},
-                {ID: "C", region: "A", head: "B", special_item: "b", outcome: "heart"},
-                {ID: "D", region: "D", head: "D", special_item: "c", outcome: "heart"},
-            ]
-
-            let SearchPhaseBlockTemplates = [
-                {ID: "key", region: "B", head: "A", ItemResponses: {b: "heart", c: "neutral"} },
-                {ID: "key2", region: "B", head: "A", ItemResponses: {b: "heart", c: "neutral"} },
-                {ID: "distr", region: "F", head: "D", ItemResponses: {b: "neutral", c: "heart"} },
-                {ID: "distr2", region: "G", head: "D", ItemResponses: {b: "neutral", c: "heart"} },
-            ]
-
-            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
-            //SearchPhaseSetup = [SearchPhaseSetup[0]]
-            //SearchPhaseSetup = []
-
-            break;
-
-        }
-
-        case("divergence") : {
-            //Tell the param object that we want to see colors for the training phase hints
-            Param.show_colors_with_icon_hints = true
-
-            // GENERAL STIMULI TEMPLATES
-            //////////////////////////////
-            let TrainingTemplates = [
-                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown"},
-                {ID: "B", region: "B", head: "B", special_item: "a", outcome: "frown"},
-                {ID: "C", region: "A", head: "C", special_item: "b", outcome: "heart"},
-                {ID: "D", region: "D", head: "C", special_item: "c", outcome: "heart"},
-            ]
-
-            let SearchPhaseBlockTemplates = [
-                {ID: "key", region: "B", head: "A", ItemResponses: {b: "heart", c: "neutral"} },
-                {ID: "key2", region: "B", head: "A", ItemResponses: {b: "heart", c: "neutral"} },
-                {ID: "distr", region: "D", head: "E", ItemResponses: {b: "neutral", c: "heart"} },
-                {ID: "distr2", region: "D", head: "F", ItemResponses: {b: "neutral", c: "heart"} },
-            ]
-
-            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
-            //SearchPhaseSetup = [SearchPhaseSetup[0]]
-            //SearchPhaseSetup = []
-
-            break;
-
-        }
-
-        case("divergence_min") : {
-            //Tell the param object that we want to see colors for the training phase hints
-            Param.show_colors_with_icon_hints = true
-
-            // GENERAL STIMULI TEMPLATES
-            //////////////////////////////
-            let TrainingTemplates = [
-                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown"},
-                {ID: "B", region: "B", head: "B", special_item: "a", outcome: "frown"},
-                {ID: "C", region: "A", head: "C", special_item: "b", outcome: "heart"},
-                {ID: "D", region: "D", head: "D", special_item: "c", outcome: "heart"},
-            ]
-
-            let SearchPhaseBlockTemplates = [
-                {ID: "key", region: "B", head: "A", ItemResponses: {b: "heart", c: "neutral"} },
-                {ID: "key2", region: "B", head: "A", ItemResponses: {b: "heart", c: "neutral"} },
-                {ID: "distr", region: "F", head: "D", ItemResponses: {b: "neutral", c: "heart"} },
-                {ID: "distr2", region: "G", head: "D", ItemResponses: {b: "neutral", c: "heart"} },
-            ]
-
-            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
-            //SearchPhaseSetup = [SearchPhaseSetup[0]]
-            //SearchPhaseSetup = []
-
-            break;
-
-        }
-
-        case("dead_end") : {
-            //Tell the param object that we want to see colors for the training phase hints
-            Param.show_colors_with_icon_hints = true
-
-            // GENERAL STIMULI TEMPLATES
-            //////////////////////////////
-            let TrainingTemplates = [
-                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown"},
-                {ID: "B", region: "B", head: "B", special_item: "b", outcome: "frown"},
-                {ID: "C", region: "A", head: "C", special_item: "c", outcome: "heart"},
-                {ID: "D", region: "D", head: "D", special_item: "d", outcome: "heart"},
-            ]
-
-            let SearchPhaseBlockTemplates = [
-                {ID: "key", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"} },
-                {ID: "key2", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"} },
-                {ID: "distr", region: "D", head: "F", ItemResponses: {c: "neutral", d: "heart"} },
-                {ID: "distr2", region: "G", head: "D", ItemResponses: {c: "neutral", d: "heart"} },
-            ]
-
-            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
-            //SearchPhaseSetup = [SearchPhaseSetup[0]]
-            //SearchPhaseSetup = []
-
-            break;
-
-        }
-
-        case("no_dead_end") : {
-            //Tell the param object that we want to see colors for the training phase hints
-            Param.show_colors_with_icon_hints = true
-
-            // GENERAL STIMULI TEMPLATES
-            //////////////////////////////
-            let TrainingTemplates = [
-                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown"},
-                {ID: "B", region: "B", head: "B", special_item: "b", outcome: "frown"},
-                {ID: "C", region: "A", head: "C", special_item: "c", outcome: "heart"},
-                {ID: "D", region: "D", head: "D", special_item: "d", outcome: "heart"},
-            ]
-
-            let SearchPhaseBlockTemplates = [
-                {ID: "key", region: "B", head: "B", ItemResponses: {c: "heart", d: "neutral"} },
-                {ID: "key2", region: "B", head: "B", ItemResponses: {c: "heart", d: "neutral"} },
-                {ID: "distr", region: "D", head: "F", ItemResponses: {c: "neutral", d: "heart"} },
-                {ID: "distr2", region: "G", head: "D", ItemResponses: {c: "neutral", d: "heart"} },
-            ]
-
-            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
-            //SearchPhaseSetup = [SearchPhaseSetup[0]]
-            //SearchPhaseSetup = []
-
-            break;
-
-        }
-
         case("baseline") : {
             //Tell the param object that we want to see colors for the training phase hints
             Param.show_colors_with_icon_hints = true
@@ -527,384 +492,80 @@ STIMULUSDATA = function(exp_code){
             // GENERAL STIMULI TEMPLATES
             //////////////////////////////
             let TrainingTemplates = [
-                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown"},
-                {ID: "B", region: "B", head: "B", special_item: "b", outcome: "frown"},
-                {ID: "C", region: "A", head: "B", special_item: "c", outcome: "heart"},
-                {ID: "D", region: "D", head: "D", special_item: "d", outcome: "heart"},
+                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown", borrowed_tertiary_color: false},
+                {ID: "B", region: "B", head: "B", special_item: "b", outcome: "frown", borrowed_tertiary_color: false},
+                {ID: "C", region: "A", head: "B", special_item: "c", outcome: "heart", borrowed_tertiary_color: "B"},
+                {ID: "D", region: "D", head: "D", special_item: "d", outcome: "heart", borrowed_tertiary_color: false},
             ]
 
             let SearchPhaseBlockTemplates = [
-                {ID: "key", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"} },
-                {ID: "key2", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"} },
-                {ID: "distr", region: "D", head: "F", ItemResponses: {c: "neutral", d: "heart"} },
-                {ID: "distr2", region: "G", head: "D", ItemResponses: {c: "neutral", d: "heart"} },
+                {ID: "key", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"}, borrowed_tertiary_color: "A"},
+                {ID: "key2", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"}, borrowed_tertiary_color: "A"},
+                {ID: "distr", region: "D", head: "F", ItemResponses: {c: "neutral", d: "heart"}, borrowed_tertiary_color: false },
+                {ID: "distr2", region: "G", head: "D", ItemResponses: {c: "neutral", d: "heart"}, borrowed_tertiary_color: "D"},
             ]
 
-            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
+            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3, [1])
             //SearchPhaseSetup = [SearchPhaseSetup[0]]
             //SearchPhaseSetup = []
 
             break;
-
         }
-        case("baseline5") : {
+
+        case("partial_dead_end") : {
             //Tell the param object that we want to see colors for the training phase hints
             Param.show_colors_with_icon_hints = true
 
             // GENERAL STIMULI TEMPLATES
             //////////////////////////////
             let TrainingTemplates = [
-                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown"},
-                {ID: "B", region: "B", head: "B", special_item: "b", outcome: "frown"},
-                {ID: "C", region: "A", head: "C", special_item: "c", outcome: "heart"},
-                {ID: "D", region: "D", head: "D", special_item: "d", outcome: "heart"},
-                {ID: "E", region: "E", head: "E", special_item: "e", outcome: "heart"},
+                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown", borrowed_tertiary_color: false},
+                {ID: "B", region: "B", head: "B", special_item: "b", outcome: "frown", borrowed_tertiary_color: false},
+                {ID: "C", region: "A", head: "C", special_item: "c", outcome: "heart", borrowed_tertiary_color: "Z"},
+                {ID: "D", region: "D", head: "D", special_item: "d", outcome: "heart", borrowed_tertiary_color: false},
             ]
 
             let SearchPhaseBlockTemplates = [
-                {ID: "key", region: "E", head: "C", ItemResponses: {c: "heart", d: "neutral", e: "neutral"} },
-                {ID: "key2", region: "F", head: "C", ItemResponses: {c: "heart", d: "neutral", e: "neutral"} },
-                {ID: "distr", region: "D", head: "F", ItemResponses: {c: "neutral", d: "heart", e: "neutral"} },
-                {ID: "distr2", region: "G", head: "D", ItemResponses: {c: "neutral", d: "heart", e: "neutral"} },
+                {ID: "key", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"}, borrowed_tertiary_color: "A"},
+                {ID: "key2", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"}, borrowed_tertiary_color: "A"},
+                {ID: "distr", region: "D", head: "F", ItemResponses: {c: "neutral", d: "heart"}, borrowed_tertiary_color: false },
+                {ID: "distr2", region: "G", head: "D", ItemResponses: {c: "neutral", d: "heart"}, borrowed_tertiary_color: "D" },
             ]
 
-            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
+            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3, [1])
             //SearchPhaseSetup = [SearchPhaseSetup[0]]
             //SearchPhaseSetup = []
 
             break;
-
         }
 
-        case("conv_talk") : {
+        case("test"):
             //Tell the param object that we want to see colors for the training phase hints
             Param.show_colors_with_icon_hints = true
 
             // GENERAL STIMULI TEMPLATES
             //////////////////////////////
             let TrainingTemplates = [
-                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown"},
-                {ID: "B", region: "B", head: "B", special_item: "b", outcome: "frown"},
-                {ID: "C", region: "A", head: "B", special_item: "c", outcome: "heart"},
-                {ID: "D", region: "D", head: "D", special_item: "d", outcome: "heart"},
-                {ID: "E", region: "E", head: "E", special_item: "e", outcome: "heart"},
+                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown", borrowed_tertiary_color: false},
+                {ID: "B", region: "B", head: "B", special_item: "b", outcome: "frown", borrowed_tertiary_color: false},
+                {ID: "C", region: "A", head: "C", special_item: "c", outcome: "heart", borrowed_tertiary_color: "Z"},
+                {ID: "D", region: "D", head: "D", special_item: "d", outcome: "heart", borrowed_tertiary_color: false},
             ]
 
             let SearchPhaseBlockTemplates = [
-                {ID: "key", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral", e: "neutral"} },
-                {ID: "key2", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral", e: "neutral"} },
-                {ID: "distr", region: "D", head: "F", ItemResponses: {c: "neutral", d: "heart", e: "neutral"} },
-                {ID: "distr2", region: "G", head: "D", ItemResponses: {c: "neutral", d: "heart", e: "neutral"} },
+                {ID: "key", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"}, borrowed_tertiary_color: "A"},
+                {ID: "key2", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"}, borrowed_tertiary_color: "A"},
+                {ID: "distr", region: "D", head: "F", ItemResponses: {c: "neutral", d: "heart"}, borrowed_tertiary_color: false },
+                {ID: "distr2", region: "G", head: "D", ItemResponses: {c: "neutral", d: "heart"}, borrowed_tertiary_color: "D" },
             ]
 
-            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
+            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,1, [1])
             //SearchPhaseSetup = [SearchPhaseSetup[0]]
             //SearchPhaseSetup = []
-            break;
-
-        }
-
-
-
-        case("centrality") : {
-            //Tell the param object that we want to see colors for the training phase hints
-            Param.show_colors_with_icon_hints = true
-
-            // GENERAL STIMULI TEMPLATES
-            //////////////////////////////
-            let TrainingTemplates = [
-                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown"},
-
-                {ID: "B", region: "B", head: "B", special_item: "a", outcome: "frown"}, // B should be listed first, so that its in the middle of the location (making C and E equally distant)
-                {ID: "C", region: "B", head: "A", special_item: "c", outcome: "heart"},
-                {ID: "D", region: "D", head: "A", special_item: "d", outcome: "heart"},
-                {ID: "E", region: "B", head: "E", special_item: "e", outcome: "heart"},
-            ]
-
-            let SearchPhaseBlockTemplates = [
-                {ID: "key_A1", region: "A", head: "F", ItemResponses: { c: "heart",d: "heart", e:"neutral"} },
-                {ID: "key_A2", region: "A", head: "G", ItemResponses: { c: "heart",d: "heart", e:"neutral"} },
-                {ID: "key_B1", region: "E", head: "B", ItemResponses: { c: "heart",d: "neutral", e:"heart"} },
-                {ID: "key_B2", region: "F", head: "B", ItemResponses: { c: "heart",d: "neutral", e:"heart"} },
-            ]
-
-            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
-            //SearchPhaseSetup = [SearchPhaseSetup[0]]
-            //SearchPhaseSetup = []
-            console.log(SearchPhaseSetup)
 
             break;
 
-        }
 
-        case("centrality_4") : {
-            //Tell the param object that we want to see colors for the training phase hints
-            Param.show_colors_with_icon_hints = true
-
-            // GENERAL STIMULI TEMPLATES
-            //////////////////////////////
-            let TrainingTemplates = [
-                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown"},
-                {ID: "B", region: "B", head: "B", special_item: "a", outcome: "frown"}, // B should be listed first, so that its in the middle of the location (making C and E equally distant)
-                {ID: "C", region: "B", head: "A", special_item: "c", outcome: "heart"},
-                {ID: "D", region: "B", head: "D", special_item: "d", outcome: "heart"},
-            ]
-
-            let SearchPhaseBlockTemplates = [
-                {ID: "key_p_length", region: "A", head: "F", ItemResponses: { c: "heart",d: "neutral"} },
-                {ID: "key_p_num", region: "A", head: "B", ItemResponses: { c: "heart",d: "neutral"} },
-                {ID: "cntrl", region: "E", head: "B", ItemResponses: { c: "heart",d: "heart"} },
-
-            ]
-
-            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
-            //SearchPhaseSetup = [SearchPhaseSetup[0]]
-            //SearchPhaseSetup = []
-            console.log(SearchPhaseSetup)
-
-            break;
-
-        }
-
-        case("centrality_4b") : {
-            //Tell the param object that we want to see colors for the training phase hints
-            Param.show_colors_with_icon_hints = true
-
-            // GENERAL STIMULI TEMPLATES
-            //////////////////////////////
-            let TrainingTemplates = [
-                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown"},
-                {ID: "B", region: "B", head: "B", special_item: "a", outcome: "frown"}, // B should be listed first, so that its in the middle of the location (making C and E equally distant)
-                {ID: "C", region: "A", head: "B", special_item: "c", outcome: "heart"},
-                {ID: "D", region: "D", head: "B", special_item: "d", outcome: "heart"},
-            ]
-
-            let SearchPhaseBlockTemplates = [
-                {ID: "key_p_length", region: "E", head: "A", ItemResponses: { c: "heart",d: "neutral"} },
-                {ID: "key_p_num", region: "B", head: "A", ItemResponses: { c: "heart",d: "neutral"} },
-                {ID: "cntrl", region: "B", head: "F", ItemResponses: { c: "heart",d: "heart"} },
-
-            ]
-
-            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
-            //SearchPhaseSetup = [SearchPhaseSetup[0]]
-            //SearchPhaseSetup = []
-            console.log(SearchPhaseSetup)
-
-            break;
-
-        }
-
-        case("hm") : {
-            //Tell the param object that we want to see colors for the training phase hints
-            Param.show_colors_with_icon_hints = true
-
-            // GENERAL STIMULI TEMPLATES
-            //////////////////////////////
-            let TrainingTemplates = [
-                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown"},
-                {ID: "B", region: "B", head: "B", special_item: "a", outcome: "frown"}, // B should be listed first, so that its in the middle of the location (making C and E equally distant)
-                {ID: "C", region: "A", head: "C", special_item: "c", outcome: "heart"},
-                {ID: "D", region: "B", head: "C", special_item: "d", outcome: "heart"},
-            ]
-
-            let SearchPhaseBlockTemplates = [
-                {ID: "A1", region: "E", head: "A", ItemResponses: { c: "heart",d: "neutral"} },
-                {ID: "A2", region: "F", head: "A", ItemResponses: { c: "heart",d: "neutral"} },
-                {ID: "B1", region: "E", head: "B", ItemResponses: { c: "neutral",d: "heart"} },
-                {ID: "B2", region: "F", head: "B", ItemResponses: { c: "neutral",d: "heart"} },
-
-            ]
-
-            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
-            //SearchPhaseSetup = [SearchPhaseSetup[0]]
-            //SearchPhaseSetup = []
-            console.log(SearchPhaseSetup)
-
-            break;
-
-        }
-
-        case("hm2") : {
-            //Tell the param object that we want to see colors for the training phase hints
-            Param.show_colors_with_icon_hints = true
-
-            // GENERAL STIMULI TEMPLATES
-            //////////////////////////////
-            let TrainingTemplates = [
-                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown"},
-                {ID: "B", region: "B", head: "B", special_item: "a", outcome: "frown"}, // B should be listed first, so that its in the middle of the location (making C and E equally distant)
-                {ID: "C", region: "C", head: "A", special_item: "c", outcome: "heart"},
-                {ID: "D", region: "C", head: "B", special_item: "d", outcome: "heart"},
-            ]
-
-            let SearchPhaseBlockTemplates = [
-                {ID: "A1", region: "A", head: "E", ItemResponses: { c: "heart",d: "neutral"} },
-                {ID: "A2", region: "A", head: "F", ItemResponses: { c: "heart",d: "neutral"} },
-                {ID: "B1", region: "B", head: "G", ItemResponses: { c: "neutral",d: "heart"} },
-                {ID: "B2", region: "B", head: "H", ItemResponses: { c: "neutral",d: "heart"} },
-
-            ]
-
-            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
-            //SearchPhaseSetup = [SearchPhaseSetup[0]]
-            //SearchPhaseSetup = []
-            console.log(SearchPhaseSetup)
-
-            break;
-
-        }
-
-        case("hm3") : {
-            //Tell the param object that we want to see colors for the training phase hints
-            Param.show_colors_with_icon_hints = true
-
-            // GENERAL STIMULI TEMPLATES
-            //////////////////////////////
-            let TrainingTemplates = [
-                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown"},
-                {ID: "C", region: "A", head: "C", special_item: "c", outcome: "heart"},
-                {ID: "D", region: "D", head: "C", special_item: "d", outcome: "heart"},
-            ]
-
-            let SearchPhaseBlockTemplates = [
-                {ID: "key1", region: "E", head: "A", ItemResponses: { c: "heart",d: "neutral"} },
-                {ID: "key2", region: "F", head: "A", ItemResponses: { c: "heart",d: "neutral"} },
-                {ID: "distr1", region: "D", head: "E", ItemResponses: { c: "neutral",d: "heart"} },
-                {ID: "distr2", region: "D", head: "F", ItemResponses: { c: "neutral",d: "heart"} },
-
-            ]
-
-            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3)
-            //SearchPhaseSetup = [SearchPhaseSetup[0]]
-            //SearchPhaseSetup = []
-            console.log(SearchPhaseSetup)
-
-            break;
-
-        }
-
-        case("convergence_base") : {
-            //Drawing Regions
-            let Training_Regions = shuffleArray(["Desert", "North", "Village", "Jungle"]) //"North", "Desert", "Village"
-            let Search_Regions = shuffleArray(["Mountains", "Beach", "Flowerfields", "Swamp"])// "Jungle", "Mountains", "Beach"
-
-            //Shuffling locations for the regions
-            let Training_Location_Arr = []
-            for(let i = 0; i<Training_Regions.length;i++){
-                Training_Location_Arr.push(shuffleArray( JSON.parse(JSON.stringify(Param.RegionData[Training_Regions[i]].Locations))))
-            }
-            let Search_Location_Arr = []
-            for(let i = 0; i<Search_Regions.length;i++){
-                Search_Location_Arr.push(shuffleArray( JSON.parse(JSON.stringify(Param.RegionData[Search_Regions[i]].Locations))))
-            }
-
-            //Shuffle heads
-            let Used_Heads  = shuffleArray(["D", "E", "G", "I", "K", "B", "N"])
-
-            //Creating Item details
-            Item_Details = generate_item_details(drawRandomElementsFromArray(Param.Available_items, 4, false ))
-            All_Items = shuffleArray(JSON.parse(JSON.stringify(Item_Details.All_Items)))
-
-            //Creating the training Fennimals (A1 and A2 share a semantic head pair, B and C do not)
-            TrainingFennimals = {
-                A: createTrainingFennimalObj("A", Training_Regions[0], Training_Location_Arr[0][0], Used_Heads[0],false, [ [All_Items[0], "frown"]], false),
-                B: createTrainingFennimalObj("B", Training_Regions[1], Training_Location_Arr[1][0], Used_Heads[1],false, [ [All_Items[1], "frown"]], false),
-                C:  createTrainingFennimalObj("C",Training_Regions[0], Training_Location_Arr[0][1], Used_Heads[1],false, [ [All_Items[2], "heart"]], false),
-                D:  createTrainingFennimalObj("D",Training_Regions[2], Training_Location_Arr[2][0], Used_Heads[3],false, [ [All_Items[3], "heart"]], false),
-                E:  createTrainingFennimalObj("E",Training_Regions[3], Training_Location_Arr[3][0], Used_Heads[4],false, [ [All_Items[3], "heart"]], false),
-            }
-
-            //Tell the param object that we want to see colors for the training phase hitns
-            Param.show_colors_with_icon_hints = false
-
-            //Setting the search phase rules
-            let SearchPhaseRules_search = {
-                hidden_feedback: true,
-                cued_item_allowed: true,
-                search_item_allowed: true,
-            }
-            let SearchPhaseRules_repeat = {
-                hidden_feedback: true,
-                cued_item_allowed: true,
-                search_item_allowed: true,
-                is_repeat_trial: true
-            }
-
-            // TODO: add IDs and actual outcomes
-            SearchPhaseSetup = [
-                {
-                    Trials: [
-                        createTestFennimalObj("Test_Key", Training_Regions[1], Training_Location_Arr[1][0],  TrainingFennimals.A.head,false, [[All_Items[2], "heart"],[All_Items[3], "neutral"] ], false, false, All_Items[2],SearchPhaseRules_search),
-                        createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[2], "neutral"],[All_Items[3], "heart"] ], false, All_Items[3], false,SearchPhaseRules_search),
-                        //createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
-                    ],
-                    hint_type: "location",
-                    type: "search",
-                    Rules: SearchPhaseRules_search
-                },
-                {
-                    Trials: [
-                        createTestFennimalObj("Test_Key", Training_Regions[1], Training_Location_Arr[1][0],  TrainingFennimals.A.head,false, [[All_Items[2], "heart"],[All_Items[3], "neutral"] ], false, false, All_Items[2],SearchPhaseRules_search),
-                        createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[2], "neutral"],[All_Items[3], "heart"] ], false, All_Items[3], false,SearchPhaseRules_search),
-                        // createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
-                    ],
-                    hint_type: "location",
-                    type: "search",
-                    Rules: SearchPhaseRules_search
-                },
-                {
-                    Trials: [
-                        createTestFennimalObj("Test_Key", Training_Regions[1], Training_Location_Arr[1][0],  TrainingFennimals.A.head,false, [[All_Items[2], "heart"],[All_Items[3], "neutral"] ], false, false, All_Items[2],SearchPhaseRules_search),
-                        createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[2], "neutral"],[All_Items[3], "heart"] ], false, All_Items[3], false,SearchPhaseRules_search),
-                        //createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
-                    ],
-                    hint_type: "location",
-                    type: "search",
-                    Rules: SearchPhaseRules_search
-                },
-                {
-                    Trials: [
-                        createTestFennimalObj("Test_Key", Training_Regions[1], Training_Location_Arr[1][0],  TrainingFennimals.A.head,false, [[All_Items[2], "heart"],[All_Items[3], "neutral"] ], false, false, All_Items[2],SearchPhaseRules_search),
-                        createTestFennimalObj("Test_D_h", Search_Regions[1], Search_Location_Arr[1][0],  TrainingFennimals.D.head,false, [[All_Items[2], "neutral"],[All_Items[3], "heart"] ], false, All_Items[3], false,SearchPhaseRules_search),
-                        // createTestFennimalObj("Test_E_l", Training_Regions[3], Training_Location_Arr[3][0],  Used_Heads[5],false, [[All_Items[0], "frown"],[All_Items[1], "frown"],[All_Items[2], "neutral"],[All_Items[3],"heart"] ], false, false, false,SearchPhaseRules_search),
-                    ],
-                    hint_type: "location",
-                    type: "search",
-                    Rules: SearchPhaseRules_search
-                },
-
-                {
-                    Trials: [
-                        createTestFennimalObj("RepeatA", TrainingFennimals.A.region, TrainingFennimals.A.location,  TrainingFennimals.A.head,false, [[All_Items[0], "correct"],[All_Items[1], "incorrect"],[All_Items[2], "incorrect"],[All_Items[3], "incorrect"] ], false, All_Items[0], false,SearchPhaseRules_repeat),
-                        createTestFennimalObj("RepeatB", TrainingFennimals.B.region, TrainingFennimals.B.location,  TrainingFennimals.B.head,false, [[All_Items[0], "incorrect"],[All_Items[1], "correct"],[All_Items[2], "incorrect"],[All_Items[3], "incorrect"] ], false, All_Items[1], false,SearchPhaseRules_repeat),
-                        createTestFennimalObj("RepeatC", TrainingFennimals.C.region, TrainingFennimals.C.location,  TrainingFennimals.C.head,false, [[All_Items[0], "incorrect"],[All_Items[1], "incorrect"],[All_Items[2], "correct"],[All_Items[3], "incorrect"] ], false, All_Items[2], false,SearchPhaseRules_repeat),
-                        createTestFennimalObj("RepeatD", TrainingFennimals.D.region, TrainingFennimals.D.location,  TrainingFennimals.D.head,false, [[All_Items[0], "incorrect"],[All_Items[1], "incorrect"],[All_Items[2], "incorrect"],[All_Items[3], "correct"] ], false, All_Items[3], false,SearchPhaseRules_repeat),
-                        createTestFennimalObj("RepeatE", TrainingFennimals.E.region, TrainingFennimals.E.location,  TrainingFennimals.E.head,false, [[All_Items[0], "incorrect"],[All_Items[1], "incorrect"],[All_Items[2], "incorrect"],[All_Items[3], "correct"] ], false, All_Items[3], false,SearchPhaseRules_repeat),
-                    ],
-                    hint_type: "location",
-                    type: "repeat",
-                    Rules: SearchPhaseRules_repeat
-                },
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            ]
-
-            break;
-
-        }
     }
 
     // CALL FUNCTIONS //

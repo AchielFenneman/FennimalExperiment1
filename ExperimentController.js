@@ -100,6 +100,7 @@ DataController = function(){
 
     //Reduces the contents of the test trial to minimize the data stores (lots of internal variables are not needed for further analysis)
     function reduce_trial_data_object(FennimalObj, absolute_minimum){
+        console.log(FennimalObj)
         let Available_Items_Arr = []
         for(let key = 0; key< Object.keys(FennimalObj.ItemResponses).length; key++){
             if(FennimalObj.ItemResponses[Object.keys(FennimalObj.ItemResponses)[key]] !== "unavailable"){
@@ -111,7 +112,6 @@ DataController = function(){
         if(absolute_minimum){
             NewObj = {
                 ID: FennimalObj.ID,
-                num_in_block: FennimalObj.encounter_order_in_block,
                 rt: FennimalObj.rt,
                 selected: FennimalObj.selected_item,
                 out_obs: FennimalObj.outcome_observed,
@@ -126,7 +126,6 @@ DataController = function(){
                 r: FennimalObj.region,
                 l: FennimalObj.location,
                 n: FennimalObj.name,
-                num_in_block: FennimalObj.encounter_order_in_block,
                 rt: FennimalObj.rt,
 
                 c_toy: FennimalObj.cued_item,
@@ -153,6 +152,10 @@ DataController = function(){
         if(typeof FennimalObj.record_of_items_carried !== "undefined"){
             NewObj.items_backpack = FennimalObj.record_of_items_carried
         }
+
+        if(typeof FennimalObj.confidence_rating !== "undefined") {NewObj.conf = FennimalObj.confidence_rating}
+        if(typeof FennimalObj.decision_style !== "undefined") {NewObj.d_style = FennimalObj.decision_style}
+        if(typeof FennimalObj.remembered_Fennimals !== "undefined") {NewObj.rem_Fen = FennimalObj.remembered_Fennimals}
 
         return(NewObj)
     }
@@ -200,7 +203,7 @@ DataController = function(){
 ExperimentController = function(){
     let that = this
     let participant_number, Stimuli
-    let experiment_design = "baseline"
+    let experiment_design = "partial_dead_end"
     let retake_quiz_until_perfect = true
     let open_question_special_Fennimal_ID = false // "key" // Set to false to have a general open question. If not set to false, then the open question specificially asks about this Fennimal.
 
@@ -209,8 +212,8 @@ ExperimentController = function(){
         allowed_errors: 1, //This is how many mistakes (omission and commission the participant is allowed to make)
         max_allowed_Levenshtein_distance: 2, //For each answer given, this determines maximum amount of errors (typos) allowed before an answer cannot be tied to a Fennimal
         max_allowed_distance_to_count_error: 4 //To make it a bit easier on subjects, we give them the benefit of the doubt: if an answer vaguely resembles a Fennimal name, then its not counted as an error-by-commission (although still as ommision!)
-
     }
+
     this.get_recall_question_bonus_rules = function(){return Recall_Question_Payment}
     //Subcontrollers
     let InstrCont, LocCont, DC, GarbageCleaner
@@ -219,10 +222,10 @@ ExperimentController = function(){
     let current_experiment_stage = "starting_instructions"
 
     let ExperimentStages = {
-        Instructions: ["consent", "full_screen_prompt", "payment_info", "basic_instructions" ], //"consent", "full_screen_prompt", "payment_info", "basic_instructions"      "consent", "full_screen_prompt", "payment_info", "basic_instructions"
-        Training: [ "exploration", "search_icon", "search_location",  "delivery_icon", "delivery_name", "cardquiz"  ],  //  "exploration", "search_location", "search_name",  "delivery_icon", "delivery_location", "cardquiz"           "exploration", "search_location", "search_name",  "delivery_icon", "delivery_location", "cardquiz"
+        Instructions: ["payment_info" ], //"consent", "full_screen_prompt", "payment_info", "basic_instructions"
+        Training: ["exploration", "search_icon", "search_location",  "delivery_icon", "delivery_name", "cardquiz"],  // "exploration", "search_icon", "search_location",  "delivery_icon", "delivery_name", "cardquiz"
         Test: [], //Updated on initialization, defined by the Stimuli.
-        Questionnaire: ["open","gender", "age", "colorblindness"], //"open","gender", "age", "colorblindness"
+        Questionnaire: ["gender", "age", "colorblindness"], //"open","gender", "age", "colorblindness"
     }
 
     //Retrieve participant number
@@ -234,7 +237,7 @@ ExperimentController = function(){
             participant_number = ProlificIDToSeed(PID)
             console.warn("SEEDED RNG " + participant_number)
         }else{
-            participant_number = 9123456789 // draw_random_participant_seed() //17032024
+            participant_number = draw_random_participant_seed() //17032024
             console.warn("NO PID FOUND. Defaulting to random seed " + participant_number)
         }
     }
@@ -289,6 +292,15 @@ ExperimentController = function(){
         InstrCont = new InstructionsController(that, false)
         LocCont = new LocationController(that)
 
+    }
+
+    this.get_all_training_phase_Fennimal_names = function(){
+        let Obj = {}
+        let TStim = Stimuli.getTrainingSetFennimalsInArray()
+        for(let i =0;i<TStim.length;i++){
+            Obj[TStim[i].ID] = TStim[i].name
+        }
+        return(Obj)
     }
 
     // STARTING INSTRUCTIONS
@@ -482,6 +494,7 @@ ExperimentController = function(){
 
             //Populating the world
             populate_world_with_Fennimal(CurrentTrial, current_experiment_stage )
+            console.log(CurrentTrial)
 
             //Clear out the backpack
             item_in_backpack = false
@@ -688,8 +701,6 @@ ExperimentController = function(){
             InstrCont.show_recall_task()
 
         }else{
-
-
             RemainingTrialsInBlock = shuffleArray(CurrentTestBlockObject.Trials)
 
             DC.start_next_block("test_" + CurrentTestBlockObject.type, "test");
@@ -754,7 +765,6 @@ ExperimentController = function(){
     //Logs the results of the recall questionnaire, computes the number of correct answers.
     this.recall_task_completed = function(AnswerArray){
         let ProcessedData = process_recall_data(AnswerArray)
-        console.log(ProcessedData)
 
         // For payment: keep track of the number of errors made
         Recall_Question_Payment.errors_made = ProcessedData.errors_made
@@ -829,17 +839,18 @@ ExperimentController = function(){
                         errors++
                     }
                 }
-
             }
         }
 
-        //Now we start calculating the errors made by omission (that is, Fennimals which did not have their IDS assigned in any of the answers
-
-        for(let key in IDNames){
-            if(! Names_matched.includes(IDNames[key])){
-                errors++
-            }
+        //Now we start calculating the errors made by omission (that is, the TRAINING-phase Fennimals which did not have their IDS assigned in any of the answers
+        // Note that we are a bit lenient here: adding the names of the search-phase Fennimals won't be counted as an error of commission (and missing them is not an error of ommision)
+        let TrainingIDs = []
+        let TrainingFennimalArr = Stimuli.getTrainingSetFennimalsInArray()
+        for(let i=0;i<TrainingFennimalArr.length;i++){
+            TrainingIDs.push(TrainingFennimalArr[i].ID)
         }
+        let Missed_Training_IDS = TrainingIDs.filter(x => !Fennimals_matched.includes(x))
+        errors = errors + Missed_Training_IDS.length
 
         //Returning
         return({

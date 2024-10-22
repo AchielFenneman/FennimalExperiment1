@@ -382,10 +382,10 @@ InstructionsController = function(ExpCont, LocCont){
             //Creating the icon. If the Fennimal has not been found, this should be an outline. Otherwise color the Fennimal
             let IconObj
             if(! fennimal_found){
-                IconObj = createFennimalIcon(Fennimal, Positions[i].x, Positions[i].y, 0.21, !fennimal_found, false)
+                IconObj = createFennimalIcon(Fennimal, Positions[i].x, Positions[i].y, 0.195, !fennimal_found, false)
                 IconObj.style.opacity = 0.4
             }else{
-                IconObj = createFennimalIcon(Fennimal, Positions[i].x, Positions[i].y, 0.21, !fennimal_found, false)
+                IconObj = createFennimalIcon(Fennimal, Positions[i].x, Positions[i].y, 0.18, !fennimal_found, false)
             }
             IconsContainer.appendChild(IconObj)
 
@@ -736,7 +736,7 @@ InstructionsController = function(ExpCont, LocCont){
         let TextField = createTextField(30, 35, 508-2*30,200, "Well done, Trainee! You're well on your way to becoming an Expert Wildlife Ranger. " +
             "Before we continue, we will first give you a quiz to review what you've learned so far. <br>" +
             "<br>" +
-            "The quiz will consist of multiple pages, each containing a few questions. You can select an answer to each question from the drop-down menu next to the question. If you make any mistakes on a page, then this page will come back up again later. The quiz is finished once you have succesfully answered all the questions on all the pages." +
+            "The quiz will consist of multiple pages, each containing a few questions. You can select an answer to each question from the drop-down menu next to the question. If you make any mistakes on a page, then this page will come back up again later. The quiz is finished once you have successfully answered all the questions on all the pages." +
             "<br><br>" +
             "<b>Tip: </b>if your memory needs some refreshing, you can freely travel across the island to take another look at all the Fennimals you have so far encountered. You can do this by clicking on the 'Go to map' button and travelling to the location of each Fennimal. <br>" +
             "")
@@ -775,7 +775,7 @@ InstructionsController = function(ExpCont, LocCont){
         Page.appendChild(createTextField(15, 35, 508 - 2*15,30, "Please answer the questions below. <b>Tip:</b> When in doubt, you can freely go to the map to visit the Fennimals."))
 
         //Show the icon
-        Page.appendChild(createFennimalIcon(FennimalObj,-58, 58,0.55,false, ! Param.show_colors_with_icon_hints))
+        Page.appendChild(createFennimalIcon(FennimalObj,-58, 58,0.52,false, ! Param.show_colors_with_icon_hints))
 
         //Some parameters for all the answer boxes
         let box_x = 320
@@ -1207,8 +1207,8 @@ InstructionsController = function(ExpCont, LocCont){
 
         let instruction_text = "Congratulations! You have passed the quiz and now completed your basic training. You're almost an Expert Wildlife ranger, but first you need to complete " + total_number_of_test_phase_days + " days of practical experience. <br>" +
         "<br>" +
-        "A new group of Fennimals have recently been spotted all over the island. Your task is to visit these new Fennimals and give them a toy that they may like. You have rely on your past experiences to select toys for these Fennimals. " +
-            "<b> As a tip: similar Fennimals tend to like the same toys.  </b> <br><br>" +
+        "A new group of Fennimals have recently been spotted all over the island. Your task is to visit these new Fennimals and give them a toy that they may like. You have to rely on your past experience to select toys for these Fennimals. " +
+            "<b> As a tip: similar Fennimals like the same toys.  </b> <br><br>" +
             "After you complete your practical experience you will automatically receive the title of Expert. " +
             "In addition, you can earn up to 5 stars, based on how well the Fennimals liked their interactions with you during this practical experience. Therefore, your earnings for this experiment depend on your performance on this part of the task! "
 
@@ -1504,19 +1504,26 @@ InstructionsController = function(ExpCont, LocCont){
         let errorplural = "s"
         if(Rules.allowed_errors === 1){ errorplural = ""}
 
-        let text = "During your time in Fenneland, you encountered many different Fennimals. " +
-            "Do you still remember their names? Please add all the names of the Fennimals below. " +
-            "You can enter a name by typing in the box and clicking on the 'Add' button. " +
+
+
+        let text = "Today we will switch things up. Do you still remember the names of the Fennimals you encountered during your training period? " +
+            "Please list all the names that you remember below <br>" +
+            "<br> " +
+            "<i>You can enter a name by typing in the box and clicking on the 'Add' button. " +
             "If you made a mistake, you can click on <span style='color:firebrick'> [x] </span> to remove an answer. " +
-            "If you think you have listed all names, then you can click on the 'Done' button to continue (you will not be able to return after pressing the button!) <br><br>" +
+            "If you think you have listed all names, then you can click on the 'Done' button to continue (you will not be able to return after pressing the button!) <br>" +
             "Each incorrect answer or for each Fennimal that you could not name count as errors." +
             " <b>You will earn a bonus star if you do not make more than " +  Rules.allowed_errors + " error" + errorplural + "</b> " +
-            "(Repeated names do not count as errors. The names are not case-sensitve, but watch out for typos!) "
-        Page.appendChild(createTextField(30, 15, 508-2*30,100, text))
+            "(Repeated names do not count as errors. The names are not case-sensitve, but watch out for typos!) </i> "
 
-        let RBC = new RecallBoxController(Page, ExpCont)
+        let TextObj = createTextField(30, 12, 508-2*30,100, text)
+        TextObj.style.fontSize = "11px"
+        Page.appendChild(TextObj)
+
+        let RBC =  new RecallBoxController(Page, 120, 90, false,true, "I do <span style='color: darkred'> not </span> remember any Fennimals", EC.recall_task_completed)
 
     }
+
     function show_questionnaire_gender(){
         hide_all_instruction_pages()
         showNewInstructionsPage()
@@ -1832,8 +1839,8 @@ InstructionsController = function(ExpCont, LocCont){
                 Param.BonusEarnedPerStar.currency_symbol + (Param.BonusEarnedPerStar.bonus_per_star * ScoreObj.total_stars).toFixed(2)
         }
 
-        text = text + "<br><br> Do NOT close or refresh this window before submitting your code to Prolific. Your completion code is: <b> " + ScoreObj.completion_code + " </b>. <br><br>"
-            "After you have submitted this code to Prolific, it is safe to close this window. Thank you for participating!"
+        text = text + "<br><br> Do NOT close or refresh this window before submitting your code to Prolific. Your completion code is: <b> " + ScoreObj.completion_code + " </b>. <br><br>" +
+            "After you have submitted this code to Prolific, then press the button below. Do not close this window before clicking the button! Thank you for participating!"
 
 
         //Set the text to the screen
@@ -1878,13 +1885,14 @@ InstructionsController = function(ExpCont, LocCont){
 
 }
 
-RecallBoxController = function(Page, ExpCont){
+//Todo: for the repeat question, modify the output criteria and the dimensions. Previous defaults: ypos = 110, height = 120
+RecallBoxController = function(Page, ypos, answer_box_height,allow_empty_input,add_checkbox_no_answer, checkbox_no_answer_text, returnfunc){
     let StartTime = Date.now()
     let Dims = {
         Field: {
             x: 50,
-            y: 110,
-            h: 120,
+            y: ypos,
+            h: answer_box_height,
             w: 408
         },
         Answer: {
@@ -1896,7 +1904,7 @@ RecallBoxController = function(Page, ExpCont){
             x: 52,
             y: 238,
             h:30,
-            w:145,
+            w:155,
 
         },
         InputButton: {
@@ -1910,13 +1918,25 @@ RecallBoxController = function(Page, ExpCont){
             y: 240,
             h:22,
             w:100
+        },
+        No_Answer_Checkbox : {
+            x: 50,
+            y: 250,
+            h: 25,
+            w: 408
         }
 
     }
-    Dims.number_of_lines = Math.floor( Dims.Field.h / Dims.Answer.h )
     let max_input_length  = 30
 
-    let ForObjBox, Box, BoxPlaceholderText, ForObjInput, InputText, InputButton, ContinueButton, AnswerArray = [], box_active, answer_id =0
+    //Setting the y values for the input line and buttons
+    Dims.InputLine.y = ypos + Dims.Field.h + 4
+    Dims.InputButton.y = ypos + Dims.Field.h + 5
+    Dims.ContinueButton.y = ypos + Dims.Field.h + 5
+    Dims.No_Answer_Checkbox.y = Dims.ContinueButton.y + Dims.ContinueButton.h + 5
+
+    let ForObjBox, Box, BoxPlaceholderText, ForObjInput, InputText, InputButton,CheckBox, CheckBoxContainer, CheckBoxText, ContinueButton, AnswerArray = [], box_active, answer_id =0
+    let RemovableElements = []
 
     //Creates the elements
     function initialize_elements(){
@@ -1924,6 +1944,7 @@ RecallBoxController = function(Page, ExpCont){
         ForObjBox = createNSElemWithDims('http://www.w3.org/2000/svg',"foreignObject",  Dims.Field.x, Dims.Field.y, Dims.Field.w, Dims.Field.h)
         ForObjBox.style.padding = "1%"
         Page.appendChild(ForObjBox)
+        RemovableElements.push(ForObjBox)
 
         //The Box contains all the answers
         Box = document.createElement("div")
@@ -1931,16 +1952,13 @@ RecallBoxController = function(Page, ExpCont){
         ForObjBox.appendChild(Box)
 
         //Adding a placeholder for the box
-        BoxPlaceholderText = document.createElement("p")
-        BoxPlaceholderText.innerHTML = "Your answers will be shown here"
-        BoxPlaceholderText.classList.add("recall_input_box_placeholder")
-        Box.appendChild(BoxPlaceholderText)
-        box_active = false
+        reset_box()
 
         //Adding input line
         ForObjInput = createNSElemWithDims('http://www.w3.org/2000/svg',"foreignObject",  Dims.InputLine.x, Dims.InputLine.y, Dims.InputLine.w, Dims.InputLine.h)
         ForObjInput.style.padding = "1%"
         Page.appendChild(ForObjInput)
+        RemovableElements.push(ForObjInput)
 
         InputText = document.createElement("input")
         InputText.maxLength = max_input_length
@@ -1951,11 +1969,41 @@ RecallBoxController = function(Page, ExpCont){
         InputButton = createSVGButtonElem(Dims.InputButton.x, Dims.InputButton.y, Dims.InputButton.w, Dims.InputButton.h, "Add")
         InputButton.onclick = add_answer_button_pressed
         Page.appendChild(InputButton)
+        RemovableElements.push(InputButton)
 
         ContinueButton = createSVGButtonElem(Dims.ContinueButton.x, Dims.ContinueButton.y, Dims.ContinueButton.w, Dims.ContinueButton.h, "Done")
         ContinueButton.onclick = finish_question
         Page.appendChild(ContinueButton)
-        ContinueButton.style.display = "none"
+
+        RemovableElements.push(ContinueButton)
+
+        if(! allow_empty_input){
+            ContinueButton.style.display = "none"
+        }
+
+        //Finally, we may need to add a checkbox for the no-answer option
+        if(add_checkbox_no_answer){
+            //The container holding both the checkbox and the text
+            CheckBoxContainer = createNSElemWithDims('http://www.w3.org/2000/svg',"foreignObject",  Dims.No_Answer_Checkbox.x, Dims.No_Answer_Checkbox.y, Dims.No_Answer_Checkbox.w, Dims.No_Answer_Checkbox.h)
+            CheckBoxContainer.style.padding = "1%"
+            CheckBoxContainer.classList.add("recall_no_answer_container")
+            Page.appendChild(CheckBoxContainer)
+            RemovableElements.push(CheckBoxContainer)
+
+            //Adding the checkbox
+            CheckBox = document.createElement("input")
+            CheckBox.setAttribute("type", "checkbox");
+            CheckBox.classList.add("recall_no_answer_checkbox")
+            CheckBoxContainer.appendChild(CheckBox)
+            CheckBox.onchange = toggle_no_answer_checkbox
+
+            //Adding the text
+            CheckBoxText = document.createElement("p")
+            CheckBoxText.innerHTML = checkbox_no_answer_text
+            CheckBoxText.classList.add("recall_no_answer_text")
+            CheckBoxContainer.appendChild(CheckBoxText)
+
+        }
     }
 
     //Call then a first answer is submitted to remove the placeholder text in the box
@@ -1964,7 +2012,17 @@ RecallBoxController = function(Page, ExpCont){
         BoxPlaceholderText.remove()
         Box.classList.remove("recall_input_answerbox_start")
         Box.classList.add("recall_input_answerbox_active")
-        ContinueButton.style.display = "inherit"
+    }
+
+    function reset_box(){
+        BoxPlaceholderText = document.createElement("p")
+        BoxPlaceholderText.innerHTML = "Your answers will be shown here"
+        BoxPlaceholderText.classList.add("recall_input_box_placeholder")
+        Box.appendChild(BoxPlaceholderText)
+        box_active = false
+
+        Box.classList.add("recall_input_answerbox_start")
+        Box.classList.remove("recall_input_answerbox_active")
     }
 
     //Call when the add answer button is pressed
@@ -1985,6 +2043,7 @@ RecallBoxController = function(Page, ExpCont){
     function answer_added(answertext){
         AnswerArray.push(new Answer(answertext, answer_id, Date.now() - StartTime))
         answer_id++
+        number_of_answers_changed()
     }
 
     //Object for the answer displayed in the box
@@ -2009,6 +2068,7 @@ RecallBoxController = function(Page, ExpCont){
         function delete_answer_from_screen(){
             AnswerDiv.remove()
             removed_by_user = true
+            number_of_answers_changed()
         }
 
         this.get_value_obj = function(){
@@ -2022,6 +2082,57 @@ RecallBoxController = function(Page, ExpCont){
 
     }
 
+    //Call when the checkbox for no input has been toggled
+    function toggle_no_answer_checkbox(){
+        if(CheckBox.checked){
+            //Disable the text input and hide the add button.
+            InputButton.style.display = "none"
+            InputText.disabled = true
+
+            //Show the continue button
+            ContinueButton.style.display = "inherit"
+        }else{
+            //Enable text input and show the add button
+            InputButton.style.display = "inherit"
+            InputText.disabled = false
+
+            //Hide the continue button
+            ContinueButton.style.display = "none"
+        }
+    }
+
+    //Call when the number of answers is updated (either when adding or when removing answer)
+    function number_of_answers_changed(){
+        //Find the number of answers displayed on-screen
+        let number_of_answers_on_screen =0
+        for(let i =0;i<AnswerArray.length;i++){
+            if(AnswerArray[i].get_value_obj().removed_by_user === false){
+                number_of_answers_on_screen++
+            }
+        }
+
+        if(number_of_answers_on_screen === 0){
+            //Reset the placeholder text
+            ContinueButton.style.display = "none"
+            reset_box()
+
+            //If enabled, show the no-answer box
+            if(add_checkbox_no_answer){
+                CheckBox.disabled = false
+                CheckBoxText.style.color = "black"
+            }
+
+        }else{
+            //Show the continue button
+            ContinueButton.style.display = "inherit"
+            //If enabled, hide the no-answer box
+            if(add_checkbox_no_answer){
+                CheckBox.disabled = true
+                CheckBoxText.style.color = "gray"
+            }
+        }
+    }
+
     //Call when the question has been finished
     function finish_question(){
         let GivenAnswers = []
@@ -2032,8 +2143,20 @@ RecallBoxController = function(Page, ExpCont){
         //Show the map again
         document.getElementById("instructions_mask").style.opacity = 0.94
 
-        ExpCont.recall_task_completed(GivenAnswers)
+        clearElements()
 
+        returnfunc(GivenAnswers)
+
+        //ExpCont.recall_task_completed(GivenAnswers)
+
+    }
+
+    //Call to delete all elements from the page
+    function clearElements(){
+        for(let i =0;i<RemovableElements.length;i++){
+            RemovableElements[i].remove()
+        }
+        RemovableElements = []
     }
     initialize_elements()
 

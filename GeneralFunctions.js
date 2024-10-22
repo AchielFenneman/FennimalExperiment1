@@ -269,11 +269,11 @@ function createFennimal(FennimalObj){
     }
 
     //Resizing head and bodies
-    HeadObj.style.transformOrigin = "50% 100%"
-    HeadObj.style.transform = "scale(1)"
+    HeadObj.style.transformOrigin = "50% 30%"
+    HeadObj.style.transform = "scale(1.2)"
 
-    BodyObj.style.transformOrigin = "50% 50%"
-    BodyObj.style.transform = "scale(.7)"
+    BodyObj.style.transformOrigin = "50% 90%"
+    BodyObj.style.transform = "scale(.9)"
 
     HeadTranslationContainer.style.transformOrigin = "center"
     HeadTranslationContainer.style.transform = "translate(0,12px)"
@@ -490,6 +490,11 @@ function ProlificIDToSeed(PID){
     return(number.substring(0,4))
 }
 
+const isColor = (strColor) => {
+    const s = new Option().style;
+    s.color = strColor;
+    return s.color !== '';
+}
 
 //DATA FLOW AND STORAGE
 function abbreviate_location_name(long_name){
