@@ -471,9 +471,7 @@ STIMULUSDATA = function(exp_code){
             type: "repeat",
             Rules: SearchPhaseRules_repeat
         })
-
-        console.log(TrainingFennimals)
-        console.log(SearchPhaseSetup)
+        
 
     }
 

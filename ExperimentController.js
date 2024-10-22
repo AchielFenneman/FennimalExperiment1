@@ -100,7 +100,6 @@ DataController = function(){
 
     //Reduces the contents of the test trial to minimize the data stores (lots of internal variables are not needed for further analysis)
     function reduce_trial_data_object(FennimalObj, absolute_minimum){
-        console.log(FennimalObj)
         let Available_Items_Arr = []
         for(let key = 0; key< Object.keys(FennimalObj.ItemResponses).length; key++){
             if(FennimalObj.ItemResponses[Object.keys(FennimalObj.ItemResponses)[key]] !== "unavailable"){
@@ -494,7 +493,6 @@ ExperimentController = function(){
 
             //Populating the world
             populate_world_with_Fennimal(CurrentTrial, current_experiment_stage )
-            console.log(CurrentTrial)
 
             //Clear out the backpack
             item_in_backpack = false

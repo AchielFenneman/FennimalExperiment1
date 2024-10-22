@@ -1942,9 +1942,6 @@ TrialRecallQuestion = function(FennimalObj, All_Fennimal_Names,  returnfunction)
             }
         }
 
-        console.log(Names_Listed)
-        console.log(All_Fennimal_Names)
-
         //Now we have an array of remembered Fennimals. Store these in the FennimalObject
         FennimalObj.remembered_Fennimals = JSON.parse(JSON.stringify(Names_Listed))
 
@@ -2044,8 +2041,7 @@ TrialDescriptionQuestion = function(FennimalObj, returnfunction){
     }
 
     function answer_changed(){
-        console.log(AnswerBox)
-        console.log(AnswerBox.value)
+
         FennimalObj.decision_style = AnswerBox.value
 
         //If there is no continue button yet, then create it
@@ -2089,9 +2085,7 @@ TrialDescriptionQuestion = function(FennimalObj, returnfunction){
 }
 
 OpenQuestionOLD = function(FennimalObj,All_Fennimal_Names, ask_detailed_followup, returnfunction){
-    console.log(All_Fennimal_Names)
-    console.log("STARTING OPEN QUESTION")
-    console.log(FennimalObj)
+
     let that = this
 
     //Create all the SVG elements
@@ -2328,8 +2322,7 @@ OpenQuestionOLD = function(FennimalObj,All_Fennimal_Names, ask_detailed_followup
             }
         }
 
-        console.log(Names_Listed)
-        console.log(All_Fennimal_Names)
+
 
         //Now we have an array of remembered Fennimals. Store these in the FennimalObject
         FennimalObj.remembered_Fennimals = JSON.parse(JSON.stringify(Names_Listed))
