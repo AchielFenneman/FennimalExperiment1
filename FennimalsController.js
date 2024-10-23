@@ -1487,7 +1487,6 @@ FennimalController = function(FennimalObj, LocCont, ExpCont, limited_backpack_it
                 }
             }
         }
-        console.log(Post_interaction_questions)
 
         // Show feedback
         FeedbackCont = new FeedbackController(FennimalObj,Container, true)
@@ -1515,7 +1514,13 @@ FennimalController = function(FennimalObj, LocCont, ExpCont, limited_backpack_it
                     let ConfSlider = new ConfidenceSlider(FennimalObj, that.post_interaction_question_answered )
                     break
                 case("decision_style"):
-                    let DecisionStyleQ = new TrialDescriptionQuestion(FennimalObj,ExpCont.get_all_training_phase_Fennimal_names(), that.post_interaction_question_answered )
+                    let need_to_ask_follow_up_questions = false
+                    if(typeof FennimalObj.TestPhaseRules.ask_follow_up_question !== "undefined"){
+                        if(FennimalObj.TestPhaseRules.ask_follow_up_question){
+                            need_to_ask_follow_up_questions = true
+                        }
+                    }
+                    let DecisionStyleQ = new TrialDescriptionQuestion(FennimalObj,ExpCont.get_all_training_phase_Fennimal_names(),need_to_ask_follow_up_questions, that.post_interaction_question_answered )
                     break
             }
         }
@@ -1784,7 +1789,7 @@ ConfidenceSlider = function(FennimalObj, returnfunction){
     initialize()
 }
 
-TrialDescriptionQuestion = function(FennimalObj, All_Fennimal_Names, returnfunction){
+TrialDescriptionQuestion = function(FennimalObj, All_Fennimal_Names, ask_follow_up, returnfunction){
     let that = this
 
     //Create all the SVG elements
@@ -1888,11 +1893,14 @@ TrialDescriptionQuestion = function(FennimalObj, All_Fennimal_Names, returnfunct
             SVGlayer.style.display = "none"
 
             //If the participant indicated that they had a specific Fennimal in mind, then ask which one.
-            console.log(AnswerBox.value)
-            switch(AnswerBox.value){
-                case("specific"): let TRQ = new TrialRecallQuestion(FennimalObj, All_Fennimal_Names , returnfunction); break
-                case("other"): ask_about_open_strategy(); break
-                case("random"): returnfunction()
+            if(ask_follow_up){
+                switch(AnswerBox.value){
+                    case("specific"): let TRQ = new TrialRecallQuestion(FennimalObj, All_Fennimal_Names , returnfunction); break
+                    case("other"): ask_about_open_strategy(); break
+                    case("random"): returnfunction()
+                }
+            }else{
+                returnfunction()
             }
 
 

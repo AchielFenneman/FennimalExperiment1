@@ -148,7 +148,7 @@ STIMULUSDATA = function(exp_code){
     let TrainingFennimals, SearchPhaseSetup, Item_Details, All_Items
 
     //Given Training and SearchBlock Templates and a number of repeated search phase blocks, sets the TrainingFennimals and the SearchPhaseSetup (defining the experiment)
-    let set_stimuli_for_basic_experiment = function(TrainingTemplates,SearchPhaseBlockTemplates, number_search_blocks, open_question_asked_in_blocks){
+    let set_stimuli_for_basic_experiment = function(TrainingTemplates,SearchPhaseBlockTemplates, number_search_blocks, follow_up_question_asked_in_blocks){
         // If set to true, then the test phase Fennimals have names based on their LOCATION (not region)
         let search_phase_Fennimals_name_based_on_location = false
 
@@ -439,8 +439,8 @@ STIMULUSDATA = function(exp_code){
             //TODO: This is a bit redunant coding...
             let BlockRules = JSON.parse(JSON.stringify(SearchPhaseRules_search))
             let need_to_modify_trial_rules = false
-            if(open_question_asked_in_blocks.includes(blocknum+1)){
-                BlockRules.ask_open_question = true
+            if(follow_up_question_asked_in_blocks.includes(blocknum+1)){
+                BlockRules.ask_follow_up_question = true
                 need_to_modify_trial_rules = true
             }
 
@@ -510,7 +510,7 @@ STIMULUSDATA = function(exp_code){
                 {ID: "distr2", region: "G", head: "D", ItemResponses: {c: "neutral", d: "heart"}, borrowed_tertiary_color: "D"},
             ]
 
-            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3, [1,2,3])
+            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3, [1])
             //SearchPhaseSetup = [SearchPhaseSetup[0]]
             //SearchPhaseSetup = []
 
@@ -537,7 +537,7 @@ STIMULUSDATA = function(exp_code){
                 {ID: "distr2", region: "G", head: "D", ItemResponses: {c: "neutral", d: "heart"}, borrowed_tertiary_color: "D" },
             ]
 
-            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3, [1,2,3])
+            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3, [1])
             //SearchPhaseSetup = [SearchPhaseSetup[0]]
             //SearchPhaseSetup = []
 
@@ -779,4 +779,4 @@ STIMULUSDATA = function(exp_code){
 
 }
 
-
+console.log("NOW")

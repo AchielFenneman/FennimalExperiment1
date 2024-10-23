@@ -223,7 +223,7 @@ ExperimentController = function(){
 
     let ExperimentStages = {
         Instructions: [ "consent", "full_screen_prompt", "payment_info", "basic_instructions"], //"consent", "full_screen_prompt", "payment_info", "basic_instructions"
-        Training: ["exploration", "search_icon", "search_location",  "delivery_icon", "delivery_name", "cardquiz"],  // "exploration", "search_icon", "search_location",  "delivery_icon", "delivery_name", "cardquiz"
+        Training: [ "exploration", "search_icon", "search_location",  "delivery_icon", "delivery_name", "cardquiz"],  // "exploration", "search_icon", "search_location",  "delivery_icon", "delivery_name", "cardquiz"
         Test: [], //Updated on initialization, defined by the Stimuli.
         Questionnaire: ["gender", "age", "colorblindness"], //"open","gender", "age", "colorblindness"
     }
