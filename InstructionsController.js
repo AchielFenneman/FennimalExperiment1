@@ -1663,8 +1663,8 @@ InstructionsController = function(ExpCont, LocCont){
         let Button_IDK = createSVGButtonElem((508-410)/2 + 300,125,120,30,"I don't know")
 
         Button_Yes.onclick = function(){hide_all_instruction_pages(); EC.record_questionnaire_response("colorblindness", "yes")}
-        Button_No.onclick = function(){hide_all_instruction_pages(); EC.record_questionnaire_response("colorblindness", "yes")}
-        Button_IDK.onclick = function(){hide_all_instruction_pages(); EC.record_questionnaire_response("colorblindness", "yes")}
+        Button_No.onclick = function(){hide_all_instruction_pages(); EC.record_questionnaire_response("colorblindness", "no")}
+        Button_IDK.onclick = function(){hide_all_instruction_pages(); EC.record_questionnaire_response("colorblindness", "idk")}
 
         Container.appendChild(Button_Yes)
         Container.appendChild(Button_No)
@@ -2027,15 +2027,23 @@ RecallBoxController = function(Page, ypos, answer_box_height,allow_empty_input,a
 
     //Call when the add answer button is pressed
     function add_answer_button_pressed(){
-        if(!box_active){
-            activate_box()
-        }
 
         let inputval = InputText.value
+        console.log(inputval)
         if(inputval!== ""){
+            if(!box_active){
+                activate_box()
+            }
             answer_added(InputText.value)
             InputText.value = ""
+        }else{
+            if(allow_empty_input){
+                if(!box_active){
+                    activate_box()
+                }
+            }
         }
+
 
     }
 

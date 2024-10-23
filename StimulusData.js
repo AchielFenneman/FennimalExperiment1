@@ -471,7 +471,14 @@ STIMULUSDATA = function(exp_code){
             type: "repeat",
             Rules: SearchPhaseRules_repeat
         })
-        
+
+        let url = new URL(window.location);
+        if(url.searchParams.get("PROLIFIC_PID") === null){
+            console.log(TrainingFennimals)
+            console.log(SearchPhaseSetup)
+        }
+
+
 
     }
 
@@ -503,7 +510,7 @@ STIMULUSDATA = function(exp_code){
                 {ID: "distr2", region: "G", head: "D", ItemResponses: {c: "neutral", d: "heart"}, borrowed_tertiary_color: "D"},
             ]
 
-            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3, [1])
+            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3, [1,2,3])
             //SearchPhaseSetup = [SearchPhaseSetup[0]]
             //SearchPhaseSetup = []
 
@@ -530,7 +537,7 @@ STIMULUSDATA = function(exp_code){
                 {ID: "distr2", region: "G", head: "D", ItemResponses: {c: "neutral", d: "heart"}, borrowed_tertiary_color: "D" },
             ]
 
-            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3, [1])
+            set_stimuli_for_basic_experiment(TrainingTemplates,SearchPhaseBlockTemplates,3, [1,2,3])
             //SearchPhaseSetup = [SearchPhaseSetup[0]]
             //SearchPhaseSetup = []
 

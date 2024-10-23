@@ -155,6 +155,7 @@ DataController = function(){
         if(typeof FennimalObj.confidence_rating !== "undefined") {NewObj.conf = FennimalObj.confidence_rating}
         if(typeof FennimalObj.decision_style !== "undefined") {NewObj.d_style = FennimalObj.decision_style}
         if(typeof FennimalObj.remembered_Fennimals !== "undefined") {NewObj.rem_Fen = FennimalObj.remembered_Fennimals}
+        if(typeof FennimalObj.alt_strategy !== "undefined") {NewObj.alt_strat = FennimalObj.alt_strategy}
 
         return(NewObj)
     }
@@ -202,7 +203,7 @@ DataController = function(){
 ExperimentController = function(){
     let that = this
     let participant_number, Stimuli
-    let experiment_design = "partial_dead_end"
+    let experiment_design = "baseline"
     let retake_quiz_until_perfect = true
     let open_question_special_Fennimal_ID = false // "key" // Set to false to have a general open question. If not set to false, then the open question specificially asks about this Fennimal.
 
@@ -221,7 +222,7 @@ ExperimentController = function(){
     let current_experiment_stage = "starting_instructions"
 
     let ExperimentStages = {
-        Instructions: ["consent", "full_screen_prompt", "payment_info", "basic_instructions" ], //"consent", "full_screen_prompt", "payment_info", "basic_instructions"
+        Instructions: [ "consent", "full_screen_prompt", "payment_info", "basic_instructions"], //"consent", "full_screen_prompt", "payment_info", "basic_instructions"
         Training: ["exploration", "search_icon", "search_location",  "delivery_icon", "delivery_name", "cardquiz"],  // "exploration", "search_icon", "search_location",  "delivery_icon", "delivery_name", "cardquiz"
         Test: [], //Updated on initialization, defined by the Stimuli.
         Questionnaire: ["gender", "age", "colorblindness"], //"open","gender", "age", "colorblindness"
