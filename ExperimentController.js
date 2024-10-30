@@ -185,6 +185,9 @@ DataController = function(){
         DataObj.Timestamps.push(["recalled names complete", Date.now() - experiment_start_time])
         console.log(DataObj)
     }
+    this.get_recalled_Fennimal_names = function(){
+        return(JSON.parse(JSON.stringify(DataObj.RecalledNames)))
+    }
 
 
     //Stores the participant's score
@@ -203,7 +206,7 @@ DataController = function(){
 ExperimentController = function(){
     let that = this
     let participant_number, Stimuli
-    let experiment_design = "baseline"
+    let experiment_design = "partial_dead_end"
     let retake_quiz_until_perfect = true
     let open_question_special_Fennimal_ID = false // "key" // Set to false to have a general open question. If not set to false, then the open question specificially asks about this Fennimal.
 
@@ -223,7 +226,7 @@ ExperimentController = function(){
 
     let ExperimentStages = {
         Instructions: [ "consent", "full_screen_prompt", "payment_info", "basic_instructions"], //"consent", "full_screen_prompt", "payment_info", "basic_instructions"
-        Training: [ "exploration", "search_icon", "search_location",  "delivery_icon", "delivery_name", "cardquiz"],  // "exploration", "search_icon", "search_location",  "delivery_icon", "delivery_name", "cardquiz"
+        Training: ["exploration", "search_icon", "search_location",  "delivery_icon", "delivery_name", "cardquiz"],  // "exploration", "search_icon", "search_location",  "delivery_icon", "delivery_name", "cardquiz"
         Test: [], //Updated on initialization, defined by the Stimuli.
         Questionnaire: ["gender", "age", "colorblindness"], //"open","gender", "age", "colorblindness"
     }
@@ -313,7 +316,7 @@ ExperimentController = function(){
         switch(ExperimentStages.Instructions[0]){
             case("consent"):  InstrCont.show_consent_screen(); break;
             case("full_screen_prompt"): InstrCont.show_fullscreen_prompt(); break;
-            case("payment_info"): InstrCont.show_payment_info(); break
+            case("payment_info"): InstrCont.show_payment_info(get_maximum_number_of_stars_earnable_single_block_setup()); break
             case("basic_instructions"): InstrCont.show_basic_instructions_screen(); break
         }
     }
@@ -678,7 +681,7 @@ ExperimentController = function(){
         current_experiment_stage = "test"
         total_number_of_test_days = JSON.parse(JSON.stringify(ExperimentStages.Test.length))
 
-        InstrCont.show_test_phase_start_instructions(ExperimentStages.Test.length, Stimuli.getAllOutcomesObservedDuringTrainingPhase())
+        InstrCont.show_test_phase_start_instructions(ExperimentStages.Test.length, Stimuli.get_number_of_search_blocks())
         GarbageCleaner.remove_basic_instructions_from_SVG()
 
     }
@@ -697,16 +700,16 @@ ExperimentController = function(){
 
         if(CurrentTestBlockObject.type === "recall_task"){
             RemainingTrialsInBlock = []
-            InstrCont.show_recall_task()
+            InstrCont.show_test_phase_block_instructions(CurrentTestBlockObject.type,false,false, current_test_day_num, total_number_of_test_days,false, true)
 
         }else{
-            RemainingTrialsInBlock = shuffleArray(CurrentTestBlockObject.Trials)
+            RemainingTrialsInBlock = CurrentTestBlockObject.Trials
 
             DC.start_next_block("test_" + CurrentTestBlockObject.type, "test");
             block_hint_type = CurrentTestBlockObject.hint_type
 
             //Showing the block-specific instructions
-            InstrCont.show_test_phase_block_instructions(CurrentTestBlockObject.type,CurrentTestBlockObject.Rules,Stimuli.getAllOutcomesObservedDuringTrainingPhase(), current_test_day_num, total_number_of_test_days)
+            InstrCont.show_test_phase_block_instructions(CurrentTestBlockObject.type,CurrentTestBlockObject.Rules,Stimuli.getAllOutcomesObservedDuringTrainingPhase(), current_test_day_num, total_number_of_test_days,RemainingTrialsInBlock.length, true)
         }
     }
     this.test_phase_block_instructions_read = function(){
@@ -792,7 +795,12 @@ ExperimentController = function(){
         //Use only lower-case for the correct answers
         let IDNames = Stimuli.getObjectOfIDsAndNames()
         for(let key in IDNames){
-            IDNames[key] = IDNames[key].toLowerCase()
+            if(IDNames[key] === false){
+                delete IDNames[key]
+            }else{
+                IDNames[key] = IDNames[key].toLowerCase()
+            }
+
         }
 
         //Now find all the names that where input by the participant.
@@ -907,6 +915,36 @@ ExperimentController = function(){
     //Last page of the experiment: show the payment screen
     let ScoreObject
 
+    //Returns the maximum number of stars that can be earned during the experiment
+    function get_maximum_number_of_stars_earnable_single_block_setup(){
+        if(Stimuli.get_number_of_search_blocks() === 1){
+            let num_stars = 0
+
+            //One star per search-phase Fennimal
+            num_stars = num_stars + Stimuli.get_number_of_search_phase_encounters()
+
+            //A possible perfection bonus
+            if(typeof Param.BonusEarnedPerStar.single_block_perfection_bonus_stars !== "undefined"){
+                if(Param.BonusEarnedPerStar.single_block_perfection_bonus_stars !== false ){
+                    num_stars = num_stars + Param.BonusEarnedPerStar.single_block_perfection_bonus_stars
+                }
+            }
+
+            //One star for each recalled Fennimal name
+            num_stars = num_stars + Stimuli.getTrainingSetFennimalsInArray().length
+
+            //One star for each repeat trial
+            num_stars = num_stars + Stimuli.getTrainingSetFennimalsInArray().length
+
+            return(num_stars)
+
+        }else{
+            console.error("ERROR: PAYMENT NOT DEFINED FOR THIS SEARCH PHASE SETUP")
+            return(0)
+        }
+
+    }
+
     // Creates an object containing all the payment-relevant information for the participants
     function create_score_object(){
         let OutcomeObject = DC.get_test_phase_outcomes()
@@ -990,8 +1028,84 @@ ExperimentController = function(){
         return(ScoreObj)
     }
 
+    function create_score_object_single_search_block(){
+        let OutcomeObject = DC.get_test_phase_outcomes()
+
+        //Determining which names have been recalled (and which ones not)
+        let TrainingPhaseNames = that.get_all_training_phase_Fennimal_names()
+        let RecalledNames = DC.get_recalled_Fennimal_names()
+        let correctly_recalled_IDs = []
+        for(let i=0;i<RecalledNames[0].length;i++){
+            if(RecalledNames[0][i].matchedID !== false){
+                correctly_recalled_IDs.push(RecalledNames[0][i].matchedID)
+            }
+        }
+        correctly_recalled_IDs = [...new Set(correctly_recalled_IDs)]
+
+        let training_names_arr = []
+        for(let key in TrainingPhaseNames){
+            training_names_arr.push(TrainingPhaseNames[key])
+        }
+
+        //Creating a summary of all outcomes
+        // For the search phase: the number of Fennimals encountered, the number of stars earned for Fennimals, wether the perfection bonus was earned, and total stars
+        //  For the recalled names: the total number of Fennimal names, the number of correctly recalled names (=number of stars earned)
+        //  For the repeat trials: the total number of repeat trials, the number of Fennimals which liked their toy (=number of stars earned)
+        //  Total number of stars earned across all blocks
+        let SummaryOutcomes = {
+            search_phase: {
+                total_search_Fennimals: OutcomeObject.test_search_unique.length,
+                stars_earned: OutcomeObject.test_search_unique.filter(item => item === "heart").length,
+                possible_stars: OutcomeObject.test_search_unique.length,
+            },
+            recalled_names: {
+                total_Fennimal_names: training_names_arr.length,
+                correctly_remembered_names: correctly_recalled_IDs.length
+            },
+            repeat_trials:{
+                total_repeat_Fennimals: OutcomeObject.test_repeat.length,
+                stars_earned: OutcomeObject.test_repeat.filter(item => item === "correct").length
+            }
+        }
+
+        //Calculating additional bonus for the search phase
+        if(typeof Param.BonusEarnedPerStar.single_block_perfection_bonus_stars !== "undefined"){
+            if(Param.BonusEarnedPerStar.single_block_perfection_bonus_stars !== false && Param.BonusEarnedPerStar.single_block_perfection_bonus_stars !== 0 ){
+                SummaryOutcomes.search_phase.perfection_bonus_amount = Param.BonusEarnedPerStar.single_block_perfection_bonus_stars
+                SummaryOutcomes.search_phase.possible_stars = SummaryOutcomes.search_phase.possible_stars + SummaryOutcomes.search_phase.perfection_bonus_amount
+
+                if(SummaryOutcomes.search_phase.total_search_Fennimals === SummaryOutcomes.search_phase.stars_earned){
+                    SummaryOutcomes.search_phase.perfection_bonus_earned = true
+                    SummaryOutcomes.search_phase.total_stars_earned = SummaryOutcomes.search_phase.stars_earned + SummaryOutcomes.search_phase.perfection_bonus_amount
+                }else{
+                    SummaryOutcomes.search_phase.perfection_bonus_earned = false
+                    SummaryOutcomes.search_phase.total_stars_earned = SummaryOutcomes.search_phase.stars_earned
+                }
+            }
+        }
+
+        //Calculating total stars earned for the entire experiment
+        SummaryOutcomes.total_stars_earned_in_experiment = SummaryOutcomes.search_phase.total_stars_earned + SummaryOutcomes.recalled_names.correctly_remembered_names + SummaryOutcomes.repeat_trials.stars_earned
+        SummaryOutcomes.total_stars_possible_in_experiment = get_maximum_number_of_stars_earnable_single_block_setup()
+        SummaryOutcomes.USD_per_star = Param.BonusEarnedPerStar.bonus_per_star
+        SummaryOutcomes.USD_earned = (SummaryOutcomes.total_stars_earned_in_experiment * SummaryOutcomes.USD_per_star).toFixed(2)
+
+        //Create a Token / completion code here
+        let cc_word_1 = shuffleArray(["Happy", "Bright", "Clean","Soft", "Funny", "Warm", "Sharp", "Small", "Kind", "Sweet", "Young", "White", "Tall"])[0]
+        let cc_word_2 = shuffleArray(["Cat", "Rabbit", "Owl","Fox","Koala", "Frog", "Shark", "Zebra", "Bat", "Flower", "Panda", "Rose", "Poppy", "Lily", "Tulip"  ])[0]
+        SummaryOutcomes.completion_code = cc_word_1 + cc_word_2 + SummaryOutcomes.total_stars_earned_in_experiment
+        SummaryOutcomes.payment_scheme = "single_block"
+
+        return(SummaryOutcomes)
+    }
+
     function show_payment_screen(){
-        ScoreObject = create_score_object()
+        if(Stimuli.get_number_of_search_blocks() === 1){
+            ScoreObject = create_score_object_single_search_block()
+        }else{
+            ScoreObject = create_score_object()
+        }
+
         DC.storeScoreObject(ScoreObject)
 
         //Tell the DC to update the form

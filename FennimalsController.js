@@ -145,11 +145,16 @@ FeedbackController = function(FennimalObject, FennimalSVGContainer, show_icon_on
 
                     break;
                 case("unknown"):
-                    if(Param.get_used_unique_names().includes(FennimalObject.name) ){
-                        Prompt.show_feedback_message(fennimal_name + " takes the toy to its home", "unknown")
+                    if(FennimalObject.name !== false){
+                        if(Param.get_used_unique_names().includes(FennimalObject.name) ){
+                            Prompt.show_feedback_message(fennimal_name + " takes the " + item_given + " to its home", "unknown")
+                        }else{
+                            Prompt.show_feedback_message("The " + fennimal_name + " takes the " + item_given + " to its home", "unknown")
+                        }
                     }else{
-                        Prompt.show_feedback_message("The " + fennimal_name + " takes the toy to its home", "unknown")
+                        Prompt.show_feedback_message("The new Fennimal takes the " + item_given + " to its home", "unknown")
                     }
+
 
                     break;
                 case("incorrect"):
@@ -1243,7 +1248,6 @@ ItemController = function(FennimalObj,LocCont, FenCont, limited_backpack_item_ar
                 //One item is not unavailable, so find the name
                 let available_item_name = Object.keys(FennimalObj.ItemResponses).find(x=>FennimalObj.ItemResponses[x]!=="unavailable");
 
-
                 if(Param.get_used_unique_names().includes(FennimalObj.name) ){
                     prompt_message = "Give the " + available_item_name + " to " + FennimalObj.name
                 }else{
@@ -1261,11 +1265,16 @@ ItemController = function(FennimalObj,LocCont, FenCont, limited_backpack_item_ar
                     }
 
                 }else{
-                    if(Param.get_used_unique_names().includes(FennimalObj.name) ){
-                        prompt_message = "Give one of the available toys to " + FennimalObj.name
+                    if(FennimalObj.name !== false){
+                        if(Param.get_used_unique_names().includes(FennimalObj.name) ){
+                            prompt_message = "Give one of the available toys to " + FennimalObj.name
+                        }else{
+                            prompt_message = "Give one of the available toys to the " + FennimalObj.name
+                        }
                     }else{
-                        prompt_message = "Give one of the available toys to the " + FennimalObj.name
+                        prompt_message = "Give one of the available toys to the new Fennimal"
                     }
+
 
                 }
             }
@@ -1548,9 +1557,12 @@ FennimalController = function(FennimalObj, LocCont, ExpCont, limited_backpack_it
         if(Param.get_used_unique_names().includes(FennimalObj.name) ){
             Prompt.show_message("This Fennimal is called "+ FennimalObj.name)
         }else{
-            Prompt.show_message("You have found a "+ FennimalObj.name)
+            if(FennimalObj.name !== false){
+                Prompt.show_message("You have found a "+ FennimalObj.name)
+            }else{
+                Prompt.show_message("You have found a new Fennimal!")
+            }
         }
-
 
     }
 
@@ -1668,7 +1680,12 @@ ConfidenceSlider = function(FennimalObj, returnfunction){
     // Shows the question and sets the text
     function showQuestion(){
         SVGlayer.style.display = "inherit"
-        QuestionText.childNodes[1].innerHTML = FennimalObj.name + " will like the " + FennimalObj.selected_item + "?"
+        if(FennimalObj.name !== false){
+            QuestionText.childNodes[1].innerHTML = FennimalObj.name + " will like the " + FennimalObj.selected_item + "?"
+        }else{
+            QuestionText.childNodes[1].innerHTML = "the new Fennimal will like the " + FennimalObj.selected_item + "?"
+        }
+
         BackgroundRect.style.opacity = 0.7
         BackgroundRect.style.transform = "scale(1,1)"
 
@@ -1828,7 +1845,13 @@ TrialDescriptionQuestion = function(FennimalObj, All_Fennimal_Names, ask_follow_
     //Create the elements (question text, dropdown menu and continue button)
     function createElements(){
         //Creating the question title
-        Title = createTextField(30, 100, 508-2*30,100, "Which of the following <b>best</b> describes your decision to give the " +  FennimalObj.selected_item + " to the " + FennimalObj.name + "?")
+        let titletext
+        if(FennimalObj.name !== false){
+            titletext = "Which of the following <b>best</b> describes your reason to give the " +  FennimalObj.selected_item + " to the " + FennimalObj.name + "?"
+        }else{
+            titletext = "Which of the following <b>best</b> describes your reason to give the " +  FennimalObj.selected_item + " to the new Fennimal?"
+        }
+        Title = createTextField(30, 100, 508-2*30,100, titletext)
         Title.style.fontSize = "15px"
         Title.style.textAlign = "center"
         //Title.style.letterSpacing = "-.25px"
@@ -1914,7 +1937,14 @@ TrialDescriptionQuestion = function(FennimalObj, All_Fennimal_Names, ask_follow_
         BackgroundRect.style.transform = "scale(1.2,.9)"
 
         setTimeout(function(){
-            let NewTitle = createTextField(30, 45, 508-2*30,200, "How did you decide to give the " + FennimalObj.selected_item + " to the " + FennimalObj.name + "?")
+            let titletext
+            if(FennimalObj.name !== false){
+                titletext = "How did you decide to give the " + FennimalObj.selected_item + " to the " + FennimalObj.name + "?"
+            }else{
+                titletext = "How did you decide to give the " + FennimalObj.selected_item + " to the new Fennimal?"
+            }
+
+            let NewTitle = createTextField(30, 45, 508-2*30,200, titletext)
             NewTitle.style.fontSize = "15px"
             NewTitle.style.textAlign = "center"
             NewTitle.style.fontWeight = "bold"
@@ -1924,9 +1954,18 @@ TrialDescriptionQuestion = function(FennimalObj, All_Fennimal_Names, ask_follow_
             SVGlayer.appendChild(NewTitle)
 
             //Adding the instructions
-            let InstructionText = createTextField(50, 70, 508-2*30,200, "Please write why you decided to give the " +
+            let instruction_text
+            if(FennimalObj !== false){
+                instruction_text = "Please write why you decided to give the " +
                 FennimalObj.selected_item  + " to the " + FennimalObj.name + ". " +
-                "After you have finished, you can click on the 'Done' button to continue. <br>  <u> (If you have previously already described your strategy, then you can leave this empty!)</u> ")
+                "After you have finished, you can click on the 'Done' button to continue. <br>  <u> (If you have previously already described your strategy, then you can leave this empty!)</u> "
+
+            }else{
+                instruction_text = "Please write why you decided to give the " +
+                    FennimalObj.selected_item  + " to the new Fennimal." +
+                    "After you have finished, you can click on the 'Done' button to continue. <br>  <u> (If you have previously already described your strategy, then you can leave this empty!)</u> "
+            }
+            let InstructionText = createTextField(50, 70, 508-2*30,200, instruction_text)
             InstructionText.style.fontStyle = "italic"
             InstructionText.style.fontSize = "12px"
 
@@ -1998,7 +2037,13 @@ TrialRecallQuestion = function(FennimalObj, All_Fennimal_Names,  returnfunction)
         BackgroundRect.style.transform = "scale(1.23,.95)"
 
         setTimeout(function(){
-            let NewTitle = createTextField(30, 40, 508-2*30,100, "Which Fennimal(s) did you have in mind when you gave the " +  FennimalObj.selected_item + " to the " + FennimalObj.name + "?")
+            let titletext
+            if(FennimalObj.name !== false){
+                titletext = "Which Fennimal(s) did you have in mind when you gave the " +  FennimalObj.selected_item + " to the " + FennimalObj.name + "?"
+            }else{
+                titletext = "Which Fennimal(s) did you have in mind when you gave the " +  FennimalObj.selected_item + " to the new Fennimal?"
+            }
+            let NewTitle = createTextField(30, 40, 508-2*30,100, titletext )
             NewTitle.style.fontSize = "15px"
             NewTitle.style.textAlign = "center"
             NewTitle.style.fontWeight = "bold"
@@ -2008,11 +2053,21 @@ TrialRecallQuestion = function(FennimalObj, All_Fennimal_Names,  returnfunction)
             SVGlayer.appendChild(NewTitle)
 
             //Adding the instructions
-            let InstructionText = createTextField(20, 80, 508-2*20,200, "Please write down the names of any Fennimals you thought about when you decided to give the " +
-                FennimalObj.selected_item  + " to the " + FennimalObj.name + ". If you remembered multiple Fennimals, then please write down all their names. <br> " +
-                "<i>You can enter a name by typing in the box and clicking on the 'Add' button. " +
-                "If you made a mistake, you can click on <span style='color:firebrick'> [x] </span> to remove an answer. " +
-                "If you have entered all the Fennimals you thought about, then you can click on the 'Done' button to continue (you will not be able to return after pressing the button!) </i>")
+            let instruction_text
+            if(FennimalObj.name !== false){
+                instruction_text = "Please write down the names of any Fennimals you thought about when you decided to give the " +
+                    FennimalObj.selected_item  + " to the " + FennimalObj.name + ". If you remembered multiple Fennimals, then please write down all their names. <br> " +
+                    "<i>You can enter a name by typing in the box and clicking on the 'Add' button. " +
+                    "If you made a mistake, you can click on <span style='color:firebrick'> [x] </span> to remove an answer. " +
+                    "If you have entered all the Fennimals you thought about, then you can click on the 'Done' button to continue (you will not be able to return after pressing the button!) </i>"
+            }else{
+                instruction_text = "Please write down the names of any Fennimals you thought about when you decided to give the " +
+                    FennimalObj.selected_item  + " to the new Fennimal. If you remembered multiple Fennimals, then please write down all their names. <br> " +
+                    "<i>You can enter a name by typing in the box and clicking on the 'Add' button. " +
+                    "If you made a mistake, you can click on <span style='color:firebrick'> [x] </span> to remove an answer. " +
+                    "If you have entered all the Fennimals you thought about, then you can click on the 'Done' button to continue (you will not be able to return after pressing the button!) </i>"
+            }
+            let InstructionText = createTextField(20, 80, 508-2*20,200, instruction_text)
             //InstructionText.style.fontStyle = "italic"
             InstructionText.style.fontSize = "12px"
 
@@ -2116,6 +2171,7 @@ TrialRecallQuestion = function(FennimalObj, All_Fennimal_Names,  returnfunction)
         },500)
 
     }
+
 
     ask_thought_about_Fennimals()
 
@@ -2260,9 +2316,17 @@ OpenQuestionOLD = function(FennimalObj,All_Fennimal_Names, ask_detailed_followup
             SVGlayer.appendChild(NewTitle)
 
             //Adding the instructions
-            let InstructionText = createTextField(50, 58, 508-2*30,200, "Please write why you decided to give the " +
-                FennimalObj.selected_item  + " to the " + FennimalObj.name + ". <br> " +
-                "After you have finished, you can click on the 'Done' button to continue (you will not be able to return after pressing the button!) ")
+            let instructions_text
+            if(FennimalObj.name !== false){
+                instructions_text = "Please write why you decided to give the " +
+                    FennimalObj.selected_item  + " to the " + FennimalObj.name + ". <br> " +
+                    "After you have finished, you can click on the 'Done' button to continue (you will not be able to return after pressing the button!) "
+            }else{
+                instructions_text = "Please write why you decided to give the " +
+                    FennimalObj.selected_item  + " to the new Fennimal. <br> " +
+                    "After you have finished, you can click on the 'Done' button to continue (you will not be able to return after pressing the button!) "
+            }
+            let InstructionText = createTextField(50, 58, 508-2*30,200, instructions_text)
             InstructionText.style.fontStyle = "italic"
             InstructionText.style.fontSize = "12px"
 

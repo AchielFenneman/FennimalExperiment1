@@ -1054,8 +1054,10 @@ ParameterObject = function() {
     //The bonus earned per star. If set to false, then no bonus is mentioned throughout the instructions
     this.BonusEarnedPerStar = {
         currency_symbol: "$",
-        bonus_per_star: "0.20"
+        bonus_per_star: "0.07",
+        single_block_perfection_bonus_stars: 3
     }
+
 
     this.flashlight_radius = 50
     this.flashlight_target_sensitivity = 50

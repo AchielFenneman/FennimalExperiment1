@@ -161,6 +161,26 @@ svg{
     opacity: 0;
 }
 
+.instruction_icon {
+    transform-origin: center;
+}
+.instruction_icon_box {
+    stroke: dimgray;
+    stroke-width: 1px;
+}
+.test_phase_instruction_block_text  {
+    font-size: 12px !important;
+    text-align: left;
+
+
+}
+.test_phase_instruction_block_text p {
+
+
+    margin: 0 auto;
+    padding: 0
+}
+
 /* Seach and delivery */
 .Fennimal_Search_Target {
     display: none
@@ -455,7 +475,11 @@ foreignObject {
     fill:white;
     stroke: gray;
     transition: all 1s ease-in-out;
-
+}
+.score_box {
+    opacity: 0;
+    display: none;
+    transition: all 500ms ease-in-out;
 }
 
 @keyframes score_star_achieved_animation {

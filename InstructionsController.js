@@ -171,7 +171,7 @@ InstructionsController = function(ExpCont, LocCont){
     }
 
     //Brief details on payment and duration
-    this.show_payment_info = function(){
+    this.show_payment_info = function(maximum_possible_stars){
         //Create the instructions page with the title and text
         showNewInstructionsPage()
 
@@ -181,10 +181,11 @@ InstructionsController = function(ExpCont, LocCont){
         SVG_references.Layer.style.display = "inherit"
 
         Container.appendChild(createInstructionTitleElem("DURATION AND PAYMENT"))
-        Container.appendChild(createTextField(30, 80, 508-2*30,250, "This experiment is expected to last around 30-35 minutes. <br>" +
+        Container.appendChild(createTextField(30, 80, 508-2*30,250, "This experiment is expected to last around 25 minutes. <br>" +
             "<br>" +
-            "Based on your decisions in the last part of the experiment you can earn up to six stars for your performance. " +
-            "You will earn a bonus of " + Param.BonusEarnedPerStar.currency_symbol+ Param.BonusEarnedPerStar.bonus_per_star + " per star that you obtain. <br>" ))
+            "Based on your decisions in the last part of the experiment you can earn up to " + maximum_possible_stars + " stars for your performance. " +
+            "You will earn a bonus of " + Param.BonusEarnedPerStar.currency_symbol+ Param.BonusEarnedPerStar.bonus_per_star + " per star that you obtain. <br>" +
+            "Therefore, you can earn a maximum bonus of " + Param.BonusEarnedPerStar.currency_symbol + (maximum_possible_stars * Param.BonusEarnedPerStar.bonus_per_star).toFixed(2) + " during this experiment. This will be paid on top of your renumeration for completing the experiment." ))
 
         let Button = createSVGButtonElem((508-150)/2,245,160,30,"CONTINUE")
         Button.onclick = function(){
@@ -1194,41 +1195,93 @@ InstructionsController = function(ExpCont, LocCont){
 
     //TEST PHASE
     //////////////
-    this.show_test_phase_start_instructions = function(total_number_of_test_phase_days, array_of_observed_outcomes){
+    let currently_viewing_test_phase_instructions_for_the_first_time = true, current_test_phase_day_number, total_number_of_test_phase_days, current_test_phase_block_type, number_of_trials_in_block
+
+    function hide_all_instruction_icons(){
+        //Hide all the icons
+        let AllInstructionIcons = document.getElementsByClassName("instruction_icon")
+        for(let i =0;i<AllInstructionIcons.length;i++){
+            AllInstructionIcons[i].style.display = "none"
+        }
+
+    }
+
+    function show_search_trials_instructions(){
         hide_all_instruction_pages()
         showNewInstructionsPage()
+        show_test_phase_instructions_counter(current_test_phase_day_number, total_number_of_test_phase_days)
+
+        hide_all_instruction_icons()
+
         SVG_references.Layer.style.display = "inherit"
 
         //Creating the container to hold all elements
         let Container = createInstructionContainer()
         SVG_references.Layer.appendChild(Container)
         Container.appendChild(createBackgroundElem())
-        Container.appendChild(createInstructionTitleElem("BASIC TRAINING COMPLETED!"))
 
-        let instruction_text = "Congratulations! You have passed the quiz and now completed your basic training. You're almost an Expert Wildlife ranger, but first you need to complete " + total_number_of_test_phase_days + " days of practical experience. <br>" +
-        "<br>" +
-        "A new group of Fennimals have recently been spotted all over the island. Your task is to visit these new Fennimals and give them a toy that they may like. You have to rely on your past experience to select toys for these Fennimals. " +
-            "<b> As a tip: similar Fennimals like the same toys.  </b> <br><br>" +
-            "After you complete your practical experience you will automatically receive the title of Expert. " +
-            "In addition, you can earn up to 5 stars, based on how well the Fennimals liked their interactions with you during this practical experience. Therefore, your earnings for this experiment depend on your performance on this part of the task! "
+        //Specific for this day
+        Container.appendChild(createInstructionTitleElem("Day 1: New Fennimals spotted!"));
+        let NewFennimalIcon = document.getElementById("instruction_icon_new_Fennimals")
+        NewFennimalIcon.style.transform = "translate(35px,55px)"
+        NewFennimalIcon.style.display = "inherit"
+        let TextField_NewF = createTextField(65, 32, 425,45, number_of_trials_in_block + " new Fennimals have been spotted at various locations on the island! " +
+            "Your task is to visit each of these Fennimals and give them a toy which they may like. " +
+            "You have to rely on your past experience to select toys for these Fennimals." +
+            "<b> As a tip: similar Fennimals will like the same toys. </b>" )
+        TextField_NewF.classList.add("test_phase_instruction_block_text")
+        Container.appendChild(TextField_NewF)
 
-        let TextField = createTextField(30, 35, 508-2*30,200, instruction_text)
-        TextField.style.fontSize = "12px"
-        TextField.style.textAlign = "left"
-        Container.appendChild(TextField)
+        let StarsIcon1 = document.getElementById("instruction_icon_star")
+        StarsIcon1.style.transform = "translate(35px,100px)"
+        StarsIcon1.style.display = "inherit"
+        let TextField_Stars1 = createTextField(65, 80, 425,35, "You will earn a <b><span style='color: darkgoldenrod'>Star</span> </b> for each Fennimal who likes the given toy.<br> " +
+            "On top of those stars, you will earn an additional <b> <span style='color: darkgoldenrod'> "+Param.BonusEarnedPerStar.single_block_perfection_bonus_stars + " Stars</span>  </b> if <u>all "+ number_of_trials_in_block + " </u> Fennimals like their toys! " )
+        TextField_Stars1.classList.add("test_phase_instruction_block_text")
+        Container.appendChild(TextField_Stars1)
 
+        let NotAvailableIcon = document.getElementById("instruction_icon_toy_not_available")
+        NotAvailableIcon.style.transform = "translate(35px,140px)"
+        NotAvailableIcon.style.display = "inherit"
+        let TextField_NotAvail = createTextField(65, 120, 425,35,  "Not all toys may be available. If the toy you want to give a Fennimal is not available, then think back of the other Fennimals you've previously encountered - what toys did they like?" )
+        TextField_NotAvail.classList.add("test_phase_instruction_block_text")
+        Container.appendChild(TextField_NotAvail)
 
-        let Button = createSVGButtonElem((508-150)/2,230,150,30,"CONTINUE")
+        let AlikeNotSameIcon = document.getElementById("instruction_icon_alike_not_same")
+        AlikeNotSameIcon.style.transform = "translate(35px,180px)"
+        AlikeNotSameIcon.style.display = "inherit"
+        let TextField_AlikeNotSame = createTextField(65, 165, 425,35,  "Each new Fennimal you encounter is a different and separate Fennimal - even if they look alike! " )
+        TextField_AlikeNotSame.classList.add("test_phase_instruction_block_text")
+        Container.appendChild(TextField_AlikeNotSame)
+
+        let UnknownFeedbackIcon = document.getElementById("instruction_icon_unknown_feedback")
+        UnknownFeedbackIcon.style.transform = "translate(35px,220px)"
+        UnknownFeedbackIcon.style.display = "inherit"
+        let TextField_UnknownFeedback = createTextField(65, 200, 425,35,  "These new Fennimals are a bit shy. After you give them a toy, they will take the toy to their homes and inspect them there. <br>" +
+            "You will only find out whether they liked the toy at the end of the experiment! " )
+        TextField_UnknownFeedback.classList.add("test_phase_instruction_block_text")
+        Container.appendChild(TextField_UnknownFeedback)
+
+        let Button = createSVGButtonElem((508-150)/2,250,150,25,"CONTINUE")
         Container.appendChild(Button)
         Button.onclick = function(){
             hide_all_instruction_pages()
-            ExpCont.test_phase_starting_instructions_read()}
+            if(currently_viewing_test_phase_instructions_for_the_first_time){
+                currently_viewing_test_phase_instructions_for_the_first_time = false
+                ExpCont.test_phase_block_instructions_read()
+            }else{
+                show_current_search_trial_instructions()
+            }
+        }
 
     }
-    this.show_test_phase_block_instructions = function(block_type,Rules,array_of_observed_outcomes, current_day_number, total_number_of_days){
+    function show_recall_names_instructions(){
         hide_all_instruction_pages()
         showNewInstructionsPage()
-        show_test_phase_instructions_counter(current_day_number, total_number_of_days)
+        show_test_phase_instructions_counter(current_test_phase_day_number, total_number_of_test_phase_days)
+
+        hide_all_instruction_icons()
+
         SVG_references.Layer.style.display = "inherit"
 
         //Creating the container to hold all elements
@@ -1236,90 +1289,104 @@ InstructionsController = function(ExpCont, LocCont){
         SVG_references.Layer.appendChild(Container)
         Container.appendChild(createBackgroundElem())
 
-        //Figure out if there are negative outcomes in this experiment
-        let negative_outcomes_observed = (array_of_observed_outcomes.includes("frown") || array_of_observed_outcomes.includes("bites") )
+        Container.appendChild(createInstructionTitleElem("Day 2: remembering names."));
 
-        let some_items_unavailable = false
-        if(typeof Rules.cued_item_allowed !== "undefined"){
-            if(! Rules.cued_item_allowed){
-                some_items_unavailable = true
+        let NameIcon = document.getElementById("instruction_icon_remember_name")
+        NameIcon.style.transform = "translate(35px,75px)"
+        NameIcon.style.display = "inherit"
+        let TextField_Name = createTextField(65, 57, 425,35, "Today we will switch things up. Do you still remember the names of the Fennimals you encountered during your training period? " +
+            "On the next page you will be asked to write down the names of these Fennimals <br>"  )
+        TextField_Name.classList.add("test_phase_instruction_block_text")
+        Container.appendChild(TextField_Name)
+
+        let StarsIcon = document.getElementById("instruction_icon_star")
+        StarsIcon.style.transform = "translate(35px,115px)"
+        StarsIcon.style.display = "inherit"
+        let TextField_Stars = createTextField(65, 97, 425,35, "You will earn one <b><span style='color: darkgoldenrod'>Star</span> </b> for each name you remember. " )
+        TextField_Stars.classList.add("test_phase_instruction_block_text")
+        Container.appendChild(TextField_Stars)
+
+        let Button = createSVGButtonElem((508-150)/2,250,150,25,"CONTINUE")
+        Container.appendChild(Button)
+        Button.onclick = function(){
+            hide_all_instruction_pages()
+            show_recall_page()
+        }
+
+    }
+    function show_repeat_trials_instructions(){
+        hide_all_instruction_pages()
+        showNewInstructionsPage()
+        show_test_phase_instructions_counter(current_test_phase_day_number, total_number_of_test_phase_days)
+
+        hide_all_instruction_icons()
+
+        SVG_references.Layer.style.display = "inherit"
+
+        //Creating the container to hold all elements
+        let Container = createInstructionContainer()
+        SVG_references.Layer.appendChild(Container)
+        Container.appendChild(createBackgroundElem())
+
+        Container.appendChild(createInstructionTitleElem("Day 3: Visiting some old friends"));
+
+        let TopText = createTextField(20, 27, 425,55, "The practical experience portion of your training is nearly over. In the meantime, the original Fennimals from your training period are starting to miss you. Time to pay a visit to your old friends! Do you still remember which toys these Fennimals liked?"  )
+        TopText.classList.add("test_phase_instruction_block_text")
+        Container.appendChild(TopText)
+
+        let RepeatIcon = document.getElementById("instruction_icon_remember_toy")
+        RepeatIcon.style.transform = "translate(35px,115px)"
+        RepeatIcon.style.display = "inherit"
+        let TextField_Name = createTextField(65, 97, 425,35, "Visit each of these Fennimals and give them the toy <b>that you've previously given them. This can be a toy which the Fennimal previously did not like! "  )
+        TextField_Name.classList.add("test_phase_instruction_block_text")
+        Container.appendChild(TextField_Name)
+
+        let StarsIcon = document.getElementById("instruction_icon_star")
+        StarsIcon.style.transform = "translate(35px,155px)"
+        StarsIcon.style.display = "inherit"
+        let TextField_Stars = createTextField(65, 137, 425,35, "You will earn one <b><span style='color: darkgoldenrod'>Star</span> </b> for each time you give the Fennimal the same toy as you have previously given it during your training period." )
+        TextField_Stars.classList.add("test_phase_instruction_block_text")
+        Container.appendChild(TextField_Stars)
+
+        let UnknownFeedbackIcon = document.getElementById("instruction_icon_unknown_feedback")
+        UnknownFeedbackIcon.style.transform = "translate(35px,195px)"
+        UnknownFeedbackIcon.style.display = "inherit"
+        let TextField_UnknownFeedback = createTextField(65, 177, 425,35,  "Since you last saw them, these Fennimals have gotten a bit shy. After you give them a toy, they will take the toy to their homes and inspect them there. " +
+            "You will only find out whether you gave them the correct toy at the end of the experiment!" )
+        TextField_UnknownFeedback.classList.add("test_phase_instruction_block_text")
+        Container.appendChild(TextField_UnknownFeedback)
+
+        let Button = createSVGButtonElem((508-150)/2,250,150,25,"CONTINUE")
+        Container.appendChild(Button)
+        Button.onclick = function(){
+            hide_all_instruction_pages()
+            if(currently_viewing_test_phase_instructions_for_the_first_time){
+                currently_viewing_test_phase_instructions_for_the_first_time = false
+                ExpCont.test_phase_block_instructions_read()
+            }else{
+                show_current_search_trial_instructions()
             }
         }
-        if(typeof Rules.search_item_allowed !== "undefined"){
-            if(! Rules.search_item_allowed){
-                some_items_unavailable = true
-            }
-        }
 
-        let hidden_feedback = false
-        if(typeof Rules.hidden_feedback !== "undefined"){
-            hidden_feedback = Rules.hidden_feedback
-        }
+    }
 
-        let text = ""
-
-        switch (block_type){
+    function show_test_phase_instruction_screen(){
+        switch(current_test_phase_block_type){
+            case("search_unique"):
+                show_search_trials_instructions()
+                break;
+            case("recall_task"):
+                show_recall_names_instructions()
+                break;
             case("repeat"):
-                Container.appendChild(createInstructionTitleElem("Visiting some old friends"));
-
-                text = "The original Fennimals from your training period are starting to miss you. Time to pay a visit to your old friends! " +
-                    "Do you still remember which toys these Fennimals liked? <br><br>" +
-                    "Visit each of these Fennimals and give them the toy <b>that you've previously given them</b>. "
-
-                if(negative_outcomes_observed){
-                    text = text + "(This can be a toy which the Fennimal did not like!)."
-                }
-
-                if(some_items_unavailable){
-                    text = text + "<br><br>" +
-                        "Not all toys may be available. If the toy you want to give a Fennimal is not available, then think back of the other Fennimals you've previously encountered - what toys did they like?"
-                }
-
-                text = text + "<br><br>"
-
-                if(hidden_feedback){
-                    text = text + "Since you last saw them, these Fennimals have gotten a bit shy. After you give them a toy, they will take the toy to their homes and inspect them there. " +
-                        "You will only find out whether they liked the toy at the end of the experiment! <br><br> "
-                }
-                break;
-            case("search"):
-                Container.appendChild(createInstructionTitleElem("New Fennimals spotted!"));
-                text = "New Fennimals have been spotted on various locations on the island! " +
-                    "Visit each of these Fennimals and give them a toy which they may like. " +
-                    "You can apply your previously learned knowledge to select a fitting toy for these Fennimals. <br><br>" +
-                    "You will <span style='color: green'>earn Stars</span>  if these new Fennimals like the toy you give to them. "
-
-                if(negative_outcomes_observed){
-                    text = text + "However, your Star-rating will be <span style='color: firebrick'>decreased </span> if these new Fennimals do not like the toys you give to them. "
-                }
-
-                text = text + "<br><br>"
-
-                if(some_items_unavailable){
-                    text = text + "Not all toys may be available. If the toy you want to give a Fennimal is not available, then think back of the other Fennimals you've previously encountered - what toys did they like?"
-                }
-
-                if(hidden_feedback){
-                    text = text + "These new Fennimals are a bit shy. After you give them a toy, they will take the toy to their homes and inspect them there. " +
-                        "You will only find out whether they liked the toy at the end of the experiment! <br><br> "
-                }
+                show_repeat_trials_instructions()
                 break;
 
         }
-
-        //The contents are based on the Rules provided
-        let TextField = createTextField(30, 35, 508-2*30,200, text)
-        TextField.style.fontSize = "12px"
-        TextField.style.textAlign = "left"
-        Container.appendChild(TextField)
-
-        let Button = createSVGButtonElem((508-150)/2,230,150,30,"CONTINUE")
-        Container.appendChild(Button)
-        Button.onclick = function(){
-            hide_all_instruction_pages()
-            ExpCont.test_phase_block_instructions_read()}
     }
-    this.show_test_phase_trial_instructions = function(FennimalObj, block_type, hint_type){
+
+
+    function show_current_search_trial_instructions(){
         let Page = SVG_references.Pages.Test_Target
         deleteClassNamesFromElement(Page, "instruction_container")
         showNewInstructionsPage()
@@ -1338,15 +1405,15 @@ InstructionsController = function(ExpCont, LocCont){
 
         //Setting the hint
         let text
-        if(hint_type === "location"){
-            if(block_type === "repeat_training"){
-                text = "An old friend has been spotted at " + Param.SubjectFacingLocationNames[FennimalObj.location]
+        if(current_hint_type === "location"){
+            if(current_test_phase_block_type === "repeat_training"){
+                text = "An old friend has been spotted at " + Param.SubjectFacingLocationNames[CurrentTrial.location]
                 let LocationText = createTextField((508/2)-200, 150, 400,55, text)
                 LocationText.style.fontSize = "20px"
                 LocationText.style.textAlign = "center"
                 Container.appendChild(LocationText)
             }else{
-                text = "A new Fennimal has been spotted at " + Param.SubjectFacingLocationNames[FennimalObj.location]
+                text = "A new Fennimal has been spotted at " + Param.SubjectFacingLocationNames[CurrentTrial.location]
                 let LocationText = createTextField((508/2)-200, 150, 400,55, text)
                 LocationText.style.fontSize = "20px"
                 LocationText.style.textAlign = "center"
@@ -1354,13 +1421,159 @@ InstructionsController = function(ExpCont, LocCont){
             }
         }
 
-        if(hint_type === "icon"){
-            Container.appendChild(createFennimalIcon(FennimalObj,150, 120,0.4,false, true))
+        if(current_hint_type === "icon"){
+            Container.appendChild(createFennimalIcon(CurrentTrial,150, 120,0.4,false, true))
         }
 
-        let ContinueButton = createSVGButtonElem((508-150)/2,245,150,30,"Go to the map")
+        let ContinueButton = createSVGButtonElem(325,240,150,30,"Go to the map")
         Container.appendChild(ContinueButton)
         ContinueButton.onclick = block_instructions_page_closed
+
+        let InstructionsButton = createSVGButtonElem(27,240,150,30,"See instructions")
+        Container.appendChild(InstructionsButton)
+        InstructionsButton.onclick = show_test_phase_instruction_screen
+
+    }
+
+    this.show_test_phase_start_instructions = function(total_number_of_test_phase_days, number_of_search_blocks){
+        hide_all_instruction_pages()
+        showNewInstructionsPage()
+        SVG_references.Layer.style.display = "inherit"
+
+        //Creating the container to hold all elements
+        let Container = createInstructionContainer()
+        SVG_references.Layer.appendChild(Container)
+        Container.appendChild(createBackgroundElem())
+        Container.appendChild(createInstructionTitleElem("BASIC TRAINING COMPLETED!"))
+
+        //The instruction text depends on the number of search blocks.
+        let instruction_text
+        if(number_of_search_blocks === 1){
+            instruction_text = "Congratulations! You have passed the quiz and now completed your basic training. You're almost an Expert Wildlife ranger, but first you need to complete " + total_number_of_test_phase_days + " days of practical experience. <br>" +
+                "<br>" +
+                "<b>During each of these days you can earn a number of bonus stars.</b> Therefore, your earnings for this experiment depend on your performance on this part of the task! Please read the instructions for each day carefully. <br>" +
+                "<br>"+
+                "You will only learn how many bonus stars you have earned at the end of the experiment. After you complete your practical experience you will automatically receive the title of Expert - and learn your score for this experiment. "
+
+        }else{
+            instruction_text = "Congratulations! You have passed the quiz and now completed your basic training. You're almost an Expert Wildlife ranger, but first you need to complete " + total_number_of_test_phase_days + " days of practical experience. <br>" +
+                "<br>" +
+                "A new group of Fennimals have recently been spotted all over the island. Your task is to visit these new Fennimals and give them a toy that they may like. You have to rely on your past experience to select toys for these Fennimals. " +
+                "<b> As a tip: similar Fennimals like the same toys.  </b> <br><br>" +
+                "After you complete your practical experience you will automatically receive the title of Expert. " +
+                "In addition, you can earn up to 5 stars, based on how well the Fennimals liked their interactions with you during this practical experience. Therefore, your earnings for this experiment depend on your performance on this part of the task! "
+        }
+
+        let TextField = createTextField(30, 35, 508-2*30,200, instruction_text)
+        TextField.style.fontSize = "12px"
+        TextField.style.textAlign = "left"
+        Container.appendChild(TextField)
+
+
+        let Button = createSVGButtonElem((508-150)/2,230,150,30,"CONTINUE")
+        Container.appendChild(Button)
+        Button.onclick = function(){
+            hide_all_instruction_pages()
+            ExpCont.test_phase_starting_instructions_read()}
+
+    }
+    this.show_test_phase_block_instructions = function(block_type,Rules,array_of_observed_outcomes, current_day_number, total_number_of_days,trials_in_block, first_time_showing){
+        current_test_phase_day_number = current_day_number
+        total_number_of_test_phase_days = total_number_of_days
+        currently_viewing_test_phase_instructions_for_the_first_time = first_time_showing
+        current_test_phase_block_type = block_type
+        number_of_trials_in_block = trials_in_block
+
+        //OLD, PREVIOUSLY USED FOR VARAIBLE INSTRUCTIONS
+        /*
+        let negative_outcomes_observed
+        if(array_of_observed_outcomes !== false){
+            negative_outcomes_observed = (array_of_observed_outcomes.includes("frown") || array_of_observed_outcomes.includes("bites") )
+        }
+
+        let some_items_unavailable = false
+        if(Rules !== false){
+            if(typeof Rules.cued_item_allowed !== "undefined"){
+                if(! Rules.cued_item_allowed){
+                    some_items_unavailable = true
+                }
+            }
+            if(typeof Rules.search_item_allowed !== "undefined"){
+                if(! Rules.search_item_allowed){
+                    some_items_unavailable = true
+                }
+            }
+        }
+
+
+        let hidden_feedback = false
+        if(typeof Rules.hidden_feedback !== "undefined"){
+            hidden_feedback = Rules.hidden_feedback
+        }
+
+         */
+
+        show_test_phase_instruction_screen()
+
+
+        switch (block_type){
+            case("repeat"):
+
+
+                break;
+            case("search"):
+                /*
+                Container.appendChild(createInstructionTitleElem("New Fennimals spotted!"));
+                text = "New Fennimals have been spotted at various locations on the island! " +
+                    "Visit each of these Fennimals and give them a toy which they may like. " +
+                    "You can apply your previously learned knowledge to select a fitting toy for these Fennimals. <br><br>" +
+                    "You will <span style='color: green'>earn Stars</span>  if these new Fennimals like the toy you give to them. "
+
+                if(negative_outcomes_observed){
+                    text = text + "However, your Star-rating will be <span style='color: firebrick'>decreased </span> if these new Fennimals do not like the toys you give to them. "
+                }
+
+                text = text + "<br><br>"
+
+                if(some_items_unavailable){
+                    text = text + "Not all toys may be available. If the toy you want to give a Fennimal is not available, then think back of the other Fennimals you've previously encountered - what toys did they like?"
+                }
+
+                if(hidden_feedback){
+                    text = text + "These new Fennimals are a bit shy. After you give them a toy, they will take the toy to their homes and inspect them there. " +
+                        "You will only find out whether they liked the toy at the end of the experiment! <br><br> "
+                }
+
+                let TextField_search = createTextField(30, 32, 508-2*30,250, text)
+                TextField_search.style.fontSize = "12px"
+                TextField_search.style.textAlign = "left"
+                Container.appendChild(TextField_search)
+
+                let Button_search = createSVGButtonElem((508-150)/2,250,150,25,"CONTINUE")
+                Container.appendChild(Button_search)
+                Button_search.onclick = function(){
+                    hide_all_instruction_pages()
+                    ExpCont.test_phase_block_instructions_read()}
+
+
+                 */
+                break;
+            case("search_unique"):
+
+
+                break;
+            case("recall_task"):
+
+                break;
+
+        }
+
+
+    }
+    this.show_test_phase_trial_instructions = function(FennimalObj, block_type, hint_type){
+        CurrentTrial = FennimalObj
+        current_hint_type = hint_type
+        show_current_search_trial_instructions()
 
     }
 
@@ -1399,8 +1612,9 @@ InstructionsController = function(ExpCont, LocCont){
         let w = (Number(LastBox.getAttribute("x")) + Number( LastBox.getAttribute("width")) )- x
         if(w<wmin){w=wmin}
 
-        document.getElementById("test_phase_day_display_box").setAttribute("x",x - box_inner_margin)
-        document.getElementById("test_phase_day_display_box").setAttribute("width",w + 2 * box_inner_margin)
+        let DisplayBox = document.getElementById("test_phase_day_display_box")
+        DisplayBox.setAttribute("x",x - box_inner_margin)
+        DisplayBox.setAttribute("width",w + 2 * box_inner_margin)
 
         //Setting all boxes to invisible
         for(let i = 1; i<11; i++){
@@ -1438,10 +1652,47 @@ InstructionsController = function(ExpCont, LocCont){
         let shift_amount = (pagewidth - highest_x_side) - box_side_screen_margin
         document.getElementById("test_phase_day_counter").style.transform = "translate(" + shift_amount + "px, 0)"
 
+        //Recentering the text
+        let TextObj = document.getElementById("test_phase_day_counter_days_left_text")
+        let BBox_TextObj = TextObj.getBBox()
+        let BBox_DisplayBox = DisplayBox.getBBox()
+        let text_target_x = (BBox_DisplayBox.x + 0.5 * BBox_DisplayBox.width) - (0.5 * BBox_TextObj.width)
+        let shift_x = text_target_x- BBox_TextObj.x
+
+        TextObj.style.transform = "translate(" + shift_x.toFixed(0) + "px, 0)"
     }
 
-    this.show_recall_task = function(){
-        show_recall_page()
+
+    function show_recall_page(){
+        hide_all_instruction_pages()
+        showNewInstructionsPage()
+        SVG_references.Layer.style.display = "inherit"
+
+        let Page = createInstructionContainer()
+        SVG_references.Layer.appendChild(Page)
+
+        //Now we need to hide the map (don't want to provide accidental hints)
+        document.getElementById("instructions_mask").style.opacity = 1
+
+        //Retrieving the rules from the expcont
+        let Rules = ExpCont.get_recall_question_bonus_rules()
+
+        let errorplural = "s"
+        if(Rules.allowed_errors === 1){ errorplural = ""}
+
+
+        let text = "Please list all the names of the training phase Fennimals that you remember. You will earn one <b><span style='color: darkgoldenrod'>Star</span> </b> for each name you remember<br>" +
+            "<br> " +
+            "<i>You can enter a name by typing in the box and clicking on the 'Add' button. " +
+            "If you made a mistake, you can click on <span style='color:firebrick'> [x] </span> to remove an answer. " +
+            "If you have listed all the names you remember, then you can click on the 'Done' button to continue (you will not be able to return after pressing the button!) <br>"
+
+        let TextObj = createTextField(50, 20, 508-2*50,100, text)
+        TextObj.style.fontSize = "11px"
+        Page.appendChild(TextObj)
+
+        let RBC =  new RecallBoxController(Page, 110, 100, false,true, "I do <span style='color: darkred'> not </span> remember any Fennimals", EC.recall_task_completed)
+
     }
 
     //QUESTIONNAIRE
@@ -1487,42 +1738,7 @@ InstructionsController = function(ExpCont, LocCont){
         }
     }
 
-    function show_recall_page(){
-        hide_all_instruction_pages()
-        showNewInstructionsPage()
-        SVG_references.Layer.style.display = "inherit"
 
-        let Page = createInstructionContainer()
-        SVG_references.Layer.appendChild(Page)
-
-        //Now we need to hide the map (don't want to provide accidental hints)
-        document.getElementById("instructions_mask").style.opacity = 1
-
-        //Retrieving the rules from the expcont
-        let Rules = ExpCont.get_recall_question_bonus_rules()
-
-        let errorplural = "s"
-        if(Rules.allowed_errors === 1){ errorplural = ""}
-
-
-
-        let text = "Today we will switch things up. Do you still remember the names of the Fennimals you encountered during your training period? " +
-            "Please list all the names that you remember below <br>" +
-            "<br> " +
-            "<i>You can enter a name by typing in the box and clicking on the 'Add' button. " +
-            "If you made a mistake, you can click on <span style='color:firebrick'> [x] </span> to remove an answer. " +
-            "If you think you have listed all names, then you can click on the 'Done' button to continue (you will not be able to return after pressing the button!) <br>" +
-            "Each incorrect answer or for each Fennimal that you could not name count as errors." +
-            " <b>You will earn a bonus star if you do not make more than " +  Rules.allowed_errors + " error" + errorplural + "</b> " +
-            "(Repeated names do not count as errors. The names are not case-sensitve, but watch out for typos!) </i> "
-
-        let TextObj = createTextField(30, 12, 508-2*30,100, text)
-        TextObj.style.fontSize = "11px"
-        Page.appendChild(TextObj)
-
-        let RBC =  new RecallBoxController(Page, 120, 90, false,true, "I do <span style='color: darkred'> not </span> remember any Fennimals", EC.recall_task_completed)
-
-    }
 
     function show_questionnaire_gender(){
         hide_all_instruction_pages()
@@ -1672,12 +1888,105 @@ InstructionsController = function(ExpCont, LocCont){
     }
 
     let ScoreObj
-    this.show_payment_screen = function(ScoreObject){
+    function show_payment_screen_single_search_block(RewardSummary){
+        console.log(RewardSummary)
+        ScoreObj = RewardSummary
+
+        let Container = createInstructionContainer()
+        SVG_references.Layer.appendChild(Container)
+        SVG_references.Pages.Finished.style.display = "inherit"
+
+        //Adding the title and text
+        Container.appendChild(createInstructionTitleElem("You are now an Expert Wildlife Ranger!"))
+        Container.appendChild(createTextField(30, 35, 508-2*30,50, "During the three days of practical experience, you earned the following bonus stars:"))
+
+        let delay = 500
+
+        setTimeout(function(){
+            //Changing the values of the boxes
+            document.getElementById("score_star_first_day_number").childNodes[0].innerHTML = "x " + RewardSummary.search_phase.total_stars_earned
+            document.getElementById("score_star_first_day_total").childNodes[0].innerHTML = "out of " + RewardSummary.search_phase.possible_stars
+
+            //Setting the box to visible
+            document.getElementById("score_box_first_day").style.display = "inherit"
+            document.getElementById("score_box_first_day").style.opacity = 1
+        },delay)
+
+        setTimeout(function(){
+            //Changing the values of the boxes
+            document.getElementById("score_star_second_day_number").childNodes[0].innerHTML = "x " + RewardSummary.recalled_names.correctly_remembered_names
+            document.getElementById("score_star_second_day_total").childNodes[0].innerHTML = "out of " + RewardSummary.recalled_names.total_Fennimal_names
+
+            //Setting the box to visible
+            document.getElementById("score_box_second_day").style.display = "inherit"
+            document.getElementById("score_box_second_day").style.opacity = 1
+        },2 * delay)
+
+        setTimeout(function(){
+            //Changing the values of the boxes
+            document.getElementById("score_star_third_day_number").childNodes[0].innerHTML = "x " + RewardSummary.repeat_trials.stars_earned
+            document.getElementById("score_star_third_day_total").childNodes[0].innerHTML = "out of " + RewardSummary.repeat_trials.total_repeat_Fennimals
+
+            //Setting the box to visible
+            document.getElementById("score_box_third_day").style.display = "inherit"
+            document.getElementById("score_box_third_day").style.opacity = 1
+        },3 * delay)
+
+        setTimeout(function(){
+            //Changing the values of the boxes
+            document.getElementById("score_star_total_number").childNodes[0].innerHTML = "x " + RewardSummary.total_stars_earned_in_experiment
+            document.getElementById("score_star_total_total").childNodes[0].innerHTML = "out of " + RewardSummary.total_stars_possible_in_experiment
+
+            //Setting the box to visible
+            document.getElementById("score_box_total").style.display = "inherit"
+            document.getElementById("score_box_total").style.opacity = 1
+        },4.5 * delay)
+
+        setTimeout(function(){
+            let text = "On the first day, " + RewardSummary.search_phase.total_stars_earned + " out of " + RewardSummary.search_phase.total_search_Fennimals + " Fennimals liked the toy you gave them. "
+            if(RewardSummary.search_phase.perfection_bonus_earned){
+                text = text + "You therefore earned an additional " + RewardSummary.search_phase.perfection_bonus_amount + " extra stars."
+            }else{
+                text = text + "You therefore unfortunately did not collected the " + RewardSummary.search_phase.perfection_bonus_amount + " extra stars."
+            }
+
+            text = text + "<br>" +
+                "On the second day, you correctly wrote down the names of " + RewardSummary.recalled_names.correctly_remembered_names + " out of the " + RewardSummary.recalled_names.total_Fennimal_names + " original Fennimals. <br>" +
+                "On the third day, you gave the correct toy to " + RewardSummary.repeat_trials.stars_earned + " out of the " + RewardSummary.repeat_trials.total_repeat_Fennimals + " original Fennimals. <br>" +
+                "<br>" +
+                "In total, you therefore earned " + RewardSummary.total_stars_earned_in_experiment + " bonus stars during the experiment! "
+
+            Container.appendChild(createTextField(30, 120, 508-2*30,100, text))
+
+            //Creating a button at the end
+            let Button = createSVGButtonElem((508-150)/2,245,160,30,"Continue")
+            Button.onclick = show_completion_code
+            Container.appendChild(Button)
+
+
+        }, 6 * delay)
+
+
+
+
+
+
+
+
+
+
+
+    }
+    function show_payment_screen_old(){
         ScoreObj = ScoreObject
+        console.log(ScoreObject)
+
         hide_all_instruction_pages()
         showNewInstructionsPage()
         SVG_references.Layer.style.display = "inherit"
 
+        let SVGStarElem = document.getElementById("score_star")
+        console.log(SVGStarElem)
 
         let Container = createInstructionContainer()
         SVG_references.Layer.appendChild(Container)
@@ -1820,6 +2129,23 @@ InstructionsController = function(ExpCont, LocCont){
         Container.appendChild(Button)
     }
 
+    this.show_payment_screen = function(ScoreObject){
+        hide_all_instruction_pages()
+        showNewInstructionsPage()
+        SVG_references.Layer.style.display = "inherit"
+
+        if(typeof ScoreObject.payment_scheme !== "undefined"){
+            if(ScoreObject.payment_scheme === "single_block"){
+                show_payment_screen_single_search_block(ScoreObject)
+            }else{
+                show_payment_screen_old(ScoreObject)
+            }
+        }else{
+            show_payment_screen_old(ScoreObject)
+        }
+
+    }
+
     function show_completion_code(){
         hide_all_instruction_pages()
         showNewInstructionsPage()
@@ -1831,12 +2157,12 @@ InstructionsController = function(ExpCont, LocCont){
         Container.appendChild(createInstructionTitleElem("Experiment finished!"))
 
         let text = "You have now completed the experiment. "
-        if(ScoreObj.total_stars > 0){
+        if(ScoreObj.total_stars_earned_in_experiment  > 0){
             let plural = "s"
-            if(ScoreObj.total_stars === 1) { plural = ""}
+            if(ScoreObj.total_stars_earned_in_experiment  === 1) { plural = ""}
 
-            text = text + "Because you obtained " + ScoreObj.total_stars+ " star" + plural + ", you have earned a bonus of " +
-                Param.BonusEarnedPerStar.currency_symbol + (Param.BonusEarnedPerStar.bonus_per_star * ScoreObj.total_stars).toFixed(2)
+            text = text + "Because each star is worth "+ Param.BonusEarnedPerStar.currency_symbol +  ScoreObj.USD_per_star +  ", and you earned  " + ScoreObj.total_stars_earned_in_experiment+ " star" + plural + ", you have earned a bonus of " +
+                Param.BonusEarnedPerStar.currency_symbol + ScoreObj.USD_earned
         }
 
         text = text + "<br><br> Do NOT close or refresh this window before submitting your code to Prolific. Your completion code is: <b> " + ScoreObj.completion_code + " </b>. <br><br>" +
@@ -1844,10 +2170,7 @@ InstructionsController = function(ExpCont, LocCont){
 
 
         //Set the text to the screen
-        Container.appendChild(createTextField(30, 120, 508-2*30,500, text))
-
-        //Modify the position of the stars
-        //document.getElementById("instructions_finished").style.transform = "translate(0px,-70px)"
+        Container.appendChild(createTextField(30, 70, 508-2*30,500, text))
 
 
         //Creating a button at the end
@@ -1964,6 +2287,17 @@ RecallBoxController = function(Page, ypos, answer_box_height,allow_empty_input,a
         InputText.maxLength = max_input_length
         InputText.placeholder = "Enter name here"
         InputText.classList.add("recall_input_line")
+        InputText.addEventListener("keyup", function(event){
+            if(event.key === "Enter"){
+                add_answer_button_pressed()
+            }else{
+                if(InputText.value === ""){
+                    ContinueButton.style.display = "inherit"
+                }else{
+                    ContinueButton.style.display = "none"
+                }
+            }
+        })
         ForObjInput.appendChild(InputText)
 
         InputButton = createSVGButtonElem(Dims.InputButton.x, Dims.InputButton.y, Dims.InputButton.w, Dims.InputButton.h, "Add")
@@ -2165,6 +2499,11 @@ RecallBoxController = function(Page, ypos, answer_box_height,allow_empty_input,a
             RemovableElements[i].remove()
         }
         RemovableElements = []
+    }
+
+    //Check for enter key pressed on the input
+    let check_for_enter_pressed = function(e){
+        console.log(e)
     }
     initialize_elements()
 
