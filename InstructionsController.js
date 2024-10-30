@@ -1943,7 +1943,7 @@ InstructionsController = function(ExpCont, LocCont){
         },4.5 * delay)
 
         setTimeout(function(){
-            let text = "On the first day, " + RewardSummary.search_phase.total_stars_earned + " out of " + RewardSummary.search_phase.total_search_Fennimals + " Fennimals liked the toy you gave them. "
+            let text = "On the first day, " + RewardSummary.search_phase.stars_earned + " out of " + RewardSummary.search_phase.total_search_Fennimals + " Fennimals liked the toy you gave them. "
             if(RewardSummary.search_phase.perfection_bonus_earned){
                 text = text + "You therefore earned an additional " + RewardSummary.search_phase.perfection_bonus_amount + " extra stars."
             }else{
