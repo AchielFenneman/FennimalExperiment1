@@ -206,7 +206,7 @@ DataController = function(){
 ExperimentController = function(){
     let that = this
     let participant_number, Stimuli
-    let experiment_design = "partial_dead_end"
+    let experiment_design = "baseline"
     let retake_quiz_until_perfect = true
     let open_question_special_Fennimal_ID = false // "key" // Set to false to have a general open question. If not set to false, then the open question specificially asks about this Fennimal.
 
