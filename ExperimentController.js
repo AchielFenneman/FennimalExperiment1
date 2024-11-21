@@ -206,7 +206,10 @@ DataController = function(){
 ExperimentController = function(){
     let that = this
     let participant_number, Stimuli
-    let experiment_design = "baseline"
+
+    // HERE WE DEFINE THE SETUP OF THE EXPERIMENT. If an array is provided, then one is selected at random
+    let experiment_design = ["baseline", "partial_dead_end"]
+
     let retake_quiz_until_perfect = true
     let open_question_special_Fennimal_ID = false // "key" // Set to false to have a general open question. If not set to false, then the open question specificially asks about this Fennimal.
 
@@ -257,7 +260,7 @@ ExperimentController = function(){
 
     }
 
-    // Call to initialize all subcontrollers and supporting objects
+    // Call to initialize all subcontrollers and supporting objects. If the experiment design is an array, then this is also where we randomly sample a single design.
     function initialize_experiment(){
         //Retrieving the participant number
         set_participant_number()
@@ -266,6 +269,10 @@ ExperimentController = function(){
         RNG = new RandomNumberGenerator(participant_number)
 
         //Create the stimulus data object
+        if(typeof experiment_design !== "string"){
+            experiment_design = shuffleArray(["baseline", "partial_dead_end"])[0]
+            console.log("Sampled design: " +  experiment_design)
+        }
         Stimuli = new STIMULUSDATA(experiment_design)
 
         //Create a garbage cleaner
