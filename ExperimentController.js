@@ -1150,3 +1150,5 @@ let EC = new ExperimentController()
 //      ALL names based on location? (retrieval stage)
 //      Hide answers during retrieval?
 //      Collapse test trials to region
+
+console.log(".....")
