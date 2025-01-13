@@ -25,7 +25,7 @@ body > svg{
     display: flex;
     justify-content: center;
     align-items: center;
-    max-width: 500px;
+    max-width: 1600px;
 }
 #top_frame{
     display: inherit;
