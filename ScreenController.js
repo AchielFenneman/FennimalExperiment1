@@ -1739,6 +1739,7 @@ ScreenController = function(ExpCont, PromptCont){
             }
 
             if(CurrentTrial.qtype === "items"){
+                CollectedData.perspective = "items"
                 //Check if the correct number of items have been selected. If so, check if the correct items themselves have been selected.
                 let correct = false
                 if(CollectedData.selected_toys_used_Fennimal.length === CurrentTrial.correct_answer.length){

@@ -23,7 +23,7 @@ ParameterObject = function() {
                 " This island is home to a wide variety of smart and friendly animals called <b>Fennimals</b>. " +
                 "These Fennimals are unique to Fenneland and are unlike any other creatures. <br>" +
                 "<br>" +
-                "During this experiment, you be a caretaker for these Fennimals. " +
+                "During this experiment, you will be a caretaker for these Fennimals. " +
                 "The Fennimals on this island love playing with toys, but are very particular about which toys they like. " +
                 "They are also very chaotic, and are prone to losing their favorite toy. " +
                 "It will be your task to hold on to these toys on behalf of the Fennimals. <br>" +

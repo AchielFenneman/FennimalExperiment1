@@ -191,7 +191,8 @@ StimulusData = function(RNG){
         let Q = {
             qtype: "items",
             correct_answer: [PublicInformationTrials[i].NewItem.name],
-            Fennimal: Fen
+            Fennimal: Fen,
+            trial_type: PublicInformationTrials[i].trial_type
         }
         QuestionBlockFennimalItems.push(Q)
     }
@@ -204,6 +205,7 @@ StimulusData = function(RNG){
             let Q = {
                 qtype: "items",
                 Fennimal: NewFen,
+                trial_type: PrivateInformationTrials[i].trial_type
             }
 
             if(Pairs_Used_In_Experiment[i] === "dissimilar-incongruent"){
@@ -229,7 +231,6 @@ StimulusData = function(RNG){
     ////////////////////////////////////
     //Now we can create all the blocks. This will be an array of objects
     let ExperimentBlocks = []
-
 
 
     //ExperimentBlocks.push({

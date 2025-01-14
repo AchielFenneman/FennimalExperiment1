@@ -196,5 +196,4 @@ ExperimentController = function(){
 
 let RNG
 let ExpCont = new ExperimentController()
-
-console.log("A")
+console.log("C")
