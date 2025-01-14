@@ -1,7 +1,7 @@
 ExperimentController = function(){
     //Defining mean time predictions and payment variables
     let TimeAndEarnings = {
-        predicted_time: 20,
+        predicted_time: 25,
         bonus_currency_symbol: "$",
         bonus_per_correct_answer: 0.10,
     }
