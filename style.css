@@ -423,10 +423,15 @@ body > svg{
 
 
 .button_item_rect_inactive{
-    fill: lightgray;
+    fill: #dddddd;
+}
+.button_item_rect_selected{
+    fill: steelblue;
+    stroke: red;
+    stroke-width: 4px;
 }
 .button_item_rect_active {
-    fill: skyblue;
+    fill: steelblue;
 }
 .partner_question_mark {
     fill:white;

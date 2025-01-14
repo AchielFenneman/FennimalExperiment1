@@ -149,7 +149,7 @@ StimulusData = function(RNG){
         let correct_answer_other
         let trialtype = Pairs_Used_In_Experiment[pairnum]
 
-        if(trialtype === "dissimilar_incongruent" || trialtype === "similar_incongruent"){
+        if(trialtype === "dissimilar-incongruent" || trialtype === "similar-incongruent"){
             correct_answer_self = PrivateInformationTrials[pairnum].NewItem.name
             correct_answer_other = PublicInformationTrials[pairnum].NewItem.name
         }else{
@@ -181,14 +181,56 @@ StimulusData = function(RNG){
 
     }
 
+    //Creating some more questions. Here the participants will see a Fennimal and are asked to state which toys this Fennimal liked (either giving a single answer, or multiple answers depending on design).
+    let QuestionBlockFennimalItems = []
+    //First we collect a list of all Fennimals and what they like. We do this by first going through the public trials. Then add the new Fennimals AND new items in the private trials
+    for(let i =0; i<PublicInformationTrials.length;i++){
+        let Fen = JSON.parse(JSON.stringify(PublicInformationTrials[i].Fennimal))
+        Fen.type = Pairs_Used_In_Experiment[i]
+
+        let Q = {
+            qtype: "items",
+            correct_answer: [PublicInformationTrials[i].NewItem.name],
+            Fennimal: Fen
+        }
+        QuestionBlockFennimalItems.push(Q)
+    }
+    //Adding the information from the private trials
+    for(let i =0;i<PrivateInformationTrials.length;i++){
+        //If its is a dissimilar trial, then there is a new Fennimal.
+        if(Pairs_Used_In_Experiment[i] === "dissimilar-incongruent" || Pairs_Used_In_Experiment[i] === "dissimilar-congruent" ){
+            let NewFen = JSON.parse(JSON.stringify(PrivateInformationTrials[i].Fennimal))
+            NewFen.type = Pairs_Used_In_Experiment[i]
+            let Q = {
+                qtype: "items",
+                Fennimal: NewFen,
+            }
+
+            if(Pairs_Used_In_Experiment[i] === "dissimilar-incongruent"){
+                Q.correct_answer = [PrivateInformationTrials[i].NewItem.name]
+            }else{
+                Q.correct_answer = [PublicInformationTrials[i].NewItem.name]
+            }
+            QuestionBlockFennimalItems.push(Q)
+        }
+
+        // If it is a similar incongruent trial, then the previous Fennimal (on location i) likes a new toy!
+        if(Pairs_Used_In_Experiment[i] === "similar-incongruent" ){
+            QuestionBlockFennimalItems[i].correct_answer.push(PrivateInformationTrials[i].NewItem.name)
+        }
+    }
+
+
     //Questions trials will start with the other-questions (random order), followed by the true state (random order)
-    let QuestionTrials = [shuffleArray(JSON.parse(JSON.stringify(QuestionBlockOther))),shuffleArray(JSON.parse(JSON.stringify(QuestionBlockSelf)))].flat()
+    let QuestionTrials = [ shuffleArray(JSON.parse(JSON.stringify(QuestionBlockOther))),shuffleArray(JSON.parse(JSON.stringify(QuestionBlockSelf))), shuffleArray(JSON.parse(JSON.stringify(QuestionBlockFennimalItems)))].flat()
     //let QuestionTrials = [shuffleArray(JSON.parse(JSON.stringify(QuestionBlockOther)))].flat()
 
     // COMPILING ALL THE BLOCKS HERE
     ////////////////////////////////////
     //Now we can create all the blocks. This will be an array of objects
     let ExperimentBlocks = []
+
+
 
     //ExperimentBlocks.push({
     //    block_type: "consent",

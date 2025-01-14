@@ -2,7 +2,7 @@
 
 
 
-TrialController = function(box_name,array_all_boxes_used_in_exp,array_all_toys_to_pick_from, FenObj, ItemAlreadyInBox, NewItemByFennimal, showPartner, PromptCont, ScreenController, special_trial){
+TrialController = function(box_name,array_all_boxes_used_in_exp,array_all_toys_to_pick_from, FenObj, ItemAlreadyInBox, NewItemByFennimal, showPartner, PromptCont, ScreenController, special_trial, AdditionalInfo){
     // Special trial:
     //      If set to false, then a normal trial occurs (used for the private and public parts).
     //      "repeat" is a repeated trial (with or without partner). These trials are shorter, and assume that there is an item in the box, but no new item given.
@@ -31,11 +31,11 @@ TrialController = function(box_name,array_all_boxes_used_in_exp,array_all_toys_t
         step_time = 1200; break
         case("measure_partner"): animation_step_arr = ["show_Fennimal_partner_and_box", "move_partner_for_question", "ask_partner_item_in_box", "revert_object_positions", "fade_out"]; break
         case("measure_self"): animation_step_arr = ["show_Fennimal_and_box","move_box_for_question", "ask_self_item_in_box", "revert_object_positions", "fade_out"]; break
+        case("items"): animation_step_arr = ["show_Fennimal_center_for_question","ask_which_items_liked", "fade_out"]; break
     }
 
     //This object will contain all the to-be-stored data collected throughout a trial. Everything stored here will be automatically transfered and saved.
     let CollectedData = {}
-
 
     let BoxFront, BoxBack, BoxLid
     let box_is_open = false
@@ -77,6 +77,22 @@ TrialController = function(box_name,array_all_boxes_used_in_exp,array_all_toys_t
     let SVG_layer = document.getElementById("items")
     let Partner_layer = document.getElementById("boxes_partner")
     let QuestionBox_layer = document.getElementById("question_box_layer")
+
+    //The parameters for the question box (x and w are dynamically set on creation)
+
+    let QuestionBox_BaseDimensions =  {
+        y: 202,
+        h:55,
+        min_number_of_element_space: 6,
+        single_element_width: 62.5
+    }
+    let QuestionBox_ItemQuestionDimensions =  {
+        y: 190,
+        h:55,
+        min_number_of_element_space: 6,
+        single_element_width: 62.5
+    }
+
 
     //We need to wrap each item into multiple groups to facilitate animations and movements across the screen
     //TODO If I ever build on this pilot, this needs to be cleaned up at some point...
@@ -138,6 +154,7 @@ TrialController = function(box_name,array_all_boxes_used_in_exp,array_all_toys_t
                 case("show_partner"): show_partner(); break;
                 case("show_box"): show_box(); break;
                 case("show_Fennimal"):show_Fennimal(); break
+                case("show_Fennimal_center_for_question"):show_Fennimal_center_for_question(); break
                 case("show_Fennimal_and_box"): show_Fennimal_and_box(); break
                 case("show_Fennimal_partner_and_box"): show_Fennimal_partner_and_box(); break
 
@@ -167,6 +184,8 @@ TrialController = function(box_name,array_all_boxes_used_in_exp,array_all_toys_t
                 case("place_new"): move_item_from_Fennimal_into_box(); break;
                 case("place_old"): return_item_from_Fennimal_back_to_box(); break
                 case("discard"): discard_item_in_box(); break
+
+                case("ask_which_items_liked"): ask_which_toys_liked_by_Fennimal(); break
 
                 case("fade_out"): fade_out(); break
             }
@@ -201,7 +220,6 @@ TrialController = function(box_name,array_all_boxes_used_in_exp,array_all_toys_t
             //ShownFennimalHeadObj.classList.remove("focus_element")
             start_next_interaction_step()
         },step_time)
-
 
     }
 
@@ -497,13 +515,13 @@ TrialController = function(box_name,array_all_boxes_used_in_exp,array_all_toys_t
         //After a brief delay for the animations, show the answer buttons
         setTimeout(function(){
             //Show the prompt question
-            create_question_box(array_all_toys_to_pick_from.length)
+            create_question_box(array_all_toys_to_pick_from.length, QuestionBox_BaseDimensions)
 
             //Create buttons
             type_of_question_currently_being_waited_for = "measure_partner"
             ButtonControllerArr = []
             for(let button_num =0; button_num< array_all_toys_to_pick_from.length; button_num++){
-                ButtonControllerArr.push(new QuestionItemButton(QuestionBoxContainerElem, array_all_toys_to_pick_from[button_num], that))
+                ButtonControllerArr.push(new QuestionItemButton(QuestionBoxContainerElem, array_all_toys_to_pick_from[button_num], that, false))
             }
         },500)
 
@@ -534,13 +552,13 @@ TrialController = function(box_name,array_all_boxes_used_in_exp,array_all_toys_t
         //After a brief delay for the animations, show the answer buttons
         setTimeout(function(){
             //Show the prompt question
-            create_question_box(array_all_toys_to_pick_from.length)
+            create_question_box(array_all_toys_to_pick_from.length,  QuestionBox_BaseDimensions)
 
             //Create buttons
             type_of_question_currently_being_waited_for = "measure_self"
             ButtonControllerArr = []
             for(let button_num =0; button_num< array_all_toys_to_pick_from.length; button_num++){
-                ButtonControllerArr.push(new QuestionItemButton(QuestionBoxContainerElem, array_all_toys_to_pick_from[button_num], that))
+                ButtonControllerArr.push(new QuestionItemButton(QuestionBoxContainerElem, array_all_toys_to_pick_from[button_num], that, false))
             }
         },500)
 
@@ -590,6 +608,7 @@ TrialController = function(box_name,array_all_boxes_used_in_exp,array_all_toys_t
     }
 
     //BOX SELECTION QUESTION
+    ///////////////////////////
     function ask_select_box(){
         CollectedData.question_box_mistake_count = 0
         CollectedData.question_box_mistakes = []
@@ -600,7 +619,7 @@ TrialController = function(box_name,array_all_boxes_used_in_exp,array_all_toys_t
             PromptCont.show_message("Which box contains this Fennimal's toy?")
         }
 
-        create_question_box(array_all_boxes_used_in_exp.length)
+        create_question_box(array_all_boxes_used_in_exp.length,  QuestionBox_BaseDimensions)
 
         //Create buttons
         ButtonControllerArr = []
@@ -610,23 +629,17 @@ TrialController = function(box_name,array_all_boxes_used_in_exp,array_all_toys_t
 
     }
 
-    function create_question_box(number_of_buttons){
-        let min_number_of_element_space = 6
-
+    function create_question_box(number_of_buttons, Dimensions){
         //Create a new element to hold all the buttons and icons
         ButtonQuestionElem = document.createElementNS("http://www.w3.org/2000/svg", 'g')
         QuestionBox_layer.appendChild(ButtonQuestionElem)
         QuestionBox_layer.style.display = "inherit"
 
-        //Defines the dims of the foreign element (which contains all the buttons)
-        let ForeignElemDimensions = {
-            y: 202,
-            w: 62.5 * Math.max(number_of_buttons, min_number_of_element_space),
-            h:55,
-        }
-        ForeignElemDimensions.x = 0.5*(508-ForeignElemDimensions.w)
+        //Setting the x and w
+        Dimensions.w =  Dimensions.single_element_width * Math.max(number_of_buttons, Dimensions.min_number_of_element_space)
+        Dimensions.x = 0.5*(508-Dimensions.w)
 
-        ButtonQuestionForeignElem = createNSElemWithDims('http://www.w3.org/2000/svg',"foreignObject",  ForeignElemDimensions.x, ForeignElemDimensions.y, ForeignElemDimensions.w, ForeignElemDimensions.h)
+        ButtonQuestionForeignElem = createNSElemWithDims('http://www.w3.org/2000/svg',"foreignObject",  Dimensions.x, Dimensions.y, Dimensions.w, Dimensions.h)
         ButtonQuestionForeignElem.classList.add("box_question_foreign")
         ButtonQuestionElem.appendChild(ButtonQuestionForeignElem)
 
@@ -685,6 +698,7 @@ TrialController = function(box_name,array_all_boxes_used_in_exp,array_all_toys_t
     }
 
     //ITEM SELECTION QUESTION
+    ////////////////////////////
     let  type_of_question_currently_being_waited_for
     function ask_item_in_box(){
         CollectedData.question_toy_in_box_error_count = 0
@@ -693,12 +707,12 @@ TrialController = function(box_name,array_all_boxes_used_in_exp,array_all_toys_t
 
         //Show the prompt question
         PromptCont.show_message( "Which toy is in the " + box_description + "?")
-        create_question_box(array_all_toys_to_pick_from.length)
+        create_question_box(array_all_toys_to_pick_from.length,  QuestionBox_BaseDimensions)
 
         //Create buttons
         ButtonControllerArr = []
         for(let button_num =0; button_num< array_all_toys_to_pick_from.length; button_num++){
-            ButtonControllerArr.push(new QuestionItemButton(QuestionBoxContainerElem, array_all_toys_to_pick_from[button_num], that))
+            ButtonControllerArr.push(new QuestionItemButton(QuestionBoxContainerElem, array_all_toys_to_pick_from[button_num], that, false))
             //ButtonControllerArr.push(new QuestionBoxButton(QuestionBoxContainerElem, array_all_boxes_used_in_exp[button_num], that))
         }
     }
@@ -747,9 +761,95 @@ TrialController = function(box_name,array_all_boxes_used_in_exp,array_all_toys_t
             start_next_interaction_step()
         }
 
+        if(type_of_question_currently_being_waited_for === "select_toys_used_by_Fennimal"){
+            //Check if the button was previously already pressed
+            if(Question_WhichToysFennimal_Selected.includes(answer_given)){
+                //Remove it from the array
+                Question_WhichToysFennimal_Selected = Question_WhichToysFennimal_Selected.filter(function(e) { return e !== answer_given })
+            }else{
+                //Add it to the array
+                Question_WhichToysFennimal_Selected.push(answer_given)
+
+            }
+
+            //Check the array length. If no items selected, then remove the continue button. Else, show the button
+            if(Question_WhichToysFennimal_Selected.length > 0){
+                Question_WhichToysFennimal_ConfirmButton.style.display = "inherit"
+            }else{
+                Question_WhichToysFennimal_ConfirmButton.style.display = "none"
+            }
+
+        }
+
 
     }
     //Open the box (no clicking required)
+
+    // QUESTION WHICH TOYS LIKED BY FENNIMAL
+    //////////////////////////////////////////
+    function show_Fennimal_center_for_question(){
+        if(typeof FenObj.name !=="undefined"){
+            PromptCont.show_message( "Do you remember "+ FenObj.name +"?")
+        }else{
+            PromptCont.show_message("Do you remember this Fennimal?")
+        }
+
+        show_Fennimal_on_screen()
+
+        //Move the Fennimal to the center of the screen.
+        FennimalOnScreen.rescale(0.8)
+        FennimalOnScreen.move_to_coords(508/2, 285/2 + 20 )
+
+
+        //Continue to the next step
+        setTimeout(function(){
+            //ShownFennimalBodyObj.classList.remove("focus_element")
+            //ShownFennimalHeadObj.classList.remove("focus_element")
+            start_next_interaction_step()
+        },step_time)
+
+    }
+
+    let Question_WhichToysFennimal_Selected, Question_WhichToysFennimal_ConfirmButton
+    function ask_which_toys_liked_by_Fennimal(){
+        if(typeof FenObj.name !=="undefined"){
+            PromptCont.show_message( "Which toy(s) did you see "+ FenObj.name +" play with? (multiple answers possible)")
+        }else{
+            PromptCont.show_message("Which toy(s) did you see this Fennimal play with? (multiple answers possible)")
+        }
+
+        type_of_question_currently_being_waited_for = "select_toys_used_by_Fennimal"
+        //For these questions, participants can potentially select multiple items. Therefore, we need a modification to the normal buttons.
+        // In particular, we need to keep track of which icons are selected by the participant (and highlight them as feedback).
+        // Then, instead of continuing once an icon has been pressed, we need to create a separate continue button.
+        create_question_box(array_all_toys_to_pick_from.length,  QuestionBox_ItemQuestionDimensions)
+
+        Question_WhichToysFennimal_Selected = []
+        ButtonControllerArr = []
+        for(let button_num =0; button_num< array_all_toys_to_pick_from.length; button_num++){
+            ButtonControllerArr.push(new QuestionItemButton(QuestionBoxContainerElem, array_all_toys_to_pick_from[button_num], that, true))
+            //ButtonControllerArr.push(new QuestionBoxButton(QuestionBoxContainerElem, array_all_boxes_used_in_exp[button_num], that))
+        }
+
+        //Creating the confirm button (but hiding it for now)
+        Question_WhichToysFennimal_ConfirmButton = createSVGButtonElem((0.5*508)-(0.5*150), 250,150,30,"Confirm selection","instructions_button")
+        Question_WhichToysFennimal_ConfirmButton.onclick = ask_which_toys_input_confirmed
+        SVG_layer.appendChild(Question_WhichToysFennimal_ConfirmButton)
+        Question_WhichToysFennimal_ConfirmButton.style.display = "none"
+
+    }
+
+    function ask_which_toys_input_confirmed(){
+        ButtonQuestionElem.remove()
+        Question_WhichToysFennimal_ConfirmButton.remove()
+        CollectedData.selected_toys_used_Fennimal = JSON.parse(JSON.stringify(Question_WhichToysFennimal_Selected))
+        trial_completed()
+    }
+
+
+
+    //OTHER
+    //////////////
     function open_box(){
         BoxLid.style.opacity = 0
         box_is_open = true
@@ -1038,9 +1138,11 @@ TrialController = function(box_name,array_all_boxes_used_in_exp,array_all_toys_t
     }
 
     function remove_all_elements(){
-        BoxLid.style.display = "none"
-        BoxFront.style.display = "none"
-        BoxBack.style.display = "none"
+        if(typeof BoxLid !== "undefined"){
+            BoxLid.style.display = "none"
+            BoxFront.style.display = "none"
+            BoxBack.style.display = "none"
+        }
         if(typeof ItemInBox_TranslationGroup !== "undefined"){
             ItemInBox_TranslationGroup.remove()
         }
@@ -1113,7 +1215,7 @@ QuestionBoxButton = function(HostElem, box_name, Contr){
 
 }
 
-QuestionItemButton = function(HostElem, ItemObj, Contr){
+QuestionItemButton = function(HostElem, ItemObj, Contr, multiple_possible){
 
     this.enable = function(){
         disabled = false
@@ -1122,6 +1224,19 @@ QuestionItemButton = function(HostElem, ItemObj, Contr){
     this.disable = function(){
         disabled = true
         ItemButton.style.cursor = "auto"
+    }
+
+    //The selected state only applies of multiple items are possible
+    let selected_state = "inactive"
+    function toggle_selected_state(){
+        if(selected_state === "active"){
+            selected_state = "inactive"
+            BackgroundRect.classList.remove("button_item_rect_selected")
+
+        }else{
+            selected_state = "active"
+            BackgroundRect.classList.add("button_item_rect_selected")
+        }
     }
 
     let ButtonDims = {
@@ -1159,6 +1274,9 @@ QuestionItemButton = function(HostElem, ItemObj, Contr){
     }
     ItemButton.onclick = function(){
         Contr.toy_question_button_pressed(ItemObj.name)
+        if(multiple_possible){
+            toggle_selected_state()
+        }
     }
 
 
@@ -1257,7 +1375,7 @@ BoxQuestionController_NoClue =function(ParentElem, self_or_other, box, ItemsArr,
 
     function create_item_button_controllers(){
         for(let item_num =0; item_num< ItemsArr.length; item_num++){
-            ButtonControllerArr.push(new QuestionItemButton(ContainerElem, ItemsArr[item_num], that))
+            ButtonControllerArr.push(new QuestionItemButton(ContainerElem, ItemsArr[item_num], that, false))
         }
     }
 
@@ -1389,7 +1507,7 @@ BoxQuestionController_Clue =function(ParentElem, array_all_boxes_used_in_exp, Fe
 
     function create_item_button_controllers(){
         for(let item_num =0; item_num< ItemsArr.length; item_num++){
-            ButtonControllerArr.push(new QuestionItemButton(ContainerElem, ItemsArr[item_num], that))
+            ButtonControllerArr.push(new QuestionItemButton(ContainerElem, ItemsArr[item_num], that, false))
         }
     }
 
@@ -1576,7 +1694,7 @@ ScreenController = function(ExpCont, PromptCont){
     }
 
     //Show a new box on the screen
-    function show_trial(box_name, FennimalObj, ItemAlreadyInBox, NewItemByFennimal, showPartner, special_trial_type, arr_items_to_show ){
+    function show_trial(box_name, FennimalObj, ItemAlreadyInBox, NewItemByFennimal, showPartner, special_trial_type, arr_items_to_show, AdditionalInfo ){
         //Making sure the layer is visible
         SVG_layers.BoxesAndItems.style.display = "inherit"
 
@@ -1591,7 +1709,7 @@ ScreenController = function(ExpCont, PromptCont){
             SVG_layers.Fennimals.style.display = "inherit"
 
             //Figuring out some details about the to-be-shown trial
-            ItemBoxCon = new TrialController(box_name,ExpCont.get_array_of_all_boxes_in_exp(),arr_items_to_show, FennimalObj, ItemAlreadyInBox, NewItemByFennimal, showPartner, PromptCont, that, special_trial_type)
+            ItemBoxCon = new TrialController(box_name,ExpCont.get_array_of_all_boxes_in_exp(),arr_items_to_show, FennimalObj, ItemAlreadyInBox, NewItemByFennimal, showPartner, PromptCont, that, special_trial_type, AdditionalInfo)
 
         },1500)
     }
@@ -1607,13 +1725,37 @@ ScreenController = function(ExpCont, PromptCont){
         CollectedData.ItemInBox = CurrentTrial.ItemInBox
         CollectedData.box = CurrentTrial.box
 
+
         //For the measurement questions, store the correct answer and a boolean to denote whether the answer was correct
         if(currentblocktype === "questions"){
             CollectedData.correct_answer = CurrentTrial.correct_answer
-            CollectedData.correct_answer_given = CurrentTrial.correct_answer === CollectedData.question_belief
 
-            if(CurrentTrial.qtype === "other"){CollectedData.perspective = "partner"}
-            if(CurrentTrial.qtype === "self"){CollectedData.perspective = "self"}
+            if(CurrentTrial.qtype === "other" || CurrentTrial.qtype === "self"){
+
+                CollectedData.correct_answer_given = CurrentTrial.correct_answer === CollectedData.question_belief
+                if(CurrentTrial.qtype === "other"){CollectedData.perspective = "partner"}
+                if(CurrentTrial.qtype === "self"){CollectedData.perspective = "self"}
+
+            }
+
+            if(CurrentTrial.qtype === "items"){
+                //Check if the correct number of items have been selected. If so, check if the correct items themselves have been selected.
+                let correct = false
+                if(CollectedData.selected_toys_used_Fennimal.length === CurrentTrial.correct_answer.length){
+                    let wrong_item = false
+                    for(let i = 0;i<CollectedData.selected_toys_used_Fennimal.length;i++){
+                        if(! CurrentTrial.correct_answer.includes(CollectedData.selected_toys_used_Fennimal[i])){
+                            wrong_item = true
+                        }
+                    }
+                    if(! wrong_item){
+                        correct = true
+                    }
+                }
+
+                CollectedData.correct_answer_given = correct
+            }
+
         }
 
 
@@ -1702,11 +1844,12 @@ ScreenController = function(ExpCont, PromptCont){
             CurrentTrial = RemainingTrials.shift()
 
             //Figuring out smoe details about which sort of trial to show.
-            let special_trial_type = false, items_to_show
+            let special_trial_type = false, items_to_show, AdditionalInfo = false
             if(currentblocktype ==="private_repeat" || currentblocktype === "public_repeat") { special_trial_type = "repeat"}
             if(currentblocktype === "questions"){
                 if(CurrentTrial.qtype === "other") {special_trial_type = "measure_partner"}
                 if(CurrentTrial.qtype === "self") {special_trial_type = "measure_self"}
+                if(CurrentTrial.qtype === "items") {special_trial_type = "items";}
 
             }
 
@@ -1719,7 +1862,7 @@ ScreenController = function(ExpCont, PromptCont){
             shuffleArray(items_to_show)
 
             //Show the trial
-            show_trial(CurrentTrial.box,CurrentTrial.Fennimal, CurrentTrial.ItemInBox,CurrentTrial.NewItem,currentblocktype ==="public" || currentblocktype === "public_repeat", special_trial_type, items_to_show)
+            show_trial(CurrentTrial.box,CurrentTrial.Fennimal, CurrentTrial.ItemInBox,CurrentTrial.NewItem,currentblocktype ==="public" || currentblocktype === "public_repeat", special_trial_type, items_to_show, false)
             //ask_box_question(CurrentTrial.qtype,CurrentTrial.box, CurrentTrial.ItemArr)
 
 

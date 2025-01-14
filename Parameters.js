@@ -12,7 +12,7 @@ ParameterObject = function() {
                 "Pressing the button below will toggle full-screen mode. On windows you can exit (and re-enter) full-screen mode at any time by pressing [F11]. " +
                 "On Mac, you can enter and leave full-screen mode at any time by pressing [Command]+[Cntrl]+[F].<br>" +
                 "<br>" +
-                "In addition, please make sure that your audio is on! (The sound will enhance your performance during this task. <br>" +
+                "In addition, please make sure that your audio is on! (The sound will enhance your performance during this task.) <br>" +
                 "<br>" +
                 "<i>Important note: this experiment is only supported for Chrome. Using any other browsers may result in unforeseen errors! </i>"
 

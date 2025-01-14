@@ -32,11 +32,12 @@ AudioControllerObject = function(){
             RegionSoundScapes[region_name].volume = 0.08
             switch(region_name){
                 case("Desert"): RegionSoundScapes[region_name].volume = 0.01; break
-                case("Beach"): RegionSoundScapes[region_name].volume = 0.15; break
+                case("Beach"): RegionSoundScapes[region_name].volume = 0.2; break
                 //case("North"): RegionSoundScapes[region_name].volume = 0.10; break
                 case("Jungle"): RegionSoundScapes[region_name].volume = 0.18; break
                 case("Swamp"): RegionSoundScapes[region_name].volume = 0.02; break
-                case("Village"): RegionSoundScapes[region_name].volume = 0.1; break
+                case("Village"): RegionSoundScapes[region_name].volume = 0.5; break
+                case("Flowerfields"): RegionSoundScapes[region_name].volume = 0.2; break
             }
 
             RegionSoundScapes[region_name].play()
