@@ -12,66 +12,50 @@ AudioControllerObject = function(){
     }
 
     let SoundEffects = {
-        giftbox: new Audio("giftbox_open.wav"),
-        chest: new Audio("chest_open.wav"),
-        crate: new Audio("crate_open.wav"),
-        container: new Audio("plastic_box_open.wav"),
-        cardboard: new Audio("cardboard_open.wav"),
-        wicker:new Audio("wicker.wav"),
-        partner:new Audio("plop.wav"),
+        rejected: new Audio("rejected.wav"),
+        positive: new Audio("positive.wav"),
+        mystery: new Audio("mystery.wav"),
 
     }
-
 
 
     //Call to play a region sound
     let ActiveRegionSounds = [], ActiveSoundEffects = []
-    this.play_region_sound=function(location_name){
-        if(Param.sound_on){
-            let region_name = Param.LocationData[location_name].region
-            RegionSoundScapes[region_name].volume = 0.08
-            switch(region_name){
-                case("Desert"): RegionSoundScapes[region_name].volume = 0.01; break
-                case("Beach"): RegionSoundScapes[region_name].volume = 0.2; break
-                //case("North"): RegionSoundScapes[region_name].volume = 0.10; break
-                case("Jungle"): RegionSoundScapes[region_name].volume = 0.18; break
-                case("Swamp"): RegionSoundScapes[region_name].volume = 0.02; break
-                case("Village"): RegionSoundScapes[region_name].volume = 0.5; break
-                case("Flowerfields"): RegionSoundScapes[region_name].volume = 0.2; break
-            }
-
-            RegionSoundScapes[region_name].play()
-            RegionSoundScapes[region_name].loop = true
-            ActiveRegionSounds.push(RegionSoundScapes[region_name])
-
+    this.play_region_sound=function(region_name){
+        switch(region_name){
+            case("Desert"): RegionSoundScapes[region_name].volume = 0.025; break
+            case("Beach"): RegionSoundScapes[region_name].volume = 0.15; break
+            case("North"): RegionSoundScapes[region_name].volume = 0.25; break
+            case("Jungle"): RegionSoundScapes[region_name].volume = 0.5; break
+            case("Swamp"): RegionSoundScapes[region_name].volume = 0.05; break
         }
+
+        RegionSoundScapes[region_name].play()
+        RegionSoundScapes[region_name].loop = true
+        ActiveRegionSounds.push(RegionSoundScapes[region_name])
+
 
     }
 
-    this.play_box_sound = function(box){
-        if(Param.sound_on){
-            switch(box){
-                case("a"): SoundEffects.giftbox.play(); break
-                case("b"): SoundEffects.cardboard.play(); break
-                case("c"): SoundEffects.chest.play(); break
-                case("d"): SoundEffects.crate.play(); break
-                case("e"): SoundEffects.container.play(); break
-                case("f"): SoundEffects.wicker.play(); break
+    //Call to play a sound effect
+    this.play_sound_effect = function (effect){
+        if(Object.hasOwn(SoundEffects, effect)){
+            ActiveSoundEffects.push(SoundEffects[effect])
+
+            switch (effect){
+                case("success"): SoundEffects[effect].volume = 0.25; break
             }
+
+            SoundEffects[effect].pause()
+            SoundEffects[effect].currentTime = 0
+            SoundEffects[effect].play()
         }
     }
-
 
     //Stop playing all sounds
     this.stop_all_region_sounds = function(){
         for(let i=0;i<ActiveRegionSounds.length; i++){
             ActiveRegionSounds[i].pause()
-        }
-    }
-
-    this.play_partner_sound = function(){
-        if(Param.sound_on){
-            SoundEffects.partner.play()
         }
     }
 
