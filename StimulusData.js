@@ -969,16 +969,16 @@ STIMULUSDATA = function(exp_code){
                 {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown", borrowed_tertiary_color: "Z"},
                 {ID: "B", region: "A", head: "B", special_item: "b", outcome: "heart", borrowed_tertiary_color: false},
                 {ID: "C", region: "C", head: "B", special_item: "c", outcome: "heart", borrowed_tertiary_color: false},
-                {ID: "D", region: "D", head: "D", special_item: "c", outcome: "heart", borrowed_tertiary_color: false},
+                {ID: "D", region: "D", head: "D", special_item: "c", outcome: "heart", borrowed_tertiary_color: "X"},
             ]
 
             let SearchPhaseBlockTemplates = [
-                {ID: "key", region: "E", head: "A", ItemResponses: {b: "heart", c: "neutral"}, borrowed_tertiary_color: "A"},
-                {ID: "key2", region: "F", head: "A", ItemResponses: {b: "heart", c: "neutral"}, borrowed_tertiary_color: "A"},
-                {ID: "key3", region: "G", head: "A", ItemResponses: {b: "heart", c: "neutral"}, borrowed_tertiary_color: "A"},
-                {ID: "distr", region: "E", head: "D", ItemResponses: {b: "neutral", c: "heart"}, borrowed_tertiary_color: "D" },
-                {ID: "distr2", region: "F", head: "D", ItemResponses: {b: "neutral", c: "heart"}, borrowed_tertiary_color: "D" },
-                {ID: "distr3", region: "G", head: "D", ItemResponses: {b: "neutral", c: "heart"}, borrowed_tertiary_color: "D"},
+                {ID: "key", region: "E", head: "A", ItemResponses: {b: "heart", c: "neutral"}, borrowed_tertiary_color: "Z"},
+                {ID: "key2", region: "F", head: "A", ItemResponses: {b: "heart", c: "neutral"}, borrowed_tertiary_color: "Z"},
+                {ID: "key3", region: "G", head: "A", ItemResponses: {b: "heart", c: "neutral"}, borrowed_tertiary_color: "Z"},
+                {ID: "distr", region: "E", head: "D", ItemResponses: {b: "neutral", c: "heart"}, borrowed_tertiary_color: "X" },
+                {ID: "distr2", region: "F", head: "D", ItemResponses: {b: "neutral", c: "heart"}, borrowed_tertiary_color: "X" },
+                {ID: "distr3", region: "G", head: "D", ItemResponses: {b: "neutral", c: "heart"}, borrowed_tertiary_color: "X"},
             ]
 
             set_stimuli_for_basic_experiment_single_block(TrainingTemplates,SearchPhaseBlockTemplates, true, false)
