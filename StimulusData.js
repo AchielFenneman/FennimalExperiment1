@@ -386,16 +386,26 @@ STIMULUSDATA = function(exp_code){
                     return(IDcode)
                 }else{
                     //So we want to have a special color here, but the target is not defined and the input is not a color name.
-                    //  In this case, we first try to select a tertiary color from one of the unused regions.
-                    //      If these are not available (or have been used for other Fennimals with an unspecified color-scheme already), then make this region gray.
-                    //      Also throw a warning, as this may or may not be intended
-                    if(Unused_Regions_Used_For_Drawing_Unassigned_Colors.length > 0){
-                        return(Param.RegionData[Unused_Regions_Used_For_Drawing_Unassigned_Colors.shift()].Fennimal_location_colors.tertiary_color)
+                    // Check if this color has already been defined for some other trials
+                    if(typeof SpecialTertiaryColors[IDcode] !== "undefined"){
+                        return(SpecialTertiaryColors[IDcode] )
+
                     }else{
-                        //Set to gray and throw a warning
-                        console.warn("WARNING: ASSIGNING GRAY AS TERTIARY COLOR TO FENNIMAL HEAD. IS THIS INTENDED BEHAVIOR?")
-                        return("gray")
+                        //Now we need to create a new color here
+                        //  In this case, we first try to select a tertiary color from one of the unused regions.
+                        //      If these are not available (or have been used for other Fennimals with an unspecified color-scheme already), then make this region gray.
+                        //      Also throw a warning, as this may or may not be intended
+                        if(Unused_Regions_Used_For_Drawing_Unassigned_Colors.length > 0){
+                            SpecialTertiaryColors[IDcode] = Param.RegionData[Unused_Regions_Used_For_Drawing_Unassigned_Colors.shift()].Fennimal_location_colors.tertiary_color
+                            return(SpecialTertiaryColors[IDcode] )
+                        }else{
+                            //Set to gray and throw a warning
+                            console.warn("WARNING: ASSIGNING GRAY AS TERTIARY COLOR TO FENNIMAL HEAD. IS THIS INTENDED BEHAVIOR?")
+                            SpecialTertiaryColors[IDcode] = 'gray'
+                            return("gray")
+                        }
                     }
+
                 }
             }
         }
@@ -554,6 +564,9 @@ STIMULUSDATA = function(exp_code){
 
     }
 
+    //Keeps track of special color schemes used for tertiary colors (head)
+    let SpecialTertiaryColors = {}
+    /*
     let set_stimuli_for_basic_experiment_multiple_blocks = function(TrainingTemplates,SearchPhaseBlockTemplates, number_search_blocks, follow_up_question_asked_in_blocks){
         number_of_search_blocks_in_experiment = number_search_blocks
         // If set to true, then the test phase Fennimals have names based on their LOCATION (not region)
@@ -717,8 +730,11 @@ STIMULUSDATA = function(exp_code){
         let find_head_color = function(IDcode){
             //First figure out if the target color is an actual training-phase Fennimal. If it is, select these colors.
             //If it is not, then select the colors from an empty region (if available) or set to gray otherwise.
+            console.log(IDcode)
             if(typeof TrainingFennimals[IDcode] !== "undefined"){
-                return(Param.RegionData[TrainingFennimals[IDcode].region].Fennimal_location_colors.tertiary_color)
+                //return(Param.RegionData[TrainingFennimals[IDcode].region].Fennimal_location_colors.tertiary_color)
+                console.log(TrainingFennimals[IDcode])
+                return TrainingFennimals[IDcode]
             }else{
                 //If the current code is not a Fennimal, then try to check if its a valid color string.
                 if(isColor(IDcode)){
@@ -797,6 +813,7 @@ STIMULUSDATA = function(exp_code){
             if(typeof Template.borrowed_tertiary_color !== "undefined"){
                 //For the head: take the tertiary color of the target Fennimal. If the value is false, then just keep it as the original color-scheme.
                 if(Template.borrowed_tertiary_color !== false){
+                    console.log("....")
                     SearchPhaseBlockTrials[i].head_color_scheme.tertiary_color = find_head_color(Template.borrowed_tertiary_color)
                 }
             }else{
@@ -889,6 +906,8 @@ STIMULUSDATA = function(exp_code){
 
     }
 
+
+     */
     let number_of_search_blocks_in_experiment = false
     this.get_number_of_search_blocks = function(){
         return(number_of_search_blocks_in_experiment)
@@ -908,16 +927,16 @@ STIMULUSDATA = function(exp_code){
             // GENERAL STIMULI TEMPLATES
             //////////////////////////////
             let TrainingTemplates = [
-                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown", borrowed_tertiary_color: false},
+                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown", borrowed_tertiary_color:  "Z"},
                 {ID: "B", region: "B", head: "B", special_item: "b", outcome: "frown", borrowed_tertiary_color: false},
                 {ID: "C", region: "A", head: "B", special_item: "c", outcome: "heart", borrowed_tertiary_color: "B"},
                 {ID: "D", region: "D", head: "D", special_item: "d", outcome: "heart", borrowed_tertiary_color: false},
             ]
 
             let SearchPhaseBlockTemplates = [
-                {ID: "key", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"}, borrowed_tertiary_color: "A"},
-                {ID: "key2", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"}, borrowed_tertiary_color: "A"},
-                {ID: "key3", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"}, borrowed_tertiary_color: "A"},
+                {ID: "key", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"}, borrowed_tertiary_color: "Z"},
+                {ID: "key2", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"}, borrowed_tertiary_color: "Z"},
+                {ID: "key3", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"}, borrowed_tertiary_color: "Z"},
                 {ID: "distr", region: "D", head: "F", ItemResponses: {c: "neutral", d: "heart"}, borrowed_tertiary_color: false },
                 {ID: "distr2", region: "G", head: "D", ItemResponses: {c: "neutral", d: "heart"}, borrowed_tertiary_color: "D"},
                 {ID: "distr3", region: "D", head: "G", ItemResponses: {c: "neutral", d: "heart"}, borrowed_tertiary_color: "D"},
@@ -937,16 +956,16 @@ STIMULUSDATA = function(exp_code){
             // GENERAL STIMULI TEMPLATES
             //////////////////////////////
             let TrainingTemplates = [
-                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown", borrowed_tertiary_color: false},
+                {ID: "A", region: "A", head: "A", special_item: "a", outcome: "frown", borrowed_tertiary_color: "Z"},
                 {ID: "B", region: "B", head: "B", special_item: "b", outcome: "frown", borrowed_tertiary_color: false},
-                {ID: "C", region: "A", head: "C", special_item: "c", outcome: "heart", borrowed_tertiary_color: "Z"},
+                {ID: "C", region: "A", head: "C", special_item: "c", outcome: "heart", borrowed_tertiary_color: false},
                 {ID: "D", region: "D", head: "D", special_item: "d", outcome: "heart", borrowed_tertiary_color: false},
             ]
 
             let SearchPhaseBlockTemplates = [
-                {ID: "key", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"}, borrowed_tertiary_color: "A"},
-                {ID: "key2", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"}, borrowed_tertiary_color: "A"},
-                {ID: "key3", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"}, borrowed_tertiary_color: "A"},
+                {ID: "key", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"}, borrowed_tertiary_color: "Z"},
+                {ID: "key2", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"}, borrowed_tertiary_color: "Z"},
+                {ID: "key3", region: "B", head: "A", ItemResponses: {c: "heart", d: "neutral"}, borrowed_tertiary_color: "Z"},
                 {ID: "distr", region: "D", head: "F", ItemResponses: {c: "neutral", d: "heart"}, borrowed_tertiary_color: false },
                 {ID: "distr2", region: "G", head: "D", ItemResponses: {c: "neutral", d: "heart"}, borrowed_tertiary_color: "D" },
                 {ID: "distr3", region: "D", head: "G", ItemResponses: {c: "neutral", d: "heart"}, borrowed_tertiary_color: "D"},

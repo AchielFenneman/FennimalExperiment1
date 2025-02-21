@@ -1151,4 +1151,4 @@ let EC = new ExperimentController()
 //      Hide answers during retrieval?
 //      Collapse test trials to region
 
-console.log( "Feb 2")
+console.log( "Feb 3")
