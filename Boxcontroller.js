@@ -101,20 +101,29 @@ BoxController = function(ParentElem, GroupingCont){
             }
         }
 
+        //ADDITION (copy function)
         function update_box_border(){
-            if(CardParam.fix_number_of_groups === false){
-                //If this box only has a single element, then color it red.
-                if(Names_of_cards_in_box.length === 1){
+            if(CardParam.minimum_group_size !== false){
+                if(Names_of_cards_in_box.length < CardParam.minimum_group_size){
                     BoxDiv.style.border = "5px dashed red"
                 }else{
                     BoxDiv.style.border = "inherit"
                 }
             }else{
-                //If this box only has a single element, then color it red.
-                if(Names_of_cards_in_box.length === 0){
-                    BoxDiv.style.border = "5px dashed red"
+                if(CardParam.fix_number_of_groups === false){
+                    //If this box only has a single element, then color it red.
+                    if(Names_of_cards_in_box.length === 1){
+                        BoxDiv.style.border = "5px dashed red"
+                    }else{
+                        BoxDiv.style.border = "inherit"
+                    }
                 }else{
-                    BoxDiv.style.border = "inherit"
+                    //If this box only has a single element, then color it red.
+                    if(Names_of_cards_in_box.length === 0){
+                        BoxDiv.style.border = "5px dashed red"
+                    }else{
+                        BoxDiv.style.border = "inherit"
+                    }
                 }
             }
         }
@@ -270,6 +279,9 @@ BoxController = function(ParentElem, GroupingCont){
             return(JSON.parse(JSON.stringify(Data)))
         }
 
+        //ADDITION
+        update_box_border()
+
 
 
     }
@@ -292,6 +304,7 @@ BoxController = function(ParentElem, GroupingCont){
             AddButtonContainer.remove()
             BoxContainer.appendChild(AddButtonContainer)
         }
+
 
 
     }

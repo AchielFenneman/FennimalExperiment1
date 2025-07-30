@@ -64,7 +64,11 @@ CardSortingParam = function(){
 
     //If set to false, allows the participant to create any number of group. If set to a number, then participants are given a fixed number of groups.
     //Note that each group is forced to have at least two elements.
-    this.fix_number_of_groups = false
+    this.fix_number_of_groups = 4
+
+    //If set to a non-zero positive number, this defines the minimum number of heads required to be in each group
+    //ADDITION
+    this.minimum_group_size = 4
 
     this.SecondStageStartPos = {
         x: 960,
@@ -72,26 +76,34 @@ CardSortingParam = function(){
     }
 
     this.PublicNames = {
-        rhino: "Nosey",
-        giraffe: "Necky",
-        elephant: "Trunko",
+        rhino: "Rhino",
+        giraffe: "Giraffey",
+        elephant: "Elephant",
         cow: "Moo",
         sheep: "Softy",
         pig: "Oinkers",
         chicken: "Rooster",
         jackolantern: "Jack-o",
-        ghost: "Spooky",
+        ghost: "Ghostie",
         witch: "Witchy",
         skull: "Skully",
         snowman: "Snowy",
         elf: "Elf",
-        christmastree: "Xmashead",
+        christmastree: "Xmastree",
         candycane: "Candy",
-        lion: "Pridey",
+        lion: "Leo",
         santa: "Santa",
-        owl: "Hoot",
-        bird: "Cresty",
-        parrot: "Re-pete-y",
+        stocking: "Stocking",
+        eagle: "Eagle",
+
+        owl: "Owlie",
+        bird: "Birdie",
+        parrot: "Parrot",
+        toucan: "Toucan",
+        peacock: "Peacock",
+        tombstone: "Tombstone",
+
+
 
 
 
@@ -140,15 +152,26 @@ CardSortingParam = function(){
     //         "%EXTRA_RULES% "
 
     //Modifying the instructions based on the used parameters
+    //ADDITION
     function update_instructions_first_block(){
         if(that.fix_number_of_groups === false){
             instructions_first_block = instructions_first_block.replace("%FIXED_GROUP_NUM%", "multiple")
             instructions_first_block = instructions_first_block.replace("%CAN_CREATE_EXTRA_GROUPS%", "You can add as many boxes as you want.")
-            instructions_first_block = instructions_first_block.replace("%EXTRA_RULES%", "<b>Extra Rules</b><br> Each head must be grouped together with at least one other head.")
+            if(that.minimum_group_size !== false){
+                instructions_first_block = instructions_first_block.replace("%EXTRA_RULES%", "<b>Extra Rules</b><br>Each group must contain at least " + that.minimum_group_size + " heads.")
+            }else{
+                instructions_first_block = instructions_first_block.replace("%EXTRA_RULES%", "<b>Extra Rules</b><br> Each head must be grouped together with at least one other head.")
+            }
         }else{
             instructions_first_block = instructions_first_block.replace("%FIXED_GROUP_NUM%", that.fix_number_of_groups)
             instructions_first_block = instructions_first_block.replace("%CAN_CREATE_EXTRA_GROUPS%", "")
-            instructions_first_block = instructions_first_block.replace("%EXTRA_RULES%", "<b>Extra Rules</b><br>Each group must contain at least one head.")
+
+            if(that.minimum_group_size !== false){
+                instructions_first_block = instructions_first_block.replace("%EXTRA_RULES%", "<b>Extra Rules</b><br>Each group must contain at least " + that.minimum_group_size + " heads.")
+            }else{
+                instructions_first_block = instructions_first_block.replace("%EXTRA_RULES%", "<b>Extra Rules</b><br>Each group must contain at least one head.")
+            }
+
         }
 
         instructions_first_block = instructions_first_block.replace("%NUMCARDS%", number_of_cards)
@@ -367,33 +390,53 @@ GroupController = function(HostElem, HeadSVGArray, Task_SVG_Data){
             if(check_if_all_cards_placed()){
                 ReservoirForeignElement.style.display = "none"
 
-                //The reservoir is empty.
-                //What we do next depends on the setup of the task. If the participant can define any number of groups, we want to check if each group has at least two elements.
-                // If there are a fixed number of groups, then check if each box has at least one element
-                if(CardParam.fix_number_of_groups === false){
-                    if(check_if_all_non_empty_groups_have_at_least_two_elements()){
-                        //All good. Now the participant can continue
-                        //Show the continue button elements and hide the reservoir
-                        GroupsTooSmallWarningText.style.display = "none"
+                //ADDITION (rest of function)
+                //Running some checks to test if all the groups are correctly created and filled, according to the rules
+                let correct_elements_per_group = false
 
+                //First we need to check if there is a minimum group size. If not, then other rules apply
+                if(CardParam.minimum_group_size !== false){
+                    if(check_if_all_groups_have_the_minimum_number_of_elements()){
+                        //All groups have the minimum number of elements
+                        GroupsTooSmallWarningText.style.display = "none"
                         show_main_continue_button()
                     }else{
-                        //Oops, at least one box contains only a single card. Inform the participant
-                        GroupsTooSmallWarningText.childNodes[0].innerHTML = "Please make sure that each group contains at least two heads"
+                        //At least one group is too small
+                        GroupsTooSmallWarningText.childNodes[0].innerHTML = "Please make sure that each group contains at least " + CardParam.minimum_group_size + " heads"
                         GroupsTooSmallWarningText.style.display = "inherit"
-
                         hide_main_continue_button()
                     }
+
                 }else{
-                    if(check_if_all_groups_have_at_least_one_element()){
-                        GroupsTooSmallWarningText.style.display = "none"
-                        show_main_continue_button()
+                    if(CardParam.fix_number_of_groups === false){
+                        if(check_if_all_non_empty_groups_have_at_least_two_elements()){
+                            //All good. Now the participant can continue
+                            //Show the continue button elements and hide the reservoir
+                            GroupsTooSmallWarningText.style.display = "none"
+
+                            show_main_continue_button()
+                        }else{
+                            //Oops, at least one box contains only a single card. Inform the participant
+                            GroupsTooSmallWarningText.childNodes[0].innerHTML = "Please make sure that each group contains at least two heads"
+                            GroupsTooSmallWarningText.style.display = "inherit"
+
+                            hide_main_continue_button()
+                        }
                     }else{
-                        GroupsTooSmallWarningText.childNodes[0].innerHTML = "Please make sure that all groups contain at least one head"
-                        GroupsTooSmallWarningText.style.display = "inherit"
-                        hide_main_continue_button()
+                        if(check_if_all_groups_have_at_least_one_element()){
+                            GroupsTooSmallWarningText.style.display = "none"
+                            show_main_continue_button()
+                        }else{
+                            GroupsTooSmallWarningText.childNodes[0].innerHTML = "Please make sure that all groups contain at least one head"
+                            GroupsTooSmallWarningText.style.display = "inherit"
+                            hide_main_continue_button()
+                        }
                     }
+
+
                 }
+
+
 
 
 
@@ -447,6 +490,17 @@ GroupController = function(HostElem, HeadSVGArray, Task_SVG_Data){
         return(true)
 
 
+    }
+
+    //ADDITION
+    function check_if_all_groups_have_the_minimum_number_of_elements(){
+        let AllBoxContentsArr = BoxCont.get_all_box_contents()
+        for(let i=0;i<AllBoxContentsArr.length;i++){
+            if(AllBoxContentsArr[i].length < CardParam.minimum_group_size){
+                return(false)
+            }
+        }
+        return(true)
     }
 
     //Now we can create a set of cards and their constituent elements.

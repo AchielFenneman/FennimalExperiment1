@@ -47,11 +47,8 @@ CardController = function(MainSVG, HeadSVG, ReservoirElem, GroupingCont){
         if(CardParam.include_names_on_card){
             NameP = document.createElement("p")
 
-            if(CardParam.PublicNames[card_name] !== undefined){
-                NameP.innerHTML = CardParam.PublicNames[card_name]
-            }else{
-                NameP.innerHTML = card_name
-            }
+            //TODO: change to subject-facing names
+            NameP.innerHTML = card_name
 
             NameP.classList.add("card_name")
 
