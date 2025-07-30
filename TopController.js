@@ -68,7 +68,7 @@ CardSortingParam = function(){
 
     //If set to a non-zero positive number, this defines the minimum number of heads required to be in each group
     //ADDITION
-    this.minimum_group_size = 4
+    this.minimum_group_size = false
 
     this.SecondStageStartPos = {
         x: 960,
