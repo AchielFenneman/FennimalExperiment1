@@ -641,7 +641,7 @@ GroupController = function(HostElem, HeadSVGArray, Task_SVG_Data){
 
     }
     function finish_task(){
-        alert("THANK YOU FOR PARTICIPATING! YOUR COMPLETION CODE IS: HEADS")
+        alert("THANK YOU FOR PARTICIPATING! YOUR COMPLETION CODE IS: HEADS17")
         console.log(BoxCont.get_all_box_data())
         document.getElementById("data_form_field").innerHTML = JSON.stringify(BoxCont.get_all_box_data())
         document.getElementById("submitbutton").click()
