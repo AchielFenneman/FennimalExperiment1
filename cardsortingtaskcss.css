@@ -1,0 +1,460 @@
+/*Top level elements*/
+.card_sorting_task_container {
+    font-family: "Myriad Pro", Arial, Helvetica, sans-serif;
+}
+.card_sorting_task_background_rect{
+    fill: whitesmoke;
+    opacity: 0.95;
+}
+/*FIRST STAGE INSTRUCTIONS*/
+.card_calibration_instructions_first_stage_pointers_box{
+    animation: 10s show_pointers_box infinite;
+}
+@keyframes show_pointers_box {
+    0%{opacity: 0}
+    3%{opacity: 1}
+    9%{opacity: 1}
+    10%{opacity: 0}
+    100%{opacity: 0}
+}
+.card_calibration_instructions_first_stage_box{
+    animation: 10s show_group_box infinite;
+}
+@keyframes show_group_box {
+    0%{opacity: 0}
+    4%{opacity: 0}
+    6%{opacity: 1}
+
+}
+#card_calibration_instructions_first_stage_box_text_A{
+    animation: 10s box_text_A infinite;
+}
+@keyframes box_text_A {
+    0%{opacity: 0}
+    6%{opacity: 0}
+    8%{opacity: 1}
+    35%{opacity:1}
+    37%{opacity: 0}
+    100%{opacity: 0}
+}
+#card_calibration_instructions_first_stage_box_text_B{
+    animation: 10s box_text_B infinite;
+
+}
+@keyframes box_text_B {
+    0%{opacity: 0}
+    6%{opacity: 0}
+    8%{opacity: 1}
+    55%{opacity:1}
+    57%{opacity: 0}
+    100%{opacity: 0}
+}
+
+.card_calibration_instructions_first_stage_pointers_heads{
+    animation: 10s show_pointers_head infinite;
+
+}
+@keyframes show_pointers_head {
+    0%{opacity: 0}
+    10%{opacity: 0}
+    12%{opacity: 1}
+    18%{opacity: 1}
+    19%{opacity: 0}
+    100%{opacity: 0}
+}
+
+#card_calibration_instructions_first_stage_card_A{
+    animation: 10s instructions_card_A infinite;
+}
+@keyframes instructions_card_A {
+    0%{opacity: 0}
+    12%{opacity: 0}
+    14%{opacity: 1}
+    27%{transform:translate(0,0)}
+    37%{transform:translate(50px,-210px)}
+    91%{transform:translate(50px,-210px)}
+    93%{transform:translate(0px,-210px)}
+    100%{transform:translate(00px,-210px)}
+}
+#card_calibration_instructions_first_stage_card_B{
+    animation: 10s instructions_card_B infinite;
+}
+@keyframes instructions_card_B {
+    0%{opacity: 0}
+    13%{opacity: 0}
+    15%{opacity: 1}
+    28%{transform:translate(0,0)}
+    32%{transform:translate(-50px,0)}
+    47%{transform:translate(-50px,0)}
+    53%{transform:translate(170px,-210px)}
+    72%{transform:translate(170px,-210px)}
+    75%{transform:translate(130px,-210px)}
+    100%{transform:translate(130px,-210px)}
+}
+#card_calibration_instructions_first_stage_card_C{
+    animation: 10s instructions_card_C infinite;
+}
+@keyframes instructions_card_C {
+    0%{opacity: 0}
+    14%{opacity: 0}
+    16%{opacity: 1}
+    28%{transform:translate(0,0)}
+    32%{transform:translate(-50px,0)}
+    47%{transform:translate(-50px,0)}
+    50%{transform:translate(-100px,0)}
+    67%{transform:translate(-100px,0)}
+    72%{transform:translate(50px,-210px)}
+    75%{transform:translate(120px,-210px)}
+    100%{transform:translate(120px,-210px)}
+}
+#card_calibration_instructions_first_stage_card_D{
+    animation: 10s instructions_card_D infinite;
+}
+@keyframes instructions_card_D {
+    0%{opacity: 0}
+    15%{opacity: 0}
+    17%{opacity: 1}
+    28%{transform:translate(0,0)}
+    32%{transform:translate(-50px,0)}
+    47%{transform:translate(-50px,0)}
+    50%{transform:translate(-100px,0)}
+    68%{transform:translate(-100px,0)}
+    71%{transform:translate(-160px,0)}
+    84%{transform:translate(-160px,0)}
+    89%{transform:translate(-290px,-210px)}
+    91%{transform:translate(-290px,-210px)}
+    93%{transform:translate(-240px,-210px)}
+    100%{transform:translate(-240px,-210px)}
+}
+
+#card_calibration_instructions_first_stage_cursor{
+    animation: 10s instructions_first_stage_cursor_movement infinite;
+}
+@keyframes instructions_first_stage_cursor_movement {
+    0%{opacity: 0}
+    17%{opacity: 0}
+    19%{opacity: 1; transform:translate(0,0)}
+    25%{transform: translate(30px,90px)}
+    28%{transform: translate(30px,90px)}
+    35%{transform: translate(60px,-120px)}
+    38%{transform: translate(60px,-120px)}
+    44%{transform: translate(80px,90px)}
+    47%{transform: translate(80px,90px)}
+    53%{transform: translate(290px,-120px)}
+    57%{transform: translate(290px,-120px)}
+    63%{transform: translate(130px,90px)}
+    67%{transform: translate(130px,90px)}
+    72%{transform: translate(290px,-120px)}
+    75%{transform: translate(290px,-120px)}
+    80%{transform: translate(190px,90px)}
+    84%{transform: translate(190px,90px)}
+    89%{transform: translate(60px,-120px)}
+    93%{transform: translate(60px,-120px)}
+
+    100%{opacity: 1}
+}
+
+#card_calibration_instructions_first_stage_cursor_fill{
+    animation: 10s instructions_first_stage_cursor_fill infinite;
+}
+@keyframes instructions_first_stage_cursor_fill {
+    0%{fill: #deaa87}
+    25%{fill:#deaa87}
+    27%{fill:blue}
+    36%{fill:blue}
+    37%{fill:#deaa87}
+    44%{fill:#deaa87}
+    47%{fill:blue}
+    54%{fill:blue}
+    57%{fill:#deaa87}
+    63%{fill:#deaa87}
+    65%{fill:blue}
+    73%{fill:blue}
+    75%{fill:#deaa87}
+    82%{fill:#deaa87}
+    84%{fill:blue}
+    91%{fill:blue}
+    93%{fill:blue}
+}
+
+/*SECOND STAGE INSTRUCTIONS*/
+#card_calibration_instructions_second_stage_cursor{
+    animation: 10s pointer_move_second_stage_instructions infinite;
+}
+@keyframes pointer_move_second_stage_instructions {
+    0% {transform: translate(0,0); opacity: 0}
+    4% {transform: translate(0,0);opacity: 1}
+    8% {transform: translate(0,-110px)}
+    12% {transform: translate(0,-110px)}
+    13% {transform: translate(0,-110px)}
+    18% {transform: translate(-180px,-230px)}
+    20% {transform: translate(-180px,-230px)}
+    27% {transform: translate(0,-110px)}
+    29% {transform: translate(0,-110px)}
+    35% {transform: translate(-100px,50px)}
+    37% {transform: translate(-100px,50px)}
+    43% {transform: translate(0,-110px)}
+    45% {transform: translate(0,-110px)}
+    50% {transform: translate(150px,50px)}
+    52% {transform: translate(150px,50px)}
+    57% {transform: translate(00px,-110px)}
+    59% {transform: translate(00px,-110px)}
+    64% {transform: translate(150px,-90px)}
+    66% {transform: translate(150px,-90px)}
+    73% {transform: translate(-100px,50px)}
+    75% {transform: translate(-100px,50px)}
+    83% {transform: translate(-180px,-140px)}
+    85% {transform: translate(-180px,-140px)}
+    90% {transform: translate(150px,-90px)}
+    92% {transform: translate(150px,-90px)}
+    95% {transform: translate(180px,-70px)}
+    96% {opacity: 1}
+    98% {opacity: 0}
+    100% {transform: translate(180px,-70px); opacity: 0}
+
+}
+#card_calibration_instructions_second_stage_cursor_fill{
+    animation: 10s pointer_fill_second_stage_instructions infinite;
+}
+@keyframes pointer_fill_second_stage_instructions {
+    0%{fill: #deaa87}
+    9%{fill: #deaa87}
+    11%{fill:blue}
+    18%{fill:blue}
+    20%{fill: #deaa87}
+    27%{fill: #deaa87}
+    29%{fill: blue}
+    35%{fill: blue}
+    37%{fill: #deaa87}
+    43%{fill: #deaa87}
+    45%{fill: blue}
+    50%{fill: blue}
+    52%{fill: #deaa87}
+    57%{fill: #deaa87}
+    59%{fill: blue}
+    64%{fill: blue}
+    66%{fill: #deaa87}
+    73%{fill: #deaa87}
+    75%{fill: blue}
+    83%{fill: blue}
+    85%{fill: #deaa87}
+    90%{fill: #deaa87}
+    92%{fill: blue}
+    95%{fill: blue}
+    97%{fill: #deaa87}
+
+}
+
+#instructions_second_stage_group_A{
+    animation: 10s instructions_second_stage_group_A_move infinite;
+}
+@keyframes instructions_second_stage_group_A_move {
+    0% {transform: translate(0,0); opacity: 0}
+    4% {opacity: 1}
+    13% {transform: translate(0,0)}
+    18% {transform: translate(-180px,-120px)}
+    100% {transform: translate(-180px,-120px)}
+
+}
+#instructions_second_stage_group_B{
+    animation: 10s instructions_second_stage_group_B_move infinite;
+}
+@keyframes instructions_second_stage_group_B_move {
+    0% {transform: translate(0,0); opacity: 0}
+    4% {opacity: 1}
+    29% {transform: translate(0,0)}
+    35% {transform: translate(-100px,150px)}
+    75% {transform: translate(-100px,150px)}
+    83% {transform: translate(-180px,-40px)}
+    100% {transform: translate(-180px,-40px)}
+}
+#instructions_second_stage_group_C{
+    animation: 10s instructions_second_stage_group_C_move infinite;
+}
+@keyframes instructions_second_stage_group_C_move {
+    0% {transform: translate(0,0); opacity: 0}
+    4% {opacity: 1}
+    45% {transform: translate(0,0)}
+    50% {transform: translate(170px,150px)}
+    100% {transform: translate(170px,150px)}
+}
+#instructions_second_stage_group_D{
+    animation: 10s instructions_second_stage_group_D_move infinite;
+}
+@keyframes instructions_second_stage_group_D_move {
+    0% {transform: translate(0,0); opacity: 0}
+    4% {opacity: 1}
+    59% {transform: translate(0,0)}
+    64% {transform: translate(150px,20px)}
+    92% {transform: translate(150px,20px)}
+    95% {transform: translate(180px,40px)}
+    100% {transform: translate(180px,40px)}
+}
+
+/*CARDS AND BOXES*/
+#ReservoirGroupDiv{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+#ReservoirCardDiv{
+    max-width: 1500px;
+    white-space: nowrap;
+    overflow: hidden;
+}
+.SVG_scrollbutton_foreign{
+    width:75px;
+    min-width: 75px;
+    height: 200px;
+}
+.card_reservoir_box_rect:hover{
+    fill: blue;
+    cursor: pointer;
+}
+.category_continue_button_element{
+    display: none;
+}
+
+.reservoir_scroll_button {
+    width: 60px;
+    height: 150px;
+    font-size: 70px;
+    background: goldenrod;
+    color: darkblue;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid black
+}
+.reservoir_scroll_button:hover{
+    background: darkblue;
+    color: goldenrod;
+}
+.reservoir_scroll_button text{
+    fill: darkblue
+}
+.reservoir_scroll_button:hover text{
+    fill: darkgoldenrod;
+}
+#reservoir_scoll_left_button {
+    border-radius: 25px 0 0 25px ;
+}
+#reservoir_scoll_right_button {
+    border-radius: 0 25px 25px 0 ;
+}
+
+.no_pointer_events{
+    pointer-events: none;
+}
+
+.card{
+    display:inline-block;
+    vertical-align: top;
+    padding: 4px;
+    cursor: pointer;
+}
+.card g{
+    cursor: pointer;
+}
+.active_card {
+    pointer-events: none;
+}
+
+.card_background{
+    fill: lightgray;
+    rx: 35px;
+
+}
+.card_head {
+}
+.card_head * {
+    display: inherit;
+}
+.card_name{
+    padding: 3px;
+    margin:-11px;
+    text-align: center;
+    font-size: 35px;
+    width: 100%;
+}
+
+#BoxForeign{
+
+}
+#BoxContainer{
+    display: flex;
+    width: 100%;
+    height: 100%;
+    flex-wrap: wrap;
+    overflow: auto;
+    align-items: center;
+    justify-content: center;
+
+}
+.CategoryBox{
+    min-height: 220px;
+    min-width: 100px;
+    background: #c4d7b8;
+    border-radius: 25px;
+    width: fit-content;
+    height: fit-content;
+    margin: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2px;
+    transition: all 300ms ease-in-out;
+
+}
+.CategoryBox div{
+    max-width: 430px;
+}
+.active_box{
+    background: green
+}
+
+.AddButtonBox{
+    border:none;
+    background: none;
+}
+.PlaceholderText{
+    font-style: italic;
+    font-size: 40px;
+    padding: 8px;
+}
+
+.button_delete_box path{
+    pointer-events: none;
+}
+.button_delete_box circle{
+    cursor: pointer;
+}
+.button_delete_box circle:hover{
+    fill: indianred;
+}
+
+.button_add_box path {
+    pointer-events: none;
+}
+.button_add_box circle{
+    cursor: pointer;
+}
+.button_add_box circle:hover{
+    fill:forestgreen;
+}
+.dynamic_element {
+    opacity: 0;
+}
+
+.category_continue_button{
+    cursor: pointer;
+}
+.category_continue_button text{
+    pointer-events: none;
+}
+.category_continue_button rect:hover{
+    fill: black;
+}
+.invisible_element{
+    display: none;
+}
