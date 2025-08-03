@@ -1,14 +1,16 @@
 AudioControllerObject = function(){
     //Creates soundcontrollers for the files in the Audio subfolder
+    let pathname = "https://achielfenneman.github.io/FennimalExperiment1//"
+    
     let RegionSoundScapes = {
-        North : new Audio("/Audio/North.wav", loop=true),
-        Jungle: new Audio("/Audio/Jungle.mp3", loop=true),
-        Desert: new Audio("/Audio/Desert.mp3", loop=true),
-        Mountains: new Audio("/Audio/Mountains.wav", loop=true),
-        Beach: new Audio("/Audio/Beach.wav", loop=true),
-        Flowerfields: new Audio("/Audio/Flowerfields.mp3", loop=true),
-        Village: new Audio("/Audio/Village.mp3", loop=true),
-        Swamp: new Audio("/Audio/Swamp.wav", loop=true),
+        North : new Audio(pathname+ "/Audio/North.wav", loop=true),
+        Jungle: new Audio(pathname+ "/Audio/Jungle.mp3", loop=true),
+        Desert: new Audio(pathname+ "/Audio/Desert.mp3", loop=true),
+        Mountains: new Audio(pathname+ "/Audio/Mountains.wav", loop=true),
+        Beach: new Audio(pathname+ "/Audio/Beach.wav", loop=true),
+        Flowerfields: new Audio(pathname+ "/Audio/Flowerfields.mp3", loop=true),
+        Village: new Audio(pathname+ "/Audio/Village.mp3", loop=true),
+        Swamp: new Audio(pathname+ "/Audio/Swamp.wav", loop=true),
     }
 
     let SoundEffects = {
