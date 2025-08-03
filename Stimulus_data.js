@@ -7,7 +7,7 @@ let StimulusSettings = function(){
         bonus_per_star: 0.10
     }
 
-    this.Instructions_at_start = [] // "browser_check_and_full_screen_prompt","consent", "overview"
+    this.Instructions_at_start = [ "browser_check_and_full_screen_prompt","consent", "card_sorting_task", "overview" ] // "browser_check_and_full_screen_prompt","consent", "card_sorting_task", "overview"
 
     //This defines which experiment will be run (definitions follow below).
     // NOTE: If there are multiple codes in an array, then one will be picked at random!
@@ -16,14 +16,13 @@ let StimulusSettings = function(){
     //Now we determine the experiment structure
     let All_Experiment_Structures = {
         schema_experiment_baseline: [
-            //{
-            //    type: "card_sorting_task"
-            //},
-            //{
-            //    type: "free_exploration",
-            //    Fennimal_interaction_type: "polaroid_photo_passive",
-            //    Fennimals_encountered: "all"
-            //},
+
+
+            {
+                type: "free_exploration",
+                Fennimal_interaction_type: "polaroid_photo_passive",
+                Fennimals_encountered: "all"
+            },
             /*
             {
                 //Defining the block type
@@ -107,12 +106,12 @@ let StimulusSettings = function(){
             all: [
                 {id: "A1", head_group: "A", region: "A"},
                  {id: "A2", head_group: "A", region: "A"},
-                /* {id: "A3", head_group: "A", region: "A"},
+                 {id: "A3", head_group: "A", region: "A"},
                 {id: "A4", head_group: "A", region: "A"},
                 {id: "B1", head_group: "B", region: "B"},
-                {id: "B1", head_group: "B", region: "B"},
-                 {id: "B1", head_group: "B", region: "B"},
-                 {id: "B1", head_group: "B", region: "B"},
+                {id: "B2", head_group: "B", region: "B"},
+                 {id: "B3", head_group: "B", region: "B"},
+                 {id: "B4", head_group: "B", region: "B"},
                  {id: "C1", head_group: "C", region: "C"},
                  {id: "C2", head_group: "C", region: "C"},
                  {id: "C3", head_group: "C", region: "C"},
@@ -122,7 +121,7 @@ let StimulusSettings = function(){
                  {id: "D3", head_group: "D", region: "D"},
                 {id: "D4", head_group: "D", region: "D"},
 
-                */
+
             ]
         }
     }

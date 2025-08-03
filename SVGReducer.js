@@ -20,7 +20,11 @@ SVGREDUCER = function(Stimuli){
 
             //Removing the top and bottom layers, as well as the opacity mask and the sky layer
             document.getElementById("map_layer_" + region + "_bottom").remove()
-            document.getElementById("map_layer_" + region + "_top").remove()
+
+            if(document.getElementById("map_layer_" + region + "_top") !== null){
+                document.getElementById("map_layer_" + region + "_top").remove()
+            }
+
             document.getElementById("map_region_opacity_mask_" + region).remove()
             document.getElementById("sky_" + region).remove()
 

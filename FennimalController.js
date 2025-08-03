@@ -188,6 +188,7 @@ FENNIMALCONTROLLER = function(FenObj, ExpCont, interaction_type, OptionalAdditio
 
         draw_Fennimal_on_screen(center_x,center_y,size)
         Interface.Prompt.show_message("There is a Fennimal present here!")
+        AudioCont.play_sound_effect("Fennimal_appears")
 
         setTimeout(function(){
             start_next_interaction_step()
@@ -228,6 +229,7 @@ FENNIMALCONTROLLER = function(FenObj, ExpCont, interaction_type, OptionalAdditio
     }
 
     function draw_Fennimal_on_screen(center_x,center_y,size){
+
         //Create
         FennimalSVGObj = create_Fennimal_SVG_object(FenObj,GenParam.Fennimal_head_size, false)
         ParentLayer.appendChild(FennimalSVGObj)
@@ -282,7 +284,7 @@ FENNIMALCONTROLLER = function(FenObj, ExpCont, interaction_type, OptionalAdditio
         camera_target_type = target_type
         camera_task_type = camera_action_type
         Clean_Up_Steps.push("remove_camera_button")
-        CameraButton.onpointerdown = enter_camera_mode
+        CameraButton.onpointerdown = function(){enter_camera_mode(); AudioCont.play_sound_effect("camera_pickup")}
         Interface.Prompt.show_message("Click on the button to open your camera...")
     }
     function enter_camera_mode(){
@@ -332,6 +334,7 @@ FENNIMALCONTROLLER = function(FenObj, ExpCont, interaction_type, OptionalAdditio
     }
     function take_photo_at_location(Coords){
         play_camera_shutter_effect(500)
+        AudioCont.play_sound_effect("photo")
 
         setTimeout(function(){
             check_photo_target(Coords)
@@ -376,12 +379,14 @@ FENNIMALCONTROLLER = function(FenObj, ExpCont, interaction_type, OptionalAdditio
         if(dist <= Settings.photo_camera_allowed_error){
             show_succesful_photo()
         }else{
+            AudioCont.play_sound_effect("rejected")
             Interface.Prompt.show_message("Oops, that wasn't it... please try again")
             leave_camera_mode()
         }
 
     }
     function show_succesful_photo(){
+        AudioCont.play_sound_effect("success")
         //Remove the camera mask to prevent further movement
         CameraMask.remove()
         CameraMask = undefined
@@ -468,6 +473,7 @@ FENNIMALCONTROLLER = function(FenObj, ExpCont, interaction_type, OptionalAdditio
         Camera_PhotoCloseButton.onpointerdown = exit_photo
     }
     function exit_photo(){
+        AudioCont.play_sound_effect("close_menu")
         //Remove the Polaroid frame and set the background mask to invisible
         Camera_Polaroid_Frame.remove()
         Camera_ViewFinder.remove()
@@ -530,6 +536,7 @@ FENNIMALCONTROLLER = function(FenObj, ExpCont, interaction_type, OptionalAdditio
             FenObj.photo_name_attempts.attempts.push(name_submitted)
 
             Interface.Prompt.show_message("Correct!")
+            AudioCont.play_sound_effect("success")
             Camera_Photo_Name_Foreign.remove()
             Camera_Polaroid_Frame.getElementsByClassName("polaroid_frame_name")[0].childNodes[0].innerHTML = FenObj.name
             Camera_Polaroid_Frame.getElementsByClassName("polaroid_frame_name")[0].childNodes[0].style.opacity = 1
@@ -538,6 +545,7 @@ FENNIMALCONTROLLER = function(FenObj, ExpCont, interaction_type, OptionalAdditio
             }, Settings.step_speed)
         }else{
             //Check if the name has been changed from the previous attempt
+            AudioCont.play_sound_effect("rejected")
             if(name_submitted !== camera_active_name_previous_attempt){
                 FenObj.photo_name_attempts.attempts.push(name_submitted)
                 FenObj.photo_name_attempts.num_errors++

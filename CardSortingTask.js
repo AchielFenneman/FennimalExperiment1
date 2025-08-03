@@ -188,7 +188,14 @@ CARDSORTINGTASK = function(currentdaynum, HostElem, Stimuli, returnfunction){
         Instructions_First_Stage_Instructions_Div.innerHTML = CardParam.get_instruction_text_first_block()
         Instructions_First_Stage_Instructions_Foreign.appendChild(Instructions_First_Stage_Instructions_Div)
 
-        let Title = create_SVG_text_elem(0.5 * GenParam.SVG_width, 75,"Day " + currentdaynum + ": organizing some cards", "instructions_element_title","Instructions_Title")
+        let title_text
+        if(currentdaynum === false){
+            title_text = "First, let's sort some cards"
+        }else{
+            title_text = "Day " + currentdaynum + ": organizing some cards"
+        }
+
+        let Title = create_SVG_text_elem(0.5 * GenParam.SVG_width, 75,title_text, "instructions_element_title","Instructions_Title")
         Title.style.fontWeight = 700
         Title.classList.add("instruction_element_nonbackground")
         Instructions_First_Stage_Layer.appendChild(Title)
@@ -205,7 +212,7 @@ CARDSORTINGTASK = function(currentdaynum, HostElem, Stimuli, returnfunction){
         Instructions_First_Stage_Layer.appendChild(Button)
         Button.style.fontWeight = 900
 
-        Button.onpointerdown = close_instruction_page
+        Button.onpointerdown = function(){close_instruction_page(); AudioCont.play_sound_effect("close_menu")}
 
         Instructions_First_Stage_Layer.style.display = "inherit"
 
@@ -243,7 +250,7 @@ CARDSORTINGTASK = function(currentdaynum, HostElem, Stimuli, returnfunction){
         Button.style.fontWeight = 900
         Instructions_Second_Stage_Layer.appendChild(Button)
 
-        Button.onpointerdown = close_instruction_page
+        Button.onpointerdown = function(){close_instruction_page(); AudioCont.play_sound_effect("close_menu")}
 
         Instructions_Second_Stage_Layer.style.display = "inherit"
 
@@ -304,14 +311,14 @@ CARDSORTINGTASK = function(currentdaynum, HostElem, Stimuli, returnfunction){
         ReservoirGroupDiv.appendChild(ReservoirScrollRight)
 
         //Setting event listeners
-        ReservoirScrollLeft.onpointerdown = function(){ReservoirCardDiv.scrollLeft -=100; that.check_reservoir_scroll()}
-        ReservoirScrollRight.onpointerdown = function(){ReservoirCardDiv.scrollLeft +=100; that.check_reservoir_scroll()}
+        ReservoirScrollLeft.onpointerdown = function(){ReservoirCardDiv.scrollLeft -=100; that.check_reservoir_scroll(); AudioCont.play_sound_effect("button_click")}
+        ReservoirScrollRight.onpointerdown = function(){ReservoirCardDiv.scrollLeft +=100; that.check_reservoir_scroll(); AudioCont.play_sound_effect("button_click")}
 
         //Instructions button
         RequestInstructionsButton = create_SVG_buttonElement(GenParam.RequestInstructionButtonSettings.center_x,GenParam.RequestInstructionButtonSettings.center_y,GenParam.RequestInstructionButtonSettings.width,GenParam.RequestInstructionButtonSettings.height,GenParam.RequestInstructionButtonSettings.text, GenParam.RequestInstructionButtonSettings.textsize)
         Card_layer.appendChild(RequestInstructionsButton)
         RequestInstructionsButton.style.fontWeight = 900
-        RequestInstructionsButton.onpointerdown = open_instructions_page
+        RequestInstructionsButton.onpointerdown = function(){open_instructions_page(); AudioCont.play_sound_effect("button_click")}
         //TODO
 
         //Continue button and associated text
@@ -322,7 +329,7 @@ CARDSORTINGTASK = function(currentdaynum, HostElem, Stimuli, returnfunction){
         CategoryContinueButton = create_SVG_buttonElement(1400,900,300,100,"Continue", 60)
         Card_layer.appendChild(CategoryContinueButton)
         CategoryContinueButton.style.fontWeight = 900
-        CategoryContinueButton.onpointerdown = start_second_stage
+        CategoryContinueButton.onpointerdown =  function(){start_second_stage(); AudioCont.play_sound_effect("button_click")}
 
 
         //Creating various text elements
@@ -655,7 +662,7 @@ CARDSORTINGTASK = function(currentdaynum, HostElem, Stimuli, returnfunction){
             FinishButton = create_SVG_buttonElement(1400,920,300,100,"Continue", 60)
             FinishButton.style.fontWeight = 900
             Card_layer.appendChild(FinishButton)
-            FinishButton.onclick = finish_task
+            FinishButton.onpointerdown = function(){finish_task(); AudioCont.play_sound_effect("close_menu")}
         }
     }
     function finish_task(){
@@ -705,7 +712,7 @@ BoxController = function(ParentElem, GroupingCont){
         AddButton.removeAttribute("id")
         AddButtonSVG.appendChild(AddButton)
 
-        AddButton.onpointerdown = create_new_box
+        AddButton.onpointerdown = function(){create_new_box(); AudioCont.play_sound_effect("thud")}
 
     }
 
@@ -837,7 +844,7 @@ BoxController = function(ParentElem, GroupingCont){
 
         }
         if(CardParam.fix_number_of_groups === false){
-            DeleteButton.onpointerdown = delete_box
+            DeleteButton.onpointerdown =  function(){delete_box(); AudioCont.play_sound_effect("button_click")}
         }
 
 
@@ -1253,6 +1260,7 @@ CardController = function(MainSVG, HeadSVG, ReservoirElem, GroupingCont){
 
         GroupingCont.check_reservoir_scroll()
         GroupingCont.update_continue_button()
+        AudioCont.play_sound_effect("card_placed")
     }
 
     //Call when the dragging is terminated without the card reaching a valid next position

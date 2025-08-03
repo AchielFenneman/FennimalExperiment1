@@ -311,6 +311,10 @@ DATACONTROLLER = function(Stimuli){
 
     }
 
+    this.store_card_data_when_included_in_general_instructions = function(CardData){
+        ExperimentData.CardTaskData = JSON.parse(JSON.stringify(CardData))
+    }
+
     //Call when stars have been earned
     let PaymentInfo = []
     this.record_stars_earned = function(daynum, phase_type, stars_earned, maximum_possible_stars){
@@ -407,7 +411,7 @@ EXPCONTROLLER = function(){
     WorldState.rebuild_state_from_available_locations(Stimuli.get_all_locations_visited_during_experiment_with_regions())
     //WorldState.reset_all_regions_to_empty_unsearched()
 
-    //Creating a Map Controller
+    //Creating an Audio and Map Controller
     let MapCont = new MapController(that,WorldState)
 
     //Creating an instructions controller
@@ -509,6 +513,7 @@ EXPCONTROLLER = function(){
             WorldState.add_Fennimal_to_map(CurrentSearchTrial)
 
             InstrCont.initialize_hint_and_search_phase_trial_instructions(CurrentSearchTrial, CurrentPhaseData.hint_type)
+            AudioCont.play_sound_effect("alert")
             MapCont.allow_participant_to_leave_location()
 
         }else{
@@ -525,7 +530,7 @@ EXPCONTROLLER = function(){
         console.log("EXPERIMENT SUBMITTED")
 
         //Submit after the alert
-        //document.getElementById("submitbutton").click()
+        document.getElementById("submitbutton").click()
     }
 
     function sort_Fennimal_array_by_features(Arr, sort_type){
@@ -719,6 +724,11 @@ EXPCONTROLLER = function(){
                 case("consent"): InstrCont.show_consent_page(); break
                 case("browser_check_and_full_screen_prompt"): InstrCont.show_browser_check_and_fullscreen_page(); break
                 case("overview"): InstrCont.show_overview_page(); break
+                case("card_sorting_task"):
+                    MapCont.disable_map_interactions()
+                    InstrCont.start_card_sorting_task(false)
+                    break
+
             }
 
 
@@ -871,6 +881,7 @@ EXPCONTROLLER = function(){
 
     //Exploration phase: check if all the locations and Fennimals have been visited. If so, finish the block. If not, allow participants to explore more...
     function exploration_phase_add_photo(){
+        AudioCont.play_sound_effect("alert")
         //Show the instructions page with the new photo added.
         InstrCont.instructions_requested_by_participant()
 
@@ -989,10 +1000,21 @@ EXPCONTROLLER = function(){
         start_next_experiment_phase()
 
     }
+
     this.card_sorting_task_complete = function(CardData){
-        CurrentPhaseData.CardData = JSON.parse(JSON.stringify(CardData))
-        DataCont.store_phase_data(CurrentPhaseData)
-        start_next_experiment_phase()
+
+        //Card data can be ran in either the instructions or as a separate day. What we do next depends on our current situation
+        console.log(CurrentPhaseData)
+
+        if(typeof CurrentPhaseData !== "undefined"){
+            CurrentPhaseData.CardData = JSON.parse(JSON.stringify(CardData))
+            DataCont.store_phase_data(CurrentPhaseData)
+            start_next_experiment_phase()
+        }else{
+            DataCont.store_card_data_when_included_in_general_instructions(CardData)
+            show_next_general_instructions_page()
+        }
+
     }
 
     function start_quiz(){
@@ -1188,6 +1210,7 @@ EXPCONTROLLER = function(){
 
 }
 
+let AudioCont = new AudioControllerObject()
 let EC = new EXPCONTROLLER()
 EC.start_experiment()
 

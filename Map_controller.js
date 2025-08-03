@@ -49,9 +49,10 @@ ActionButton = function(ParentElem, button_icon, TargetObject, warmup_time, acti
 
 
     function start_countdown(){
+        AudioCont.play_sound_effect("search_loop")
         CountdownCircle.classList.add("warmup_circle_active")
         CountdownCircle.style.animation = "warmup_circle_animation " + warmup_time + "ms linear"
-        Countdown_Timer = setTimeout(function(){if(button_functional){activationfunc()}}, warmup_time)
+        Countdown_Timer = setTimeout(function(){if(button_functional){activationfunc(); AudioCont.play_sound_effect("success")}}, warmup_time)
 
     }
     function break_countdown(){
@@ -66,13 +67,22 @@ ActionButton = function(ParentElem, button_icon, TargetObject, warmup_time, acti
     }
 
     Button.onpointerdown = function(){
+        console.log(button_icon)
+        let sound_effect = "button_click"
+        if(button_icon === "return_arrow"){
+            sound_effect = "close_menu"
+        }
+
         if(warmup_time === undefined){
+            AudioCont.play_sound_effect(sound_effect)
             activationfunc()
         }else{
             if(warmup_time === false){
+                AudioCont.play_sound_effect(sound_effect)
                 activationfunc()
             }else{
                 if(warmup_time <= 0){
+                    AudioCont.play_sound_effect(sound_effect)
                     activationfunc()
                 }else{
                     start_countdown()
@@ -210,6 +220,8 @@ MapController = function(ExpCont, WorldState){
 
     //Moves and zooms the map to a given region. Special case: "All" zooms the map out
     function zoom_map_to_region(region_name){
+        AudioCont.stop_all_region_sounds()
+
         //Get coordinates of center
         let coords = GenParam.Map_Region_Centers_Percentage[region_name]
 
@@ -237,9 +249,14 @@ MapController = function(ExpCont, WorldState){
             for(let i = 0;i<Masks.length;i++){
                 Masks[i].style.opacity =0
             }
+            AudioCont.stop_all_region_sounds()
         }else{
+            AudioCont.play_region_sound(region_name)
             if(region_name !== "Home"){
                 let Mask = document.getElementById("map_region_opacity_mask_" + region_name).style.opacity = 0
+
+            }else{
+
             }
         }
     }
@@ -379,7 +396,7 @@ MapController = function(ExpCont, WorldState){
         //Update the locator
         if(current_nearest_location === false){
             Interface.Locator.change_locator_name(GenParam.RegionData[current_region].display_name)
-            //TODO: update locator icon color
+            //AudioCont.play_sound_effect("nearby_location")
         }else{
             //Check if the location is searchable, or has been searched
             let location_search_status = WorldState.get_search_status_of_location(current_nearest_location)
@@ -500,9 +517,6 @@ MapController = function(ExpCont, WorldState){
     //Shows the action button on the map level. Assumes that there can be only a single button at the same time. If called with false will remove all buttons.
     let ActiveActionButtonArr = []
 
-
-
-
     //SEARCH AND TRANSITION FUNCTIONS
     function perform_search_at_current_location(){
         let Closest_Marker = get_closest_object(CurrentPlayerPos, document.getElementsByClassName("location_marker_" + current_region))
@@ -596,6 +610,7 @@ MapController = function(ExpCont, WorldState){
         setTimeout(function(){
             Transition_Mask.style.animation = ""
         }, GenParam.map_to_location_transition_speed)
+
 
     }
 
@@ -1042,10 +1057,12 @@ MapController = function(ExpCont, WorldState){
     //Call to disable or enable map interations
     this.disable_map_interactions = function(){
         player_allowed_to_move = false
+        AudioCont.stop_all_region_sounds()
 
     }
     this.enable_map_interactions = function(){
         player_allowed_to_move = true
+        AudioCont.play_region_sound(current_region)
     }
 
     //Call to show the request-instructions button on the top of the page
@@ -1057,7 +1074,7 @@ MapController = function(ExpCont, WorldState){
         RequestInstructionsButton = create_SVG_buttonElement(GenParam.RequestInstructionButtonSettings.center_x,GenParam.RequestInstructionButtonSettings.center_y,GenParam.RequestInstructionButtonSettings.width,GenParam.RequestInstructionButtonSettings.height,GenParam.RequestInstructionButtonSettings.text, GenParam.RequestInstructionButtonSettings.textsize)
         Interface_Layer.appendChild(RequestInstructionsButton)
         RequestInstructionsButton.style.display = "none"
-        RequestInstructionsButton.onclick = request_instructions_button_clicked
+        RequestInstructionsButton.onpointerdown = function(){request_instructions_button_clicked(); AudioCont.play_sound_effect("button_click")}
         RequestInstructionsButton.style.fontWeight = GenParam.RequestInstructionButtonSettings.fontWeight
         RequestInstructionsButton.classList.add("do_not_move_on_click")
 

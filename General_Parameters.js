@@ -26,7 +26,7 @@ GENERALPARAM = function(){
                 "and scope of the study and that you consent to these terms, and that you are aware of your rights as a participant. "
         },
         Overview:{
-            story: "<b>Your task in this experiment. </b>In this experiment you will travel to an island called Fenneland. This remove island has a unique wildlife, and is filled with many smart animals called <u>Fennimals</u>. " +
+            story: "<b>Your task in this experiment. </b>In this experiment you will travel to an island called Fenneland. This remote island has a unique wildlife, and is filled with many smart animals called <u>Fennimals</u>. " +
                 "These Fennimals are unique to Fenneland and are unlike any other creatures. <br>" +
                 "<br>" +
                 "This experiment will consist of %NUMBERDAYS% days. At the start of each day you will receive further instructions on how to interact with the Fennimals on the island. ",
@@ -310,7 +310,7 @@ GENERALPARAM = function(){
     this.ActionButtonParameters_OnObject = {
         height: 50,
         width: 50,
-        warmup_time: 1000
+        warmup_time: 750
     }
     this.location_detection_distance = 30
 

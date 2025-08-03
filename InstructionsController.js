@@ -133,40 +133,50 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
 
     }
     function update_progress_new_day(currentday){
-        for(let i = 0;i<ProgressDayNumberIndicators.length;i++){
+        if(currentday === false){
+            for(let i = 0;i<ProgressDayNumberIndicators.length;i++){
 
-            //Previous days
-            if( (i+1) < currentday ){
-                ProgressDayNumberIndicators[i].style.fill = "navy"
-                ProgressDayNumberIndicators[i].style.opacity = 0.7
-                ProgressDayNumberIndicators[i].setAttribute("r",   0.7 *0.5 * progress_elements_height)
-
-                ProgressDayNumberNumbers[i].style.fill = "white"
-                ProgressDayNumberNumbers[i].style.fontSize = "30px"
-
+                ProgressDayNumberIndicators[i].style.display = "none"
+                ProgressDayNumberNumbers[i].style.display = "none"
             }
 
-            //Current day
-            if( (i+1) === currentday){
-                ProgressDayNumberIndicators[i].style.fill = "goldenrod"
-                ProgressDayNumberIndicators[i].style.opacity = 0.75
-                ProgressDayNumberIndicators[i].setAttribute("r",  0.5 * progress_elements_height)
+        }else{
+            for(let i = 0;i<ProgressDayNumberIndicators.length;i++){
 
-                ProgressDayNumberNumbers[i].style.fill = "navy"
-                ProgressDayNumberNumbers[i].style.fontSize = "40px"
-                ProgressDayNumberNumbers[i].style.fontWeight = 600
-            }
+                //Previous days
+                if( (i+1) < currentday ){
+                    ProgressDayNumberIndicators[i].style.fill = "navy"
+                    ProgressDayNumberIndicators[i].style.opacity = 0.7
+                    ProgressDayNumberIndicators[i].setAttribute("r",   0.7 *0.5 * progress_elements_height)
 
-            //Future days
-            if( (i+1) > currentday){
-                ProgressDayNumberIndicators[i].style.fill = "gray"
-                ProgressDayNumberIndicators[i].style.opacity = 0.5
-                ProgressDayNumberIndicators[i].setAttribute("r",   0.7 *0.5 * progress_elements_height)
+                    ProgressDayNumberNumbers[i].style.fill = "white"
+                    ProgressDayNumberNumbers[i].style.fontSize = "30px"
 
-                ProgressDayNumberNumbers[i].style.fill = "white"
-                ProgressDayNumberNumbers[i].style.fontSize = "30px"
+                }
+
+                //Current day
+                if( (i+1) === currentday){
+                    ProgressDayNumberIndicators[i].style.fill = "goldenrod"
+                    ProgressDayNumberIndicators[i].style.opacity = 0.75
+                    ProgressDayNumberIndicators[i].setAttribute("r",  0.5 * progress_elements_height)
+
+                    ProgressDayNumberNumbers[i].style.fill = "navy"
+                    ProgressDayNumberNumbers[i].style.fontSize = "40px"
+                    ProgressDayNumberNumbers[i].style.fontWeight = 600
+                }
+
+                //Future days
+                if( (i+1) > currentday){
+                    ProgressDayNumberIndicators[i].style.fill = "gray"
+                    ProgressDayNumberIndicators[i].style.opacity = 0.5
+                    ProgressDayNumberIndicators[i].setAttribute("r",   0.7 *0.5 * progress_elements_height)
+
+                    ProgressDayNumberNumbers[i].style.fill = "white"
+                    ProgressDayNumberNumbers[i].style.fontSize = "30px"
+                }
             }
         }
+
 
     }
 
@@ -200,7 +210,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
         }
         ParentElem.appendChild(ClosingButton)
         ClosingButton.classList.add("instruction_element_nonbackground")
-        ClosingButton.onpointerdown = close_instructions
+        ClosingButton.onpointerdown = function(){close_instructions(); AudioCont.play_sound_effect("close_menu") }
     }
 
 
@@ -335,7 +345,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
             }
         }
 
-        ContinueButton.onpointerdown = ExpCont.general_instructions_page_completed
+        ContinueButton.onpointerdown = function(){ExpCont.general_instructions_page_completed(); AudioCont.play_sound_effect("button_click") }
 
 
     }
@@ -411,7 +421,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
         //The continue button
         OverviewPage_ContinueButton = create_SVG_buttonElement(0.5 * GenParam.SVG_width, 0.92* GenParam.SVG_height,400, 75,"Continue", 40)
         CurrentInstructionsSVG.appendChild(OverviewPage_ContinueButton)
-        OverviewPage_ContinueButton.onpointerdown = overview_page_next_step
+        OverviewPage_ContinueButton.onpointerdown = function(){overview_page_next_step(); AudioCont.play_sound_effect("button_click") }
     }
 
     function overview_page_next_step(){
@@ -481,7 +491,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
 
                     //let SearchButton = create_Action_Button_SVG_Element("magnifier", {center_x: 500,center_y:500, width: .5*boxheight, height: .5*boxheight}, false, 3000)
                     let SearchButtonDims = {center_x: 0.545 *GenParam.SVG_width, center_y:box_offset_top + 1.5*boxheight + 1*spacing_boxes, width: .55*boxheight, height: .55*boxheight}
-                    OverviewPage_SearchButton = new ActionButton(CurrentInstructionsSVG,"magnifier", SearchButtonDims,1000, function(){overview_page_next_step(); create_ripple(CurrentInstructionsSVG, SearchButtonDims.center_x, SearchButtonDims.center_y ,true)})
+                    OverviewPage_SearchButton = new ActionButton(CurrentInstructionsSVG,"magnifier", SearchButtonDims,1000, function(){overview_page_next_step(); create_ripple(CurrentInstructionsSVG, SearchButtonDims.center_x, SearchButtonDims.center_y ,true, AudioCont)})
                     OverviewPage_ContinueButton.style.display = "none"
                     //CurrentInstructionsSVG.appendChild(SearchButton)
 
@@ -594,6 +604,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
     }
 
     this.update_exploration_phase_instructions_to_show_completion = function(){
+        AudioCont.play_sound_effect("alert")
         TextElem_Main_Instructions.remove()
         TextElem_Main_Instructions = create_SVG_text_in_foreign_element("Well done! You have photographed all the Fennimals! You will continue to the next phase of the experiment after closing these instructions!", 100,150,(1920 - 2*100), 500,"instruction_element_text")
         TextElem_Main_Instructions.classList.add("instruction_element_nonbackground")
@@ -609,6 +620,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
 
     //Call to update the state of the free exploration instructions
     function update_and_show_free_exploration_instructions (){
+        //AudioCont.play_sound_effect("alert")
         ParentElem.style.display = "inherit"
 
         //Animate the page being opened
@@ -839,6 +851,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
 
         //Show the instructions background as usual
         clear_instructions()
+
         CurrentInstructionsSVG = create_SVG_group(0,0,undefined,undefined)
         ParentElem.appendChild(CurrentInstructionsSVG)
         ParentElem.style.display = "inherit"
@@ -961,6 +974,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
         ContinueButton.onpointerdown = function(){
             ExpCont.quiz_instructions_closed()
             that.update_progress_within_day(0)
+            AudioCont.play_sound_effect("button_click")
         }
 
     }
@@ -1020,13 +1034,13 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
         //Adding a check-answer button
         QuizAnswerButton = create_SVG_buttonElement(QuestionForeign.getBBox().x + 0.5*QuestionForeign.getBBox().width, 0.7* GenParam.SVG_height,400, 75,"Check answers", 40)
         QuizAnswerButton.classList.add("quiz_question_element")
-        QuizAnswerButton.onpointerdown = check_quiz_answers
+        QuizAnswerButton.onpointerdown = function(){check_quiz_answers(); AudioCont.play_sound_effect("button_click") }
         ParentElem.appendChild(QuizAnswerButton)
         QuizAnswerButton.style.display = "none"
 
         QuizFinishButton = create_SVG_buttonElement(QuestionForeign.getBBox().x + 0.5*QuestionForeign.getBBox().width, 0.8* GenParam.SVG_height,400, 75,"Continue", 40)
         QuizFinishButton.classList.add("quiz_question_element")
-        QuizFinishButton.onpointerdown = quiz_question_completed
+        QuizFinishButton.onpointerdown =  function(){quiz_question_completed(); AudioCont.play_sound_effect("button_click") }
         ParentElem.appendChild(QuizFinishButton )
         QuizFinishButton.style.display = "none"
 
@@ -1183,6 +1197,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
 
     function show_bonus_star_on_screen(Parent,center_x,center_y, show_animated_stars, optional_class_name, optional_resize_factor){
         //If requested, show some animated stars bursting out
+        AudioCont.play_sound_effect("star_earned")
         let main_star_delay = 0
         if(show_animated_stars){
             let num_stars = 50
@@ -1315,6 +1330,11 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
             }
         }
 
+        //Sound a chime if there are any errors
+        if( CurrentQuizQuestion.subquestions_correct_arr.includes(false)){
+            AudioCont.play_sound_effect("rejected")
+        }
+
         //Show the continue button
         setTimeout(function(){
             QuizFinishButton.style.display = "inherit"
@@ -1384,6 +1404,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
 
         CardDiv.appendChild(SVG)
         Parent.appendChild(CardDiv)
+        AudioCont.play_sound_effect("thud")
 
         //Adding theday number at the top
 
@@ -1455,7 +1476,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
 
         let ContinueButton = create_SVG_buttonElement(0.5 * GenParam.SVG_width, 0.90* GenParam.SVG_height,400, 75,"Continue", 40)
         CurrentInstructionsSVG.appendChild(ContinueButton)
-        ContinueButton.onpointerdown = show_completion_code_screen
+        ContinueButton.onpointerdown = function(){show_completion_code_screen(); AudioCont.play_sound_effect("button_click") }
 
     }
 
