@@ -23,7 +23,7 @@ let StimulusSettings = function(){
                 Fennimal_interaction_type: "polaroid_photo_passive",
                 Fennimals_encountered: "all"
             },
-         
+
             {
                 //Defining the block type
                 type: "hint_and_search",
@@ -51,7 +51,7 @@ let StimulusSettings = function(){
              Fennimal_interaction_type: "polaroid_photo_active",
              allowed_attempts_before_answer_given: 3,
          },
-         
+
           */
             {
                 //Defining the quiz here
@@ -788,4 +788,3 @@ let StimulusTransformer = function(StimTemplate){
 }
 
 //TODO: set seed (for shufflearray)
-console.log("..........")
