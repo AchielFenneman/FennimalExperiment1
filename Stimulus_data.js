@@ -788,3 +788,4 @@ let StimulusTransformer = function(StimTemplate){
 }
 
 //TODO: set seed (for shufflearray)
+console.log("..........")
