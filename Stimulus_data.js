@@ -23,7 +23,7 @@ let StimulusSettings = function(){
                 Fennimal_interaction_type: "polaroid_photo_passive",
                 Fennimals_encountered: "all"
             },
-            /*
+         
             {
                 //Defining the block type
                 type: "hint_and_search",
@@ -37,21 +37,22 @@ let StimulusSettings = function(){
                 Fennimal_interaction_type: "polaroid_photo_active",
                 allowed_attempts_before_answer_given: 3,
             },
-            {
-                //Defining the block type
-                type: "hint_and_search",
-                hint_type: "name",
+            /*
+         {
+             //Defining the block type
+             type: "hint_and_search",
+             hint_type: "name",
 
-                //Defining which Fennimals are encountered in this block
-                Fennimals_encountered: "all",
-                sort_trials_by: "head_group",
+             //Defining which Fennimals are encountered in this block
+             Fennimals_encountered: "all",
+             sort_trials_by: "head_group",
 
-                //Defining the Fennimal interaction type
-                Fennimal_interaction_type: "polaroid_photo_active",
-                allowed_attempts_before_answer_given: 3,
-            },
-            
-             */
+             //Defining the Fennimal interaction type
+             Fennimal_interaction_type: "polaroid_photo_active",
+             allowed_attempts_before_answer_given: 3,
+         },
+         
+          */
             {
                 //Defining the quiz here
                 type: 'quiz',
