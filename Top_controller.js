@@ -7,6 +7,8 @@ const GenParam = new GENERALPARAM()
 //Creating an interface controller
 let Interface = new InterfaceController()
 
+//Creating an audio controller
+let AudioCont = new AudioControllerObject()
 
 
 //Defining the world state object here
@@ -209,7 +211,8 @@ DATACONTROLLER = function(Stimuli){
         browser: getBrowser(),
         TimeStamps: [],
         RawPhaseData: [],
-        StoredData: []
+        StoredData: [],
+        Questionnaire: []
     }
 
     //On creation, store the Fennimals and experiment code. We want to store these templates in minimal form
@@ -315,6 +318,10 @@ DATACONTROLLER = function(Stimuli){
         ExperimentData.CardTaskData = JSON.parse(JSON.stringify(CardData))
     }
 
+    this.store_questionnaire_data = function(QuestionnaireAnswerObj){
+        ExperimentData.Questionnaire.push(JSON.parse(JSON.stringify(QuestionnaireAnswerObj)))
+    }
+
     //Call when stars have been earned
     let PaymentInfo = []
     this.record_stars_earned = function(daynum, phase_type, stars_earned, maximum_possible_stars){
@@ -409,7 +416,6 @@ EXPCONTROLLER = function(){
     //Creating the world state (this keep tracks of which Fennimals are present on the map)
     let WorldState = new WorldStateObject()
     WorldState.rebuild_state_from_available_locations(Stimuli.get_all_locations_visited_during_experiment_with_regions())
-    //WorldState.reset_all_regions_to_empty_unsearched()
 
     //Creating an Audio and Map Controller
     let MapCont = new MapController(that,WorldState)
@@ -434,7 +440,7 @@ EXPCONTROLLER = function(){
     function start_next_experiment_phase(){
 
         if(Remaining_experiment_phases.length === 0){
-            finish_experiment()
+            start_post_experiment_questionnaire()
         }else{
             CurrentPhaseData = Remaining_experiment_phases.shift()
 
@@ -454,6 +460,9 @@ EXPCONTROLLER = function(){
                 current_interaction_num_in_phase = 0
 
                 WorldState.clear_all_locations(true)
+                if(GenParam.DisplayFoundFennimalIconsOnMap.show){
+                    MapCont.clear_all_Fennimal_icons_from_map()
+                }
 
 
                 switch(current_phase_of_the_experiment){
@@ -501,6 +510,14 @@ EXPCONTROLLER = function(){
                         MapCont.disable_map_interactions()
                         start_quiz()
                         break
+                    case("match_head_to_region"):
+                        MapCont.disable_map_interactions()
+                        start_match_head_to_region_task()
+                        break
+                    case("head_region_sorting_task"):
+                        MapCont.disable_map_interactions()
+                        start_head_to_region_sorting_task()
+                        break
                 }
             }
 
@@ -519,6 +536,27 @@ EXPCONTROLLER = function(){
         }else{
             phase_completed()
         }
+    }
+
+    let Remaining_Questionnaire_Pages
+    function start_post_experiment_questionnaire(){
+        Remaining_Questionnaire_Pages  = Stimuli.get_questionnaire_pages_arr()
+        start_next_questionnaire_page()
+    }
+
+    function start_next_questionnaire_page(){
+        if(Remaining_Questionnaire_Pages.length > 0){
+            InstrCont.show_questionnaire_page(Remaining_Questionnaire_Pages.shift())
+        }else{
+            finish_experiment()
+        }
+
+    }
+
+    this.questionnaire_page_completed = function(PageData){
+        DataCont.store_questionnaire_data(PageData)
+        start_next_questionnaire_page()
+
     }
 
     function finish_experiment(){
@@ -681,7 +719,6 @@ EXPCONTROLLER = function(){
 
                     //Finding the distance
                     let dist = EUDistPoints(centerpoint0,centerpoint1)
-                    console.log(dist)
 
                     //Determine whether this is a similar pair or an other-pair
                     if( (AllPairs[p].includes("xmas") && AllPairs[p].includes("halloween")) || (AllPairs[p].includes("safari") && AllPairs[p].includes("bird")) ){
@@ -709,7 +746,6 @@ EXPCONTROLLER = function(){
 
         // If not, then check whether the participant has the option to voluntarily screen out...1
         //      Give the participant the option to continue OR to screen out
-        console.log(participant_screened_out)
 
     }
 
@@ -746,8 +782,6 @@ EXPCONTROLLER = function(){
     this.general_instructions_page_completed = function(){
         show_next_general_instructions_page()
     }
-
-
 
     //PHASE INSTRUCTIONS
     //////////////////
@@ -838,6 +872,11 @@ EXPCONTROLLER = function(){
         let Fennimal_previously_visited = (typeof FenObj.visited) !== "undefined"
         FenObj.visited = true
 
+        //If enabled, add a Fennimal icon to the map
+        if(GenParam.DisplayFoundFennimalIconsOnMap.show){
+            MapCont.add_Fennimal_icon_on_map(FenObj)
+        }
+
         //Make and store a copy of the data
         if(typeof CurrentPhaseData.Data === "undefined"){
             CurrentPhaseData.Data = []
@@ -881,13 +920,16 @@ EXPCONTROLLER = function(){
 
     //Exploration phase: check if all the locations and Fennimals have been visited. If so, finish the block. If not, allow participants to explore more...
     function exploration_phase_add_photo(){
-        AudioCont.play_sound_effect("alert")
+        //AudioCont.play_sound_effect("alert")
         //Show the instructions page with the new photo added.
-        InstrCont.instructions_requested_by_participant()
+        //InstrCont.instructions_requested_by_participant()
 
         //Check if all Fennimals have been discovered. If not, allow the participant to continue. If yes, then this phase has been completed
         if(exploration_phase_check_if_all_Fennimals_visited()){
             // Raise a flag: if the instructions page is now closed, then go to the next experiment phase.
+            AudioCont.play_sound_effect("alert")
+            InstrCont.instructions_requested_by_participant()
+
             flag_exploration_phase_has_been_completed_after_instructions_closed = true
             InstrCont.update_exploration_phase_instructions_to_show_completion()
         }else{
@@ -1004,8 +1046,6 @@ EXPCONTROLLER = function(){
     this.card_sorting_task_complete = function(CardData){
 
         //Card data can be ran in either the instructions or as a separate day. What we do next depends on our current situation
-        console.log(CurrentPhaseData)
-
         if(typeof CurrentPhaseData !== "undefined"){
             CurrentPhaseData.CardData = JSON.parse(JSON.stringify(CardData))
             DataCont.store_phase_data(CurrentPhaseData)
@@ -1017,6 +1057,8 @@ EXPCONTROLLER = function(){
 
     }
 
+    //QUIZ
+    /////////
     function start_quiz(){
         create_quiz_questions()
         InstrCont.show_quiz_instructions(current_phase_num, CurrentPhaseData)
@@ -1066,6 +1108,16 @@ EXPCONTROLLER = function(){
                             SubQ.answer_options = Stimuli.get_all_locations_visited_during_experiment_as_participant_facing_names()
                             SubQ.correct_answer = GenParam.LocationDisplayNames[FennimalsInSet[qnum].location]
                             break
+                        case("region"):
+                            SubQ.question_text = "In which part of the island did you see this Fennimal?"
+                            let regions_in_experiment = Stimuli.get_all_regions_visited_during_experiment()
+                            let subject_facing_region_names = []
+                            for(let i =0;i<regions_in_experiment.length;i++){
+                                subject_facing_region_names.push(GenParam.RegionData[regions_in_experiment[i]].display_name)
+                            }
+                            SubQ.answer_options = subject_facing_region_names
+                            SubQ.correct_answer = GenParam.RegionData[FennimalsInSet[qnum].region].display_name
+                            break
                     }
                     NewQ.subquestions.push(SubQ)
                 }
@@ -1090,7 +1142,6 @@ EXPCONTROLLER = function(){
 
         //Adding an array to hold all questions
         CurrentPhaseData.QuestionsAnswered = []
-        console.log(CurrentPhaseData)
 
 
 
@@ -1138,7 +1189,7 @@ EXPCONTROLLER = function(){
             id: QuizQuestion.FenObj.id,
             cue_type: QuizQuestion.cue_type,
             subquestions: ReducedSubquestions,
-            answers_correct: QuizQuestion.subquestions_correct_arr.includes(false),
+            answers_correct: ! QuizQuestion.subquestions_correct_arr.includes(false),
             num: QuizQuestion.question_num
         }
 
@@ -1201,6 +1252,75 @@ EXPCONTROLLER = function(){
         phase_completed()
     }
 
+    // MATCH HEAD TO SAMPLE
+    /////////////////////////
+    function start_match_head_to_region_task(){
+        let TaskData
+        switch(CurrentPhaseData.Fennimals_encountered){
+            case("all"):
+                TaskData = create_match_head_to_region_data(Stimuli.get_Fennimals_objects_in_array())
+        }
+
+        InstrCont.start_match_head_to_region_task(current_phase_num, TaskData)
+
+    }
+
+    function create_match_head_to_region_data(Array_of_Included_Fennimals){
+        //Returns an array containing one element per question. Each of these elements:
+        //      Contains a property: "target_region"
+        //      Contains an array of IDs for the "target_Fennimal_ids"
+        //      Contains an array of FennimalObjects for  all "Fennimal_Object_Arr"
+
+        //Finding all unique regions in the provided array
+        let all_regions = []
+        for(let i =0;i<Array_of_Included_Fennimals.length;i++){
+            all_regions.push(Array_of_Included_Fennimals[i].region)
+        }
+        all_regions = [... new Set(all_regions)]
+
+        //Now for each region we can create a question
+        let Out = []
+        for(let regnum =0;regnum < all_regions.length; regnum++ ){
+            let target = all_regions[regnum]
+
+            let NewObj = {
+                target_region:target,
+                target_Fennimal_ids: [],
+                Fennimal_Object_Arr : Array_of_Included_Fennimals
+            }
+
+            //Finding all Fennimals in this region
+            for(let i =0;i<Array_of_Included_Fennimals.length; i++){
+                if(Array_of_Included_Fennimals[i].region === target){
+                    NewObj.target_Fennimal_ids.push(Array_of_Included_Fennimals[i].id)
+                }
+            }
+
+            //Pushing
+            Out.push(shuffleArray(NewObj))
+        }
+
+        return(Out)
+    }
+
+    // HEAD TO REGION SORTING TASK
+    ////////////////////////////////
+    function start_head_to_region_sorting_task(){
+        let TaskData
+        switch(CurrentPhaseData.Fennimals_included){
+            case("all"):
+                TaskData = Stimuli.get_Fennimals_objects_in_array()
+        }
+
+        InstrCont.start_head_to_region_sorting_task(current_phase_num, TaskData)
+    }
+
+    this.head_to_region_sorting_task_completed = function(Data){
+        CurrentPhaseData.Errors = JSON.parse(JSON.stringify(Data))
+        DataCont.store_phase_data(CurrentPhaseData)
+        start_next_experiment_phase()
+    }
+
     //END OF EXPERIMENT FUCNTIONS
     function show_payment_screen(){
         InstrCont.show_payment_screen(DataCont.get_payment_data())
@@ -1210,7 +1330,7 @@ EXPCONTROLLER = function(){
 
 }
 
-let AudioCont = new AudioControllerObject()
+
 let EC = new EXPCONTROLLER()
 EC.start_experiment()
 
@@ -1218,9 +1338,4 @@ EC.start_experiment()
 
 
 
-//TODO: PHOTO: STORE FAILED ATTEMPTS
-//TODO: When zooming out, add name to region. When searching for location, add region name
-
-
-
-
+console.log("READY")

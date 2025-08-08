@@ -52,7 +52,7 @@ ActionButton = function(ParentElem, button_icon, TargetObject, warmup_time, acti
         AudioCont.play_sound_effect("search_loop")
         CountdownCircle.classList.add("warmup_circle_active")
         CountdownCircle.style.animation = "warmup_circle_animation " + warmup_time + "ms linear"
-        Countdown_Timer = setTimeout(function(){if(button_functional){activationfunc(); AudioCont.play_sound_effect("success")}}, warmup_time)
+        Countdown_Timer = setTimeout(function(){if(button_functional){activationfunc(); }}, warmup_time)
 
     }
     function break_countdown(){
@@ -67,7 +67,6 @@ ActionButton = function(ParentElem, button_icon, TargetObject, warmup_time, acti
     }
 
     Button.onpointerdown = function(){
-        console.log(button_icon)
         let sound_effect = "button_click"
         if(button_icon === "return_arrow"){
             sound_effect = "close_menu"
@@ -205,6 +204,12 @@ MapController = function(ExpCont, WorldState){
 
                         ClosestOutline.Object.setAttribute("id", "location_outline_" + marker_name)
 
+                        //Now we also update the RegionData in the General Parameters object
+                        if(typeof GenParam.RegionData[marker_region].Locations === "undefined"){
+                            GenParam.RegionData[marker_region].Locations = []
+                        }
+                        GenParam.RegionData[marker_region].Locations.push(marker_name)
+
 
                     }else{
                         console.error("Double-assigned a location outline ID! " + marker_id)
@@ -257,6 +262,13 @@ MapController = function(ExpCont, WorldState){
 
             }else{
 
+            }
+        }
+
+        //Optionally show some of the icons
+        if(GenParam.DisplayFoundFennimalIconsOnMap.show){
+            if(GenParam.DisplayFoundFennimalIconsOnMap.display_only_in_current_region){
+                display_all_Fennimal_icon_on_map_for_region(region_name)
             }
         }
     }
@@ -409,7 +421,7 @@ MapController = function(ExpCont, WorldState){
                 Location_Outline.classList.remove("map_location_outline")
 
                 if(location_search_status === "searched_empty"){
-                    Location_Outline.classList.add("map_location_outline_searched")
+                    //Location_Outline.classList.add("map_location_outline_searched")
                 }else{
                     Location_Outline.classList.add("map_location_outline_active")
                 }
@@ -419,6 +431,140 @@ MapController = function(ExpCont, WorldState){
 
 
 
+    }
+
+    //Keep track of which icons are displayed on the map (if enabled)
+    let CurrentFennimalIconsOnMap = [], Arr_IDs_of_Fennimals_currently_on_map = []
+
+    FennimalIconOnMap = function(FenObj){
+        let BoxSettings = {
+            width: 35,
+            height: 35,
+            offset_x: -5,
+            offset_y : -50,
+            inner_size_factor: 0.9,
+            max_opacity: 0.8
+        }
+
+        //Some locations needs a manual tweak for fit
+        switch(FenObj.location){
+            case("Lake"): BoxSettings.offset_x = -30; BoxSettings.offset_y = 10; break
+            case("Statue"): BoxSettings.offset_x = 20; break
+            case("Fountain"): BoxSettings.offset_y = 0; BoxSettings.offset_x =-30; break
+            case("Farm"): BoxSettings.offset_y = 0; BoxSettings.offset_x =30; break
+            case("Dam"): BoxSettings.offset_y = -60; BoxSettings.offset_x =10; break
+            case("Waterfall"):  BoxSettings.offset_x =-20; break
+            case("Cliff"): BoxSettings.offset_x = 30; BoxSettings.offset_y = 30; break
+            case("Rainforest"): BoxSettings.offset_x = -20; break
+            case("Bush"): BoxSettings.offset_y = 0;  BoxSettings.offset_x = -20; break
+            case("Port"): BoxSettings.offset_y = 0; break
+
+        }
+
+        //First we want to grab the target coordinates of the location. For this we can piggy-back off of the location markers
+        let TargetLocationMaker = document.getElementById("location_marker_" + FenObj.location)
+        let MapCoords = {x: TargetLocationMaker.getBBox().x , y:  TargetLocationMaker.getBBox().y }
+
+        //Now we create a small Fennimal icon in a box
+        let FennimalIconGroup= create_SVG_group(0,0,0,0,undefined,undefined)
+        let FennimalIconBoxOuter = create_SVG_rect(0,0,BoxSettings.width + "px", BoxSettings.height + "px", undefined,undefined)
+        FennimalIconBoxOuter.style.fill = GenParam.RegionData[FenObj.region].color
+        FennimalIconBoxOuter.style.rx = "5px"
+        let FennimalIconBoxInner = create_SVG_rect( (0.5*(1-BoxSettings.inner_size_factor)*BoxSettings.width) + "px" , (0.5*(1-BoxSettings.inner_size_factor)*BoxSettings.height ) + "px", (BoxSettings.inner_size_factor * BoxSettings.width) + "px", (BoxSettings.inner_size_factor * BoxSettings.height) + "px", undefined,undefined )
+        FennimalIconBoxInner.style.fill = GenParam.RegionData[FenObj.region].lighter_color
+        FennimalIconBoxInner.style.rx = "3px"
+
+
+        //Creating and adding the correct icon
+        let Icon
+        switch (GenParam.DisplayFoundFennimalIconsOnMap.icon_type){
+            case("full"):
+                Icon = create_Fennimal_SVG_object(FenObj, GenParam.Fennimal_head_size, false)
+                break
+            case("head"):
+                Icon =create_Fennimal_SVG_object_head_only(FenObj, false)
+                break
+        }
+
+
+        //Adding elements on the map
+        FennimalIconGroup.appendChild(FennimalIconBoxOuter)
+        FennimalIconGroup.appendChild(FennimalIconBoxInner)
+        FennimalIconGroup.appendChild(Icon)
+        Map_Layer.appendChild(FennimalIconGroup)
+
+        //Scaling the icon
+        let scale_factor_w = 1/( Icon.getBBox().width / (BoxSettings.inner_size_factor * BoxSettings.width))
+        let scale_factor_h = 1/( Icon.getBBox().height / (BoxSettings.inner_size_factor * BoxSettings.height))
+        let min_scale_factor = Math.floor( Math.min(scale_factor_w, scale_factor_h) * 100) / 100
+
+        //Applying to the Fennimal icon scale group
+        let ScaleGroup = Icon.getElementsByClassName("Fennimal_scale_group")[0]
+        ScaleGroup.style.transform = "scale(" + min_scale_factor + ")"
+
+        //Translation. This depends on whether there is a name. If no, center icon in the middle of the card. If yes, align it to the top instead
+        let NewBox = Icon.getBBox()
+        let TargetCenter = {x:Math.round(0.5*BoxSettings.width), y:Math.round(0.5*BoxSettings.height)}
+        let delta_x = TargetCenter.x - (NewBox.x + 0.5*NewBox.width)
+        let delta_y = TargetCenter.y - (NewBox.y + 0.5*NewBox.height)
+        Icon.style.transform = "translate(" + delta_x + "px, " + delta_y + "px)"
+
+        //Moving the box to the right location
+        FennimalIconGroup.style.transform = "translate(" + Math.round(MapCoords.x + BoxSettings.offset_x) + "px," + Math.round(MapCoords.y + BoxSettings.offset_y) + "px)"
+        FennimalIconGroup.style.opacity = BoxSettings.max_opacity
+
+        //Setting transform
+        FennimalIconGroup.style.transition = "all 1000ms ease-in-out"
+
+        this.remove = function(){
+            FennimalIconGroup.remove()
+
+        }
+
+        this.display_only_if_in_region = function(region){
+            let should_display = false
+            if(FenObj.region === region){
+                should_display = true
+            }else{
+                if(GenParam.DisplayFoundFennimalIconsOnMap.display_all_icons_on_watchtower && region === "All"){
+                    should_display = true
+                }
+            }
+
+            if(should_display){
+                FennimalIconGroup.style.opacity = BoxSettings.max_opacity
+            }else{
+                FennimalIconGroup.style.opacity = 0
+            }
+        }
+    }
+
+    this.clear_all_Fennimal_icons_from_map = function(){
+        Arr_IDs_of_Fennimals_currently_on_map = []
+
+        for(let i =0;i<CurrentFennimalIconsOnMap.length;i++){
+            CurrentFennimalIconsOnMap[i].remove()
+        }
+
+        CurrentFennimalIconsOnMap = []
+
+
+
+    }
+
+    function display_all_Fennimal_icon_on_map_for_region(region){
+        for(let i =0;i<CurrentFennimalIconsOnMap.length;i++){
+            CurrentFennimalIconsOnMap[i].display_only_if_in_region(region)
+        }
+
+    }
+
+    this.add_Fennimal_icon_on_map = function(FenObj){
+        //Check if this Fennimal is already displayed (prevents duplicates)
+        if(! Arr_IDs_of_Fennimals_currently_on_map.includes(FenObj.id)){
+            CurrentFennimalIconsOnMap.push(new FennimalIconOnMap(FenObj))
+            Arr_IDs_of_Fennimals_currently_on_map.push(FenObj.id)
+        }
     }
 
     //ACTION BUTTON FUNCTIONS
@@ -448,6 +594,7 @@ MapController = function(ExpCont, WorldState){
                     break;
                 case("empty_location"):
                     Interface.Prompt.show_message("There is nothing here at the moment...", false)
+                    AudioCont.play_sound_effect("rejected")
                     if(GenParam.can_enter_empty_locations){
                         show_action_button("enter_location_" + current_nearest_location, Current_Action_Focal_Target,false )
                     }
@@ -459,6 +606,7 @@ MapController = function(ExpCont, WorldState){
                //
                 case("enter_location_with_unvisited_Fennimal"):
                     Interface.Prompt.show_message("There is a Fennimal present at this location!", false)
+                    AudioCont.play_sound_effect("success")
                     show_action_button("enter_location_" + current_nearest_location, Current_Action_Focal_Target,false )
                     break
             }
@@ -538,6 +686,7 @@ MapController = function(ExpCont, WorldState){
         }else{
             //If an object is returned, then this is a Fennimal
             current_action_key_status = "Fennimal_present"
+
         }
 
         //current_action_key_status = false
@@ -644,8 +793,43 @@ MapController = function(ExpCont, WorldState){
     this.reset_map_to_player_in_center = function(){
         this.return_to_map()
         Player.jump_to_map_center()
+        if(GenParam.DisplayFoundFennimalIconsOnMap.show){
+            if(GenParam.DisplayFoundFennimalIconsOnMap.display_only_in_current_region){
+                display_all_Fennimal_icon_on_map_for_region("Home")
+            }
+        }
 
     }
+
+    //Call to disable or enable map interations
+    this.disable_map_interactions = function(){
+        player_allowed_to_move = false
+        AudioCont.stop_all_region_sounds()
+
+    }
+    this.enable_map_interactions = function(){
+        player_allowed_to_move = true
+        AudioCont.play_region_sound(current_region)
+    }
+
+    //Call to show the request-instructions button on the top of the page
+    this.show_request_instructions_button = function(){
+        RequestInstructionsButton.style.display = "inherit"
+
+    }
+    function create_request_instructions_button(){
+        RequestInstructionsButton = create_SVG_buttonElement(GenParam.RequestInstructionButtonSettings.center_x,GenParam.RequestInstructionButtonSettings.center_y,GenParam.RequestInstructionButtonSettings.width,GenParam.RequestInstructionButtonSettings.height,GenParam.RequestInstructionButtonSettings.text, GenParam.RequestInstructionButtonSettings.textsize)
+        Interface_Layer.appendChild(RequestInstructionsButton)
+        RequestInstructionsButton.style.display = "none"
+        RequestInstructionsButton.onpointerdown = function(){request_instructions_button_clicked(); AudioCont.play_sound_effect("button_click")}
+        RequestInstructionsButton.style.fontWeight = GenParam.RequestInstructionButtonSettings.fontWeight
+        RequestInstructionsButton.classList.add("do_not_move_on_click")
+
+    }
+    function request_instructions_button_clicked(){
+        ExpCont.instructions_requested()
+    }
+
 
     //On start
     reset_all_region_opacity_masks()
@@ -660,7 +844,6 @@ MapController = function(ExpCont, WorldState){
         //PlayerIcon.style.transformOrigin = "center"
         PlayerIcon.style.transition = default_transition
         let IconDims = {w: PlayerIcon.getBBox().width, h: PlayerIcon.getBBox().height}
-        console.log(IconDims)
 
         this.allow_movement = function(){
             player_allowed_to_move = true
@@ -1054,34 +1237,6 @@ MapController = function(ExpCont, WorldState){
     assign_outline_IDs()
     let Player = new PlayerIconController()
 
-    //Call to disable or enable map interations
-    this.disable_map_interactions = function(){
-        player_allowed_to_move = false
-        AudioCont.stop_all_region_sounds()
-
-    }
-    this.enable_map_interactions = function(){
-        player_allowed_to_move = true
-        AudioCont.play_region_sound(current_region)
-    }
-
-    //Call to show the request-instructions button on the top of the page
-    this.show_request_instructions_button = function(){
-        RequestInstructionsButton.style.display = "inherit"
-
-    }
-    function create_request_instructions_button(){
-        RequestInstructionsButton = create_SVG_buttonElement(GenParam.RequestInstructionButtonSettings.center_x,GenParam.RequestInstructionButtonSettings.center_y,GenParam.RequestInstructionButtonSettings.width,GenParam.RequestInstructionButtonSettings.height,GenParam.RequestInstructionButtonSettings.text, GenParam.RequestInstructionButtonSettings.textsize)
-        Interface_Layer.appendChild(RequestInstructionsButton)
-        RequestInstructionsButton.style.display = "none"
-        RequestInstructionsButton.onpointerdown = function(){request_instructions_button_clicked(); AudioCont.play_sound_effect("button_click")}
-        RequestInstructionsButton.style.fontWeight = GenParam.RequestInstructionButtonSettings.fontWeight
-        RequestInstructionsButton.classList.add("do_not_move_on_click")
-
-    }
-    function request_instructions_button_clicked(){
-        ExpCont.instructions_requested()
-    }
 
     //On start
     Player.jump_to_map_center()

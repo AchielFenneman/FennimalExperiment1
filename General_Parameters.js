@@ -5,21 +5,21 @@ GENERALPARAM = function(){
     this.GeneralInstructions = {
         Consent: {
             left_column: "On this website you will participate in an experiment conducted on behalf of the University of Vienna (Austria). " +
-                "You participation in this study is voluntary. You can refuse to participate at any time without having to give a reason. " +
+                "Your participation in this study is voluntary. You can refuse to participate at any time without having to give a reason. " +
                 "There will be no negative consequences if you refuse to participate or withdraw from the study early. <br>" +
                 "<br>" +
-                "The aim of this study is to investigate how people interact with novel situations. This kind of stody is necessary to gain new, " +
-                "reliable academic research results. Your informed consent to participate in this study is an indispensible prerequisite for to conduct this study. " +
+                "The aim of this study is to investigate how people interact with novel situations. This kind of study is necessary to gain new, " +
+                "reliable academic research results. Your informed consent to participate in this study is an indispensible prerequisite for us to conduct this study. " +
                 "Please take time to read the following information carefully. If you have any questions regarding the information provided, please do not hesitate the " +
-                "study team by sending a message via Prolific or by sending an eamil to the study leader (Achiel Fenneman; achiel.fenneman@univie.ac.at). <br>" +
+                "study team by sending a message via Prolific or by sending an email to the study leader (Achiel Fenneman; achiel.fenneman@univie.ac.at). <br>" +
                 "<br>" +
                 "<b>Study contents. </b> We will <u>not</u> provide any deceiving of erroneous information to you at any point. You will <u>not</u> be shown any aversive, " +
                 "shocking, adult or otherwise inappropriate content at any point during the experiment. ",
             right_column: "<b> Data protection. </b> All the data that you provide is completely anonymous. We will <u>not</u> store or record any personally identifiable information at any point. " +
                 "By participating in this experiment you agree that data collected during the study are recorded and analyzed. You agree that your data are " +
                 "permanently saved electronically in anonymized form, that this data will be archived in an open-access database and may be shared with other researchers " +
-                "in the future. If you want your data to be deleted at a laster time, you can arrange for this by contexting Achiel Fenneman, and without having to give a reason. " +
-                "You can do so up to one month after completing the experiment. You can freely contact the research team to recieve a copy of your data " +
+                "in the future. If you want your data to be deleted at a later time, you can arrange for this by contacting Achiel Fenneman, and without having to give a reason. " +
+                "You can do so up to one month after completing the experiment. You can freely contact the research team to receive a copy of your data " +
                 "(due to the steps taken by the research team to ensure anonymity, you will have to provide your Prolific ID code to fulfil this request). <br>" +
                 "<br>" +
                 "By ticking the box below, you indicate that you are above the age of 18, that you have been provided with clear and detailed information about the objective " +
@@ -43,7 +43,7 @@ GENERALPARAM = function(){
 
     //General parameters for interactions
     //Can the participant enter empty locations?
-    this.can_enter_empty_locations = true
+    this.can_enter_empty_locations = false
 
     //Defines the fraction of the map covered by the zoomed-in view
     this.map_zoom_level = 0.35
@@ -58,7 +58,7 @@ GENERALPARAM = function(){
     this.Map_Region_Centers_Percentage = {
         Home: {x: 50, y: 50 },
         North: {x: 50, y: 5 },
-        Desert: {x: 50, y: 95 },
+        Desert: {x: 50, y: 90 },
         Jungle: {x: 25, y: 50 },
         Village: {x: 75, y: 50 },
         Flowerfields: {x: 35, y: 15 },
@@ -109,7 +109,7 @@ GENERALPARAM = function(){
             lighter_color: "#f5f55b",
             color: "#c7c602", //#fffe03
             darker_color: "#757500",
-            prefix: "scaley",
+
             Fennimal_location_colors:{
                 primary_color: "#969239",
                 secondary_color: "#d1caa9",
@@ -117,7 +117,7 @@ GENERALPARAM = function(){
                 eye_color: "#f7fe25",
             },
             contrast_color: "#47395b",
-            preferredBodyType: "I",
+            preferredBodyType: "scaley",
             display_name: "The Desert"
         },
         Mountains: {
@@ -137,7 +137,7 @@ GENERALPARAM = function(){
         Beach: {
             lighter_color: "#ffd0b0",
             color: "#ffe6d5",
-            darker_color: "#615c58",
+            darker_color: "#9e682e", // "#615c58",
             Fennimal_location_colors:{
                 primary_color: "#f5a149",//"#665244",
                 secondary_color: "#ffe6d5",//"#dedcdc",//"#f7cdbc",
@@ -254,6 +254,19 @@ GENERALPARAM = function(){
         }
     }
 
+    //Assumes that locations have been set by the map controller! Returns false if location does not exist on the map
+    this.find_region_of_location = function(location){
+        for(let i in this.RegionData){
+            if(typeof this.RegionData[i].Locations !== "undefined"){
+                if(this.RegionData[i].Locations.includes(location)){
+                    return(i)
+                }
+            }
+        }
+        return(false)
+
+    }
+
     this.HeadDisplayNames  = {
         rhino: "Rhino",
         giraffe: "Giraffey",
@@ -274,6 +287,7 @@ GENERALPARAM = function(){
         santa: "Santa",
         stocking: "Stocking",
         eagle: "Eagle",
+        giftbox: "Boxy",
 
         owl: "Owlie",
         bird: "Birdie",
@@ -289,6 +303,20 @@ GENERALPARAM = function(){
         halloween: "xmas",
         bird: "safari",
         safari: "bird"
+    }
+    this.Head_Group_Cluster_Types = {
+        xmas: "holiday",
+        halloween: "holiday",
+        bird: "animal",
+        safari: "animal"
+    }
+
+    //OTHER SETTINGS
+    this.DisplayFoundFennimalIconsOnMap = {
+        show: true,
+        icon_type: 'head', //Can be either "full" or "head"
+        display_only_in_current_region: true,
+        display_all_icons_on_watchtower: true
     }
 
     //ACTION BUTTON PARAMETERS
@@ -313,6 +341,11 @@ GENERALPARAM = function(){
         warmup_time: 750
     }
     this.location_detection_distance = 30
+
+    this.Quiz_settings = {
+        show_color_when_asking_for_region: true,
+        show_color_when_asking_for_location: false,
+    }
 
     //FENNIMAL GENERAL PARAMTERES
     this.Fennimal_head_size = 0.6

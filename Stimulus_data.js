@@ -7,16 +7,129 @@ let StimulusSettings = function(){
         bonus_per_star: 0.10
     }
 
-    this.Instructions_at_start = [ "browser_check_and_full_screen_prompt","consent", "card_sorting_task", "overview" ] // "browser_check_and_full_screen_prompt","consent", "card_sorting_task", "overview"
+    //Which instructions pages are shown to participants before the first day?
+    this.Instructions_at_start = ["browser_check_and_full_screen_prompt","consent", "card_sorting_task", "overview"  ] // "browser_check_and_full_screen_prompt","consent", "card_sorting_task", "overview"
+
+    //Which pages are shown to participants after the last day but BEFORE the payment screen?
+    //     "demographics_questionnaire": contains a question on age, gender and color-blindness
+    this.Pages_at_end = ["demographics_questionnaire"]
 
     //This defines which experiment will be run (definitions follow below).
     // NOTE: If there are multiple codes in an array, then one will be picked at random!
-    this.Experiment_Code = ["schema_experiment_baseline"] // "schema_experiment_offset"
+    this.Experiment_Code = ["schema_experiment_offset", "schema_experiment_baseline"] // "schema_experiment_offset"
 
     //Now we determine the experiment structure
     let All_Experiment_Structures = {
-        schema_experiment_baseline: [
+        test : [
 
+
+            {
+                //Defining the quiz here
+                type: 'quiz',
+
+                QuestionSets: [{
+                    //Defining which information is presented. Can be icon or name
+                    cue: 'gray_head',
+
+                    //Defining which questions are asked
+                    questions_asked: ["name","region", "location"],
+
+                    //Defining which Fennimals are included
+                    Fennimals_included: "all"
+                }
+                ],
+
+                //Defining the complement conditions.
+                //      If set to true, then an incorrectly answered question will be repeated at the end of the cue untill all answers have been completed.
+                require_perfect_answers: false,
+
+                //If set to anything but false, participants can freely travel the island to explore the Fennimals.
+                //    Non-false value should refer to the interaction style of the observed Fennimal.
+                //TODO
+                //allow_participant_to_travel_map: "passive_observation",
+
+                //If set to true, participants will earn a bonus star for each correct answer
+                award_star_for_correct_answer: true
+            } ,
+
+            {
+                type: "head_region_sorting_task",
+                Fennimals_included: "all"
+            },
+
+
+            {
+                type: "match_head_to_region",
+                Fennimals_encountered: "all",
+            },
+
+            {
+                //Defining the block type
+                type: "hint_and_search",
+                hint_type: "name",
+
+                //Defining which Fennimals are encountered in this block
+                Fennimals_encountered: "all",
+                sort_trials_by: "region",
+
+                //Defining the Fennimal interaction type
+                Fennimal_interaction_type: "polaroid_photo_active",
+                allowed_attempts_before_answer_given: 3,
+            },
+
+            {
+                type: "free_exploration",
+                Fennimal_interaction_type: "polaroid_photo_passive",
+                Fennimals_encountered: "all"
+            },
+
+            {
+                //Defining the quiz here
+                type: 'quiz',
+
+                QuestionSets: [{
+                    //Defining which information is presented. Can be icon or name
+                    cue: 'gray_icon',
+
+                    //Defining which questions are asked
+                    questions_asked: ["name","region"],
+
+                    //Defining which Fennimals are included
+                    Fennimals_included: "all"
+                }
+                ],
+
+                //Defining the complement conditions.
+                //      If set to true, then an incorrectly answered question will be repeated at the end of the cue untill all answers have been completed.
+                require_perfect_answers: false,
+
+                //If set to anything but false, participants can freely travel the island to explore the Fennimals.
+                //    Non-false value should refer to the interaction style of the observed Fennimal.
+                //TODO
+                //allow_participant_to_travel_map: "passive_observation",
+
+                //If set to true, participants will earn a bonus star for each correct answer
+                award_star_for_correct_answer: true
+            } ,
+
+
+
+
+
+            {
+                type: "name_recall_task",
+
+                //If set to true, participants will earn a bonus star for each correct answer
+                award_star_for_each_correct_name: true,
+
+                //Allowed Levenshtein distance to still assign a correct match
+                allowed_Levenshtein_distance_for_match: 2,
+
+            },
+
+        ],
+
+        schema_experiment_baseline:  [
 
             {
                 type: "free_exploration",
@@ -27,42 +140,129 @@ let StimulusSettings = function(){
             {
                 //Defining the block type
                 type: "hint_and_search",
-                hint_type: "location",
+                hint_type: "icon",
 
                 //Defining which Fennimals are encountered in this block
                 Fennimals_encountered: "all",
-                sort_trials_by: "head_group",
+                sort_trials_by: "region",
 
                 //Defining the Fennimal interaction type
                 Fennimal_interaction_type: "polaroid_photo_active",
                 allowed_attempts_before_answer_given: 3,
             },
-            /*
-         {
-             //Defining the block type
-             type: "hint_and_search",
-             hint_type: "name",
+            {
+                type: "head_region_sorting_task",
+                Fennimals_included: "all"
+            },
 
-             //Defining which Fennimals are encountered in this block
-             Fennimals_encountered: "all",
-             sort_trials_by: "head_group",
+            {
+                //Defining the block type
+                type: "hint_and_search",
+                hint_type: "name",
 
-             //Defining the Fennimal interaction type
-             Fennimal_interaction_type: "polaroid_photo_active",
-             allowed_attempts_before_answer_given: 3,
-         },
+                //Defining which Fennimals are encountered in this block
+                Fennimals_encountered: "all",
+                sort_trials_by: "random",
 
-          */
+                //Defining the Fennimal interaction type
+                Fennimal_interaction_type: "polaroid_photo_active",
+                allowed_attempts_before_answer_given: 3,
+            },
+
             {
                 //Defining the quiz here
                 type: 'quiz',
 
                 QuestionSets: [{
                     //Defining which information is presented. Can be icon or name
-                    cue: 'icon',
+                    cue: 'gray_head',
 
                     //Defining which questions are asked
-                    questions_asked: ["name","location"],
+                    questions_asked: ["name","region"],
+
+                    //Defining which Fennimals are included
+                    Fennimals_included: "all"
+                }
+                ],
+
+                //Defining the complement conditions.
+                //      If set to true, then an incorrectly answered question will be repeated at the end of the cue untill all answers have been completed.
+                require_perfect_answers: false,
+
+                //If set to anything but false, participants can freely travel the island to explore the Fennimals.
+                //    Non-false value should refer to the interaction style of the observed Fennimal.
+                //TODO
+                //allow_participant_to_travel_map: "passive_observation",
+
+                //If set to true, participants will earn a bonus star for each correct answer
+                award_star_for_correct_answer: true
+            } ,
+
+
+            {
+                type: "name_recall_task",
+
+                //If set to true, participants will earn a bonus star for each correct answer
+                award_star_for_each_correct_name: true,
+
+                //Allowed Levenshtein distance to still assign a correct match
+                allowed_Levenshtein_distance_for_match: 2,
+
+            },
+
+
+        ],
+
+        schema_experiment_offset: [
+
+            {
+                type: "free_exploration",
+                Fennimal_interaction_type: "polaroid_photo_passive",
+                Fennimals_encountered: "all"
+            },
+
+            {
+                //Defining the block type
+                type: "hint_and_search",
+                hint_type: "icon",
+
+                //Defining which Fennimals are encountered in this block
+                Fennimals_encountered: "all",
+                sort_trials_by: "region",
+
+                //Defining the Fennimal interaction type
+                Fennimal_interaction_type: "polaroid_photo_active",
+                allowed_attempts_before_answer_given: 3,
+            },
+            {
+                type: "head_region_sorting_task",
+                Fennimals_included: "all"
+            },
+
+            {
+                //Defining the block type
+                type: "hint_and_search",
+                hint_type: "name",
+
+                //Defining which Fennimals are encountered in this block
+                Fennimals_encountered: "all",
+                sort_trials_by: "random",
+
+                //Defining the Fennimal interaction type
+                Fennimal_interaction_type: "polaroid_photo_active",
+                allowed_attempts_before_answer_given: 3,
+            },
+
+            {
+                //Defining the quiz here
+                type: 'quiz',
+
+                QuestionSets: [{
+                    //Defining which information is presented. Can be icon or name
+                    cue: 'gray_head',
+
+                    //Defining which questions are asked
+                    questions_asked: ["name","region"],
 
                     //Defining which Fennimals are included
                     Fennimals_included: "all"
@@ -105,25 +305,95 @@ let StimulusSettings = function(){
     let All_Fennimal_Sets = {
         schema_experiment_baseline: {
             all: [
+                {id: "RA_CA_1", head_group: "A", region: "A"},
+                {id: "RA_CA_2", head_group: "A", region: "A"},
+                {id: "RA_CA_3", head_group: "A", region: "A"},
+                {id: "RA_CA_4", head_group: "A", region: "A"},
+                {id: "RB_CB_5", head_group: "B", region: "B"},
+                {id: "RB_CB_6", head_group: "B", region: "B"},
+                {id: "RB_CB_7", head_group: "B", region: "B"},
+                {id: "RB_CB_8", head_group: "B", region: "B"},
+                {id: "RC_CC_9", head_group: "C", region: "C"},
+                {id: "RC_CC_10", head_group: "C", region: "C"},
+                {id: "RC_CC_11", head_group: "C", region: "C"},
+                {id: "RC_CC_12", head_group: "C", region: "C"},
+                {id: "RD_CD_13", head_group: "D", region: "D"},
+                {id: "RD_CD_14", head_group: "D", region: "D"},
+                {id: "RD_CD_15", head_group: "D", region: "D"},
+                {id: "RD_CD_16", head_group: "D", region: "D"},
+            ],
+
+            //If added, this defines whether the head groups should be drawn based on similar types.
+            //  Each to-be-clustered group should have a key in this object. The value refers to which groups will be co-sampled.
+            //  NOTE: only very limited similar groups are currently defined... TODO: this is currently very finnicky and can easily be derailed...
+            head_group_clusters : {
+                A: "X",
+                B: "X",
+                C: "Y",
+                D: "Y"
+            }
+
+        },
+
+        schema_experiment_offset: {
+            all: [
+                {id: "RA_CA_1", head_group: "A", region: "A"},
+                {id: "RA_CA_2", head_group: "A", region: "A"},
+                {id: "RA_CC_3", head_group: "C", region: "A"},
+                {id: "RA_CC_4", head_group: "C", region: "A"},
+                {id: "RB_CC_5", head_group: "C", region: "B"},
+                {id: "RB_CC_6", head_group: "C", region: "B"},
+                {id: "RB_CB_7", head_group: "B", region: "B"},
+                {id: "RB_CB_8", head_group: "B", region: "B"},
+                {id: "RC_CA_9", head_group: "A", region: "C"},
+                {id: "RC_CA_10", head_group: "A", region: "C"},
+                {id: "RC_CD_11", head_group: "D", region: "C"},
+                {id: "RC_CD_12", head_group: "D", region: "C"},
+                {id: "RD_CD_13", head_group: "D", region: "D"},
+                {id: "RD_CD_14", head_group: "D", region: "D"},
+                {id: "RD_CB_15", head_group: "B", region: "D"},
+                {id: "RD_CB_16", head_group: "B", region: "D"},
+            ],
+
+            //If added, this defines whether the head groups should be drawn based on similar types.
+            //  Each to-be-clustered group should have a key in this object. The value refers to which groups will be co-sampled.
+            //  NOTE: only very limited similar groups are currently defined... TODO: this is currently very finnicky and can easily be derailed...
+            head_group_clusters : {
+                A: "X",
+                B: "X",
+                C: "Y",
+                D: "Y"
+            }
+
+        },
+
+        test: {
+            all: [
                 {id: "A1", head_group: "A", region: "A"},
-                 {id: "A2", head_group: "A", region: "A"},
-                 {id: "A3", head_group: "A", region: "A"},
+                {id: "A2", head_group: "A", region: "A"},
+                {id: "A3", head_group: "A", region: "A"},
                 {id: "A4", head_group: "A", region: "A"},
                 {id: "B1", head_group: "B", region: "B"},
                 {id: "B2", head_group: "B", region: "B"},
-                 {id: "B3", head_group: "B", region: "B"},
-                 {id: "B4", head_group: "B", region: "B"},
-                 {id: "C1", head_group: "C", region: "C"},
-                 {id: "C2", head_group: "C", region: "C"},
-                 {id: "C3", head_group: "C", region: "C"},
-                 {id: "C4", head_group: "C", region: "C"},
-                 {id: "D1", head_group: "D", region: "D"},
-                 {id: "D2", head_group: "D", region: "D"},
-                 {id: "D3", head_group: "D", region: "D"},
+                {id: "B3", head_group: "B", region: "B"},
+                {id: "B4", head_group: "B", region: "B"},
+                {id: "C1", head_group: "C", region: "C"},
+                {id: "C2", head_group: "C", region: "C"},
+                {id: "C3", head_group: "C", region: "C"},
+                {id: "C4", head_group: "C", region: "C"},
+                {id: "D1", head_group: "D", region: "D"},
+                {id: "D2", head_group: "D", region: "D"},
+                {id: "D3", head_group: "D", region: "D"},
                 {id: "D4", head_group: "D", region: "D"},
 
 
-            ]
+            ],
+            head_group_clusters : {
+                A: "X",
+                B: "X",
+                C: "Y",
+                D: "Y"
+            }
         }
     }
 
@@ -150,8 +420,12 @@ let StimulusSettings = function(){
     //                  note: be sure that all names are sufficiently different to prevent double IDs from being submitted by the participant (the data will include a flag if this occurs)
     //      quiz: this starts a card-quiz phase. Participants are given a set of cards, each of which contains a hint (targetting a specific Fennimal) and a set of questions.
     //              QuestionSets: these define which question are shown to the participant. This should be an array of object, with each object containing the following properties:
-    //                  cue: the type of que presented on the left side of the card, to define the target Fennimal. Supported cue types are "name" (text containing the name of the Fennimal) and "icon" (presenting the icon of a Fennimal without name)
-    //                  questions_asked: an array defining which questions are presented on the card. Currently supported are "name" and "location" (TODO: support region here too)
+    //                  cue: the type of que presented on the left side of the card, to define the target Fennimal. Supported cue types are:
+    //                      "name" (text containing the name of the Fennimal),
+    //                      "icon" (presenting the icon of a Fennimal without name)
+    //                      "gray_icon", which is presented with a gray color-scheme
+    //                      "sepia_icon", which is represented in a sepia color
+    //                  questions_asked: an array defining which questions are presented on the card. Currently supported are "name" and, "region" and "location"
     //                  Fennimals_included: defines which Fennimals are shown (one question per included Fennimal). TODO: right now, only allows ALL - update for more specified options later
     //              NOTE: card questions are randomized within a 'block', but the blocks are presented in order of specification.
     //          require_perfect_answers: if set to true, then any cards with mistakes will be re-appended at the end of the stack. Therefore, participants will need to correctly answer ALL questions before finishing this phase.
@@ -279,11 +553,11 @@ let StimulusSettings = function(){
     ////////////////////
 
     this.use_region_preferred_body_types = true
-    this.preferred_region_sample_order = [["Flowerfields", "Beach", "Swamp", "Mountains"], ["Jungle", "Desert", "Village"], ["North"]]
+    this.preferred_region_sample_order = [[ "Beach",  "Mountains", "Jungle", "Desert", "Village", "Flowerfields"], ["North", "Swamp"]] // [["Flowerfields", "Beach", "Swamp", "Mountains"], ["Jungle", "Desert", "Village"], ["North"]]
 
     this.allowed_head_groups = ["bird", "safari", "halloween", "xmas"]
 
-    this.use_constract_color_for_head = true
+    this.use_constract_color_for_head = false
 
     this.name_is_determined_as = "head"
 
@@ -459,16 +733,95 @@ let StimulusTransformer = function(StimTemplate){
                                    Possible_groups.push(key)
                                }
                             }
+                            shuffleArray(Possible_groups)
 
                             //Select one of these possible classes, and remove it from the available object.
                             let selected_group_name = shuffleArray(Possible_groups)[0]
                             let Selected_Group = shuffleArray( JSON.parse(JSON.stringify(Available_Head_Groups[selected_group_name])))
                             delete Available_Head_Groups[selected_group_name]
 
-                            //Adding to the map
                             Map.head_group[group_id] = {class: selected_group_name, Heads: Selected_Group}
 
                         }
+
+                        //At this point we have a head_group object with keys for each group. Each key contains a class and an array of heads.
+                        //  If there is NO specification for a head cluster, then all is good.
+
+                        //HOWEVER: in some experiments we want to further impose another restriction: some head groups should be clustered together.
+                        //  If this is the case, then there should be an object "head_group_clusters" in the Fennimal Sets object
+                        if(typeof StimTemplate.Fennimals_Encountered_During_Experiment.head_group_clusters !== "undefined"){
+                            //Now we first figure out all the head classes which we have defined above
+                            let all_head_classes_assigned = []
+                            let HeadGroups = {}
+                            for(let group in Map.head_group){
+                                all_head_classes_assigned.push(Map.head_group[group].class)
+                                HeadGroups[Map.head_group[group].class] = JSON.parse(JSON.stringify(Map.head_group[group].Heads))
+                            }
+
+                            //Figuring out which unique clusters we should look for
+                            let unique_clusters = []
+                            for(let group in StimTemplate.Fennimals_Encountered_During_Experiment.head_group_clusters){
+                                unique_clusters.push(StimTemplate.Fennimals_Encountered_During_Experiment.head_group_clusters[group])
+                            }
+                            unique_clusters = [...new Set(unique_clusters)]
+
+                            //Now we know which clusters to look for, and the sets whichs already work.
+                            //In the general parameters, there is an object defining the cluster group for each of the head groups.
+                            let clusters_of_head_classes = []
+                            for(let i =0;i<all_head_classes_assigned.length; i++){
+                                clusters_of_head_classes.push(GenParam.Head_Group_Cluster_Types[all_head_classes_assigned[i]])
+                            }
+                            let unique_clusters_of_head_classes = [...new Set(clusters_of_head_classes)]
+                            let Clusters = {}
+                            for(let i =0;i<unique_clusters_of_head_classes.length;i++){
+                                let groups_in_cluster = []
+                                for(let groupnum =0;groupnum<clusters_of_head_classes.length;groupnum++){
+                                    if(clusters_of_head_classes[groupnum] === unique_clusters_of_head_classes[i]){
+                                        groups_in_cluster.push(all_head_classes_assigned[groupnum])
+                                    }
+                                }
+                                Clusters[unique_clusters_of_head_classes[i]] = groups_in_cluster
+                            }
+
+                            //Now we need to check if there are enough clusters. If not, throw an error
+                            if(Object.keys(Clusters).length < unique_clusters.length ){
+                                console.error("ERROR: Not enough head groups with the correct clusters to satisfy stimulus requirements")
+                            }
+
+                            //Now assigning the keys of the requested clusters to one of the defined clusters.
+                            let AssignedKeys = {}
+                            let shuffled_clusters = shuffleArray(Object.keys(Clusters) )
+
+                            for(let keynum=0;keynum< unique_clusters.length; keynum++ ){
+                                AssignedKeys[unique_clusters[keynum]] = shuffled_clusters[keynum]
+                            }
+
+                            //Now we know which key is assigned to which cluster, which head groups is assigned to each cluster, and which heads are assigned to each head group.
+                            //We can now create a new Map.head_groups object to replace the old one
+                            let NewMapping = {}
+                            for(let groupkey in Map.head_group ){
+                                let clusterKey = StimTemplate.Fennimals_Encountered_During_Experiment.head_group_clusters[groupkey]
+                                let clusterName = AssignedKeys[clusterKey]
+                                let drawnGroup = Clusters[clusterName].shift()
+                                let headsInGroup = HeadGroups[drawnGroup]
+
+                                NewMapping[groupkey] = {
+                                    class: drawnGroup,
+                                    Heads: headsInGroup
+                                }
+
+                            }
+
+                            //Assigning
+                            Map.head_group = NewMapping
+
+
+                        }
+
+
+
+
+
                         break;
 
                     case("region"):
@@ -738,6 +1091,10 @@ let StimulusTransformer = function(StimTemplate){
 
     this.get_instruction_pages_arr = function(){
         return(JSON.parse(JSON.stringify(StimTemplate.Instructions_at_start)))
+    }
+
+    this.get_questionnaire_pages_arr = function(){
+        return(JSON.parse(JSON.stringify(StimTemplate.Pages_at_end)))
     }
 
     //BONUS DETAILS

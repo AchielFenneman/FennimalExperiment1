@@ -41,7 +41,6 @@ SVGREDUCER = function(Stimuli){
         //Finding all locations on the map
         let AllLocations = document.getElementsByClassName("location")
         let Locations_visited_in_experiment = Stimuli.get_all_locations_visited_during_experiment()
-        console.log(Locations_visited_in_experiment)
 
         let ToBeDeletedIds = []
 

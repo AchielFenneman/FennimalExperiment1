@@ -42,9 +42,9 @@ CardSortingParam = function(){
         "All heads within a group should have the same theme, topic or type - and different groups should have different themes, topics or types.<br>" +
         "<br>" +
         "<b>You can organize these groups on the next page. </b> <br>" +
-        "On the top of the screen you will find %FIXED_GROUP_NUM% boxes. Each box represents a different group. " +
+        "At the top of the screen you will find %FIXED_GROUP_NUM% boxes. Each box represents a different group. " +
         "%CAN_CREATE_EXTRA_GROUPS% <br>" +
-        "On the bottom of the screen you fill find %NUMCARDS% different cartoon heads%INCLUDE_NAMES_TEXT%. <br>" +
+        "At the bottom of the screen you will fill find %NUMCARDS% different cartoon heads%INCLUDE_NAMES_TEXT%. <br>" +
         "Your task is to move these heads from the bottom part to the different boxes in the top part.<br>" +
         "You can move a head to a group by holding down your mouse and dragging / releasing the head op top of one of the groups.<br>" +
         "<br>" +
@@ -54,7 +54,8 @@ CardSortingParam = function(){
         "<br>" +
         "<b>Your task is to sort these groups.</b> <br>" +
         "On the next page you can use your cursor to drag the groups to different positions. <br> " +
-        "You can place these groups anywhere on the screen. Please sort these groups by how closely related you think they are. <br> " +
+        "You can place these groups anywhere on the screen. <u>Please sort these groups by how closely related you think they are.</u><br>" +
+        "<br> " +
         "If you think two groups are more closely related to eachother, then move them closer together. " +
         "If you think two groups are not at all related to eachother, then move them further apart. <br>"
 
@@ -1213,6 +1214,7 @@ CardController = function(MainSVG, HeadSVG, ReservoirElem, GroupingCont){
                 NameP.innerHTML = GenParam.HeadDisplayNames[card_name]
             }else{
                 NameP.innerHTML = card_name
+                console.log(card_name)
             }
 
             NameP.classList.add("card_name")

@@ -398,6 +398,7 @@ function create_Action_Button_SVG_Element(icon_type, Dims, is_drawn_on_map, warm
         LocationIconGroup.style.transform = "scale(3)"
 
 
+        console.log(location)
         let LocationIcon = document.getElementById("location_icon_"+location).cloneNode(true)
         LocationIcon.removeAttribute("id")
         LocationIcon.style.transform = "translate(-15px,-30px)"
@@ -653,3 +654,37 @@ function create_Fennimal_SVG_object(FenObj, head_scale_factor, outline_only){
     return(TranslationGroup)
 }
 
+function create_Fennimal_SVG_object_head_only(FenObj, outline_only){
+    //Create the Fennimal SVG container. There are two layers here, one for transform (top), one for scale (second)
+    let TranslationGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g')
+    let ScaleGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g')
+    TranslationGroup.appendChild(ScaleGroup)
+
+    let HeadGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g')
+    let HeadScaleGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g')
+    HeadGroup.appendChild(HeadScaleGroup)
+    ScaleGroup.appendChild(HeadGroup)
+
+    //Now we can find and copy the SVG code for the head
+    let HeadSVG = document.getElementById("Fennimal_head_" + FenObj.head).cloneNode(true)
+    HeadSVG.style.display = "inherit"
+    HeadScaleGroup.appendChild(HeadSVG)
+
+    //Adding colors
+    if(outline_only){
+        TranslationGroup.style.fill = "black"
+        set_fill_for_all_elements_in_array(TranslationGroup.querySelectorAll("*"), "black")
+    }else{
+        set_fill_for_all_elements_in_array(HeadGroup.getElementsByClassName("Fennimal_primary_color"), FenObj.ColorScheme.Head.primary_color)
+        set_fill_for_all_elements_in_array(HeadGroup.getElementsByClassName("Fennimal_secondary_color"),  FenObj.ColorScheme.Head.secondary_color)
+        set_fill_for_all_elements_in_array(HeadGroup.getElementsByClassName("Fennimal_tertiary_color"),  FenObj.ColorScheme.Head.tertiary_color)
+        set_fill_for_all_elements_in_array(HeadGroup.getElementsByClassName("Fennimal_eye_color"),  FenObj.ColorScheme.Head.eye_color)
+    }
+
+    //Labelling some key groups for easy access
+    ScaleGroup.classList.add("Fennimal_scale_group")
+    TranslationGroup.classList.add("Fennimal_translation_group")
+
+    //Returning
+    return(TranslationGroup)
+}

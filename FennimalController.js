@@ -1,8 +1,8 @@
 GENERAL_FENNIMAL_INTERACTION_SETTINGS = function(){
     this.sequence_order = {
-        "passive_observation": ["enter_location", "fade_and_Fennimal_appear_center"],
-        "polaroid_photo_passive": ["enter_location", "Fennimal_appear_variable", "take_photo_passive"],
-        "polaroid_photo_active": ["enter_location", "Fennimal_appear_variable", "take_photo_active"],
+        "passive_observation": [ "fade_and_Fennimal_appear_center"],
+        "polaroid_photo_passive": [ "Fennimal_appear_variable", "take_photo_passive"],
+        "polaroid_photo_active": ["Fennimal_appear_variable", "take_photo_active"],
     }
 
     this.sequence_order_if_already_visited = {
@@ -28,7 +28,7 @@ GENERAL_FENNIMAL_INTERACTION_SETTINGS = function(){
         relative_appearance_speed:0.5
     }
 
-    this.step_speed = 1500
+    this.step_speed = 1000
 
     this.photo_camera_allowed_error = 200
 }
@@ -43,7 +43,7 @@ FENNIMALCONTROLLER = function(FenObj, ExpCont, interaction_type, OptionalAdditio
         CameraButton, CameraMask, camera_target_type, camera_task_type, Camera_ViewFinder, Camera_Polaroid_Frame, Camera_PhotoCloseButton, Camera_Photo_Name_Foreign, Camera_Photo_Name_Input,
         camera_active_name_attempts_left, camera_active_name_previous_attempt
     let Photo_Settings = {
-        backgroundColor: "#444444",
+        backgroundColor: GenParam.RegionData[FenObj.region].darker_color,
         offset_from_center_y: -100,
         animation_speed: 300,
         CloseButtonCoords:{
@@ -79,8 +79,6 @@ FENNIMALCONTROLLER = function(FenObj, ExpCont, interaction_type, OptionalAdditio
         InteractionSequence = Settings.sequence_order[interaction_type]
         FenObj.interaction_type = interaction_type
     }
-
-    console.log(InteractionSequence)
 
     // TOP LEVEL INTERACTIONS
     //////////////////////////
@@ -155,18 +153,16 @@ FENNIMALCONTROLLER = function(FenObj, ExpCont, interaction_type, OptionalAdditio
         }
     }
 
-    console.log(InteractionSequence)
-
     // SEQUENCE-SPECIFIC FUNCTIONS
     ////////////////////////////////
     function enter_location(){
         setTimeout(function(){
             Interface.Prompt.show_message("You are now at the " + participant_facing_location_name + "..." )
-        }, 0.5 * Settings.step_speed)
+        }, 0.15 * Settings.step_speed)
 
         setTimeout(function(){
             start_next_interaction_step()
-        }, Settings.step_speed)
+        }, 0.5 * Settings.step_speed)
     }
 
     function fade_background(){
@@ -202,7 +198,7 @@ FENNIMALCONTROLLER = function(FenObj, ExpCont, interaction_type, OptionalAdditio
 
         setTimeout(function(){
             start_next_interaction_step()
-        }, 1.5 * Settings.step_speed)
+        }, 0.5 * Settings.step_speed)
 
 
     }
@@ -449,7 +445,6 @@ FENNIMALCONTROLLER = function(FenObj, ExpCont, interaction_type, OptionalAdditio
             Camera_Polaroid_Frame.getElementsByClassName("polaroid_frame_name")[0].childNodes[0].style.opacity = 0
             add_photo_active_name_input()
             if(camera_task_type === "active"){
-                console.log(OptionalAdditionalInformation)
                 if(typeof OptionalAdditionalInformation.allowed_attempts_before_answer_given !== "undefined"){
                     if(OptionalAdditionalInformation.allowed_attempts_before_answer_given !== false){
                         camera_active_name_attempts_left = OptionalAdditionalInformation.allowed_attempts_before_answer_given
@@ -489,7 +484,7 @@ FENNIMALCONTROLLER = function(FenObj, ExpCont, interaction_type, OptionalAdditio
         setTimeout(function(){
             start_next_interaction_step()
 
-        }, 0.5*  Settings.step_speed)
+        }, 0.15*  Settings.step_speed)
 
 
     }
@@ -526,7 +521,6 @@ FENNIMALCONTROLLER = function(FenObj, ExpCont, interaction_type, OptionalAdditio
     function try_submitted_Fennimal_photo_name(name_submitted){
         //Get (case-insensitive) distance to the actual name.
         let name_distance = LevenshteinDistance(name_submitted.toLowerCase(), FenObj.name.toLowerCase())
-        console.log(name_distance)
 
         if(typeof FenObj.photo_name_attempts === "undefined"){
             FenObj.photo_name_attempts = {attempts:[], num_errors:0}

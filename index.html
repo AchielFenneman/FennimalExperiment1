@@ -16,6 +16,11 @@
             -ms-user-select: none; /* IE 10 and IE 11 */
             user-select: none; /* Standard syntax */
             max-height: 99dvh;
+            background: white;
+        }
+
+        #Statics_Layer{
+            display: inherit;
         }
 
         #interaction_elements {
@@ -290,7 +295,12 @@
             font-size: 50px;
             padding: 0;
             margin: 0;
-            margin-left: 9px
+            margin-left: 9px;
+            filter: blur(10px);
+            transition: all 300ms ease-in-out;
+        }
+        .recall_input_answer_text:hover{
+            filter: none;
         }
         .recall_input_answer_remove {
             padding-left: 3px;
@@ -351,6 +361,20 @@
             fill: white
         }
 
+        /*HEAD TO REGION TASK */
+        .HeadToRegionCard_Reservoir {
+            filter: blur(15px)
+        }
+        .HeadToRegionCard_Reservoir:hover{
+            filter: none;
+        }
+
+        /*Head Region Sorting Task*/
+        .HeadRegionSortingTask_blurred_card:hover{
+            filter: none !important;
+
+        }
+
 
 
 
@@ -391,9 +415,8 @@
 <script type="text/javascript" src = "Interface.js"></script>
 <script type="text/javascript" src = "SVGReducer.js"></script>
 <script type="text/javascript" src = "CardSortingTask.js"></script>
-
-<script type="text/javascript" src = "https://achielfenneman.github.io/FennimalExperiment1//Audio/AudioController.js"></script>
-<!--<script type="text/javascript" src = "https://achielfenneman.github.io/FennimalExperiment1//Audio/AudioController.js"></script> -->
-
+<script type="text/javascript" src = "/Audio/AudioController.js"></script>
+<!--   <script type="text/javascript" src = "/Audio/AudioController.js"></script>     -->
+<!--   <script type="text/javascript" src = "https://achielfenneman.github.io/FennimalExperiment1//Audio/AudioController.js"></script> -->
 <script type="text/javascript" src = "Top_controller.js"></script>
 </html>
