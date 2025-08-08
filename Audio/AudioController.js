@@ -1,6 +1,6 @@
 AudioControllerObject = function(){
     //Creates soundcontrollers for the files in the Audio subfolder
-    let pathname = "" // "https://achielfenneman.github.io/FennimalExperiment1//"
+    let pathname = "https://achielfenneman.github.io/FennimalExperiment1//"
 
     let RegionSoundScapes = {
         North : new Audio(pathname+ "/Audio/North.wav", loop=true),
