@@ -16,7 +16,7 @@ let StimulusSettings = function(){
 
     //This defines which experiment will be run (definitions follow below).
     // NOTE: If there are multiple codes in an array, then one will be picked at random!
-    this.Experiment_Code = ["schema_experiment_offset", "schema_experiment_baseline"] // "schema_experiment_offset"
+    this.Experiment_Code = ["schema_experiment_offset"] // "schema_experiment_offset"
 
     //Now we determine the experiment structure
     let All_Experiment_Structures = {
@@ -1145,3 +1145,4 @@ let StimulusTransformer = function(StimTemplate){
 }
 
 //TODO: set seed (for shufflearray)
+console.log("now")
