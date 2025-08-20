@@ -8,7 +8,7 @@ let StimulusSettings = function(){
     }
 
     //Which instructions pages are shown to participants before the first day?
-    this.Instructions_at_start = ["browser_check_and_full_screen_prompt","consent", "card_sorting_task", "overview"  ] // "browser_check_and_full_screen_prompt","consent", "card_sorting_task", "overview"
+    this.Instructions_at_start = ["browser_check_and_full_screen_prompt","consent",  "overview"  ] //"browser_check_and_full_screen_prompt","consent",  "overview"      "browser_check_and_full_screen_prompt","consent", "card_sorting_task", "overview"
 
     //Which pages are shown to participants after the last day but BEFORE the payment screen?
     //     "demographics_questionnaire": contains a question on age, gender and color-blindness
@@ -16,27 +16,39 @@ let StimulusSettings = function(){
 
     //This defines which experiment will be run (definitions follow below).
     // NOTE: If there are multiple codes in an array, then one will be picked at random!
-    this.Experiment_Code = ["schema_experiment_offset"] // "schema_experiment_offset"
+    this.Experiment_Code = ["schema_experiment_searchlearn"] // "schema_experiment_offset"
 
     //Now we determine the experiment structure
     let All_Experiment_Structures = {
         test : [
 
-
             {
                 //Defining the quiz here
                 type: 'quiz',
 
-                QuestionSets: [{
-                    //Defining which information is presented. Can be icon or name
-                    cue: 'gray_head',
+                QuestionSets: [
+                    {
+                        question_set_type: "normal",
+                        //Defining which information is presented. Can be icon or name
+                        cue: 'gray_head',
+                        show_name: false,
 
-                    //Defining which questions are asked
-                    questions_asked: ["name","region", "location"],
+                        //Defining which questions are asked
+                        questions_asked: ["name","region"],
 
-                    //Defining which Fennimals are included
-                    Fennimals_included: "all"
-                }
+                        //Defining which Fennimals are included
+                        Fennimals_included: "all"
+                    },
+
+                    {
+                        question_set_type: "treatment",
+                        cue: "gray_head",
+                        show_name: true,
+                        question_groups:[
+                            {Fennimals_included: "TEST", questions_asked: ["other_heads_in_region"]},
+                            {Fennimals_included: "CNTRL", questions_asked: ["color", "body_type"]},
+                        ]
+                    }
                 ],
 
                 //Defining the complement conditions.
@@ -51,6 +63,24 @@ let StimulusSettings = function(){
                 //If set to true, participants will earn a bonus star for each correct answer
                 award_star_for_correct_answer: true
             } ,
+
+            /*
+
+
+            {
+                type: "name_recall_task",
+
+                //If set to true, participants will earn a bonus star for each correct answer
+                award_star_for_each_correct_name: true,
+
+                //Allowed Levenshtein distance to still assign a correct match
+                allowed_Levenshtein_distance_for_match: 2,
+
+            },
+
+
+
+
 
             {
                 type: "head_region_sorting_task",
@@ -83,20 +113,82 @@ let StimulusSettings = function(){
                 Fennimals_encountered: "all"
             },
 
+
+
+             */
+
+
+
+
+
+
+
+        ],
+
+        schema_experiment_searchlearn:  [
+
+            {
+                type: "free_exploration",
+                Fennimal_interaction_type: "polaroid_photo_passive",
+                Fennimals_encountered: "all"
+            },
+
+            {
+                //Defining the block type
+                type: "hint_and_search",
+                hint_type: "icon",
+
+                //Defining which Fennimals are encountered in this block
+                Fennimals_encountered: "all",
+                sort_trials_by: "region",
+
+                //Defining the Fennimal interaction type
+                Fennimal_interaction_type: "polaroid_photo_active",
+                allowed_attempts_before_answer_given: 3,
+            },
+            {
+                type: "head_region_sorting_task",
+                Fennimals_included: "all",
+            },
+            {
+                //Defining the block type
+                type: "hint_and_search",
+                hint_type: "name",
+
+                //Defining which Fennimals are encountered in this block
+                Fennimals_encountered: "all",
+                sort_trials_by: "random",
+
+                //Defining the Fennimal interaction type
+                Fennimal_interaction_type: "polaroid_photo_active",
+                allowed_attempts_before_answer_given: 3,
+            },
+
             {
                 //Defining the quiz here
                 type: 'quiz',
 
                 QuestionSets: [{
+                    question_set_type: "normal",
                     //Defining which information is presented. Can be icon or name
-                    cue: 'gray_icon',
+                    cue: 'gray_head',
+                    show_name: false,
 
                     //Defining which questions are asked
                     questions_asked: ["name","region"],
 
                     //Defining which Fennimals are included
                     Fennimals_included: "all"
-                }
+                },
+                    {
+                        question_set_type: "treatment",
+                        cue: "gray_head",
+                        show_name: true,
+                        question_groups:[
+                            {Fennimals_included: "TEST", questions_asked: ["other_heads_in_region"]},
+                            {Fennimals_included: "CNTRL", questions_asked: ["color", "body_type"]},
+                        ]
+                    }
                 ],
 
                 //Defining the complement conditions.
@@ -112,10 +204,6 @@ let StimulusSettings = function(){
                 award_star_for_correct_answer: true
             } ,
 
-
-
-
-
             {
                 type: "name_recall_task",
 
@@ -126,6 +214,16 @@ let StimulusSettings = function(){
                 allowed_Levenshtein_distance_for_match: 2,
 
             },
+            {
+                type: "card_sorting_task",
+                SpecialSettings: {
+                    skip_second_phase: true,
+                    fix_number_of_groups: false,
+                    minimum_group_size: 2
+
+                }
+            },
+
 
         ],
 
@@ -367,6 +465,55 @@ let StimulusSettings = function(){
 
         },
 
+        schema_experiment_searchlearn: {
+            all: [
+                {id: "RA_CA_1_T", head_group: "A", region: "A"},
+                {id: "RA_CB_2_T", head_group: "B", region: "A"},
+                {id: "RA_CC_3_T", head_group: "C", region: "A"},
+                {id: "RA_CD_4_T", head_group: "D", region: "A"},
+                {id: "RB_CA_5_T", head_group: "A", region: "B"},
+                {id: "RB_CB_6_T", head_group: "B", region: "B"},
+                {id: "RB_CC_7_T", head_group: "C", region: "B"},
+                {id: "RB_CD_8_T", head_group: "D", region: "B"},
+                {id: "RC_CA_9_C", head_group: "A", region: "C"},
+                {id: "RC_CB_10_C", head_group: "B", region: "C"},
+                {id: "RC_CC_11_C", head_group: "C", region: "C"},
+                {id: "RC_CD_12_C", head_group: "D", region: "C"},
+                {id: "RD_CA_13_C", head_group: "A", region: "D"},
+                {id: "RD_CB_14_C", head_group: "B", region: "D"},
+                {id: "RD_CC_15_C", head_group: "C", region: "D"},
+                {id: "RD_CD_16_C", head_group: "D", region: "D"},
+            ],
+            subgroups: {
+                TEST: [
+                    {id: "RA_CA_1_T"},
+                    {id: "RA_CB_2_T"},
+                    {id: "RA_CC_3_T"},
+                    {id: "RA_CD_4_T"},
+
+                    {id: "RB_CA_5_T"},
+                    {id: "RB_CB_6_T"},
+                    {id: "RB_CC_7_T"},
+                    {id: "RB_CD_8_T"},
+                ],
+                CNTRL: [
+                    {id: "RC_CA_9_C"},
+                    {id: "RC_CB_10_C"},
+                    {id: "RC_CC_11_C"},
+                    {id: "RC_CD_12_C"},
+
+                    {id: "RD_CA_13_C"},
+                    {id: "RD_CB_14_C"},
+                    {id: "RD_CC_15_C"},
+                    {id: "RD_CD_16_C"},
+                ],
+            },
+
+
+
+
+        },
+
         test: {
             all: [
                 {id: "A1", head_group: "A", region: "A"},
@@ -378,16 +525,29 @@ let StimulusSettings = function(){
                 {id: "B3", head_group: "B", region: "B"},
                 {id: "B4", head_group: "B", region: "B"},
                 {id: "C1", head_group: "C", region: "C"},
-                {id: "C2", head_group: "C", region: "C"},
-                {id: "C3", head_group: "C", region: "C"},
-                {id: "C4", head_group: "C", region: "C"},
+                //{id: "C2", head_group: "C", region: "C"},
+                //{id: "C3", head_group: "C", region: "C"},
+                //{id: "C4", head_group: "C", region: "C"},
                 {id: "D1", head_group: "D", region: "D"},
-                {id: "D2", head_group: "D", region: "D"},
-                {id: "D3", head_group: "D", region: "D"},
-                {id: "D4", head_group: "D", region: "D"},
+                //{id: "D2", head_group: "D", region: "D"},
+                //{id: "D3", head_group: "D", region: "D"},
+                //{id: "D4", head_group: "D", region: "D"},
+
+
 
 
             ],
+            subgroups: {
+                TEST: [ {id: "A1"},
+                    {id: "A2"},
+                    {id: "A3"},
+                    {id: "A4"}],
+                CNTRL: [ {id: "B1"},
+                    {id: "B2"},
+                    {id: "B3"},
+                    {id: "B4"}],
+            },
+
             head_group_clusters : {
                 A: "X",
                 B: "X",
@@ -420,12 +580,20 @@ let StimulusSettings = function(){
     //                  note: be sure that all names are sufficiently different to prevent double IDs from being submitted by the participant (the data will include a flag if this occurs)
     //      quiz: this starts a card-quiz phase. Participants are given a set of cards, each of which contains a hint (targetting a specific Fennimal) and a set of questions.
     //              QuestionSets: these define which question are shown to the participant. This should be an array of object, with each object containing the following properties:
+    //                  question_set_type: two modes of quiz are currently supported
+    //                      normal: participants will see the requested questions for ALL Fennimals.
+    //                      treatment: questions differ for different subgroups.
+    //                          must contain an array "subgroups". Each element in this array should have:
+    //                              a string property "Fennimals_included", which must refer to one of the subgruops defined in the All_Fennimal_Sets
+    //                              an array property "questions_included". This can contain "head_select_task
+
     //                  cue: the type of que presented on the left side of the card, to define the target Fennimal. Supported cue types are:
     //                      "name" (text containing the name of the Fennimal),
     //                      "icon" (presenting the icon of a Fennimal without name)
     //                      "gray_icon", which is presented with a gray color-scheme
     //                      "sepia_icon", which is represented in a sepia color
-    //                  questions_asked: an array defining which questions are presented on the card. Currently supported are "name" and, "region" and "location"
+    //                  show_name: if set to true, the Fennimal's name is displayed on the question part. Defaults to false.
+    //                  questions_asked: an array defining which questions are presented on the card. Currently supported are "name", "region", "location", "color",  "body_type" and "other_heads_in_region". NB: this last one CANNOT BE COMBINED WITH OTHER QUESTIONS
     //                  Fennimals_included: defines which Fennimals are shown (one question per included Fennimal). TODO: right now, only allows ALL - update for more specified options later
     //              NOTE: card questions are randomized within a 'block', but the blocks are presented in order of specification.
     //          require_perfect_answers: if set to true, then any cards with mistakes will be re-appended at the end of the stack. Therefore, participants will need to correctly answer ALL questions before finishing this phase.
@@ -433,8 +601,9 @@ let StimulusSettings = function(){
     //          award_star_for_correct_answer: if set to true, then participants will earn a star for each CARD where they correctly answered all questions. Also modifies the instructions accordingly.
     //      card_sorting_task: gives the participant a series of cards (one for each Fennimal), and asks participants to first sort them into groups, then sort these groups based on their similarity
     //          NOTE: this task is a bit more plugged-in-later-on in terms of coding. All parameters are specified in the CardSortingTask javascript file.
-    //      pseudoday: this is not an actual day, but instead a placeholder for an event (for example: for screening out participants).
-    //          Due to their nature, behavior of these days is more hard-coded...
+    //      head_region_sorting_task: Participants see all heads, sort them into their region.
+    //          fennimals_included: which heads need to be sorted
+    //          reveal_at_end: during the task, all placed Fennimals are blurred. Will be revealed on completion, unless this is set to false (defaults to true)
 
     //Supported interaction types for free_exploration, jump_trials and hint_and_search:
     //      passive_observation
@@ -455,105 +624,11 @@ let StimulusSettings = function(){
     this.Experiment_Structure = All_Experiment_Structures[this.Experiment_Code]
     this.Fennimals_Encountered_During_Experiment = All_Fennimal_Sets[this.Experiment_Code]
 
-
-    //Defines the order in which the experiment takes place
-    /*
-    this.Experiment_Structure = [
-        {
-            type: "name_recall_task",
-
-            //If set to true, participants will earn a bonus star for each correct answer
-            award_star_for_each_correct_name: true,
-
-            //Allowed Levenshtein distance to still assign a correct match
-            allowed_Levenshtein_distance_for_match: 2,
-
-        },
-
-        {
-            //Defining the quiz here
-            type: 'quiz',
-
-            QuestionSets: [{
-                //Defining which information is presented. Can be icon or name
-                cue: 'icon',
-
-                //Defining which questions are asked
-                questions_asked: ["name","location"],
-
-                //Defining which Fennimals are included
-                Fennimals_included: "all"
-            },
-            ],
-
-            //Defining the complement conditions.
-            //      If set to true, then an incorrectly answered question will be repeated at the end of the cue untill all answers have been completed.
-            require_perfect_answers: false,
-
-            //If set to anything but false, participants can freely travel the island to explore the Fennimals.
-            //    Non-false value should refer to the interaction style of the observed Fennimal.
-            //TODO
-            //allow_participant_to_travel_map: "passive_observation",
-
-            //If set to true, participants will earn a bonus star for each correct answer
-            award_star_for_correct_answer: true
-        },
-
-
-        {
-            type: "card_sorting_task"
-        },
-
-        {
-            //Defining the block type
-            type: "hint_and_search",
-            hint_type: "location",
-
-            //Defining which Fennimals are encountered in this block
-            Fennimals_encountered: "all",
-            sort_trials_by: "head_group",
-
-            //Defining the Fennimal interaction type
-            Fennimal_interaction_type: "polaroid_photo_active",
-            allowed_attempts_before_answer_given: 3,
-        },
-
-        {
-            type: "free_exploration",
-            Fennimal_interaction_type: "polaroid_photo_passive",
-            Fennimals_encountered: "all"
-        },
-
-
-
-
-        {
-            type: "hint_and_search",
-            hint_type: "name",
-            Fennimal_interaction_type: "polaroid_photo_active_with_limited_attempts",
-            Fennimals_encountered: "all"
-        },
-        {
-            type: "hint_and_search",
-            hint_type: "icon",
-            Fennimal_interaction_type: "polaroid_photo_active_with_limited_attempts",
-            Fennimals_encountered: "all"
-
-        },
-        {
-            type: "name_recall_task",
-        },
-    ]
-*/
-
-
-    //"free_exploration", "search_icon", "search_name", "recall_names"
-
     //GENERAL SETTINGS
     ////////////////////
 
     this.use_region_preferred_body_types = true
-    this.preferred_region_sample_order = [[ "Beach",  "Mountains", "Jungle", "Desert", "Village", "Flowerfields"], ["North", "Swamp"]] // [["Flowerfields", "Beach", "Swamp", "Mountains"], ["Jungle", "Desert", "Village"], ["North"]]
+    this.preferred_region_sample_order = ["North", "Desert", "Village", "Jungle"] // [[ "Beach",  "Mountains", "Jungle", "Desert", "Village", "Flowerfields"], ["North", "Swamp"]] // [["Flowerfields", "Beach", "Swamp", "Mountains"], ["Jungle", "Desert", "Village"], ["North"]]
 
     this.allowed_head_groups = ["bird", "safari", "halloween", "xmas"]
 
@@ -1104,7 +1179,6 @@ let StimulusTransformer = function(StimTemplate){
     this.get_maximum_number_of_bonus_stars = function(){
         //TODO: so far, only supports the name recall task and the quiz.
         let max_stars = 0
-        console.log(this.Experiment_Structure)
         for(let i =0;i<this.Experiment_Structure.length;i++){
 
             //The quiz types may have stars associated to them
@@ -1113,10 +1187,17 @@ let StimulusTransformer = function(StimTemplate){
                     if(this.Experiment_Structure[i].award_star_for_correct_answer){
                         //There is a quiz in which participants can earn a star for each correct answer.
                         for(let setnum = 0;setnum < this.Experiment_Structure[i].QuestionSets.length; setnum++){
-                            //TODO: modify to allow for more detailed sets later
-                            if(this.Experiment_Structure[i].QuestionSets[setnum].Fennimals_included === "all"){
-                                max_stars = max_stars + this.get_Fennimals_objects_in_array().length
+
+                            if(this.Experiment_Structure[i].QuestionSets[setnum].question_set_type === "normal"){
+                                max_stars = max_stars + this.get_Fennimals_in_set(this.Experiment_Structure[i].QuestionSets[setnum].Fennimals_included).length
                             }
+
+                            if(this.Experiment_Structure[i].QuestionSets[setnum].question_set_type === "treatment"){
+                                for(let subsetnum = 0; subsetnum < this.Experiment_Structure[i].QuestionSets[setnum].question_groups.length; subsetnum++){
+                                    max_stars = max_stars + this.get_Fennimals_in_set(this.Experiment_Structure[i].QuestionSets[setnum].question_groups[subsetnum].Fennimals_included).length
+                                }
+                            }
+
                         }
                     }
                 }
@@ -1142,7 +1223,58 @@ let StimulusTransformer = function(StimTemplate){
         return(JSON.parse(JSON.stringify(StimTemplate.BonusStarValue)))
     }
 
+    this.get_Fennimals_in_set = function(setname){
+
+        if(setname === "all"){
+            return(this.get_Fennimals_objects_in_array())
+        }else{
+            return(this.get_Fennimals_in_subgroup(setname))
+        }
+    }
+
+    //Returns the Fennimals in a specified subgroup. Returns as an array of Fennimal objects. If this subgroup does not exist, returns false and print a warning
+    this.get_Fennimals_in_subgroup = function(subgroup_name){
+        if(typeof StimTemplate.Fennimals_Encountered_During_Experiment.subgroups === "undefined"){
+            console.warn("WARNING: REQUEST WAS MADE FOR SUBGROUP OF FENNIMALS, BUT NONE ARE DEFINED. RETURNING FALSE")
+            return(false)
+        }
+
+        if(typeof StimTemplate.Fennimals_Encountered_During_Experiment.subgroups[subgroup_name] === "undefined"){
+        console.warn("WARNING: REQUEST WAS MADE FOR SUBGROUP WITH UNKONWN NAME: " + subgroup_name + ". THIS GROUP HAS NOT BEEN SPECIFIED IN STIMULI. RETURNING FALSE")
+            return(false)
+        }
+
+        let Arr = []
+        for(let i =0;i<StimTemplate.Fennimals_Encountered_During_Experiment.subgroups[subgroup_name].length; i++){
+            let id = StimTemplate.Fennimals_Encountered_During_Experiment.subgroups[subgroup_name][i].id
+            for(let fen =0;fen<FennimalObjArr.length;fen++){
+                if(FennimalObjArr[fen].id === id){
+                    Arr.push(JSON.parse(JSON.stringify(FennimalObjArr[fen])))
+                }
+            }
+        }
+        return(Arr)
+
+    }
+
+    //Returns false if there are no subgroups, otherwise returns object with one key for each subgroup, each containing the ID of the Fennimal in this group
+    this.get_Fennimal_subgroups = function(){
+        if(typeof StimTemplate.Fennimals_Encountered_During_Experiment.subgroups === "undefined"){
+            return false
+        }else{
+            let Out = {}
+            for(let key in StimTemplate.Fennimals_Encountered_During_Experiment.subgroups){
+                Out[key] = []
+                let Elem = StimTemplate.Fennimals_Encountered_During_Experiment.subgroups[key]
+                for(let i = 0;i<Elem.length;i++){
+                    Out[key].push(Elem[i].id)
+                }
+            }
+            return(Out)
+        }
+
+    }
+
 }
 
 //TODO: set seed (for shufflearray)
-console.log("now")

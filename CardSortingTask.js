@@ -2,6 +2,9 @@
 
 CardSortingParam = function(){
     let that = this
+
+    this.skip_second_phase = false
+
     this.Card_Size = {
         width: 180,
         height: 180,
@@ -119,12 +122,38 @@ CardSortingParam = function(){
     this.get_instruction_text_second_block = function(){
         return(update_instructions_second_block())
     }
+
+    //Call to change parameters. Should be called with an object in which each key in a setting, and each value is the new value.
+    this.modify_parameters = function(NewParams){
+        for(let key in NewParams){
+            switch(key){
+                case("skip_second_phase"):
+                    this.skip_second_phase = NewParams[key]
+                    break
+                case("fix_number_of_groups"):
+                    this.fix_number_of_groups = NewParams[key]
+                    break
+                case("minimum_group_size"):
+                    this.minimum_group_size = NewParams[key]
+
+            }
+
+
+        }
+
+    }
 }
 
-CARDSORTINGTASK = function(currentdaynum, HostElem, Stimuli, returnfunction){
+CARDSORTINGTASK = function(currentdaynum, HostElem, Stimuli, returnfunction, Special_Settings){
 
     let Task_SVG_Data = new CardSortingTaskSVG().string
     let CardParam = new CardSortingParam()
+
+    //Overwriting parameters here
+    if(typeof Special_Settings !== "undefined"){
+        CardParam.modify_parameters(Special_Settings)
+    }
+
     let MainContainer = create_SVG_group(0,0,"card_sorting_task_container")
     let BackgroundRect = create_SVG_rect(0,0,GenParam.SVG_width, GenParam.SVG_height, "card_sorting_task_background_rect", undefined)
     let SVGDIV = create_SVG_group(0,0,undefined)
@@ -166,10 +195,6 @@ CARDSORTINGTASK = function(currentdaynum, HostElem, Stimuli, returnfunction){
 
     Card_layer.style.display = "inherit"
 
-    //Hiding the finish button
- //   let FinishButton = document.getElementById("finish_button"), FinishButtonText = document.getElementById("finish_button_warning_text")
- //   FinishButton.style.display = "none"
- //   FinishButtonText.style.display = "none"
 
     //INSTRUCTIONS
     let Instructions_First_Stage_Layer = document.getElementById("instructions_page_first_stage"),
@@ -526,7 +551,7 @@ CARDSORTINGTASK = function(currentdaynum, HostElem, Stimuli, returnfunction){
     //Now we can create a set of cards and their constituent elements.
     let CardArr = []
     for(let i =0;i<HeadSVGArray.length;i++){
-        CardArr.push(new CardController(Card_layer, HeadSVGArray[i], ReservoirCardDiv, that))
+        CardArr.push(new CardController(Card_layer, HeadSVGArray[i], ReservoirCardDiv, that, CardParam))
         //that.check_reservoir_scroll()
     }
 
@@ -558,7 +583,7 @@ CARDSORTINGTASK = function(currentdaynum, HostElem, Stimuli, returnfunction){
     }
 
     //BOX FUNCTIONS
-    let BoxCont = new BoxController(Card_layer, that)
+    let BoxCont = new BoxController(Card_layer, that, CardParam)
 
     this.return_cards_when_box_deleted = function(Arr_of_names){
         for(let i = 0;i<CardArr.length;i++){
@@ -622,33 +647,37 @@ CARDSORTINGTASK = function(currentdaynum, HostElem, Stimuli, returnfunction){
 
     //Hands off the boxes to a second stage (relative position) controller
     function start_second_stage(){
-        //Hide the previous continue button and associated elements
-        let ContinueButtonElementsArr = document.getElementsByClassName("category_continue_button_element")
-        for(let i =0; i<ContinueButtonElementsArr.length;i++){
-            ContinueButtonElementsArr[i].style.display = "none"
+        if(! CardParam.skip_second_phase){
+            //Hide the previous continue button and associated elements
+            let ContinueButtonElementsArr = document.getElementsByClassName("category_continue_button_element")
+            for(let i =0; i<ContinueButtonElementsArr.length;i++){
+                ContinueButtonElementsArr[i].style.display = "none"
+            }
+
+            //Fix all cards in place
+            for(let i =0;i<CardArr.length;i++){
+                CardArr[i].fix_card_in_place()
+            }
+
+            //Remove all the buttons in the boxes (and on the SVG)
+            BoxCont.fix_all_boxes_in_place()
+
+            //Change the text at the top of the screen
+            Title.innerHTML = "Which groups are more closely related to each other?"
+            SubTitle.innerHTML = "Please move groups closer together if they are more related"
+
+            //Transform all boxes to draggable groups, move them to the center
+            BoxCont.transform_all_boxes_to_draggable_elements(SVG,Card_layer)
+
+            //Show instructions for the second stage
+            current_phase = 2
+            show_second_instructions_page()
+
+            //Hide the continue button
+            hide_main_continue_button()
+        }else{
+            finish_task()
         }
-
-        //Fix all cards in place
-        for(let i =0;i<CardArr.length;i++){
-            CardArr[i].fix_card_in_place()
-        }
-
-        //Remove all the buttons in the boxes (and on the SVG)
-        BoxCont.fix_all_boxes_in_place()
-
-        //Change the text at the top of the screen
-        Title.innerHTML = "Which groups are more closely related to each other?"
-        SubTitle.innerHTML = "Please move groups closer together if they are more related"
-
-        //Transform all boxes to draggable groups, move them to the center
-        BoxCont.transform_all_boxes_to_draggable_elements(SVG,Card_layer)
-
-        //Show instructions for the second stage
-        current_phase = 2
-        show_second_instructions_page()
-
-        //Hide the continue button
-        hide_main_continue_button()
 
     }
 
@@ -668,6 +697,7 @@ CARDSORTINGTASK = function(currentdaynum, HostElem, Stimuli, returnfunction){
     }
     function finish_task(){
         //Returning data
+        console.log(JSON.parse(JSON.stringify(BoxCont.get_all_box_data())))
         returnfunction(JSON.parse(JSON.stringify(BoxCont.get_all_box_data())))
 
         //Delete all elements
@@ -675,13 +705,14 @@ CARDSORTINGTASK = function(currentdaynum, HostElem, Stimuli, returnfunction){
 
     }
 
+
 }
 
 
-BoxController = function(ParentElem, GroupingCont){
+BoxController = function(ParentElem, GroupingCont, CardParam){
     //Creating the foreignelement which will contain all the boxes.
     let that = this
-    let CardParam = new CardSortingParam()
+
 
     let Box_Foreign = create_SVG_foreignElement(10,100,1900, 750)
     Box_Foreign.id = "BoxForeign"
@@ -929,30 +960,37 @@ BoxController = function(ParentElem, GroupingCont){
 
         //Call to get all the relevant data for this box (contents and position)
         this.get_box_data = function(){
-            let BBox = DraggableForeignElem.getBBox()
-
-            let BoxPos = {
-                x: parseFloat(DraggableForeignElem.style.transform.split(",")[0].replace(/[^\d.-]/g, '')),
-                y: parseFloat(DraggableForeignElem.style.transform.split(",")[1].replace(/[^\d.-]/g, ''))
-            }
-
             let Data = {
                 contents: Names_of_cards_in_box,
-                position: {
-                    x: BoxPos.x,
-                    y: BoxPos.y,
-                    width: BBox.width,
-                    height: BBox.height
-                },
-                num_rows: num_card_rows,
-                num_cols: num_card_cols
+
             }
 
-            //Calculating centerpoint (for easy analysis)
-            Data.centerpoint = {
-                x: BoxPos.x + 0.5* BBox.width,
-                y: BoxPos.y + 0.5* BBox.height,
+            if(typeof DraggableForeignElem !== "undefined"){
+                let BBox = DraggableForeignElem.getBBox()
+
+                let BoxPos = {
+                    x: parseFloat(DraggableForeignElem.style.transform.split(",")[0].replace(/[^\d.-]/g, '')),
+                    y: parseFloat(DraggableForeignElem.style.transform.split(",")[1].replace(/[^\d.-]/g, ''))
+                }
+
+                //Calculating centerpoint (for easy analysis)
+                Data.centerpoint = {
+                    x: BoxPos.x + 0.5* BBox.width,
+                    y: BoxPos.y + 0.5* BBox.height,
+                }
+
+                Data.position = {}
+
+                Data.position.x = BoxPos.x
+                Data.position.y = BoxPos.y
+                Data.position.width = BBox.width
+                Data.position.height = BBox.height
+                Data.num_cols = num_card_cols
+                Data.num_rows = num_card_rows
+
+
             }
+
 
             // Return
             return(JSON.parse(JSON.stringify(Data)))
@@ -1153,6 +1191,7 @@ BoxController = function(ParentElem, GroupingCont){
     if(CardParam.fix_number_of_groups === false){
         create_new_box()
         create_new_box()
+        console.log("HERE")
     }else{
         for(let i=0; i<CardParam.fix_number_of_groups;i++){
             create_new_box()
@@ -1162,8 +1201,7 @@ BoxController = function(ParentElem, GroupingCont){
 
 }
 
-CardController = function(MainSVG, HeadSVG, ReservoirElem, GroupingCont){
-    let CardParam = new CardSortingParam()
+CardController = function(MainSVG, HeadSVG, ReservoirElem, GroupingCont, CardParam){
     //Defining the key variables of the card
     let card_name, CardDiv, SVG_elem, NameP, SVG_innergroup, HeadSVGElem, current_station_name, CurrentStationElem, current_state, that = this, CurrentContainingBox, is_currently_in_box = false, is_fixed_in_place = false
 

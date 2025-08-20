@@ -1,4 +1,5 @@
 
+
 INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
     //GENERAL VALUES and functions
     let current_instruction_type
@@ -200,7 +201,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
 
     }
 
-    function add_closing_button_to_Parent(position){
+    function add_closing_button_to_Parent(position, add_keyboard_shortcut_for_closing){
         switch(position){
             case("top-right"):
                 ClosingButton = create_SVG_buttonElement(1820,3* boundary_size,75,75,"🗙", 70)
@@ -211,7 +212,16 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
         ParentElem.appendChild(ClosingButton)
         ClosingButton.classList.add("instruction_element_nonbackground")
         ClosingButton.onpointerdown = function(){close_instructions(); AudioCont.play_sound_effect("close_menu") }
+
+        if(typeof add_keyboard_shortcut_for_closing !== "undefined"){
+            if(add_keyboard_shortcut_for_closing){
+                add_keyboard_shortcuts_to_object(ClosingButton, ["Escape", "Enter", " "], 700, function(){close_instructions(); AudioCont.play_sound_effect("close_menu") })
+            }
+        }
+
     }
+
+
 
     //GENERAL INTERACTIONS
     ///////////////////////////
@@ -261,7 +271,8 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
         Background.style.display = "inherit"
         Background.style.transition = "all 200ms ease-in-out"
         ParentElem.style.display = "inherit"
-        add_closing_button_to_Parent("top-left")
+        add_closing_button_to_Parent("top-left", true)
+
 
         setTimeout(function(){
             Background.setAttribute("x", boundary_size)
@@ -489,7 +500,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
 
                     //let SearchButton = create_Action_Button_SVG_Element("magnifier", {center_x: 500,center_y:500, width: .5*boxheight, height: .5*boxheight}, false, 3000)
                     let SearchButtonDims = {center_x: 0.545 *GenParam.SVG_width, center_y:box_offset_top + 1.5*boxheight + 1*spacing_boxes, width: .55*boxheight, height: .55*boxheight}
-                    OverviewPage_SearchButton = new ActionButton(CurrentInstructionsSVG,"magnifier", SearchButtonDims,1000, function(){overview_page_next_step(); AudioCont.play_sound_effect("success"); create_ripple(CurrentInstructionsSVG, SearchButtonDims.center_x, SearchButtonDims.center_y ,true, AudioCont)})
+                    OverviewPage_SearchButton = new ActionButton(CurrentInstructionsSVG,"magnifier", SearchButtonDims,1000, false, function(){overview_page_next_step(); AudioCont.play_sound_effect("success"); create_ripple(CurrentInstructionsSVG, SearchButtonDims.center_x, SearchButtonDims.center_y ,true, AudioCont)})
                     OverviewPage_ContinueButton.style.display = "none"
                     //CurrentInstructionsSVG.appendChild(SearchButton)
 
@@ -521,7 +532,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
                     LookoutTowerScale.style.transformOrigin = "center"
                     LookoutTowerScale.style.transform = "scale(2)"
                     MoveElemToCoords(LookoutTowerTranslate,0.52 *GenParam.SVG_width,box_offset_top + 2*boxheight + 2*spacing_boxes - 45)
-                    let LookoutTowerText = create_SVG_text_in_foreign_element("There is a lookout tower located at the center of the island. Climbing this tower will give you an overview of Fenneland!",
+                    let LookoutTowerText = create_SVG_text_in_foreign_element("There is a lookout tower located at the center of the island. If you are unsure where to go, climbing this tower will give you a hint!",
                         0.58 *GenParam.SVG_width,box_offset_top + 2*boxheight + 2*spacing_boxes ,0.375 * GenParam.SVG_width, boxheight,"instructions_element_text")
                     CurrentInstructionsSVG.appendChild(LookoutTowerText)
                     break
@@ -575,7 +586,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
         //LocationBox.add_array_of_Location_icons(WorldState.get_location_states_in_array(), 175,175, true )
 
         //Adding the closing button on the top-right
-        add_closing_button_to_Parent("top-right")
+        add_closing_button_to_Parent("top-right", false)
 
         //Setting all the text here
         document.getElementById("Instructions_Title").innerHTML = "Day " + current_block_num + ": take a photo of all the Fennimals on the island"
@@ -693,7 +704,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
         ParentElem.style.display = "inherit"
 
         //Adding the closing button the bottom of the page
-        add_closing_button_to_Parent(close_button_pos)
+        add_closing_button_to_Parent(close_button_pos, false)
 
         //Setting all the text here
         document.getElementById("Instructions_Title").innerHTML = "Day " + current_block_num + " : search the island for different Fennimals"
@@ -707,7 +718,8 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
 
         let instruction_text = "It's time to check in on the Fennimals. In today's task, you will repeatedly be requested to find different Fennimals. For each Fennimal, you will be " + hint_type_text + ". " +
             "" +
-            "After you have done so, you will be " + next_hint_text + ", untill you have visited all " + Fennimals_in_phase_Array.length + " Fennimals which are currently on the island. "
+            "After you have done so, you will be " + next_hint_text + ", untill you have visited all " + Fennimals_in_phase_Array.length + " Fennimals which are currently on the island. <br><br>" +
+            "<i>Tip: don't know where to go next? Try climbing the watchtower!</i>"
 
         TextElem_Main_Instructions = create_SVG_text_in_foreign_element(instruction_text, 100,300,(1920 - 2*100), 500,"instruction_element_text")
         TextElem_Main_Instructions.classList.add("instruction_element_nonbackground")
@@ -1231,7 +1243,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
     //CARD SORTING TASK
     ///////////////////////
 
-    this.start_card_sorting_task = function(current_block_num){
+    this.start_card_sorting_task = function(current_block_num, SpecialSettings){
         current_instruction_type = "card_sorting_task"
 
         //Show the instructions background as usual
@@ -1241,7 +1253,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
         ParentElem.appendChild(CurrentInstructionsSVG)
         ParentElem.style.display = "inherit"
 
-        let CardSortCont = new CARDSORTINGTASK(current_block_num, ParentElem, Stimuli, this.card_sorting_task_completed)
+        let CardSortCont = new CARDSORTINGTASK(current_block_num, ParentElem, Stimuli, this.card_sorting_task_completed, SpecialSettings)
         let ProgressElem = create_progress_elements()
         ProgressElem.setAttribute("y", 1025)
         ProgressElem.style.opacity = 0.5
@@ -1303,7 +1315,6 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
         }else{
             document.getElementById("Instructions_Title").innerHTML = "Day " + current_block_num + ": time for a quiz!"
         }
-
 
         let instructions_text = "Well done! You're well on your way towards becoming an expert on the Fennimals on the island. " +
             "Before we continue, we will first give you a quiz to review what you've learned so far. <br>" +
@@ -1380,9 +1391,15 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
         if(QuizQuestion.cue_type.includes("icon") ) {cue_type = "icon"}
         if(QuizQuestion.cue_type.includes("head") ) {cue_type = "head"}
 
+        //Check whether we need to display the Fennimal's name on the screen
+        let show_name_on_screen = false
+        if(typeof QuizQuestion.show_name !== "undefined" ){
+            if(QuizQuestion.show_name){
+                show_name_on_screen = true
+            }
+        }
+
         let FrameG, Frame, IconSVG
-
-
         switch(cue_type){
             case("icon"):
                 //Adding the photo frame
@@ -1394,8 +1411,12 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
                 QuestionGroup.appendChild(FrameG)
                 FrameG.appendChild(Frame)
 
-                //Setting the photo frame text to ???
-                Frame.getElementsByClassName("polaroid_frame_name")[0].innerHTML = "???"
+                //Setting the photo frame text
+                if(show_name_on_screen){
+                    Frame.getElementsByClassName("polaroid_frame_name")[0].innerHTML = QuizQuestion.FenObj.name
+                }else{
+                    Frame.getElementsByClassName("polaroid_frame_name")[0].innerHTML = "???"
+                }
 
                 //Adding the icon
                 IconSVG = create_Fennimal_SVG_object(QuizQuestion.FenObj,GenParam.Fennimal_head_size, false)
@@ -1421,8 +1442,13 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
                 QuestionGroup.appendChild(FrameG)
                 FrameG.appendChild(Frame)
 
-                //Setting the photo frame text to ???
-                Frame.getElementsByClassName("polaroid_frame_name")[0].innerHTML = "???"
+                //Setting the photo frame text
+                if(show_name_on_screen){
+                    Frame.getElementsByClassName("polaroid_frame_name")[0].innerHTML = QuizQuestion.FenObj.name
+                }else{
+                    Frame.getElementsByClassName("polaroid_frame_name")[0].innerHTML = "???"
+                }
+
 
                 //Adding the icon
                 IconSVG = create_Fennimal_SVG_object_head_only(QuizQuestion.FenObj, false)
@@ -1440,7 +1466,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
         }
 
         //Adding the subquestions on the right two-thirds of the page
-        let QuestionForeign = create_SVG_foreignElement(.35 * GenParam.SVG_width,0.2 * GenParam.SVG_height,.6 * GenParam.SVG_width, 0.6 * GenParam.SVG_height,undefined,undefined )
+        let QuestionForeign = create_SVG_foreignElement(.35 * GenParam.SVG_width,0.175 * GenParam.SVG_height,.6 * GenParam.SVG_width, 0.6 * GenParam.SVG_height,undefined,undefined )
         let QuestionContainer = document.createElement("div")
         QuestionContainer.style.height = "100%"
         QuestionGroup.appendChild(QuestionForeign)
@@ -1460,7 +1486,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
         ParentElem.appendChild(QuizAnswerButton)
         QuizAnswerButton.style.display = "none"
 
-        QuizFinishButton = create_SVG_buttonElement(QuestionForeign.getBBox().x + 0.5*QuestionForeign.getBBox().width, 0.8* GenParam.SVG_height,400, 75,"Continue", 40)
+        QuizFinishButton = create_SVG_buttonElement(QuestionForeign.getBBox().x + 0.5*QuestionForeign.getBBox().width, 0.85* GenParam.SVG_height,400, 75,"Continue", 40)
         QuizFinishButton.classList.add("quiz_question_element")
         QuizFinishButton.onpointerdown =  function(){quiz_question_completed(); AudioCont.play_sound_effect("button_click") }
         ParentElem.appendChild(QuizFinishButton )
@@ -1471,6 +1497,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
     Quiz_Subquestion = function(SubQuestionObj, onchangecheckfunc){
         //Shorthand
         let fontsize = "35px"
+
         //Create the DOM elements
         let SubQDiv = document.createElement("div")
         SubQDiv.style.width = "100%"
@@ -1479,7 +1506,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
         let SubQ_MainDiv = document.createElement("div")
         let SubQ_FeedbackDiv = document.createElement("div")
         SubQ_MainDiv.style.width = "100%"
-        SubQ_MainDiv.style.display = "flex"
+
         SubQ_FeedbackDiv.style.width = "100%"
         SubQDiv.appendChild(SubQ_MainDiv)
         SubQDiv.appendChild(SubQ_FeedbackDiv)
@@ -1488,27 +1515,40 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
         SubQ_FeedbackDiv.style.textAlign = "center"
         SubQ_FeedbackDiv.style.fontStyle = "italic"
 
-        //Question text
-        let SubQ_QuestionDiv = document.createElement("div")
-        SubQ_QuestionDiv.style.width = "60%"
-        SubQ_QuestionDiv.style.fontSize = fontsize
-        SubQ_QuestionDiv.innerHTML = SubQuestionObj.question_text
-        SubQ_MainDiv.appendChild(SubQ_QuestionDiv)
+        //The subquestion can either be presented in_row (question next to answer) or in_column (question on top of answer)
+        let SubQ_QuestionDiv = document.createElement("div"), SubQ_AnswerDiv = document.createElement("div"), InputObj
 
-        //Now the answer box. This depends on the answer options. If its "text", then provide a written text input. If its an array, then provide a dropdown menu
-        let SubQ_AnswerDiv = document.createElement("div")
-        SubQ_AnswerDiv.style.width = "38%"
-        SubQ_MainDiv.appendChild(SubQ_AnswerDiv)
+        function create_subquestion_in_row(){
+            //Question text
+            SubQ_QuestionDiv.style.width = "60%"
+            SubQ_QuestionDiv.style.fontSize = fontsize
+            SubQ_QuestionDiv.innerHTML = SubQuestionObj.question_text
+            SubQ_MainDiv.appendChild(SubQ_QuestionDiv)
 
-        let InputObj
-        if(SubQuestionObj.answer_options === "text"){
-            InputObj = document.createElement("input")
-            InputObj.type = "text"
+            SubQ_AnswerDiv.style.width = "38%"
+            SubQ_MainDiv.appendChild(SubQ_AnswerDiv)
+            SubQ_MainDiv.style.display = "flex"
 
-        }else{
+        }
+
+        function create_subquestion_in_column(){
+            //Question text
+            SubQ_QuestionDiv.style.width = "100%"
+            SubQ_QuestionDiv.style.fontSize = fontsize
+            SubQ_QuestionDiv.innerHTML = SubQuestionObj.question_text
+            SubQ_QuestionDiv.style.marginBottom = "20px"
+            SubQ_MainDiv.appendChild(SubQ_QuestionDiv)
+
+            SubQ_AnswerDiv.style.width = "100%"
+            SubQ_MainDiv.appendChild(SubQ_AnswerDiv)
+
+
+        }
+
+        function create_answer_box_for_dropdown(){
             //For some of the dropdown menus we may need to color the answer.
             //Unfortunately, the names here are already coded in the participants language, so we need a small object to back-translate
-            let RegionNameTranslation, LocationNameTranslation
+            let RegionNameTranslation, LocationNameTranslation, ColorNameTranslation = {}
             if(GenParam.Quiz_settings.show_color_when_asking_for_region || GenParam.Quiz_settings.show_color_when_asking_for_location){
                 RegionNameTranslation = {}
                 for(let i in GenParam.RegionData){
@@ -1522,48 +1562,77 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
 
             }
 
+            ColorNameTranslation = {}
+            for(let i in GenParam.RegionData){
+                ColorNameTranslation[GenParam.RegionData[i].color_description] = i
+            }
 
-            if(Array.isArray(SubQuestionObj.answer_options )){
-                InputObj = document.createElement("select");
-                for(let namenum in SubQuestionObj.answer_options){
+            InputObj = document.createElement("select");
+            for(let namenum in SubQuestionObj.answer_options){
 
-                    let option = document.createElement("option");
-                    option.value = SubQuestionObj.answer_options[namenum]
-                    option.text = SubQuestionObj.answer_options[namenum]
-                    InputObj.appendChild(option)
+                let option = document.createElement("option");
+                option.value = SubQuestionObj.answer_options[namenum]
+                option.text = SubQuestionObj.answer_options[namenum]
+                InputObj.appendChild(option)
 
-                    //Check if we need to color the answers
-                    if(GenParam.Quiz_settings.show_color_when_asking_for_region || GenParam.Quiz_settings.show_color_when_asking_for_location){
-                        //Check if these answers are a region or a location
-                        let is_region = Object.keys(RegionNameTranslation).includes(option.value)
-                        let is_location = Object.keys(LocationNameTranslation).includes(option.value)
+                //Check if we need to color the answers
+                if(GenParam.Quiz_settings.show_color_when_asking_for_region || GenParam.Quiz_settings.show_color_when_asking_for_location){
+                    //Check if these answers are a region or a location
+                    let is_region = Object.keys(RegionNameTranslation).includes(option.value)
+                    let is_location = Object.keys(LocationNameTranslation).includes(option.value)
 
-                        if(is_region && GenParam.Quiz_settings.show_color_when_asking_for_region ){
-                            option.style.background = GenParam.RegionData[RegionNameTranslation[option.value]].lighter_color + "22"
-                            option.style.color = GenParam.RegionData[RegionNameTranslation[option.value]].darker_color
-                        }
-
-                        if(is_location && GenParam.Quiz_settings.show_color_when_asking_for_location ){
-                            //Finding the region
-                            let region_name = GenParam.find_region_of_location( LocationNameTranslation[option.value])
-                            option.style.background = GenParam.RegionData[region_name].lighter_color + "22"
-                            option.style.color = GenParam.RegionData[region_name].darker_color
-                        }
+                    if(is_region && GenParam.Quiz_settings.show_color_when_asking_for_region ){
+                        option.style.background = GenParam.RegionData[RegionNameTranslation[option.value]].lighter_color + "22"
+                        option.style.color = GenParam.RegionData[RegionNameTranslation[option.value]].darker_color
                     }
 
+                    if(is_location && GenParam.Quiz_settings.show_color_when_asking_for_location ){
+                        //Finding the region
+                        let region_name = GenParam.find_region_of_location( LocationNameTranslation[option.value])
+                        option.style.background = GenParam.RegionData[region_name].lighter_color + "22"
+                        option.style.color = GenParam.RegionData[region_name].darker_color
+                    }
                 }
-                //Adding a hidden default
-                InputObj.value = ""
+
+
+                if(Object.keys(ColorNameTranslation).includes(option.value)){
+                    option.style.background = GenParam.RegionData[ColorNameTranslation[option.value]].lighter_color + "22"
+                    option.style.color = GenParam.RegionData[ColorNameTranslation[option.value]].darker_color
+                }
+
             }
+            //Adding a hidden default
+            InputObj.value = ""
+
         }
 
-        InputObj.style.width  = "100%"
-        InputObj.style.height = "100%"
-        InputObj.style.fontSize = fontsize
-        InputObj.style.textAlign = "center"
-        SubQ_AnswerDiv.appendChild(InputObj)
+        //Creating the question elements depending on its type
+        switch(SubQuestionObj.question_type){
+            case("text"):
+                create_subquestion_in_row()
+                InputObj = document.createElement("input")
+                InputObj.type = "text"
+                break
+            case("dropdown"):
+                create_subquestion_in_row()
+                create_answer_box_for_dropdown()
+                break
+            case("head_select"):
+                create_subquestion_in_column()
+                let SelectBox = new HeadSelectTask(CurrentInstructionsSVG, SubQ_AnswerDiv, SubQuestionObj.answer_options, SubQuestionObj.correct_answer, check_if_answer_correct_by_head_select_task)
+                break
 
-        InputObj.onchange = onchangecheckfunc
+        }
+
+        if(SubQuestionObj.question_type !== "head_select"){
+            InputObj.style.width  = "100%"
+            InputObj.style.height = "100%"
+            InputObj.style.fontSize = fontsize
+            InputObj.style.textAlign = "center"
+            SubQ_AnswerDiv.appendChild(InputObj)
+            InputObj.onchange = onchangecheckfunc
+        }
+
 
         //Returns the DOM elements for the subquestion
         this.getDOM = function(){
@@ -1606,6 +1675,19 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
 
             return(answer_correct)
 
+        }
+
+        //Alternative way to check if the answer was correct, can be called by other objects (assumes that it is passed with the correct properties)
+        function check_if_answer_correct_by_head_select_task(Answer){
+            if(Answer.num_errors === 0){
+                SubQ_QuestionDiv.innerHTML = "<tspan style = 'color: darkgreen'>✔</tspan> " + SubQuestionObj.question_text
+
+            }else{
+                SubQ_FeedbackDiv.innerHTML = "Oops! You did not select all the correct Fennimals..."
+                SubQ_FeedbackDiv.style.color = "firebrick"
+                SubQ_QuestionDiv.innerHTML = "<tspan style = 'color: firebrick'>✘</tspan> " + SubQuestionObj.question_text
+            }
+            check_quiz_answers_bypass(Answer)
         }
 
         this.get_value = function(){
@@ -1776,11 +1858,15 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
 
                     //Add some text
                     setTimeout(function(){
-                        let BonusText = create_SVG_text_elem(QuizFinishButton.getBBox().x + 0.5 * QuizFinishButton.getBBox().width - 190, QuizFinishButton.getBBox().y - 100, "You earned a Star!", "quiz_question_element", undefined )
+                        let BonusText = create_SVG_text_elem(QuizFinishButton.getBBox().x + 0.5 * QuizFinishButton.getBBox().width, QuizFinishButton.getBBox().y - 100, "You earned a Star!", "quiz_question_element", undefined )
                         BonusText.style.fontStyle = "italic"
-                        BonusText.style.fontSize = "50px"
-                        BonusText.style.fontWeight = 700
+                        BonusText.style.fontSize = "70px"
+                        BonusText.style.fontWeight = 900
                         BonusText.style.fill = "goldenrod"
+                        BonusText.style.strokeWidth = "2px"
+                        BonusText.style.stroke = "black"
+                        BonusText.style.textAnchor = "middle"
+
                         ParentElem.appendChild(BonusText)
                     }, 1000)
                 }
@@ -1797,6 +1883,39 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
         setTimeout(function(){
             QuizFinishButton.style.display = "inherit"
         },1000)
+
+    }
+
+    function check_quiz_answers_bypass(Answer){
+
+        if(CurrentQuizQuestion.award_star_for_correct_answer){
+            if(Answer.correct){
+                show_bonus_star_on_screen(ParentElem, QuizFinishButton.getBBox().x + 0.5 * QuizFinishButton.getBBox().width, QuizFinishButton.getBBox().y - 250,  true, "quiz_question_element", false)
+
+                //Add some text
+                setTimeout(function(){
+                    let BonusText = create_SVG_text_elem(QuizFinishButton.getBBox().x + 0.5 * QuizFinishButton.getBBox().width, QuizFinishButton.getBBox().y - 100, "You earned a Star!", "quiz_question_element", undefined )
+                    BonusText.style.fontStyle = "italic"
+                    BonusText.style.fontSize = "70px"
+                    BonusText.style.fontWeight = 900
+                    BonusText.style.fill = "goldenrod"
+                    BonusText.style.strokeWidth = "2px"
+                    BonusText.style.stroke = "black"
+                    BonusText.style.textAnchor = "middle"
+                    ParentElem.appendChild(BonusText)
+                }, 1000)
+            }
+
+        }
+
+        if(! Answer.correct){
+            AudioCont.play_sound_effect("rejected")
+        }
+
+        CurrentQuizQuestion.Answer_Head_Select = Answer
+        setTimeout(function(){
+            QuizFinishButton.style.display = "inherit"
+        }, 1500)
 
     }
     function quiz_question_completed(){
@@ -3057,7 +3176,6 @@ HeadRegionSortingTask = function(Parent, FennimalObjectArray, TopController, ret
             CardElem.BlurContainer.style.height = "100%"
             CardElem.BlurContainer.style.transition = "all 250ms ease-in-out"
 
-
             //Creating the SVG to hold the icon
             CardElem.SVGObj = document.createElementNS("http://www.w3.org/2000/svg", "svg")
             CardElem.SVGObj.style.width = "100%"
@@ -3425,5 +3543,236 @@ HeadRegionSortingTask = function(Parent, FennimalObjectArray, TopController, ret
     }
 
     show_next_card()
+
+}
+
+HeadSelectTask = function(SVGParent, DivParent, FennimalObjectArray, Arr_of_Correct_Ids, returnfunc){
+    //Some general parameters
+    let Dims = {
+        Container: {
+            height: (0.5 * GenParam.SVG_height) + "px",
+            width: "100%"
+        },
+        Cards: {
+            width: 170,
+            height: 170,
+            background_not_selected:  "lightgray",
+            background_selected:  "dimgray",
+            border_selected: "5px solid black",
+            border_not_selected: "5px solid gray",
+            opacity_selected: 1,
+            opacity_not_selected: 0.5,
+            background_correct: "green",
+            background_incorrect_comission: "darkred",
+            background_incorrect_omission: "pink"
+        },
+        CheckAnswerButton: {
+            x: .46 * GenParam.SVG_width,
+            y: 0.8 * GenParam.SVG_height
+        },
+        FinishButton: {
+            x: .80 * GenParam.SVG_width,
+            y: 0.8 * GenParam.SVG_height
+        }
+    }
+
+
+    //Creating the container element
+    let Container, CardControllers = [], RemainingCardsToBePlaced, CheckAnswerButton, FinishButton, all_cards_fixed_in_place = false
+    function start_task(){
+        Container = document.createElement("div")
+        Container.style.width = Dims.Container.width
+        Container.style.height = Dims.Container.height
+        Container.style.display = "flex"
+        Container.style.flexWrap = "wrap"
+        DivParent.appendChild(Container)
+
+        //Creating the check and continue buttons
+        CheckAnswerButton = create_SVG_buttonElement(Dims.CheckAnswerButton.x,Dims.CheckAnswerButton.y,400, 75,"Check answers", 40)
+        CheckAnswerButton.classList.add("quiz_question_element")
+        CheckAnswerButton.onpointerdown = function(){check_answer(); AudioCont.play_sound_effect("button_click") }
+        SVGParent.appendChild(CheckAnswerButton)
+        CheckAnswerButton.style.display = "none"
+
+        //FinishButton = create_SVG_buttonElement(Dims.FinishButton.x,Dims.FinishButton.y,400, 75,"Continue", 40)
+        //FinishButton.classList.add("quiz_question_element")
+        //FinishButton.onpointerdown = function(){ AudioCont.play_sound_effect("button_click") }
+        //SVGParent.appendChild(FinishButton)
+        //FinishButton.style.display = "none"
+
+        setTimeout(function(){
+            for(let i = 0; i<FennimalObjectArray.length;i++){
+                CardControllers.push(new Card(FennimalObjectArray[i], Container))
+            }
+        }, 100)
+    }
+
+    //Defining a card
+    Card = function(FenObj, ContainerObj){
+        let CardElem = {}, is_currently_selected = false
+
+        function create_elems(){
+            CardElem.Container = document.createElement("div")
+            CardElem.Container.style.width = Dims.Cards.width + "px"
+            CardElem.Container.style.height = Dims.Cards.height + "px"
+            CardElem.Container.style.background = Dims.Cards.background_not_selected
+            CardElem.Container.style.margin = "2px"
+            CardElem.Container.style.marginBottom = 0
+            CardElem.Container.style.cursor = "pointer"
+            CardElem.Container.style.border = Dims.Cards.border_not_selected
+            CardElem.Container.style.borderRadius = "40px"
+
+            CardElem.BlurContainer = document.createElement("div")
+            CardElem.BlurContainer.style.width = "100%"
+            CardElem.BlurContainer.style.height = "100%"
+            CardElem.BlurContainer.style.transition = "all 250ms ease-in-out"
+
+            //Creating the SVG to hold the icon
+            CardElem.SVGObj = document.createElementNS("http://www.w3.org/2000/svg", "svg")
+            CardElem.SVGObj.style.width = "100%"
+            CardElem.SVGObj.style.height = "100%"
+            CardElem.SVGObj.style.pointerEvents = "none"
+            CardElem.SVGObj.style.opacity = Dims.Cards.opacity_not_selected
+
+            CardElem.Container.appendChild(CardElem.BlurContainer)
+            CardElem.BlurContainer.appendChild(CardElem.SVGObj)
+            ContainerObj.appendChild(CardElem.Container)
+
+            //Creating the icon
+            CardElem.Icon = create_Fennimal_SVG_object_head_only(FenObj, false)
+            CardElem.SVGObj.appendChild(CardElem.Icon)
+
+            //Resizing and translating the icon
+            let scale_factor_w = 1/( CardElem.Icon.getBBox().width / Dims.Cards.width)
+            let scale_factor_h = 1/( CardElem.Icon.getBBox().height / Dims.Cards.height)
+            let min_scale_factor = Math.floor( Math.min(scale_factor_w, scale_factor_h) * 100) / 100
+
+            //Applying to the Fennimal icon scale group
+            let ScaleGroup = CardElem.Icon.getElementsByClassName("Fennimal_scale_group")[0]
+            ScaleGroup.style.transform = "scale(" + min_scale_factor + ")"
+
+            //Translation. This depends on whether there is a name. If no, center icon in the middle of the card. If yes, align it to the top instead
+            let NewBox = CardElem.Icon.getBBox()
+            let TargetCenter = {x:Math.round(0.5*Dims.Cards.width), y:Math.round(0.5*Dims.Cards.height)}
+            let delta_x = TargetCenter.x - (NewBox.x + 0.5*NewBox.width)
+            let delta_y = TargetCenter.y - (NewBox.y + 0.5*NewBox.height)
+            CardElem.Icon.style.transform = "translate(" + delta_x + "px, " + delta_y + "px)"
+
+            //Setting grayscale
+            CardElem.SVGObj.style.filter = "grayscale(100%)"
+
+            //Setting event listener
+            CardElem.Container.onpointerdown = toggle_selection
+
+
+        }
+
+        create_elems()
+
+        function toggle_selection(){
+            if(! all_cards_fixed_in_place){
+                AudioCont.play_sound_effect("card_placed")
+                if(is_currently_selected){
+                    is_currently_selected = false
+                    CardElem.Container.style.background = Dims.Cards.background_not_selected
+                    CardElem.SVGObj.style.opacity = Dims.Cards.opacity_not_selected
+                    CardElem.Container.style.border = Dims.Cards.border_not_selected
+                }else{
+                    is_currently_selected = true
+                    CardElem.Container.style.background = Dims.Cards.background_selected
+                    CardElem.SVGObj.style.opacity = Dims.Cards.opacity_selected
+                    CardElem.Container.style.border = Dims.Cards.border_selected
+                }
+                card_has_been_pressed()
+            }
+        }
+
+        this.get_current_selection_state = function(){
+            return(is_currently_selected)
+        }
+
+
+        this.set_feedback = function(feedback_type){
+            CardElem.BlurContainer.style.filter = "blur(20px)"
+            CardElem.SVGObj.style.filter = "none"
+
+            switch(feedback_type){
+                case("correct"):
+                    CardElem.Container.style.background = Dims.Cards.background_correct
+                    CardElem.Container.style.borderColor = Dims.Cards.background_correct
+                    break
+                case("incorrect_omission"):
+                    CardElem.Container.style.background = Dims.Cards.background_incorrect_omission
+                    break
+                case("incorrect_comission"):
+                    CardElem.Container.style.background = Dims.Cards.background_incorrect_comission
+                    break
+            }
+        }
+
+        this.get_card_Fennimal_ID = function(){
+            return(FenObj.id)
+        }
+
+
+
+    }
+
+    function card_has_been_pressed(){
+        //Find how many cards are currently selected
+        let number_cards_selected = 0
+        for(let i =0;i<CardControllers.length;i++){
+            if(CardControllers[i].get_current_selection_state()){
+                number_cards_selected++
+            }
+        }
+
+        if(number_cards_selected === Arr_of_Correct_Ids.length){
+            CheckAnswerButton.style.display = "inherit"
+        }else{
+            CheckAnswerButton.style.display = "none"
+        }
+
+    }
+
+    function check_answer(){
+        //Hide the check button and fix all cards in place
+        CheckAnswerButton.style.display = "none"
+        all_cards_fixed_in_place = true
+
+        //Blur all the answers and give feedback
+        let number_of_errors = 0
+        let IDs_selected = []
+
+        for(let i = 0;i<CardControllers.length;i++){
+            if(CardControllers[i].get_current_selection_state()){
+                IDs_selected.push(CardControllers[i].get_card_Fennimal_ID())
+                if(Arr_of_Correct_Ids.includes(CardControllers[i].get_card_Fennimal_ID())){
+                    CardControllers[i].set_feedback("correct")
+                }else{
+                    CardControllers[i].set_feedback("incorrect_comission")
+                    number_of_errors++
+                }
+            }else{
+                if(Arr_of_Correct_Ids.includes(CardControllers[i].get_card_Fennimal_ID())){
+                    CardControllers[i].set_feedback("incorrect_omission")
+                    number_of_errors++
+                }else{
+                    CardControllers[i].set_feedback("true_negative")
+                }
+            }
+        }
+
+        //Now return the output
+
+        returnfunc( {
+            num_errors: number_of_errors,
+            correct: number_of_errors === 0,
+            Ids_selected: IDs_selected
+        })
+
+    }
+
+    start_task()
 
 }

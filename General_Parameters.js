@@ -36,6 +36,8 @@ GENERALPARAM = function(){
 
     }
 
+    this.get_hint_on_top_of_watchtower = true
+
     //Finding the dimensions of the SVG object
     this.SVGObject = document.getElementById("Scannimals_Task_SVG")
     this.SVG_width = parseFloat(document.getElementById("Scannimals_Task_SVG").getAttribute("width"))
@@ -47,6 +49,7 @@ GENERALPARAM = function(){
 
     //Defines the fraction of the map covered by the zoomed-in view
     this.map_zoom_level = 0.35
+    this.map_zoom_level_center = 0.375
 
     //Defined the zoom speed
     this.map_zoom_animation_speed = 500
@@ -57,7 +60,7 @@ GENERALPARAM = function(){
     //Note: these are denoted in PERCENTAGES
     this.Map_Region_Centers_Percentage = {
         Home: {x: 50, y: 50 },
-        North: {x: 50, y: 5 },
+        North: {x: 50, y: 10 },
         Desert: {x: 50, y: 90 },
         Jungle: {x: 25, y: 50 },
         Village: {x: 75, y: 50 },
@@ -89,7 +92,8 @@ GENERALPARAM = function(){
             },
             contrast_color: "#edc25e",
             preferredBodyType: "beaver",
-            display_name: "The Frozen North"
+            display_name: "The Frozen North",
+            color_description: "blue"
         },
         Jungle: {
             lighter_color: "#b5e092",
@@ -103,7 +107,8 @@ GENERALPARAM = function(){
             },
             contrast_color: "#ac7dd7ff",
             preferredBodyType: "longneck",
-            display_name: "The Jungle"
+            display_name: "The Jungle",
+            color_description: "green"
         },
         Desert: {
             lighter_color: "#f5f55b",
@@ -118,7 +123,8 @@ GENERALPARAM = function(){
             },
             contrast_color: "#47395b",
             preferredBodyType: "scaley",
-            display_name: "The Desert"
+            display_name: "The Desert",
+            color_description: "yellow"
         },
         Mountains: {
             lighter_color: "#d6bba9",
@@ -132,7 +138,8 @@ GENERALPARAM = function(){
             },
             contrast_color: "#9fd8ee",
             preferredBodyType: "climber",
-            display_name: "The Mountains"
+            display_name: "The Mountains",
+            color_description: "brown"
         },
         Beach: {
             lighter_color: "#ffd0b0",
@@ -146,7 +153,8 @@ GENERALPARAM = function(){
             },
             contrast_color: "#c30b69",
             preferredBodyType: "turtle",
-            display_name: "The Beach"
+            display_name: "The Beach",
+            color_description: "sand"
         },
         Flowerfields: {
             lighter_color: "#ffcffa",
@@ -160,7 +168,8 @@ GENERALPARAM = function(){
             },
             contrast_color: "#799742",
             preferredBodyType: "cow",
-            display_name: "The Fields of Flowers"
+            display_name: "The Fields of Flowers",
+            color_description: "lavender"
 
         },
         Village: {
@@ -176,7 +185,8 @@ GENERALPARAM = function(){
             },
             contrast_color: "#80eeca",
             preferredBodyType: "rotund",
-            display_name: "The Village"
+            display_name: "The Village",
+            color_description: "red"
 
         },
         Swamp: {
@@ -191,7 +201,9 @@ GENERALPARAM = function(){
             },
             contrast_color: "#cb156b",
             preferredBodyType: "mushroom",
-            display_name: "The Swamp"
+            display_name: "The Swamp",
+            color_description: "teal"
+
         },
         Home: {
             lighter_color: "#CCCCCC",
@@ -295,6 +307,17 @@ GENERALPARAM = function(){
         toucan: "Toucan",
         peacock: "Peacock",
         tombstone: "Tombstone",
+    }
+
+    this.BodyDisplayNames = {
+        beaver: "Furry, with a big tail",
+        longneck: "Long neck with leaves on its shoulders",
+        scaley: "Scaled and spikey",
+        climber: "Long and thin",
+        turtle: "Armoured like a turtle",
+        cow: "Spotted like a cow",
+        rotund: "Chubby with a scarf",
+        mushroom: "Shaped like a mushroom",
     }
 
     //DEFINES WHICH HEAD GROUPS ARE SIMILAR TO EACHOTHER

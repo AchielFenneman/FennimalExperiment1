@@ -466,6 +466,20 @@ FENNIMALCONTROLLER = function(FenObj, ExpCont, interaction_type, OptionalAdditio
         Camera_PhotoCloseButton = create_SVG_buttonElement(Photo_Settings.CloseButtonCoords.x,Photo_Settings.CloseButtonCoords.y,Photo_Settings.CloseButtonCoords.w,Photo_Settings.CloseButtonCoords.h,"🗙", 70)
         ParentLayer.appendChild(Camera_PhotoCloseButton)
         Camera_PhotoCloseButton.onpointerdown = exit_photo
+
+        //Below allows for an event listener to make closing the photo respond to keyboard commands
+        /*Camera_PhotoCloseButton.tabIndex = "0"
+        setTimeout(function(){Camera_PhotoCloseButton.focus()},10)
+
+        Camera_PhotoCloseButton.onkeydown = function(event){
+            if(event.key === "Enter" || event.key === "Escape" || event.key === ""){
+                exit_photo()
+            }
+        }
+         */
+        add_keyboard_shortcuts_to_object(Camera_PhotoCloseButton, ["Escape", "Enter", " "], 750, exit_photo)
+
+
     }
     function exit_photo(){
         AudioCont.play_sound_effect("close_menu")
@@ -508,6 +522,7 @@ FENNIMALCONTROLLER = function(FenObj, ExpCont, interaction_type, OptionalAdditio
         Camera_Photo_Name_Input.style.fontSize = "80px"
         Camera_Photo_Name_Input.style.textAlign = "Center"
         Camera_Photo_Name_Input.placeholder = "Type here"
+        setTimeout(function(){Camera_Photo_Name_Input.focus()},10)
         Camera_Photo_Name_Foreign.appendChild(Camera_Photo_Name_Input)
 
         Camera_Photo_Name_Input.onkeydown = function(event){
@@ -582,6 +597,8 @@ FENNIMALCONTROLLER = function(FenObj, ExpCont, interaction_type, OptionalAdditio
         }
 
     }
+
+
 
 
 

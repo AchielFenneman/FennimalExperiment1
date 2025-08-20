@@ -185,6 +185,10 @@ WorldStateObject = function(){
         return(Arr)
     }
 
+    this.get_location_states_as_object = function(){
+        return(State)
+    }
+
     //Get an array of all Fennimals currently present on the map (deep copy!)
     this.get_array_of_Fennimals_on_map = function(){
         let Arr = []
@@ -212,7 +216,8 @@ DATACONTROLLER = function(Stimuli){
         TimeStamps: [],
         RawPhaseData: [],
         StoredData: [],
-        Questionnaire: []
+        Questionnaire: [],
+        Fennimal_subgroups: Stimuli.get_Fennimal_subgroups()
     }
 
     //On creation, store the Fennimals and experiment code. We want to store these templates in minimal form
@@ -235,6 +240,8 @@ DATACONTROLLER = function(Stimuli){
 
     }
     store_Fennimal_objects()
+    console.log(ExperimentData)
+
 
     //On creation, check to see if there is a Prolific ID code. If so, store the first few digits
     function check_if_there_is_a_prolific_code(){
@@ -332,6 +339,7 @@ DATACONTROLLER = function(Stimuli){
     //Call at the end of the experiment to retrieve the payment data. This also generates a completion code
     this.get_payment_data = function(){
         //Calculating total stars
+        console.log(ExperimentData)
         ExperimentData.PaymentData = {}
         ExperimentData.PaymentData.phases = JSON.parse(JSON.stringify(PaymentInfo))
         ExperimentData.PaymentData.total_stars = 0
@@ -444,81 +452,64 @@ EXPCONTROLLER = function(){
         }else{
             CurrentPhaseData = Remaining_experiment_phases.shift()
 
-            if(CurrentPhaseData.type === "pseudoday"){
-                console.log("STARTING PSEUDO")
-                switch(CurrentPhaseData.event_type){
-                    case("screener_based_on_card_sorting_task"):
-                        screener_for_card_task()
-                        break
-                }
-            }else{
+            current_phase_of_the_experiment = CurrentPhaseData.type
+            current_phase_num++
+            CurrentPhaseData.phasenum = current_phase_num
 
-                current_phase_of_the_experiment = CurrentPhaseData.type
-                current_phase_num++
-                CurrentPhaseData.phasenum = current_phase_num
+            current_interaction_num_in_phase = 0
 
-                current_interaction_num_in_phase = 0
-
-                WorldState.clear_all_locations(true)
-                if(GenParam.DisplayFoundFennimalIconsOnMap.show){
-                    MapCont.clear_all_Fennimal_icons_from_map()
-                }
+            WorldState.clear_all_locations(true)
+            if(GenParam.DisplayFoundFennimalIconsOnMap.show){
+                MapCont.clear_all_Fennimal_icons_from_map()
+            }
 
 
-                switch(current_phase_of_the_experiment){
+            switch(current_phase_of_the_experiment){
 
-                    case("free_exploration"):
-                        flag_exploration_phase_has_been_completed_after_instructions_closed = false
+                case("free_exploration"):
+                    flag_exploration_phase_has_been_completed_after_instructions_closed = false
 
-                        //Populating the entire map at once
-                        switch(CurrentPhaseData.Fennimals_encountered){
-                            case("all"):
-                                WorldState.populate_map_with_array_of_Fennimals(Stimuli.get_Fennimals_objects_in_array(),true)
-                                CurrentPhaseData.number_interactions_in_phase = Stimuli.get_Fennimals_objects_in_array().length
-                                CurrentPhaseData.Fennimals_in_phase = WorldState.get_array_of_Fennimals_on_map()
-                                break
-                        }
-                        //Block map interactions and show the instructions
-                        MapCont.disable_map_interactions()
-                        InstrCont.initialize_free_exploration_instructions(CurrentPhaseData.phasenum, CurrentPhaseData.Fennimals_in_phase)
-                        break
-                    case("hint_and_search"):
-                        flag_hint_and_search_phase_general_instructions_shown = false
-                        //Creating an array of all Fennimals to visit during the trial
-                        let Trials = sort_Fennimal_array_by_features(Stimuli.get_Fennimals_objects_in_array(), CurrentPhaseData.sort_trials_by)
+                    //Populating the entire map at once
+                    let Fennimals_on_map = Stimuli.get_Fennimals_in_set(CurrentPhaseData.Fennimals_encountered)
+                    WorldState.populate_map_with_array_of_Fennimals(Fennimals_on_map,true)
+                    CurrentPhaseData.number_interactions_in_phase = Fennimals_on_map.length
+                    CurrentPhaseData.Fennimals_in_phase = WorldState.get_array_of_Fennimals_on_map()
 
-                        switch(CurrentPhaseData.Fennimals_encountered){
-                            case("all"):
-                                CurrentPhaseData.number_interactions_in_phase = Trials.length
-                                CurrentPhaseData.Fennimals_in_phase = Trials
-                                break
-                        }
+                    //Block map interactions and show the instructions
+                    MapCont.disable_map_interactions()
+                    InstrCont.initialize_free_exploration_instructions(CurrentPhaseData.phasenum, CurrentPhaseData.Fennimals_in_phase)
+                    break
+                case("hint_and_search"):
+                    flag_hint_and_search_phase_general_instructions_shown = false
+                    //Creating an array of all Fennimals to visit during the trial
+                    let Trials = sort_Fennimal_array_by_features(Stimuli.get_Fennimals_in_set(CurrentPhaseData.Fennimals_encountered), CurrentPhaseData.sort_trials_by)
+                    CurrentPhaseData.number_interactions_in_phase = Trials.length
+                    CurrentPhaseData.Fennimals_in_phase = Trials
 
-                        //Showing the general phase instuctions.
-                        MapCont.disable_map_interactions()
-                        InstrCont.initialize_hint_and_search_phase_general_instructions(CurrentPhaseData.phasenum, CurrentPhaseData.Fennimals_in_phase, CurrentPhaseData.hint_type, "bottom-center")
-                        break
-                    case("name_recall_task"):
-                        MapCont.disable_map_interactions()
-                        InstrCont.start_name_recall_task(CurrentPhaseData.phasenum, CurrentPhaseData.award_star_for_each_correct_name)
-                        break
-                    case("card_sorting_task"):
-                        MapCont.disable_map_interactions()
-                        InstrCont.start_card_sorting_task(CurrentPhaseData.phasenum)
-                        break
-                    case("quiz"):
-                        MapCont.disable_map_interactions()
-                        start_quiz()
-                        break
-                    case("match_head_to_region"):
-                        MapCont.disable_map_interactions()
-                        start_match_head_to_region_task()
-                        break
-                    case("head_region_sorting_task"):
-                        MapCont.disable_map_interactions()
-                        start_head_to_region_sorting_task()
-                        break
-                }
+                    //Showing the general phase instuctions.
+                    MapCont.disable_map_interactions()
+                    InstrCont.initialize_hint_and_search_phase_general_instructions(CurrentPhaseData.phasenum, CurrentPhaseData.Fennimals_in_phase, CurrentPhaseData.hint_type, "bottom-center")
+                    break
+                case("name_recall_task"):
+                    MapCont.disable_map_interactions()
+                    InstrCont.start_name_recall_task(CurrentPhaseData.phasenum, CurrentPhaseData.award_star_for_each_correct_name)
+                    break
+                case("card_sorting_task"):
+                    MapCont.disable_map_interactions()
+                    InstrCont.start_card_sorting_task(CurrentPhaseData.phasenum, CurrentPhaseData.SpecialSettings)
+                    break
+                case("quiz"):
+                    MapCont.disable_map_interactions()
+                    start_quiz()
+                    break
+                case("match_head_to_region"):
+                    MapCont.disable_map_interactions()
+                    start_match_head_to_region_task()
+                    break
+                case("head_region_sorting_task"):
+                    MapCont.disable_map_interactions()
+                    start_head_to_region_sorting_task()
+                    break
             }
 
         }
@@ -531,7 +522,7 @@ EXPCONTROLLER = function(){
 
             InstrCont.initialize_hint_and_search_phase_trial_instructions(CurrentSearchTrial, CurrentPhaseData.hint_type)
             AudioCont.play_sound_effect("alert")
-            MapCont.allow_participant_to_leave_location()
+            MapCont.allow_participant_to_leave_location(true)
 
         }else{
             phase_completed()
@@ -762,7 +753,7 @@ EXPCONTROLLER = function(){
                 case("overview"): InstrCont.show_overview_page(); break
                 case("card_sorting_task"):
                     MapCont.disable_map_interactions()
-                    InstrCont.start_card_sorting_task(false)
+                    InstrCont.start_card_sorting_task(false, undefined)
                     break
 
             }
@@ -895,7 +886,7 @@ EXPCONTROLLER = function(){
                     Interface.Prompt.show_message("This photo has been added to your collection!")
                     exploration_phase_add_photo()
                 }else{
-                    MapCont.allow_participant_to_leave_location()
+                    MapCont.allow_participant_to_leave_location(true)
                 }
                 break
             case("hint_and_search"):
@@ -903,7 +894,7 @@ EXPCONTROLLER = function(){
                     start_next_trial_in_hint_and_search_phase()
                     Interface.Prompt.show_message("Time to find the next Fennimal!")
                 }else{
-                    MapCont.allow_participant_to_leave_location()
+                    MapCont.allow_participant_to_leave_location(true)
                 }
 
                 break
@@ -933,7 +924,7 @@ EXPCONTROLLER = function(){
             flag_exploration_phase_has_been_completed_after_instructions_closed = true
             InstrCont.update_exploration_phase_instructions_to_show_completion()
         }else{
-            MapCont.allow_participant_to_leave_location()
+            MapCont.allow_participant_to_leave_location(true)
         }
 
     }
@@ -966,6 +957,7 @@ EXPCONTROLLER = function(){
 
     //Recalled names task
     function process_recalled_names(RecalledNames, max_dist_for_match){
+        console.log(RecalledNames)
         //Get an array of all the names encountered during the experiment
         // Each element should have an ID and a name
 
@@ -1068,6 +1060,83 @@ EXPCONTROLLER = function(){
         show_next_quiz_question()
     }
     //Assumes that the CurrentPhaseData is the quiz type, creates a set of Questions in the object
+    function create_single_quiz_subquestion(subquestion_type, FenObj){
+        //Extracting some information
+        let subject_facing_region_names = []
+        let subject_facing_color_names = []
+        let subject_facing_body_names = []
+
+        let regions_in_experiment = Stimuli.get_all_regions_visited_during_experiment()
+        for(let i =0;i<regions_in_experiment.length;i++){
+            subject_facing_region_names.push(GenParam.RegionData[regions_in_experiment[i]].display_name)
+            subject_facing_color_names.push(GenParam.RegionData[regions_in_experiment[i]].color_description)
+        }
+
+        let bodies_in_experiment = Stimuli.get_all_bodies_encountered_during_experiment()
+        for(let i =0;i<bodies_in_experiment.length;i++){
+            subject_facing_body_names.push(GenParam.BodyDisplayNames[bodies_in_experiment[i]])
+        }
+
+        let SubQ = {qtype: subquestion_type}
+
+        switch(subquestion_type){
+            case("name"):
+                SubQ.question_type = "text"
+                SubQ.question_text = "What is this Fennimal's name?"
+                SubQ.answer_options = "text"
+                SubQ.correct_answer = FenObj.name
+                break
+            case("location"):
+                SubQ.question_type = "dropdown"
+                SubQ.question_text = "Where did you see this Fennimal?"
+                SubQ.answer_options = Stimuli.get_all_locations_visited_during_experiment_as_participant_facing_names()
+                SubQ.correct_answer = GenParam.LocationDisplayNames[FenObj.location]
+                break
+            case("region"):
+                SubQ.question_type = "dropdown"
+                SubQ.question_text = "In which part of the island did you see this Fennimal?"
+                SubQ.answer_options = subject_facing_region_names
+                SubQ.correct_answer = GenParam.RegionData[FenObj.region].display_name
+                break
+            case("color"):
+                SubQ.question_type = "dropdown"
+                SubQ.question_text = "What color did this Fennimal have?"
+                SubQ.answer_options = subject_facing_color_names
+                SubQ.correct_answer = GenParam.RegionData[FenObj.region].color_description
+                break
+            case("other_heads_in_region"):
+                SubQ.question_type = "head_select"
+                //The answer options should be an array of Fennimal object WHICH DOES NOT INCLUDE THIS TARGET FENNIMAL.
+                //The correct answers should be an array of IDs
+                SubQ.correct_answer = []
+
+                let OtherFennimalArray = []
+                let id_target = FenObj.id
+                let AllFennimals = Stimuli.get_Fennimals_objects_in_array()
+                for(let i =0;i<AllFennimals.length;i++){
+                    if(AllFennimals[i].id !== id_target){
+                        OtherFennimalArray.push(AllFennimals[i])
+                        if(AllFennimals[i].region === FenObj.region){
+                            SubQ.correct_answer.push(AllFennimals[i].id)
+                        }
+                    }
+                }
+                SubQ.answer_options = shuffleArray( OtherFennimalArray )
+
+                SubQ.question_text = "Which " + SubQ.correct_answer.length + " other Fennimals did you see in the same region as this Fennimal?"
+                break
+            case("body_type"):
+                SubQ.question_type = "dropdown"
+                SubQ.question_text = "What description best matches the shape of this Fennimal's body?"
+                SubQ.answer_options = subject_facing_body_names
+                SubQ.correct_answer = GenParam.BodyDisplayNames[FenObj.body]
+                break
+
+
+        }
+        return(SubQ)
+
+    }
     function create_quiz_questions(){
         //Each QuestionObject needs to have the following properties:
         //  A question_number
@@ -1079,51 +1148,60 @@ EXPCONTROLLER = function(){
 
         for(let blocknum =0; blocknum < CurrentPhaseData.QuestionSets.length; blocknum++){
             let BlockQuestions = []
-            let FennimalsInSet = []
-            switch (CurrentPhaseData.QuestionSets[blocknum].Fennimals_included){
-                case("all"):
-                    FennimalsInSet = Stimuli.get_Fennimals_objects_in_array()
-                    break
 
-            }
+            //There are type main types of quiz questions supported: normal type (for checking whether partcipants memorized the Fennimals, which should go first, and treatment types, which differ between different Fennimals.
+            switch(CurrentPhaseData.QuestionSets[blocknum].question_set_type){
+                case("normal"):
+                    let FennimalsInSet = Stimuli.get_Fennimals_in_set(CurrentPhaseData.QuestionSets[blocknum].Fennimals_included)
 
-            for(let qnum = 0;qnum< FennimalsInSet.length; qnum++){
-                let NewQ = {
-                    FenObj:FennimalsInSet[qnum],
-                    cue_type: CurrentPhaseData.QuestionSets[blocknum].cue,
-                    subquestions: [],
-                    award_star_for_correct_answer: CurrentPhaseData.award_star_for_correct_answer
-                }
+                    for(let qnum = 0;qnum< FennimalsInSet.length; qnum++){
+                        let NewQ = {
+                            FenObj:FennimalsInSet[qnum],
+                            cue_type: CurrentPhaseData.QuestionSets[blocknum].cue,
+                            subquestions: [],
+                            award_star_for_correct_answer: CurrentPhaseData.award_star_for_correct_answer,
+                            question_type: "normal"
+                        }
 
-                for(let subnum = 0;subnum<CurrentPhaseData.QuestionSets[blocknum].questions_asked.length; subnum++){
-                    let SubQ = {qtype: CurrentPhaseData.QuestionSets[blocknum].questions_asked[subnum]}
-                    switch(CurrentPhaseData.QuestionSets[blocknum].questions_asked[subnum]){
-                        case("name"):
-                            SubQ.question_text = "What is this Fennimal's name?"
-                            SubQ.answer_options = "text"
-                            SubQ.correct_answer = FennimalsInSet[qnum].name
-                            break
-                        case("location"):
-                            SubQ.question_text = "Where did you see this Fennimal?"
-                            SubQ.answer_options = Stimuli.get_all_locations_visited_during_experiment_as_participant_facing_names()
-                            SubQ.correct_answer = GenParam.LocationDisplayNames[FennimalsInSet[qnum].location]
-                            break
-                        case("region"):
-                            SubQ.question_text = "In which part of the island did you see this Fennimal?"
-                            let regions_in_experiment = Stimuli.get_all_regions_visited_during_experiment()
-                            let subject_facing_region_names = []
-                            for(let i =0;i<regions_in_experiment.length;i++){
-                                subject_facing_region_names.push(GenParam.RegionData[regions_in_experiment[i]].display_name)
-                            }
-                            SubQ.answer_options = subject_facing_region_names
-                            SubQ.correct_answer = GenParam.RegionData[FennimalsInSet[qnum].region].display_name
-                            break
+                        for(let subnum = 0;subnum<CurrentPhaseData.QuestionSets[blocknum].questions_asked.length; subnum++){
+                            NewQ.subquestions.push(create_single_quiz_subquestion(CurrentPhaseData.QuestionSets[blocknum].questions_asked[subnum],FennimalsInSet[qnum] ))
+                        }
+                        BlockQuestions.push(NewQ)
+
                     }
-                    NewQ.subquestions.push(SubQ)
-                }
-                BlockQuestions.push(NewQ)
+                    QuestionsArr.push(shuffleArray(BlockQuestions))
+                    break
+                case("treatment"):
+                    let SetsOfQuestions = []
+                    for(let questionsetnum = 0;questionsetnum < CurrentPhaseData.QuestionSets[blocknum].question_groups.length; questionsetnum++){
+                        //Get all the Fennimals in this set
+                        let group_name = CurrentPhaseData.QuestionSets[blocknum].question_groups[questionsetnum].Fennimals_included
+                        let FennimalsInSubset = Stimuli.get_Fennimals_in_subgroup(group_name)
+
+                        //Now for each Fennimal in this subset we need to create a question element
+                        for(let qnum = 0;qnum< FennimalsInSubset.length; qnum++){
+
+                            let NewQ = {
+                                FenObj:FennimalsInSubset[qnum],
+                                cue_type: CurrentPhaseData.QuestionSets[blocknum].cue,
+                                show_name: CurrentPhaseData.QuestionSets[blocknum].show_name,
+                                subquestions: [],
+                                award_star_for_correct_answer: CurrentPhaseData.award_star_for_correct_answer,
+                                question_type: "treatment"
+                            }
+
+                            for(let subnum = 0;subnum<CurrentPhaseData.QuestionSets[blocknum].question_groups[questionsetnum].questions_asked.length; subnum++){
+                                NewQ.subquestions.push(create_single_quiz_subquestion(CurrentPhaseData.QuestionSets[blocknum].question_groups[questionsetnum].questions_asked[subnum],FennimalsInSubset[qnum] ))
+                            }
+                            SetsOfQuestions.push(NewQ)
+
+
+                        }
+
+
+                    }
+                    QuestionsArr.push(shuffleArray(SetsOfQuestions.flat()))
             }
-            QuestionsArr.push(shuffleArray(BlockQuestions))
         }
 
         CurrentPhaseData.questions = QuestionsArr.flat()
@@ -1143,11 +1221,6 @@ EXPCONTROLLER = function(){
         //Adding an array to hold all questions
         CurrentPhaseData.QuestionsAnswered = []
 
-
-
-
-
-
     }
 
     function phase_completed(){
@@ -1166,8 +1239,6 @@ EXPCONTROLLER = function(){
 
     function show_next_quiz_question(){
         if(CurrentPhaseData.questions.length > 0){
-
-
             InstrCont.show_next_quiz_question(CurrentPhaseData.questions.shift())
         }else{
             quiz_completed()
@@ -1175,25 +1246,44 @@ EXPCONTROLLER = function(){
     }
 
     this.quiz_question_answered = function(QuizQuestion){
-        //Reduce information
-        let ReducedSubquestions = []
-        for(let i =0;i<QuizQuestion.subquestions.length;i++){
-            ReducedSubquestions.push({
-                qtype: QuizQuestion.subquestions[i].qtype,
-                ans: QuizQuestion.subquestion_answer_arr[i],
-                cor: QuizQuestion.subquestions_correct_arr[i]
-            })
+        let QuizQuestionReduced = {}
+        console.log(QuizQuestion)
+
+        if(typeof QuizQuestion.Answer_Head_Select !== "undefined"){
+            QuizQuestionReduced = {
+                id: QuizQuestion.FenObj.id,
+                cue_type: QuizQuestion.cue_type,
+                special_question_type: "head_select_task",
+                answer:QuizQuestion.Answer_Head_Select,
+                answers_correct: QuizQuestion.Answer_Head_Select.correct,
+                num: QuizQuestion.question_num,
+
+            }
+            QuizQuestion.subquestions_correct_arr = [QuizQuestion.Answer_Head_Select.correct]
+        }else{
+            //Reduce information
+            let ReducedSubquestions = []
+            for(let i =0;i<QuizQuestion.subquestions.length;i++){
+                ReducedSubquestions.push({
+                    qtype: QuizQuestion.subquestions[i].qtype,
+                    ans: QuizQuestion.subquestion_answer_arr[i],
+                    cor: QuizQuestion.subquestions_correct_arr[i]
+                })
+            }
+
+            QuizQuestionReduced = {
+                id: QuizQuestion.FenObj.id,
+                cue_type: QuizQuestion.cue_type,
+                subquestions: ReducedSubquestions,
+                answers_correct: ! QuizQuestion.subquestions_correct_arr.includes(false),
+                num: QuizQuestion.question_num
+            }
+
         }
 
-        let QuizQuestionReduced = {
-            id: QuizQuestion.FenObj.id,
-            cue_type: QuizQuestion.cue_type,
-            subquestions: ReducedSubquestions,
-            answers_correct: ! QuizQuestion.subquestions_correct_arr.includes(false),
-            num: QuizQuestion.question_num
-        }
 
         //Store in array
+        QuizQuestionReduced.question_type = QuizQuestion.question_type
         CurrentPhaseData.QuestionsAnswered.push(JSON.parse(JSON.stringify(QuizQuestionReduced)))
 
         //Update the counters for the completed quiz questions
@@ -1230,6 +1320,7 @@ EXPCONTROLLER = function(){
         }
         InstrCont.update_progress_within_day(percentage_completed)
 
+        console.log(CurrentPhaseData)
         //Now continuing to the next question
         show_next_quiz_question()
 
@@ -1237,6 +1328,7 @@ EXPCONTROLLER = function(){
     }
     function quiz_completed(){
         //Cleaning up
+        console.log(CurrentPhaseData)
         delete CurrentPhaseData.questions
 
 
@@ -1252,15 +1344,12 @@ EXPCONTROLLER = function(){
         phase_completed()
     }
 
+
+
     // MATCH HEAD TO SAMPLE
     /////////////////////////
     function start_match_head_to_region_task(){
-        let TaskData
-        switch(CurrentPhaseData.Fennimals_encountered){
-            case("all"):
-                TaskData = create_match_head_to_region_data(Stimuli.get_Fennimals_objects_in_array())
-        }
-
+        let TaskData = create_match_head_to_region_data(Stimuli.get_Fennimals_in_set(CurrentPhaseData.Fennimals_encountered))
         InstrCont.start_match_head_to_region_task(current_phase_num, TaskData)
 
     }
@@ -1306,12 +1395,7 @@ EXPCONTROLLER = function(){
     // HEAD TO REGION SORTING TASK
     ////////////////////////////////
     function start_head_to_region_sorting_task(){
-        let TaskData
-        switch(CurrentPhaseData.Fennimals_included){
-            case("all"):
-                TaskData = Stimuli.get_Fennimals_objects_in_array()
-        }
-
+        let TaskData = Stimuli.get_Fennimals_in_set(CurrentPhaseData.Fennimals_included)
         InstrCont.start_head_to_region_sorting_task(current_phase_num, TaskData)
     }
 
@@ -1338,4 +1422,9 @@ EC.start_experiment()
 
 
 
-console.log("READY")
+//TODO: PHOTO: STORE FAILED ATTEMPTS
+//TODO: When zooming out, add name to region. When searching for location, add region name
+
+
+
+console.log("20 A")

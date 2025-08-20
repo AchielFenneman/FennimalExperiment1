@@ -1,4 +1,4 @@
-ActionButton = function(ParentElem, button_icon, TargetObject, warmup_time, activationfunc){
+ActionButton = function(ParentElem, button_icon, TargetObject, warmup_time, keyboard_shortcut_arr, activationfunc){
     //If this element has a warmup time, then we need to include a circle on the icon to represent this
 
     let Button, Countdown_Timer, CountdownCircle
@@ -107,6 +107,14 @@ ActionButton = function(ParentElem, button_icon, TargetObject, warmup_time, acti
     //Call to retrieve a reference to the button element
     this.getButtonElem = function(){
         return(Button)
+    }
+
+    //Optionally adding keyboard shortcuts
+    if(typeof keyboard_shortcut_arr  !== "undefined"){
+        if(Array.isArray(keyboard_shortcut_arr)){
+            console.log("adding keyboard " + keyboard_shortcut_arr)
+            add_keyboard_shortcuts_to_object(Button,keyboard_shortcut_arr, 500, activationfunc )
+        }
     }
 
 }
@@ -236,6 +244,9 @@ MapController = function(ExpCont, WorldState){
             zoom_level = 1
             coords = {x:50,y:50}
         }
+        if(region_name === "Home"){
+            zoom_level = GenParam.map_zoom_level_center
+        }
 
         //Setting zoom level to the correct scale level
         let scale_level = 1/zoom_level
@@ -315,10 +326,20 @@ MapController = function(ExpCont, WorldState){
         current_action_key_status = false
 
         //Check if the player is sufficiently close to the watchtower
-        if(document.getElementById("map_watchtower_action_region").isPointInFill(PointObj) === true){
+        /*if(document.getElementById("map_watchtower_action_region").isPointInFill(PointObj) === true){
             if(current_player_status !== "transition"){
                 current_action_key_status = "watchtower"
             }
+        }
+
+         */
+
+
+        //If no locations are nearby, then maybe the watchtower is (but only if there are no nearby locations...)
+        let dist_to_watchtower = get_distance_to_object(CurrentPlayerPos, document.getElementById("watchtower"))
+        if(dist_to_watchtower < 200){
+            current_action_key_status = "watchtower"
+
         }
 
     }
@@ -349,6 +370,7 @@ MapController = function(ExpCont, WorldState){
                 }
 
             }else{
+
                 current_action_key_status = false
             }
 
@@ -438,8 +460,8 @@ MapController = function(ExpCont, WorldState){
 
     FennimalIconOnMap = function(FenObj){
         let BoxSettings = {
-            width: 35,
-            height: 35,
+            width: 60,
+            height: 60,
             offset_x: -5,
             offset_y : -50,
             inner_size_factor: 0.9,
@@ -458,6 +480,9 @@ MapController = function(ExpCont, WorldState){
             case("Rainforest"): BoxSettings.offset_x = -20; break
             case("Bush"): BoxSettings.offset_y = 0;  BoxSettings.offset_x = -20; break
             case("Port"): BoxSettings.offset_y = 0; break
+            case("Iceberg"): BoxSettings.offset_y = -10; BoxSettings.offset_x = - 25 ; break
+            case("Igloo"): BoxSettings.offset_y = 0; BoxSettings.offset_x = - 25; break
+            case("Pineforest"): BoxSettings.offset_y = -10;  break
 
         }
 
@@ -581,22 +606,24 @@ MapController = function(ExpCont, WorldState){
                     break;
                 case("search"):
                     Interface.Prompt.show_message("You can search around for Fennimals in this area", false)
-                    show_action_button("magnifier", Current_Action_Focal_Target, GenParam.ActionButtonParameters_OnObject.warmup_time)
+                    show_action_button("magnifier", Current_Action_Focal_Target, false, GenParam.ActionButtonParameters_OnObject.warmup_time)
                     break;
                 case("watchtower"):
                     Interface.Prompt.show_message("You can climb up the tower to get a better view of Fenneland", false)
-                    show_action_button("binoculars", false, false);
+                    //show_action_button("binoculars", false, false);
+                    console.log(document.getElementById("watchtower"))
+                    show_action_button("binoculars", document.getElementById("watchtower"), ["Enter"], false);
                     break
 
                 case("watchtower_down"):
                     Interface.Prompt.show_message("Click anywhere to go back down again", 1500)
-                    show_action_button("downstairs", false, false);
+                    show_action_button("downstairs", false, ["Escape"], false);
                     break;
                 case("empty_location"):
                     Interface.Prompt.show_message("There is nothing here at the moment...", false)
                     AudioCont.play_sound_effect("rejected")
                     if(GenParam.can_enter_empty_locations){
-                        show_action_button("enter_location_" + current_nearest_location, Current_Action_Focal_Target,false )
+                        show_action_button("enter_location_" + current_nearest_location, Current_Action_Focal_Target,["Enter"] ,false)
                     }
                     break
 
@@ -607,7 +634,7 @@ MapController = function(ExpCont, WorldState){
                 case("enter_location_with_unvisited_Fennimal"):
                     Interface.Prompt.show_message("There is a Fennimal present at this location!", false)
                     AudioCont.play_sound_effect("success")
-                    show_action_button("enter_location_" + current_nearest_location, Current_Action_Focal_Target,false )
+                    show_action_button("enter_location_" + current_nearest_location, Current_Action_Focal_Target,["Enter"], false )
                     break
             }
 
@@ -634,7 +661,7 @@ MapController = function(ExpCont, WorldState){
                 break
             case("enter_location_with_visited_Fennimal"):
                 enter_location(current_nearest_location)
-                that.allow_participant_to_leave_location()
+                that.allow_participant_to_leave_location(true)
                 break
 
             case("return_to_map"):
@@ -649,17 +676,19 @@ MapController = function(ExpCont, WorldState){
         }
         ActiveActionButtonArr = []
     }
-    function show_action_button(button_icon, TargetObject, warmup_time){
+    function show_action_button(button_icon, TargetObject,keyboard_shortcuts_arr, warmup_time, ){
         //Remove all buttons
         remove_all_action_buttons()
 
         //Create a new button
-        ActiveActionButtonArr.push(new ActionButton(Interface_Layer, button_icon, TargetObject, warmup_time, action_key_pressed))
+        ActiveActionButtonArr.push(new ActionButton(Interface_Layer, button_icon, TargetObject, warmup_time, keyboard_shortcuts_arr, action_key_pressed))
 
         //If button icon is false, then we're done
         if(button_icon ===  false){
             return true
         }
+
+
     }
 
     //Shows the action button on the map level. Assumes that there can be only a single button at the same time. If called with false will remove all buttons.
@@ -764,10 +793,14 @@ MapController = function(ExpCont, WorldState){
     }
 
     //Call to allow the participant to leave a location
-    this.allow_participant_to_leave_location = function(){
+    this.allow_participant_to_leave_location = function(add_keyboard_shortcut){
         if(currently_in_location){
-            show_action_button("return_arrow", "center", false);
+            show_action_button("return_arrow", "center", ["Escape", "Enter", " "], false);
             current_action_key_status = "return_to_map"
+        }
+
+        if(add_keyboard_shortcut){
+
         }
     }
 
@@ -828,6 +861,30 @@ MapController = function(ExpCont, WorldState){
     }
     function request_instructions_button_clicked(){
         ExpCont.instructions_requested()
+    }
+
+    //HINTS
+    function flash_hints_from_watchtower(){
+        //Find out which locations have a Fennimal and have not been searched
+        let TargetLocations = []
+        let CurrentStates = WorldState.get_location_states_as_object()
+        for(let key in CurrentStates){
+            if(CurrentStates[key].search_status === 'unsearched'){
+                if(typeof CurrentStates[key].id !== "undefined"){
+                    TargetLocations.push(key)
+                }
+            }
+        }
+
+        for(let i =0;i<TargetLocations.length;i++){
+            flash_hint_at_location(TargetLocations[i])
+        }
+
+    }
+
+    function flash_hint_at_location(location_name){
+        let Marker =  document.getElementById("location_marker_" + location_name)
+        create_ripple(Map_Layer,Marker.getBBox().x, Marker.getBBox().y,true)
     }
 
 
@@ -925,9 +982,9 @@ MapController = function(ExpCont, WorldState){
                 //For computational efficiency, we perform checks only for the relevant region.
                 if(current_region === "Home"){
                     //Check if the player touched the auto-move region
-                    if(document.getElementById("map_watchtower_forced_region").isPointInFill(PointObj) === true){
-                        playerthat.climb_watchtower()
-                    }
+                    //if(document.getElementById("map_watchtower_forced_region").isPointInFill(PointObj) === true){
+                    //    playerthat.climb_watchtower()
+                   // }
                 }
             }
 
@@ -1125,6 +1182,11 @@ MapController = function(ExpCont, WorldState){
         //This updates whenever the player is moving around. Use to check if the action key may be primed for action.
 
         //Watchtower functions
+        //////////////////////
+
+        //Interval to show hints on top of the watchtower
+        let Watchtower_hint_interval, watchtower_hint_speed = 3000
+
         this.climb_watchtower = function(){
             //Remove the action key status
             current_action_key_status = false
@@ -1164,6 +1226,10 @@ MapController = function(ExpCont, WorldState){
                 },500)
             },10)
 
+            if(GenParam.get_hint_on_top_of_watchtower){
+                Watchtower_hint_interval = setInterval(function(){flash_hints_from_watchtower()}, watchtower_hint_speed)
+            }
+
         }
 
         this.leave_watchtower = function(){
@@ -1174,6 +1240,8 @@ MapController = function(ExpCont, WorldState){
             PlayerIcon.style.transition = "all 2s ease-in"
             Interface.Prompt.hide()
             current_player_status = "transition"
+
+            clearInterval(Watchtower_hint_interval)
 
             setTimeout(function(){
                 //Move down the ladder
@@ -1201,6 +1269,7 @@ MapController = function(ExpCont, WorldState){
             //Enable movement
             //
         }
+
 
         //Mouse input for entering the watchtower
         /*
