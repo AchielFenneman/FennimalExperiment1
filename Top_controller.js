@@ -1143,6 +1143,10 @@ EXPCONTROLLER = function(){
         for(let blocknum =0; blocknum < CurrentPhaseData.QuestionSets.length; blocknum++){
             let BlockQuestions = []
 
+            if(typeof CurrentPhaseData.QuestionSets[blocknum].question_set_type === "undefined"){
+                CurrentPhaseData.QuestionSets[blocknum].question_set_type = "normal"
+            }
+
             //There are type main types of quiz questions supported: normal type (for checking whether partcipants memorized the Fennimals, which should go first, and treatment types, which differ between different Fennimals.
             switch(CurrentPhaseData.QuestionSets[blocknum].question_set_type){
                 case("normal"):
@@ -1409,6 +1413,8 @@ EXPCONTROLLER = function(){
 let EC = new EXPCONTROLLER()
 EC.start_experiment()
 
+
+console.log("10 25")
 
 
 

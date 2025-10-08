@@ -342,7 +342,6 @@ function create_SVG_buttonElement(center_x, center_y,width,height,text, text_siz
 
 //Returns a SVG object for the action button (with the correct coordinates and dimensions
 function create_Action_Button_SVG_Element(icon_type, Dims, is_drawn_on_map, warmup_time){
-    console.log(Dims)
     //Creating the group to hold all elements
     let ButtonContainer = document.createElementNS("http://www.w3.org/2000/svg", 'g')
 
@@ -405,8 +404,6 @@ function create_Action_Button_SVG_Element(icon_type, Dims, is_drawn_on_map, warm
         let LocationIconGroup = create_SVG_group(0,0,undefined,undefined)
         LocationIconGroup.style.transform = "scale(3)"
 
-
-        console.log(location)
         let LocationIcon = document.getElementById("location_icon_"+location).cloneNode(true)
         LocationIcon.removeAttribute("id")
         LocationIcon.style.transform = "translate(-15px,-30px)"
@@ -699,14 +696,14 @@ function create_Fennimal_SVG_object_head_only(FenObj, outline_only){
 
 // NOTE: sets focus after delay, but will not work after focus lost...
 function add_keyboard_shortcuts_to_object(Object, arr_keys, focusdelay, executefunction){
-    console.log(Object)
+
     Object.tabIndex = "0"
     setTimeout(function(){Object.focus()},focusdelay)
 
     Object.onkeydown = function(event){
-        console.log(event.key)
+
         if(arr_keys.includes(event.key )){
-            console.log("fire")
+
             executefunction()
         }
     }

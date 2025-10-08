@@ -8,7 +8,7 @@ let StimulusSettings = function(){
     }
 
     //Which instructions pages are shown to participants before the first day?
-   this.Instructions_at_start = [ "browser_check_and_full_screen_prompt","consent", "card_sorting_task", "overview"] //"browser_check_and_full_screen_prompt","consent",  "overview"      "browser_check_and_full_screen_prompt","consent", "card_sorting_task", "overview"
+    this.Instructions_at_start = [ "browser_check_and_full_screen_prompt","consent", "card_sorting_task", "overview"] //"browser_check_and_full_screen_prompt","consent",  "overview"      "browser_check_and_full_screen_prompt","consent", "card_sorting_task", "overview"
 
     //Which pages are shown to participants after the last day but BEFORE the payment screen?
     //     "demographics_questionnaire": contains a question on age, gender and color-blindness
@@ -490,7 +490,6 @@ let StimulusSettings = function(){
                 award_star_for_correct_answer: true
             } ,
 
-
             {
                 type: "name_recall_task",
 
@@ -738,7 +737,7 @@ let StimulusSettings = function(){
     ////////////////////
 
     this.use_region_preferred_body_types = true
-    this.preferred_region_sample_order = [["North", "Desert", "Village", "Jungle"], ["Beach", "Mountains", "Flowerfields", "Swamp"] ]// [[ "Beach",  "Mountains", "Jungle", "Desert", "Village", "Flowerfields"], ["North", "Swamp"]] // [["Flowerfields", "Beach", "Swamp", "Mountains"], ["Jungle", "Desert", "Village"], ["North"]]
+    this.preferred_region_sample_order = ["North", "Desert", "Village", "Jungle","Beach", "Mountains", "Flowerfields", "Swamp" ]// [[ "Beach",  "Mountains", "Jungle", "Desert", "Village", "Flowerfields"], ["North", "Swamp"]] // [["Flowerfields", "Beach", "Swamp", "Mountains"], ["Jungle", "Desert", "Village"], ["North"]]
 
     this.allowed_head_groups = ["bird", "safari", "halloween", "xmas"]
 
@@ -1012,7 +1011,7 @@ let StimulusTransformer = function(StimTemplate){
                     case("region"):
                         Map.region = {}
                         //Get a random shuffle of the regions (but presevering a preferential order!)
-                        let Selected_Region_Order = get_region_sample_order()
+                        let Selected_Region_Order =  shuffleArray( get_region_sample_order() ) //TODO CHECK ORDER PRESERVATION
 
                         //Find out which locations and regions are present in the SVG
                         let Available_Locations = get_all_locations_in_SVG()
@@ -1293,12 +1292,13 @@ let StimulusTransformer = function(StimTemplate){
 
             //The quiz types may have stars associated to them
             if(this.Experiment_Structure[i].type === "quiz"){
+
                 if(typeof this.Experiment_Structure[i].award_star_for_correct_answer !== "undefined"){
                     if(this.Experiment_Structure[i].award_star_for_correct_answer){
                         //There is a quiz in which participants can earn a star for each correct answer.
                         for(let setnum = 0;setnum < this.Experiment_Structure[i].QuestionSets.length; setnum++){
 
-                            if(this.Experiment_Structure[i].QuestionSets[setnum].question_set_type === "normal"){
+                            if(typeof this.Experiment_Structure[i].QuestionSets[setnum].question_set_type === "undefined" || this.Experiment_Structure[i].QuestionSets[setnum].question_set_type === "normal"){
                                 max_stars = max_stars + this.get_Fennimals_in_set(this.Experiment_Structure[i].QuestionSets[setnum].Fennimals_included).length
                             }
 
@@ -1315,9 +1315,10 @@ let StimulusTransformer = function(StimTemplate){
 
             //The recalled names may earn a bonus for each correctly recalled name
             if(this.Experiment_Structure[i].type === "name_recall_task"){
+
                 if(typeof this.Experiment_Structure[i].award_star_for_each_correct_name !== "undefined"){
                     if(this.Experiment_Structure[i].award_star_for_each_correct_name){
-                        max_stars = max_stars + this.get_Fennimals_objects_in_array().length
+                        max_stars = max_stars + this.get_Fennimals_in_subgroup("all").length
                     }
                 }
             }
@@ -1344,25 +1345,45 @@ let StimulusTransformer = function(StimTemplate){
 
     //Returns the Fennimals in a specified subgroup. Returns as an array of Fennimal objects. If this subgroup does not exist, returns false and print a warning
     this.get_Fennimals_in_subgroup = function(subgroup_name){
-        if(typeof StimTemplate.Fennimals_Encountered_During_Experiment.subgroups === "undefined"){
-            console.warn("WARNING: REQUEST WAS MADE FOR SUBGROUP OF FENNIMALS, BUT NONE ARE DEFINED. RETURNING FALSE")
-            return(false)
-        }
 
-        if(typeof StimTemplate.Fennimals_Encountered_During_Experiment.subgroups[subgroup_name] === "undefined"){
-        console.warn("WARNING: REQUEST WAS MADE FOR SUBGROUP WITH UNKONWN NAME: " + subgroup_name + ". THIS GROUP HAS NOT BEEN SPECIFIED IN STIMULI. RETURNING FALSE")
-            return(false)
-        }
-
-        let Arr = []
-        for(let i =0;i<StimTemplate.Fennimals_Encountered_During_Experiment.subgroups[subgroup_name].length; i++){
-            let id = StimTemplate.Fennimals_Encountered_During_Experiment.subgroups[subgroup_name][i].id
-            for(let fen =0;fen<FennimalObjArr.length;fen++){
-                if(FennimalObjArr[fen].id === id){
-                    Arr.push(JSON.parse(JSON.stringify(FennimalObjArr[fen])))
+        //Check if theres is a key with this name in Fennimals Encountered During Experiment.
+        //If the group to search for is not "all", then search for subgroups...
+        if(subgroup_name === "all"){
+            let Arr = []
+            for(let i =0;i<StimTemplate.Fennimals_Encountered_During_Experiment.all.length; i++){
+                let id = StimTemplate.Fennimals_Encountered_During_Experiment.all[i].id
+                for(let fen =0;fen<FennimalObjArr.length;fen++){
+                    if(FennimalObjArr[fen].id === id){
+                        Arr.push(JSON.parse(JSON.stringify(FennimalObjArr[fen])))
+                    }
                 }
             }
+            console.log(Arr)
+            return(Arr)
+        }else{
+            if(typeof StimTemplate.Fennimals_Encountered_During_Experiment.subgroups === "undefined"){
+                console.warn("WARNING: REQUEST WAS MADE FOR SUBGROUP OF FENNIMALS, BUT NONE ARE DEFINED. RETURNING FALSE")
+                return(false)
+            }
+
+            if(typeof StimTemplate.Fennimals_Encountered_During_Experiment.subgroups[subgroup_name] === "undefined"){
+                console.warn("WARNING: REQUEST WAS MADE FOR SUBGROUP WITH UNKONWN NAME: " + subgroup_name + ". THIS GROUP HAS NOT BEEN SPECIFIED IN STIMULI. RETURNING FALSE")
+                return(false)
+            }
+
+            let Arr = []
+            for(let i =0;i<StimTemplate.Fennimals_Encountered_During_Experiment.subgroups[subgroup_name].length; i++){
+                let id = StimTemplate.Fennimals_Encountered_During_Experiment.subgroups[subgroup_name][i].id
+                for(let fen =0;fen<FennimalObjArr.length;fen++){
+                    if(FennimalObjArr[fen].id === id){
+                        Arr.push(JSON.parse(JSON.stringify(FennimalObjArr[fen])))
+                    }
+                }
+            }
+            return(Arr)
         }
+
+
         return(Arr)
 
     }
@@ -1388,4 +1409,3 @@ let StimulusTransformer = function(StimTemplate){
 }
 
 //TODO: set seed (for shufflearray)
-console.log("OCTOBER")
