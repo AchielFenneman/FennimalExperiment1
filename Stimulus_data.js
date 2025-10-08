@@ -8,7 +8,7 @@ let StimulusSettings = function(){
     }
 
     //Which instructions pages are shown to participants before the first day?
-    this.Instructions_at_start = ["browser_check_and_full_screen_prompt","consent",  "overview" ] //"browser_check_and_full_screen_prompt","consent",  "overview"      "browser_check_and_full_screen_prompt","consent", "card_sorting_task", "overview"
+   this.Instructions_at_start = [ "browser_check_and_full_screen_prompt","consent", "card_sorting_task", "overview"] //"browser_check_and_full_screen_prompt","consent",  "overview"      "browser_check_and_full_screen_prompt","consent", "card_sorting_task", "overview"
 
     //Which pages are shown to participants after the last day but BEFORE the payment screen?
     //     "demographics_questionnaire": contains a question on age, gender and color-blindness
