@@ -843,7 +843,7 @@ INSTRUCTIONSCONTROLLER = function(ExpCont, WorldState, Stimuli){
         let instruction_text =  "Today you can earn some bonus stars! Please write down all the names of the different Fennimals which you can remember. <br>" +
             "<br> " +
             "<i>You can enter a name by typing in the box and clicking on the 'Add' button. " +
-            "If you made a mistake, you can click on <span style='color:firebrick'> [x] </span> to remove an answer. Your previous answers will be blurred, but you can reveal them by moving your cursor over them. " +
+            "Your previous answers will be blurred, but if you made a mistake you can click on <span style='color:firebrick'> [x] </span> to remove an answer. " +
             "If you have listed all the names you remember, then you can click on the 'Done' button to continue (you will not be able to return after pressing the button!) <br>"
         TextElem_Main_Instructions = create_SVG_text_in_foreign_element(instruction_text, 100,50,(1920 - 2*100), 350,"instruction_element_text")
         TextElem_Main_Instructions.classList.add("instruction_element_nonbackground")

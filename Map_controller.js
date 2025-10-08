@@ -112,7 +112,6 @@ ActionButton = function(ParentElem, button_icon, TargetObject, warmup_time, keyb
     //Optionally adding keyboard shortcuts
     if(typeof keyboard_shortcut_arr  !== "undefined"){
         if(Array.isArray(keyboard_shortcut_arr)){
-            console.log("adding keyboard " + keyboard_shortcut_arr)
             add_keyboard_shortcuts_to_object(Button,keyboard_shortcut_arr, 500, activationfunc )
         }
     }
@@ -611,7 +610,6 @@ MapController = function(ExpCont, WorldState){
                 case("watchtower"):
                     Interface.Prompt.show_message("You can climb up the tower to get a better view of Fenneland", false)
                     //show_action_button("binoculars", false, false);
-                    console.log(document.getElementById("watchtower"))
                     show_action_button("binoculars", document.getElementById("watchtower"), ["Enter"], false);
                     break
 
@@ -1121,7 +1119,7 @@ MapController = function(ExpCont, WorldState){
                         setMouseTargetCoords(event.x,event.y)
                         start_mouse_moving_interval()
                     }else{
-                        console.log("movement blocked")
+
                     }
 
                     //Clicking anywhere on the map while in the watchtower will move the player down

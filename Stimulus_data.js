@@ -8,7 +8,7 @@ let StimulusSettings = function(){
     }
 
     //Which instructions pages are shown to participants before the first day?
-    this.Instructions_at_start = ["browser_check_and_full_screen_prompt","consent",  "overview"  ] //"browser_check_and_full_screen_prompt","consent",  "overview"      "browser_check_and_full_screen_prompt","consent", "card_sorting_task", "overview"
+    this.Instructions_at_start = ["browser_check_and_full_screen_prompt","consent",  "overview" ] //"browser_check_and_full_screen_prompt","consent",  "overview"      "browser_check_and_full_screen_prompt","consent", "card_sorting_task", "overview"
 
     //Which pages are shown to participants after the last day but BEFORE the payment screen?
     //     "demographics_questionnaire": contains a question on age, gender and color-blindness
@@ -16,11 +16,152 @@ let StimulusSettings = function(){
 
     //This defines which experiment will be run (definitions follow below).
     // NOTE: If there are multiple codes in an array, then one will be picked at random!
-    this.Experiment_Code = ["schema_experiment_searchlearn"] // "schema_experiment_offset"
+    this.Experiment_Code = ["schema_experiment_offset"] // "schema_experiment_offset"
 
     //Now we determine the experiment structure
     let All_Experiment_Structures = {
         test : [
+            {
+                type: "name_recall_task",
+
+                //If set to true, participants will earn a bonus star for each correct answer
+                award_star_for_each_correct_name: true,
+
+                //Allowed Levenshtein distance to still assign a correct match
+                allowed_Levenshtein_distance_for_match: 2,
+
+            },
+
+            {
+                //Defining the block type
+                type: "hint_and_search",
+                hint_type: "name",
+
+                //Defining which Fennimals are encountered in this block
+                Fennimals_encountered: "all",
+                sort_trials_by: "region",
+
+                //Defining the Fennimal interaction type
+                Fennimal_interaction_type: "polaroid_photo_active",
+                allowed_attempts_before_answer_given: 3,
+            },
+
+
+
+            {
+                //Defining the quiz here
+                type: 'quiz',
+
+                QuestionSets: [{
+                    question_set_type: "normal",
+                    //Defining which information is presented. Can be icon or name
+                    cue: 'gray_head',
+                    show_name: false,
+
+                    //Defining which questions are asked
+                    questions_asked: ["name","region"],
+
+                    //Defining which Fennimals are included
+                    Fennimals_included: "all"
+                }
+                ],
+
+                //Defining the complement conditions.
+                //      If set to true, then an incorrectly answered question will be repeated at the end of the cue untill all answers have been completed.
+                require_perfect_answers: false,
+
+                //If set to anything but false, participants can freely travel the island to explore the Fennimals.
+                //    Non-false value should refer to the interaction style of the observed Fennimal.
+                //TODO
+                //allow_participant_to_travel_map: "passive_observation",
+
+                //If set to true, participants will earn a bonus star for each correct answer
+                award_star_for_correct_answer: true
+            } ,
+
+
+            {
+                //Defining the block type
+                type: "hint_and_search",
+                hint_type: "icon",
+
+                //Defining which Fennimals are encountered in this block
+                Fennimals_encountered: "all",
+                sort_trials_by: "region",
+
+                //Defining the Fennimal interaction type
+                Fennimal_interaction_type: "polaroid_photo_active",
+                allowed_attempts_before_answer_given: 3,
+            },
+
+            {
+                type: "free_exploration",
+                Fennimal_interaction_type: "polaroid_photo_passive",
+                Fennimals_encountered: "all"
+            },
+            {
+                type: "name_recall_task",
+
+                //If set to true, participants will earn a bonus star for each correct answer
+                award_star_for_each_correct_name: true,
+
+                //Allowed Levenshtein distance to still assign a correct match
+                allowed_Levenshtein_distance_for_match: 2,
+
+            },
+            {
+                type: "name_recall_task",
+
+                //If set to true, participants will earn a bonus star for each correct answer
+                award_star_for_each_correct_name: true,
+
+                //Allowed Levenshtein distance to still assign a correct match
+                allowed_Levenshtein_distance_for_match: 2,
+
+            },
+            {
+                type: "name_recall_task",
+
+                //If set to true, participants will earn a bonus star for each correct answer
+                award_star_for_each_correct_name: true,
+
+                //Allowed Levenshtein distance to still assign a correct match
+                allowed_Levenshtein_distance_for_match: 2,
+
+            },
+            {
+                type: "name_recall_task",
+
+                //If set to true, participants will earn a bonus star for each correct answer
+                award_star_for_each_correct_name: true,
+
+                //Allowed Levenshtein distance to still assign a correct match
+                allowed_Levenshtein_distance_for_match: 2,
+
+            },
+            {
+                type: "name_recall_task",
+
+                //If set to true, participants will earn a bonus star for each correct answer
+                award_star_for_each_correct_name: true,
+
+                //Allowed Levenshtein distance to still assign a correct match
+                allowed_Levenshtein_distance_for_match: 2,
+
+            },
+            {
+                type: "name_recall_task",
+
+                //If set to true, participants will earn a bonus star for each correct answer
+                award_star_for_each_correct_name: true,
+
+                //Allowed Levenshtein distance to still assign a correct match
+                allowed_Levenshtein_distance_for_match: 2,
+
+            },
+
+
+            /*
 
             {
                 //Defining the quiz here
@@ -64,7 +205,14 @@ let StimulusSettings = function(){
                 award_star_for_correct_answer: true
             } ,
 
-            /*
+            {
+                type: "free_exploration",
+                Fennimal_interaction_type: "polaroid_photo_passive",
+                Fennimals_encountered: "all"
+            },
+
+
+
 
 
             {
@@ -164,45 +312,7 @@ let StimulusSettings = function(){
                 allowed_attempts_before_answer_given: 3,
             },
 
-            {
-                //Defining the quiz here
-                type: 'quiz',
 
-                QuestionSets: [{
-                    question_set_type: "normal",
-                    //Defining which information is presented. Can be icon or name
-                    cue: 'gray_head',
-                    show_name: false,
-
-                    //Defining which questions are asked
-                    questions_asked: ["name","region"],
-
-                    //Defining which Fennimals are included
-                    Fennimals_included: "all"
-                },
-                    {
-                        question_set_type: "treatment",
-                        cue: "gray_head",
-                        show_name: true,
-                        question_groups:[
-                            {Fennimals_included: "TEST", questions_asked: ["other_heads_in_region"]},
-                            {Fennimals_included: "CNTRL", questions_asked: ["color", "body_type"]},
-                        ]
-                    }
-                ],
-
-                //Defining the complement conditions.
-                //      If set to true, then an incorrectly answered question will be repeated at the end of the cue untill all answers have been completed.
-                require_perfect_answers: false,
-
-                //If set to anything but false, participants can freely travel the island to explore the Fennimals.
-                //    Non-false value should refer to the interaction style of the observed Fennimal.
-                //TODO
-                //allow_participant_to_travel_map: "passive_observation",
-
-                //If set to true, participants will earn a bonus star for each correct answer
-                award_star_for_correct_answer: true
-            } ,
 
             {
                 type: "name_recall_task",
@@ -525,13 +635,13 @@ let StimulusSettings = function(){
                 {id: "B3", head_group: "B", region: "B"},
                 {id: "B4", head_group: "B", region: "B"},
                 {id: "C1", head_group: "C", region: "C"},
-                //{id: "C2", head_group: "C", region: "C"},
-                //{id: "C3", head_group: "C", region: "C"},
-                //{id: "C4", head_group: "C", region: "C"},
+                {id: "C2", head_group: "C", region: "C"},
+                {id: "C3", head_group: "C", region: "C"},
+                {id: "C4", head_group: "C", region: "C"},
                 {id: "D1", head_group: "D", region: "D"},
-                //{id: "D2", head_group: "D", region: "D"},
-                //{id: "D3", head_group: "D", region: "D"},
-                //{id: "D4", head_group: "D", region: "D"},
+                {id: "D2", head_group: "D", region: "D"},
+                {id: "D3", head_group: "D", region: "D"},
+                {id: "D4", head_group: "D", region: "D"},
 
 
 
@@ -628,7 +738,7 @@ let StimulusSettings = function(){
     ////////////////////
 
     this.use_region_preferred_body_types = true
-    this.preferred_region_sample_order = ["North", "Desert", "Village", "Jungle"] // [[ "Beach",  "Mountains", "Jungle", "Desert", "Village", "Flowerfields"], ["North", "Swamp"]] // [["Flowerfields", "Beach", "Swamp", "Mountains"], ["Jungle", "Desert", "Village"], ["North"]]
+    this.preferred_region_sample_order = [["North", "Desert", "Village", "Jungle"], ["Beach", "Mountains", "Flowerfields", "Swamp"] ]// [[ "Beach",  "Mountains", "Jungle", "Desert", "Village", "Flowerfields"], ["North", "Swamp"]] // [["Flowerfields", "Beach", "Swamp", "Mountains"], ["Jungle", "Desert", "Village"], ["North"]]
 
     this.allowed_head_groups = ["bird", "safari", "halloween", "xmas"]
 
@@ -1278,3 +1388,4 @@ let StimulusTransformer = function(StimTemplate){
 }
 
 //TODO: set seed (for shufflearray)
+console.log("OCTOBER")

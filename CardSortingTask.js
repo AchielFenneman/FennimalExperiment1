@@ -1191,7 +1191,7 @@ BoxController = function(ParentElem, GroupingCont, CardParam){
     if(CardParam.fix_number_of_groups === false){
         create_new_box()
         create_new_box()
-        console.log("HERE")
+
     }else{
         for(let i=0; i<CardParam.fix_number_of_groups;i++){
             create_new_box()
@@ -1252,7 +1252,6 @@ CardController = function(MainSVG, HeadSVG, ReservoirElem, GroupingCont, CardPar
                 NameP.innerHTML = GenParam.HeadDisplayNames[card_name]
             }else{
                 NameP.innerHTML = card_name
-                console.log(card_name)
             }
 
             NameP.classList.add("card_name")

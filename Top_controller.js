@@ -260,7 +260,6 @@ DATACONTROLLER = function(Stimuli){
 
     this.record_consent_given = function(){
         ExperimentData.consent_given = Date.now() - StartTime
-        console.log(ExperimentData)
 
     }
 
@@ -333,13 +332,11 @@ DATACONTROLLER = function(Stimuli){
     let PaymentInfo = []
     this.record_stars_earned = function(daynum, phase_type, stars_earned, maximum_possible_stars){
         PaymentInfo.push(JSON.parse(JSON.stringify({day: daynum, day_type: phase_type, stars_earned: stars_earned, maximum_possible_stars: maximum_possible_stars})))
-        console.log(PaymentInfo)
     }
 
     //Call at the end of the experiment to retrieve the payment data. This also generates a completion code
     this.get_payment_data = function(){
         //Calculating total stars
-        console.log(ExperimentData)
         ExperimentData.PaymentData = {}
         ExperimentData.PaymentData.phases = JSON.parse(JSON.stringify(PaymentInfo))
         ExperimentData.PaymentData.total_stars = 0
@@ -366,7 +363,6 @@ DATACONTROLLER = function(Stimuli){
         store_experiment_data()
 
         //Returning the payment object
-        console.log(ExperimentData)
         return(JSON.parse(JSON.stringify(ExperimentData.PaymentData)))
 
 
@@ -383,7 +379,6 @@ DATACONTROLLER = function(Stimuli){
 
         //Copy to the form
         document.getElementById("data_form_field").innerHTML = JSON.stringify(StoredData)
-        console.log(StoredData)
 
     }
 
@@ -957,7 +952,6 @@ EXPCONTROLLER = function(){
 
     //Recalled names task
     function process_recalled_names(RecalledNames, max_dist_for_match){
-        console.log(RecalledNames)
         //Get an array of all the names encountered during the experiment
         // Each element should have an ID and a name
 
@@ -1247,7 +1241,6 @@ EXPCONTROLLER = function(){
 
     this.quiz_question_answered = function(QuizQuestion){
         let QuizQuestionReduced = {}
-        console.log(QuizQuestion)
 
         if(typeof QuizQuestion.Answer_Head_Select !== "undefined"){
             QuizQuestionReduced = {
@@ -1320,7 +1313,6 @@ EXPCONTROLLER = function(){
         }
         InstrCont.update_progress_within_day(percentage_completed)
 
-        console.log(CurrentPhaseData)
         //Now continuing to the next question
         show_next_quiz_question()
 
@@ -1328,7 +1320,6 @@ EXPCONTROLLER = function(){
     }
     function quiz_completed(){
         //Cleaning up
-        console.log(CurrentPhaseData)
         delete CurrentPhaseData.questions
 
 
@@ -1427,4 +1418,4 @@ EC.start_experiment()
 
 
 
-console.log("20 A")
+
