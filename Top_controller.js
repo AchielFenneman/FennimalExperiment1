@@ -1414,7 +1414,7 @@ let EC = new EXPCONTROLLER()
 EC.start_experiment()
 
 
-console.log("10 25")
+console.log("11 25")
 
 
 
