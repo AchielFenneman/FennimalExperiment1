@@ -1454,7 +1454,7 @@ let EC = new EXPCONTROLLER()
 EC.start_experiment()
 
 
-console.log("03 26")
+console.log("03 26 2 ")
 
 
 //TODO: PHOTO: STORE FAILED ATTEMPTS

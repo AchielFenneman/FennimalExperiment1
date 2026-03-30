@@ -34,10 +34,10 @@ let AttentionCheckController = function(exp_start_time, idle_time_minimum_thresh
     //Event listener for focus in
     window.addEventListener("focus", function (event) {
         Window_out_of_focus_events_array.push({
-            start: out_of_focus_start_time - exp_start_time ,
-            dur: Date.now() - out_of_focus_start_time
+            start: Math.round((out_of_focus_start_time - exp_start_time ) / 1000) ,
+            dur: Math.round((Date.now() - out_of_focus_start_time) / 1000)
         })
-        total_time_window_out_of_focus = total_time_window_out_of_focus + (Date.now() - out_of_focus_start_time)
+        total_time_window_out_of_focus = total_time_window_out_of_focus + Math.round((Date.now() - out_of_focus_start_time) / 1000)
     })
 
     //Functions for the idle time.
@@ -50,12 +50,11 @@ let AttentionCheckController = function(exp_start_time, idle_time_minimum_thresh
             //We have passed the threshold, so note an idle event
             if(current_idle_time_recoding_state === "active"){
                 Idle_time_event_array.push({
-                    start: idle_time_timer_start - exp_start_time ,
-                    dur: Date.now() - idle_time_timer_start
+                    start: Math.round((idle_time_timer_start - exp_start_time)/1000) ,
+                    dur: Math.round((Date.now() - idle_time_timer_start) / 1000)
                 })
-                total_idle_time = total_time_window_out_of_focus + (Date.now() - idle_time_timer_start)
+                total_idle_time = total_time_window_out_of_focus + Math.round( (Date.now() - idle_time_timer_start) / 1000)
             }
-            console.log(Idle_time_event_array)
         }
 
         //Resetting the idle timer
