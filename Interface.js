@@ -1,4 +1,4 @@
-PromptController = function(){
+PromptController = function () {
     let that = this
     //The prompt on the top
     let PromptBox = document.getElementById("prompt_box")
@@ -21,7 +21,7 @@ PromptController = function(){
 
     //Call to hide the prompt (resetting it)
     let state = "shown"
-    this.hide = function(){
+    this.hide = function () {
         PromptBox.style.opacity = 0;
         PromptTextElem.style.opacity = 0;
         state = "hidden"
@@ -32,7 +32,8 @@ PromptController = function(){
 
         reduce_box_to_minimal()
     }
-    function appear_from_hidden(){
+
+    function appear_from_hidden() {
         PromptBox.style.display = "inherit"
         PromptTextElem.style.display = "inherit"
 
@@ -42,7 +43,7 @@ PromptController = function(){
     }
 
     //Call to minimize the prompt (this maintains its colors!)
-    function reduce_box_to_minimal(){
+    function reduce_box_to_minimal() {
         clearTimeout(currentTimeout)
         state = "minimized"
         PromptTextElem.style.opacity = 0;
@@ -52,28 +53,29 @@ PromptController = function(){
         //Cancel any previous timeouts
         cancelTimeout()
 
-        switch(collapse_style){
+        switch (collapse_style) {
             case("center"):
                 PromptBox.style.stroke = PromptBox.style.fill
                 PromptBox.setAttribute("width", 0)
-                PromptBox.setAttribute("x",0.5* GenParam.SVG_width)
+                PromptBox.setAttribute("x", 0.5 * GenParam.SVG_width)
         }
 
-        currentTimeout = setTimeout(function(){
+        currentTimeout = setTimeout(function () {
             Text.innerHTML = ""
             PromptTextElem.style.display = "inherit"
 
             currentmessagetext = ""
-        },base_speed)
+        }, base_speed)
     }
-    function expand_box_to_contain_text(){
-        PromptBox.setAttribute("x", PromptTextElem.getBBox().x  - margin)
-        PromptBox.setAttribute("width", PromptTextElem.getBBox().width + 2*margin)
+
+    function expand_box_to_contain_text() {
+        PromptBox.setAttribute("x", PromptTextElem.getBBox().x - margin)
+        PromptBox.setAttribute("width", PromptTextElem.getBBox().width + 2 * margin)
         PromptBox.style.opacity = max_opacity
     }
 
     //Changes the current color-scheme of the prompt. Note that this will be reset after the prompt is hidden
-    this.change_colors_based_on_region = function(region_name){
+    this.change_colors_based_on_region = function (region_name) {
         //Given a location, get the region
         let color_light = GenParam.RegionData[region_name].lighter_color
         let color_dark = GenParam.RegionData[region_name].darker_color
@@ -85,8 +87,8 @@ PromptController = function(){
     }
 
     //Todo: update
-    this.change_colors_based_on_location = function(location_name){
-        let region = GenParam.LocationTransitionData["location_" +  location_name].region
+    this.change_colors_based_on_location = function (location_name) {
+        let region = GenParam.LocationTransitionData["location_" + location_name].region
         this.change_colors_based_on_region(region)
 
 
@@ -94,20 +96,20 @@ PromptController = function(){
 
     //Call to show a message
     let auto_duration_timeout
-    this.show_message = function(text, auto_remove_after_duration){
+    this.show_message = function (text, auto_remove_after_duration) {
         clearTimeout(auto_duration_timeout)
         clearTimeout(currentTimeout)
 
-        if(state === "hidden" ){
+        if (state === "hidden") {
             appear_from_hidden()
         }
 
-        if(currentmessagetext !== text){
+        if (currentmessagetext !== text) {
             //Set the text
             change_text(text)
             expand_box_to_contain_text()
 
-            if(state === "minimized"){
+            if (state === "minimized") {
                 //Text.innerHTML = text
 
                 //Expand the box
@@ -117,19 +119,22 @@ PromptController = function(){
             }
         }
 
-        if(typeof auto_remove_after_duration !== "undefined"){
-            if(auto_remove_after_duration !== false){
-                auto_duration_timeout= setTimeout(function(){that.hide()}, auto_remove_after_duration)
+        if (typeof auto_remove_after_duration !== "undefined") {
+            if (auto_remove_after_duration !== false) {
+                auto_duration_timeout = setTimeout(function () {
+                    that.hide()
+                }, auto_remove_after_duration)
             }
         }
-
 
 
     }
 
     //Call to show a message, but with a new set of colors
-    this.show_message_with_new_colors = function(text, boxfill, boxstroke, textcol){
-        if(state === "hidden" ){ appear_from_hidden()}
+    this.show_message_with_new_colors = function (text, boxfill, boxstroke, textcol) {
+        if (state === "hidden") {
+            appear_from_hidden()
+        }
 
         //Set the colors
         PromptBox.style.fill = boxfill
@@ -142,11 +147,13 @@ PromptController = function(){
     }
 
     //Call to show a feedback message
-    this.show_feedback_message = function(text, valence){
-        if(state === "hidden" ){ appear_from_hidden()}
+    this.show_feedback_message = function (text, valence) {
+        if (state === "hidden") {
+            appear_from_hidden()
+        }
 
         let boxfill, textcol, boxstroke
-        switch(valence){
+        switch (valence) {
             case("unknown"): {
                 boxfill = "#f2f2f2"
                 boxstroke = "#4d4d4d99"
@@ -196,18 +203,16 @@ PromptController = function(){
         change_text(text)
 
 
-
-
     }
 
-    function impose_temporary_block(){
+    function impose_temporary_block() {
         block_from_change = true
-        setTimeout(function(){
+        setTimeout(function () {
             block_from_change = false
         }, base_speed)
     }
 
-    function change_text(new_text){
+    function change_text(new_text) {
 
         //The box is already shown. First we hide the text
         PromptTextElem.style.display = "none"
@@ -216,14 +221,14 @@ PromptController = function(){
         currentmessagetext = new_text
         PromptTextElem.style.display = "inherit"
 
-        setTimeout(function(){
-           PromptTextElem.style.opacity = max_opacity
-        },base_speed)
+        setTimeout(function () {
+            PromptTextElem.style.opacity = max_opacity
+        }, base_speed)
     }
 
     //Cancel any previous timeouts
-    function cancelTimeout(){
-        if(currentTimeout !== false){
+    function cancelTimeout() {
+        if (currentTimeout !== false) {
             clearTimeout(currentTimeout)
             currentTimeout = false
         }
@@ -232,20 +237,20 @@ PromptController = function(){
     //On constructions
     this.hide()
 
-    this.get_current_message_text = function(){
-        return(currentmessagetext)
+    this.get_current_message_text = function () {
+        return (currentmessagetext)
     }
 
 }
 
-LocatorController = function(){
+LocatorController = function () {
     let Container = document.getElementById("interface_location")
     let Text = document.getElementById("interface_location_text")
     let Box = document.getElementById("interface_location_box")
 
     let minwidth = 15
 
-    this.change_region_colors = function(region_name){
+    this.change_region_colors = function (region_name) {
 
         //Given a location, get the region
         let color_light = GenParam.RegionData[region_name].lighter_color
@@ -256,11 +261,11 @@ LocatorController = function(){
 
     }
 
-    this.change_locator_name = function(location_name){
+    this.change_locator_name = function (location_name) {
 
-        if(location_name === false){
+        if (location_name === false) {
             Container.style.display = "none"
-        }else{
+        } else {
             Container.style.display = "inherit"
 
             //Setting colors
@@ -273,24 +278,24 @@ LocatorController = function(){
             Box.style.transition = "all 200ms ease-in-out"
 
             //First we are reducing the side of the box to the minimum
-            setTimeout(function(){
+            setTimeout(function () {
                 Box.setAttribute("width", minwidth)
                 Text.style.transition = "all 300ms ease-in-out"
-            },5)
+            }, 5)
 
             //Then we expand the box
-            setTimeout(function(){
-                let new_width = minwidth +  parseInt(Text.getBBox().width)+ 60
+            setTimeout(function () {
+                let new_width = minwidth + parseInt(Text.getBBox().width) + 60
                 Box.setAttribute("width", new_width)
-            },205)
+            }, 205)
 
             //Then we show the text
-            setTimeout(function(){
+            setTimeout(function () {
                 Text.style.opacity = 1
             }, 405)
 
             //Later on, reset the transitions
-            setTimeout(function(){
+            setTimeout(function () {
                 Text.style.transition = ""
                 Box.style.transition = ""
             }, 700)
@@ -298,25 +303,23 @@ LocatorController = function(){
     }
 
     //Show and hides the locator. DOES NOT CHANGE ITS VALUE OR COLOR
-    this.hide = function(){
+    this.hide = function () {
         Container.style.display = "none"
     }
-    this.show = function(){
+    this.show = function () {
         Container.style.display = "inherit"
     }
 
 
-
-
 }
 
-InterfaceController = function(){
+InterfaceController = function () {
     document.getElementById("Interface").style.display = "inherit"
 
     this.Prompt = new PromptController()
     this.Locator = new LocatorController()
 
-    this.player_moved_to_new_region = function(region_name){
+    this.player_moved_to_new_region = function (region_name) {
         this.Prompt.change_colors_based_on_region(region_name)
         this.Locator.change_region_colors(region_name)
         this.Locator.change_locator_name(GenParam.RegionData[region_name].display_name)

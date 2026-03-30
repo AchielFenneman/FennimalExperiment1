@@ -1,4 +1,4 @@
-GENERALPARAM = function(){
+GENERALPARAM = function () {
 
     //Defines the sequence of the starting instructions
 
@@ -25,7 +25,7 @@ GENERALPARAM = function(){
                 "By ticking the box below, you indicate that you are above the age of 18, that you have been provided with clear and detailed information about the objective " +
                 "and scope of the study and that you consent to these terms, and that you are aware of your rights as a participant. "
         },
-        Overview:{
+        Overview: {
             story: "<b>Your task in this experiment. </b>In this experiment you will travel to an island called Fenneland. This remote island has a unique wildlife, and is filled with many smart animals called <u>Fennimals</u>. " +
                 "These Fennimals are unique to Fenneland and are unlike any other creatures. <br>" +
                 "<br>" +
@@ -59,15 +59,15 @@ GENERALPARAM = function(){
 
     //Note: these are denoted in PERCENTAGES
     this.Map_Region_Centers_Percentage = {
-        Home: {x: 50, y: 50 },
-        North: {x: 50, y: 10 },
-        Desert: {x: 50, y: 90 },
-        Jungle: {x: 25, y: 50 },
-        Village: {x: 75, y: 50 },
-        Flowerfields: {x: 35, y: 15 },
-        Mountains: {x: 65, y: 15 },
-        Swamp: {x: 70, y: 85 },
-        Beach: {x: 25, y: 85 },
+        Home: {x: 50, y: 50},
+        North: {x: 50, y: 10},
+        Desert: {x: 50, y: 90},
+        Jungle: {x: 25, y: 50},
+        Village: {x: 75, y: 50},
+        Flowerfields: {x: 35, y: 15},
+        Mountains: {x: 65, y: 15},
+        Swamp: {x: 70, y: 85},
+        Beach: {x: 25, y: 85},
     }
 
     //The environment may place additional constraints on speed. These are defined below
@@ -80,11 +80,11 @@ GENERALPARAM = function(){
 
     //Region data
     this.RegionData = {
-        North : {
+        North: {
             lighter_color: "#a2b2fc",
             color: "#0020ac",
             darker_color: "#001987",
-            Fennimal_location_colors:{
+            Fennimal_location_colors: {
                 primary_color: "#526785",
                 secondary_color: "#b0c9d4",
                 tertiary_color: "#1a46b8",
@@ -99,7 +99,7 @@ GENERALPARAM = function(){
             lighter_color: "#b5e092",
             color: "#588b1e",
             darker_color: "#235412",
-            Fennimal_location_colors:{
+            Fennimal_location_colors: {
                 primary_color: "#566e44",
                 secondary_color: "#cfedbe",
                 tertiary_color: "#78ab09",
@@ -115,7 +115,7 @@ GENERALPARAM = function(){
             color: "#c7c602", //#fffe03
             darker_color: "#757500",
 
-            Fennimal_location_colors:{
+            Fennimal_location_colors: {
                 primary_color: "#969239",
                 secondary_color: "#d1caa9",
                 tertiary_color: "#d2d911",
@@ -130,7 +130,7 @@ GENERALPARAM = function(){
             lighter_color: "#d6bba9",
             color: "#502d16",
             darker_color: "#26150a",
-            Fennimal_location_colors:{
+            Fennimal_location_colors: {
                 primary_color: "#953f05", //"#ded3d6",
                 secondary_color: "#b09a90",//"#dedcdc",
                 tertiary_color: "#502d16",
@@ -145,7 +145,7 @@ GENERALPARAM = function(){
             lighter_color: "#ffd0b0",
             color: "#ffe6d5",
             darker_color: "#9e682e", // "#615c58",
-            Fennimal_location_colors:{
+            Fennimal_location_colors: {
                 primary_color: "#f5a149",//"#665244",
                 secondary_color: "#ffe6d5",//"#dedcdc",//"#f7cdbc",
                 tertiary_color: "#ffd0b0",//"#f2e7df",
@@ -160,8 +160,8 @@ GENERALPARAM = function(){
             lighter_color: "#ffcffa",
             color: "#f472e6",
             darker_color: "#783771",
-            Fennimal_location_colors:{
-                primary_color:  "#4d2f49",
+            Fennimal_location_colors: {
+                primary_color: "#4d2f49",
                 secondary_color: "#d3bfd9",
                 tertiary_color: "#890fbd",
                 eye_color: "#e8b3ff",
@@ -177,7 +177,7 @@ GENERALPARAM = function(){
             lighter_color: "#fcb1b1",
             color: "#f20000",
             darker_color: "#7d0101",
-            Fennimal_location_colors:{
+            Fennimal_location_colors: {
                 primary_color: "#734b53",
                 secondary_color: "#ccb1b8",
                 tertiary_color: "#d10f0f",
@@ -193,10 +193,10 @@ GENERALPARAM = function(){
             lighter_color: "#adffef",
             color: "#00fdcc",
             darker_color: "#025e4c",
-            Fennimal_location_colors:{
+            Fennimal_location_colors: {
                 primary_color: "#5b7878",
                 secondary_color: "#c2f0ea",
-                tertiary_color:  "#00b3b3",
+                tertiary_color: "#00b3b3",
                 eye_color: "#8affff",
             },
             contrast_color: "#cb156b",
@@ -258,28 +258,28 @@ GENERALPARAM = function(){
 
     }
 
-    this.get_display_name_of_location = function(location_name){
-        if(location_name in this.LocationDisplayNames){
-            return(this.LocationDisplayNames[location_name])
-        }else{
-            return(location_name)
+    this.get_display_name_of_location = function (location_name) {
+        if (location_name in this.LocationDisplayNames) {
+            return (this.LocationDisplayNames[location_name])
+        } else {
+            return (location_name)
         }
     }
 
     //Assumes that locations have been set by the map controller! Returns false if location does not exist on the map
-    this.find_region_of_location = function(location){
-        for(let i in this.RegionData){
-            if(typeof this.RegionData[i].Locations !== "undefined"){
-                if(this.RegionData[i].Locations.includes(location)){
-                    return(i)
+    this.find_region_of_location = function (location) {
+        for (let i in this.RegionData) {
+            if (typeof this.RegionData[i].Locations !== "undefined") {
+                if (this.RegionData[i].Locations.includes(location)) {
+                    return (i)
                 }
             }
         }
-        return(false)
+        return (false)
 
     }
 
-    this.HeadDisplayNames  = {
+    this.HeadDisplayNames = {
         rhino: "Rhino",
         giraffe: "Giraffey",
         elephant: "Elephant",
@@ -352,7 +352,7 @@ GENERALPARAM = function(){
         width: 250,
     }
     this.ActionButtonParameters_Center = {
-        center_x: (this.SVG_width / 2)  ,
+        center_x: (this.SVG_width / 2),
         center_y: 950,
         height: 250,
         width: 250,
@@ -376,7 +376,7 @@ GENERALPARAM = function(){
     //Instruction settings
     this.RequestInstructionButtonSettings = {
         center_x: 100,
-        center_y : 75,
+        center_y: 75,
         width: 100,
         height: 100,
         textsize: 100,

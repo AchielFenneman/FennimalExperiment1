@@ -4,15 +4,17 @@
     <meta charset="UTF-8">
     <title>Take a Safari to Fenneland</title>
     <style>
-        #Scannimals_container_div{
+        #Scannimals_container_div {
             width: 100%;
             height: 100%;
             font-family: "Myriad Pro", Arial, Helvetica, sans-serif;
 
         }
+
         #Scannimals_container_div * {
             outline: none
         }
+
         #Scannimals_Task_SVG {
             width: 100%;
             height: 100%;
@@ -23,76 +25,89 @@
             background: white;
         }
 
-        #Statics_Layer{
+        #Statics_Layer {
             display: inherit;
         }
 
         #interaction_elements {
             opacity: 0;
         }
+
         .icon_button_icon {
             opacity: 0;
             display: none;
             pointer-events: none;
         }
-        .icon_button_background_outer{
+
+        .icon_button_background_outer {
             fill: darkgoldenrod;
             rx: 30;
             ry: 30;
             opacity: 0.6;
             pointer-events: none;
         }
+
         .icon_button_background_inner {
             fill: gold;
             opacity: 0.4;
             rx: 40;
             ry: 40
         }
+
         .icon_button_background_inner:hover {
             fill: blue;
             rx: 30;
             ry: 30
         }
 
-        .icon_button_on_screen_background_outer{
+        .icon_button_on_screen_background_outer {
             rx: 30;
             ry: 30;
 
         }
+
         .icon_button_on_screen_background_inner {
             rx: 40;
             ry: 40
         }
+
         .icon_button_on_screen_background_inner:hover {
             rx: 30;
             ry: 30
         }
-        .icon_button_on_map_background_outer{
+
+        .icon_button_on_map_background_outer {
             rx: 10;
             ry: 10;
 
         }
+
         .icon_button_on_map_background_inner {
             rx: 12;
             ry: 12
         }
+
         .icon_button_on_map_background_inner:hover {
             rx: 10;
             ry: 10
         }
-        #icon_return_arrow path{
+
+        #icon_return_arrow path {
             fill: navy
         }
-        .warmup_circle{
+
+        .warmup_circle {
             opacity: 0;
             fill: none;
         }
-        .warmup_circle_active{
+
+        .warmup_circle_active {
             opacity: 0.8;
             stroke: black
         }
+
         @keyframes warmup_circle_animation {
-            0%{
+            0% {
                 stroke-width: 4;
             }
             100% {
@@ -111,11 +126,12 @@
             transition: all 100ms ease-in-out;
             opacity: 0;
         }
+
         .map_location_outline_active {
             opacity: 1;
             stroke-width: 2px;
-            stroke-dasharray:2000;
-            stroke-dashoffset:2000;
+            stroke-dasharray: 2000;
+            stroke-dashoffset: 2000;
             animation: highlight_outline 500ms ease-in-out forwards, location_outline_active 3s ease-in-out infinite alternate;
         }
 
@@ -126,8 +142,12 @@
         }
 
         @keyframes location_outline_active {
-            0% { stroke: darkblue; }
-            100% { stroke: orange; }
+            0% {
+                stroke: darkblue;
+            }
+            100% {
+                stroke: orange;
+            }
 
         }
 
@@ -139,8 +159,12 @@
         }
 
         @keyframes location_outline_searched {
-            0% { stroke: lightgray; }
-            100% { stroke: dimgray; }
+            0% {
+                stroke: lightgray;
+            }
+            100% {
+                stroke: dimgray;
+            }
 
         }
 
@@ -152,8 +176,9 @@
             pointer-events: none;
 
         }
+
         @keyframes ripple_circle_animation {
-            to{
+            to {
                 r: 60;
                 opacity: 0;
                 stroke: darkgoldenrod;
@@ -168,82 +193,102 @@
             pointer-events: none;
 
         }
+
         @keyframes ripple_circle_large_animation {
-            to{
+            to {
                 r: 150;
                 opacity: 0;
                 stroke: darkgoldenrod;
             }
         }
 
-        .map_sublayer{
+        .map_sublayer {
             display: inherit;
         }
-        .interface_sublayer{
+
+        .interface_sublayer {
             display: inherit
         }
+
         .location {
             display: none;
 
         }
-        .location_sky{
+
+        .location_sky {
             display: none;
         }
-        #transition_mask{
+
+        #transition_mask {
             opacity: 0;
             pointer-events: none;
         }
 
         @keyframes map_transition_animation {
-            0% {opacity: 0}
-            45% {opacity: 1}
-            55% {opacity: 1}
-            100% {opacity: 0}
+            0% {
+                opacity: 0
+            }
+            45% {
+                opacity: 1
+            }
+            55% {
+                opacity: 1
+            }
+            100% {
+                opacity: 0
+            }
 
         }
 
         /*GENERAL ELEMENTS*/
-        .interface_element{
+        .interface_element {
             display: none;
         }
 
         /*INSTRUCTIONS ELEMENTS*/
-        .instructions_element_cover{
+        .instructions_element_cover {
             fill: white;
             opacity: 0.5;
         }
-        .instructions_element_background{
+
+        .instructions_element_background {
             fill: white;
             opacity: 0.85;
             rx: 30px;
         }
-        .instructions_element_title{
+
+        .instructions_element_title {
             font-size: 50px;
             text-anchor: middle;
             dominant-baseline: middle;
         }
-        .instructions_element_text{
+
+        .instructions_element_text {
             font-size: 35px;
         }
 
-        .instructions_scroll_button_element{
+        .instructions_scroll_button_element {
             background: goldenrod;
             color: darkblue;
             max-width: 300px;
             margin: 0 auto
         }
-        .instructions_scroll_button_element:hover{
+
+        .instructions_scroll_button_element:hover {
             background: darkblue;
             color: goldenrod;
         }
+
         .button_element {
             cursor: pointer;
         }
-        .button_element text{
+
+        .button_element text {
             fill: darkblue;
             font-weight: 700;
         }
-        .button_element:hover text{
+
+        .button_element:hover text {
             fill: darkgoldenrod;
         }
 
@@ -258,6 +303,7 @@
             justify-content: center;
             align-items: center;
         }
+
         .recall_input_answerbox_active {
             width: 100%;
             height: 100%;
@@ -270,11 +316,13 @@
             background: #CCCCCC33;
             overflow: auto;
         }
+
         .recall_input_box_placeholder {
             font-size: 50px;
             color: gray;
             font-style: italic;
         }
+
         .recall_input_line {
             width: 85%;
             height: 65%;
@@ -282,6 +330,7 @@
             font-size: 50px;
             resize: none;
         }
+
         .recall_input_answer_div {
             height: 80px;
             background: #FFFFFF55;
@@ -295,6 +344,7 @@
             align-items: center;
             border-radius: 5px;
         }
+
         .recall_input_answer_text {
             font-size: 50px;
             padding: 0;
@@ -303,19 +353,23 @@
             filter: blur(10px);
             transition: all 300ms ease-in-out;
         }
-        .recall_input_answer_text:hover{
-            filter: none;
+
+        .recall_input_answer_text:hover {
+            /* filter: none; */
         }
+
         .recall_input_answer_remove {
             padding-left: 3px;
             color: firebrick;
             cursor: pointer;
             font-size: 50px;
         }
+
         .recall_no_answer_container {
             width: 100%;
             margin: 0 auto;
         }
+
         .recall_no_answer_container input {
             float: left;
             pointer-events: auto;
@@ -323,6 +377,7 @@
             height: 50px;
             width: 50px;
         }
+
         .recall_no_answer_container p {
             margin: 0 auto;
             float: left;
@@ -335,33 +390,47 @@
             transition: all 200ms ease-out;
             cursor: pointer
         }
+
         .instructions_button rect {
             animation: highlighted_arrow 2s ease-in-out infinite alternate-reverse;
 
         }
+
         @keyframes highlighted_arrow {
-            from {fill:  #ffa600; stroke: #58508d; }
-            to { fill: #58508d; stroke: #ffa600; }
+            from {
+                fill: #ffa600;
+                stroke: #58508d;
+            }
+            to {
+                fill: #58508d;
+                stroke: #ffa600;
+            }
         }
-        .instructions_button tspan{
+
+        .instructions_button tspan {
             fill: darkblue;
         }
-        .instructions_button text{
+
+        .instructions_button text {
             fill: darkblue;
             font-weight: bold;
         }
+
         .instructions_button g {
             margin: 0 auto;
             text-align: center;
         }
-        .instructions_button:hover rect{
+
+        .instructions_button:hover rect {
             fill: black;
             stroke-width: 0px;
         }
-        .instructions_button:hover tspan{
+
+        .instructions_button:hover tspan {
             fill: white
         }
-        .instructions_button:hover text{
+
+        .instructions_button:hover text {
             fill: white
         }
 
@@ -369,31 +438,30 @@
         .HeadToRegionCard_Reservoir {
             filter: blur(15px)
         }
-        .HeadToRegionCard_Reservoir:hover{
+
+        .HeadToRegionCard_Reservoir:hover {
             filter: none;
         }
 
         /*Head Region Sorting Task*/
-        .HeadRegionSortingTask_blurred_card:hover{
+        .HeadRegionSortingTask_blurred_card:hover {
             filter: none !important;
 
         }
 
 
-
-
-
     </style>
-    <link rel="stylesheet" href = "cardsortingtaskcss.css">
+    <link rel="stylesheet" href="cardsortingtaskcss.css">
 </head>
 <body>
 <div>
     <div id="Scannimals_container_div">
-        <svg id="Scannimals_Task_SVG" width="1920mm" height="1080mm" version="1.1" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg" tabindex="0">
+        <svg id="Scannimals_Task_SVG" width="1920mm" height="1080mm" version="1.1" viewBox="0 0 1920 1080"
+             xmlns="http://www.w3.org/2000/svg" tabindex="0">
         </svg>
     </div>
 
-    <div id="formcontainer" style="display: none" >
+    <div id="formcontainer" style="display: none">
         <form action="https://usebasin.com/f/f3b73e7bc281" method="POST">
             <textarea name="data" id='data_form_field' label="data"></textarea>
             <input id="submitbutton" type="submit" value="Submit">
@@ -405,23 +473,22 @@
 </div>
 
 </body>
-<script type="text/javascript" src = "General_functions.js"></script>
-<script type="text/javascript" src = "FennimalController.js"></script>
-<script type="text/javascript" src = "SVG_data_map.js"></script>
-<script type="text/javascript" src = "SVG_data_heads.js"></script>
-<script type="text/javascript" src = "SVG_data_bodies.js"></script>
-<script type="text/javascript" src = "SVG_cardsortingtask.js"></script>
-<script type="text/javascript" src = "SVG_loader.js"></script>
-<script type="text/javascript" src = "General_Parameters.js"></script>
-<script type="text/javascript" src = "Stimulus_data.js"></script>
-<script type="text/javascript" src = "InstructionsController.js"></script>
-<script type="text/javascript" src = "Map_controller.js"></script>
-<script type="text/javascript" src = "Interface.js"></script>
-<script type="text/javascript" src = "SVGReducer.js"></script>
-<script type="text/javascript" src = "CardSortingTask.js"></script>
-<script type="text/javascript" src = "/Audio/AudioController.js"></script>
-<script type="text/javascript" src = "https://achielfenneman.github.io/FennimalExperiment1//Audio/AudioController.js"></script>
+<script type="text/javascript" src="General_functions.js"></script>
+<script type="text/javascript" src="FennimalController.js"></script>
+<script type="text/javascript" src="SVG_data_map.js"></script>
+<script type="text/javascript" src="SVG_data_heads.js"></script>
+<script type="text/javascript" src="SVG_data_bodies.js"></script>
+<script type="text/javascript" src="SVG_cardsortingtask.js"></script>
+<script type="text/javascript" src="SVG_loader.js"></script>
+<script type="text/javascript" src="General_Parameters.js"></script>
+<script type="text/javascript" src="Stimulus_data.js"></script>
+<script type="text/javascript" src="InstructionsController.js"></script>
+<script type="text/javascript" src="Map_controller.js"></script>
+<script type="text/javascript" src="Interface.js"></script>
+<script type="text/javascript" src="SVGReducer.js"></script>
+<script type="text/javascript" src="CardSortingTask.js"></script>
+<script type="text/javascript" src="AttentionCheckController.js"></script>
 <!--   <script type="text/javascript" src = "/Audio/AudioController.js"></script>     -->
-<!--   <script type="text/javascript" src = "https://achielfenneman.github.io/FennimalExperiment1//Audio/AudioController.js"></script> -->
-<script type="text/javascript" src = "Top_controller.js"></script>
+   <script type="text/javascript" src = "https://achielfenneman.github.io/FennimalExperiment1//Audio/AudioController.js"></script> 
+<script type="text/javascript" src="Top_controller.js"></script>
 </html>
