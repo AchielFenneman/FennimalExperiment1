@@ -9,7 +9,7 @@ async function extract_all_SVG_heads_to_array() {
     HiddenDiv.style.display = "none"
     document.body.appendChild(HiddenDiv)
 
-    const response = await fetch("SVG/Heads.svg")
+    const response = await fetch("./SVG/Heads.svg")
     const string = await response.text()
     HiddenDiv.innerHTML = string
 
@@ -40,7 +40,7 @@ async function extract_all_SVG_bodies_to_array() {
     HiddenDiv.style.display = "none"
     document.body.appendChild(HiddenDiv)
 
-    const response = await fetch("SVG/Bodies.svg")
+    const response = await fetch("./SVG/Bodies.svg")
     const string = await response.text()
     HiddenDiv.innerHTML = string
 
@@ -127,10 +127,10 @@ async function load_additional_svg_assets(){
     document.getElementById("Fennimal_Templates_Layer").innerHTML = ""
     await extract_all_SVG_heads_to_array()
     await extract_all_SVG_bodies_to_array()
-    await extract_SVG_elements_by_type("SVG/Hats.svg", "hat", "All_Hats",document.getElementById("Fennimal_Templates_Layer") )
-    await extract_SVG_elements_by_type("SVG/Items.svg", "item", "All_Items",document.getElementById("Fennimal_Templates_Layer") )
-    await extract_SVG_elements_by_type("SVG/Items.svg", "misc", "Misc",document.getElementById("Fennimal_Templates_Layer") )
-    await extract_SVG_elements_by_type("SVG/Items.svg", "toybox", "All_Boxes",document.getElementById("Fennimal_Templates_Layer") )
+    await extract_SVG_elements_by_type("./SVG/Hats.svg", "hat", "All_Hats",document.getElementById("Fennimal_Templates_Layer") )
+    await extract_SVG_elements_by_type("./SVG/Items.svg", "item", "All_Items",document.getElementById("Fennimal_Templates_Layer") )
+    await extract_SVG_elements_by_type("./SVG/Items.svg", "misc", "Misc",document.getElementById("Fennimal_Templates_Layer") )
+    await extract_SVG_elements_by_type("./SVG/Items.svg", "toybox", "All_Boxes",document.getElementById("Fennimal_Templates_Layer") )
     await extract_player_SVG()
 
 
@@ -166,7 +166,7 @@ ImageLoader = function(Array_of_visited_regions_and_locations, LocationHolderEle
         let filename = Array_of_visited_regions_and_locations[i][1] + "_" + Array_of_visited_regions_and_locations[i][0].toLowerCase() + ".png"
         let NewGroup = create_SVG_group(0,0,"location","location_" + Array_of_visited_regions_and_locations[i][0] )
         let Img = document.createElementNS("http://www.w3.org/2000/svg", 'image')
-        Img.setAttribute("href", "Locations/" + filename)
+        Img.setAttribute("href", "./Locations/" + filename)
         Img.setAttribute("width", "100%")
         Img.setAttribute("height", "100%")
         Img.setAttribute('preserveAspectRatio', 'none')
@@ -183,7 +183,7 @@ ImageLoader = function(Array_of_visited_regions_and_locations, LocationHolderEle
 async function loadMainElements(){
     try {
         //Loading main map elements
-        const response = await fetch('SVG/Main.svg')
+        const response = await fetch('./SVG/Main.svg')
         const SVG_main_string = await response.text()
         document.getElementById("Scannimals_container_div").innerHTML = SVG_main_string;
         document.getElementById("Scannimals_container_div").getElementsByTagName("svg")[0].id = "Scannimals_Task_SVG"
