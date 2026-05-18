@@ -1981,7 +1981,7 @@ let StimulusTransformer = function (StimTemplate) {
                 if(typeof this.Experiment_Structure[i].Fennimal_interaction_type === "string"){
                     if(this.Experiment_Structure[i].Fennimal_interaction_type.includes("ask_")){
                         if(typeof this.Experiment_Structure[i].bonus_stars_per_correct_answer !== "undefined" && this.Experiment_Structure[i].bonus_stars_per_correct_answer !== false){
-                            max_stars = this.Experiment_Structure[i].bonus_stars_per_correct_answer * this.Experiment_Structure[i].Fennimals_encountered.length
+                            max_stars = max_stars + this.Experiment_Structure[i].bonus_stars_per_correct_answer * this.Experiment_Structure[i].Fennimals_encountered.length
                         }
 
                     }
@@ -1990,7 +1990,7 @@ let StimulusTransformer = function (StimTemplate) {
                 if(Array.isArray(this.Experiment_Structure[i].Fennimal_interaction_type)){
                     for(let intnum = 0; intnum<this.Experiment_Structure[i].Fennimal_interaction_type.length; intnum++) {
                         if(typeof this.Experiment_Structure[i].bonus_stars_per_correct_answer !== "undefined" && this.Experiment_Structure[i].bonus_stars_per_correct_answer !== false){
-                            max_stars = this.Experiment_Structure[i].bonus_stars_per_correct_answer * this.Experiment_Structure[i].Fennimals_encountered.length
+                            max_stars = max_stars + this.Experiment_Structure[i].bonus_stars_per_correct_answer * this.Experiment_Structure[i].Fennimals_encountered.length
 
                         }
                     }
