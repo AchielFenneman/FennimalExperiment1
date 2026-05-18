@@ -826,7 +826,7 @@ let StimulusSettings = function () {
                 Fennimal_interaction_type:"ask_Fennimal_toy",
                 Fennimals_encountered: ["S1" , "S2",   "P1" , "P2" ],
                 partner_behavior: false,
-                bonus_star_for_correct_answer: true,
+                bonus_stars_per_correct_answer: 1,
             }
 
         ]
