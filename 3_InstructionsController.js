@@ -6,6 +6,7 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
     let CurrentInstructionsSVG
     let boundary_size = 30
     let that = this
+    let number_of_interactions_in_current_day, current_interaction_num_in_day
 
     //Clears the instructions page
     function clear_instructions() {
@@ -117,6 +118,7 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
 
     //Pass false to hide the entire progress bar
     this.update_progress_within_day = function (percentage_complete) {
+        console.log(percentage_complete)
         if (percentage_complete === false) {
             ProgressWithinDayBar.parentElement.style.display = "none"
         } else {
@@ -174,7 +176,7 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
 
     }
 
-    function add_closing_button_to_Parent(position, add_keyboard_shortcut_for_closing, optional_additional_function) {
+    function add_closing_button_to_Parent(position, add_keyboard_shortcut_for_closing, optional_additional_function, optional_delay_time) {
         switch (position) {
             case("top-right"):
                 ClosingButton = create_SVG_buttonElement(1820, 3 * boundary_size, 75, 75, "🗙", 70)
@@ -199,6 +201,13 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
                     close_instructions();
                     AudioCont.play_sound_effect("close_menu")
                 })
+            }
+        }
+
+        if(optional_delay_time!== undefined) {
+            if(optional_delay_time > 0){
+                ClosingButton.style.display = "none"
+                setTimeout(function () {ClosingButton.style.display = "inherit"}, optional_delay_time)
             }
         }
 
@@ -805,9 +814,15 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
 
     // HINT AND SEARCH PHASES
     /////////////////////////
-    this.initialize_hint_and_search_phase_general_instructions = function (interaction_type,hint_type, current_block_num, can_earn_stars, fennefinder_status, Fennimals_in_phase_Array) {
+    this.initialize_hint_and_search_phase_general_instructions = function (interaction_type,hint_type, current_block_num, num_bonus_stars_per_question, fennefinder_status, Fennimals_in_phase_Array) {
         let close_button_pos = "bottom-center", bonus_star_id
         current_instruction_type = "hint_and_search"
+        let continue_button_time = 500
+
+        if(num_bonus_stars_per_question === true){num_bonus_stars_per_question = 1}
+        let can_earn_stars = num_bonus_stars_per_question > 0
+
+
         if(Array.isArray(interaction_type)){
             //Multiple types are included in this trial, which should be included in the instructions.
             for(let i = 0; i < interaction_type.length; i++) {
@@ -837,9 +852,6 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
         //Show instructions layer
         ParentElem.style.display = "inherit"
 
-        //Adding the closing button the bottom of the page=
-        add_closing_button_to_Parent(close_button_pos, false, function(){if(document.getElementById(bonus_star_id) !== null){document.getElementById(bonus_star_id).remove()}})
-
         let task_type_text, Fennimal_state_text, verb_text, ask_insert_text = ""
         switch(interaction_type) {
             case("polaroid_photo_active"): task_type_text = "It's time to check in on the Fennimals. Let's go take some photos of them! "; Fennimal_state_text = " need to be checked in on."; verb_text = "photographed"; break
@@ -857,16 +869,42 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
 
         let can_earn_stars_text = "", text_y = 300, text_h = 500
         if(can_earn_stars){
-            bonus_star_id = "deletable_center_bonus_star"
-            show_bonus_star_on_screen(ParentElem, 0.5 * GenParam.SVG_width, 0.53 * GenParam.SVG_height, true, undefined, 1, bonus_star_id)
+            continue_button_time =  continue_button_time + num_bonus_stars_per_question * 500
+            const dx = 0.08 * GenParam.SVG_width
+            const center = 0.5 * GenParam.SVG_width
+            const AllXpos = {
+                1: [center],
+                2: [center - 0.5*dx, center + 0.5 * dx],
+                3: [center - dx,center, center +  dx],
+                4: [center - 1.5*dx,center - 0.5*dx, center + 0.5 * dx, center + 1.5 * dx],
+                5: [center - 2*dx,center - dx,center, center +  dx, center + 2*dx],
+            }
+            const starpos = AllXpos[num_bonus_stars_per_question]
+
+            for(let i =0;i<num_bonus_stars_per_question; i++){
+                setTimeout(function(){
+                    show_bonus_star_on_screen(ParentElem, starpos[i], 0.53 * GenParam.SVG_height, true, "deletable_bonus_star", 1, undefined)
+                },(i+1)*300)
+            }
             document.getElementsByClassName("instructions_element_background")[0].style.fill = GenParam.background_fill_for_instructions_where_stars_can_be_earned
 
-            can_earn_stars_text = "<b>Please answer carefully, as you will earn a bonus star for each question you correctly answer! </b><br><br><br><br><br>";
+            let numtext = "a bonus star"
+            if(num_bonus_stars_per_question > 1){
+                numtext = num_bonus_stars_per_question + " bonus stars"
+            }
+            can_earn_stars_text = "<b><br><br> Please answer carefully, as you will earn " + numtext + " for each question you correctly answer! </b><br><br><br><br><br>";
             text_y = 200
             text_h = 600
         }
 
         let hint_type_text, next_hint_text
+        if(typeof hint_type === "object"){
+            if(hint_type.length === 1){
+                hint_type = hint_type[0]
+            }
+            else{hint_type = "multiple"}}
+
+
         switch (hint_type) {
             case("location"):
                 hint_type_text = " told a location where a Fennimal was recently spotted";
@@ -884,6 +922,10 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
                 hint_type_text = " given a toy which you have to bring to its owner";
                 next_hint_text = "given the next toy to bring to its owner";
                 break
+            case("food"):
+                hint_type_text = " shown which type of food this Fennimal likes";
+                next_hint_text = "shown the next type of food to bring to a Fennimal";
+                break
             case("multiple"):
                 hint_type_text = " given a given a hint on which Fennimal to find";
                 next_hint_text = "given the next hint";
@@ -898,8 +940,11 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
             Fennefinder_text = "Unfortunately, the Fennefinder has run out of battery - so you'll have to find all Fennimals by memory! "
         }
 
+        let number_of_trials_text = ", until you have " + verb_text + " all " + Fennimals_in_phase_Array.length + " Fennimals which " + Fennimal_state_text
+        if(hint_type === "multiple"){number_of_trials_text = "."}
+
         let instruction_text = task_type_text + "One at a time, you will be " + hint_type_text + ". " + ask_insert_text +
-            "After you have done so, you will be " + next_hint_text + ", untill you have " + verb_text + " all " + Fennimals_in_phase_Array.length + " Fennimals which " + Fennimal_state_text +" <br><br>" +
+            "After you have done so, you will be " + next_hint_text + "  " +number_of_trials_text +
             can_earn_stars_text +
             Fennefinder_text + "<br>" + "<i>Tip: don't know where to go next? Try climbing the watchtower!</i>"
 
@@ -911,11 +956,23 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
         //Updating the number of days in the progress bar
         update_progress_new_day(current_block_num)
 
+        //Adding the closing button the bottom of the page
+        function delete_bonus_star_icons(){
+            let Stars = document.getElementsByClassName("deletable_bonus_star")
+            while(Stars.length > 0){
+                Stars[0].remove()
+            }
+        }
+        add_closing_button_to_Parent(close_button_pos, false, delete_bonus_star_icons, continue_button_time)
+
+
 
     }
 
-    this.initialize_hint_and_search_phase_trial_instructions = function (FenObj, hint_type) {
-        console.log(hint_type)
+    this.initialize_hint_and_search_phase_trial_instructions = function (FenObj, hint_type, percentage_complete) {
+        this.update_progress_within_day(percentage_complete)
+        let continue_button_time = 500
+
         current_instruction_type = "hint_and_search"
         ParentElem.style.display = "inherit"
 
@@ -929,10 +986,15 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
         if(hint_type === "toybox"){
             document.getElementById("Instructions_Title").innerHTML = "Bring this box to the correct Fennimal!"
         }
+        if(hint_type === "toybox"){
+            document.getElementById("Instructions_Title").innerHTML = "Find the Fennimal which likes this food!"
+        }
 
         TextElem_Main_Instructions.remove()
 
         //Displaying the actual hint here
+        let icon_y = 0.45 * GenParam.SVG_height
+        if(FenObj.bonus_stars_earnable === true || FenObj.bonus_stars_earnable > 0){icon_y = 0.375 * GenParam.SVG_height}
         switch (hint_type) {
             case("location"):
                 TextElem_Main_Instructions = create_SVG_text_in_foreign_element("Hint: this Fennimal can be found at the <b> " + GenParam.LocationDisplayNames[FenObj.location] + "</b>", 100, 400, (1920 - 2 * 100), 200, "instruction_element_text")
@@ -956,7 +1018,7 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
                 let FennimalScaleGroup = Icon.getElementsByClassName("Fennimal_scale_group")[0]
                 let Box = FennimalScaleGroup.getBBox()
                 let delta_x = (0.5 * GenParam.SVG_width) - (Box.x + 0.5 * Box.width)
-                let delta_y = (0.45 * GenParam.SVG_height) - (Box.y + 0.45 * Box.height)
+                let delta_y = (icon_y) - (Box.y + 0.45 * Box.height)
                 Icon.style.transform = "translate(" + delta_x + "px, " + delta_y + "px)"
                 Icon.classList.add("instruction_element_nonbackground")
 
@@ -1010,29 +1072,72 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
                     BoxIcon.style.display = "inherit"
                 }, 200)
 
-                console.log(FenObj.toybox)
+                break
+            case("food"):
+                TextElem_Main_Instructions = create_SVG_group(0,0,undefined,undefined)
+                CurrentInstructionsSVG.appendChild(TextElem_Main_Instructions)
+                let FoodIcon = copy_scale_and_move_object_to_position(document.getElementById("food_" + FenObj.food_preference + "_first"), TextElem_Main_Instructions, 0.5 * GenParam.SVG_width, 0.5 * GenParam.SVG_height, 7 )
+                FoodIcon.style.display = "none"
+                FoodIcon.classList.add("instruction_element_nonbackground")
+                CurrentInstructionsSVG.appendChild(TextElem_Main_Instructions)
+
+
+                setTimeout(function () {
+                    FoodIcon.style.display = "inherit"
+                }, 200)
                 break
 
 
         }
 
         //Optionally add stars if any can be earned
-        if(FenObj.bonus_star_earnable === true){
-            show_bonus_star_on_screen(ParentElem, 0.035 * GenParam.SVG_width, 0.06 * GenParam.SVG_height, false, "instruction_element_nonbackground", 0.5)
-            show_bonus_star_on_screen(ParentElem, 0.965 * GenParam.SVG_width, 0.06 * GenParam.SVG_height, false, "instruction_element_nonbackground", 0.5)
-            show_bonus_star_on_screen(ParentElem, 0.035 * GenParam.SVG_width, 0.94 * GenParam.SVG_height, false, "instruction_element_nonbackground", 0.5)
-            show_bonus_star_on_screen(ParentElem, 0.965 * GenParam.SVG_width, 0.94 * GenParam.SVG_height, false, "instruction_element_nonbackground", 0.5)
+        if(FenObj.bonus_stars_earnable === true || FenObj.bonus_stars_earnable > 0){
+
+            let num_bonus_stars = FenObj.bonus_stars_earnable
+            if(num_bonus_stars === true){num_bonus_stars = 1}
+
+            let bonustext = "You can earn a bonus star"
+            if(num_bonus_stars > 1){bonustext = "You can earn up to " + num_bonus_stars + " stars!"}
+
+
             document.getElementsByClassName("instructions_element_background")[0].style.fill = GenParam.background_fill_for_instructions_where_stars_can_be_earned
-            let BonusText = create_SVG_text_in_foreign_element("You can earn a bonus star", 0.25 * GenParam.SVG_width, 0.7*GenParam.SVG_height, 0.5 * GenParam.SVG_width, 0.1 * GenParam.SVG_height, "questionbar_bonustext")
+            let BonusText = create_SVG_text_in_foreign_element(bonustext, -0.175 * GenParam.SVG_width, 0.29*GenParam.SVG_height, 0.5 * GenParam.SVG_width, 0.1 * GenParam.SVG_height, "questionbar_bonustext")
             BonusText.style.fontSize = "40px"
             BonusText.style.textAlign = "center"
             BonusText.classList.add("instruction_element_nonbackground")
 
-            ParentElem.appendChild(BonusText)
+            TextElem_Main_Instructions.appendChild(BonusText)
+            console.log(TextElem_Main_Instructions)
+
+            //Bonus stars
+            const dx = 0.06 * GenParam.SVG_width
+            const center = 0.5 * GenParam.SVG_width
+            const AllXpos = {
+                1: [center],
+                2: [center - 0.5*dx, center + 0.5 * dx],
+                3: [center - dx,center, center +  dx],
+                4: [center - 1.5*dx,center - 0.5*dx, center + 0.5 * dx, center + 1.5 * dx],
+                5: [center - 2*dx,center - dx,center, center +  dx, center + 2*dx],
+            }
+            const starpos = AllXpos[num_bonus_stars]
+
+            for(let i =0 ; i <num_bonus_stars; i++){
+                setTimeout(function(){
+                    let X = show_bonus_star_on_screen(TextElem_Main_Instructions,  starpos[i], 0.75* GenParam.SVG_height, true, "instruction_element_nonbackground", 0.75)
+                    console.log(X)
+                }, (i+1) * 400)
+            }
+
+            console.log(ParentElem)
+            console.log(ParentElem.getElementsByClassName("button_element")[0])
+            continue_button_time = num_bonus_stars * 500
+
         }else{
             document.getElementsByClassName("instructions_element_background")[0].style.fill = ""
 
         }
+
+
         open_instructions_page()
 
     }
@@ -1098,9 +1203,15 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
 
     // JUMP TO TRIAL
     ///////////////////
-    this.initialize_jump_to_trial_instructions = function(interaction_type, current_block_num, can_earn_stars, fennefinder_status, Fennimals_in_phase_Array){
+    this.initialize_jump_to_trial_instructions = function(interaction_type, current_block_num, num_bonus_stars_per_question, fennefinder_status, Fennimals_in_phase_Array){
         let close_button_pos = "bottom-center", bonus_star_id
         current_instruction_type = "hint_and_search"
+        let continue_button_time = 500
+
+        if(num_bonus_stars_per_question === true){num_bonus_stars_per_question = 1}
+        let can_earn_stars = num_bonus_stars_per_question > 0
+        console.log(can_earn_stars)
+
         if(Array.isArray(interaction_type)){
             //Multiple types are included in this trial, which should be included in the instructions.
             for(let i = 0; i < interaction_type.length; i++) {
@@ -1130,9 +1241,6 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
         //Show instructions layer
         ParentElem.style.display = "inherit"
 
-        //Adding the closing button the bottom of the page=
-        add_closing_button_to_Parent(close_button_pos, false, function(){if(document.getElementById(bonus_star_id) !== null){document.getElementById(bonus_star_id).remove()}})
-
         let task_type_text, Fennimal_state_text, verb_text, ask_insert_text = "", verb_text_present
         switch(interaction_type) {
             case("polaroid_photo_active"): task_type_text = "It's time to check in on the Fennimals. Let's go take some photos of them! "; Fennimal_state_text = " need to be checked in on."; verb_text = "photographed"; verb_text_present = "photograph"; break
@@ -1150,11 +1258,30 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
 
         let can_earn_stars_text = "", text_y = 100, text_h = 500
         if(can_earn_stars){
-            bonus_star_id = "deletable_center_bonus_star"
-            show_bonus_star_on_screen(ParentElem, 0.5 * GenParam.SVG_width, 0.5 * GenParam.SVG_height, true, undefined, 1, bonus_star_id)
+            continue_button_time =  continue_button_time + num_bonus_stars_per_question * 500
+            const dx = 0.08 * GenParam.SVG_width
+            const center = 0.5 * GenParam.SVG_width
+            const AllXpos = {
+                1: [center],
+                2: [center - 0.5*dx, center + 0.5 * dx],
+                3: [center - dx,center, center +  dx],
+                4: [center - 1.5*dx,center - 0.5*dx, center + 0.5 * dx, center + 1.5 * dx],
+                5: [center - 2*dx,center - dx,center, center +  dx, center + 2*dx],
+            }
+            const starpos = AllXpos[num_bonus_stars_per_question]
+
+            for(let i =0;i<num_bonus_stars_per_question; i++){
+                setTimeout(function(){
+                    show_bonus_star_on_screen(ParentElem, starpos[i], 0.48 * GenParam.SVG_height, true, "deletable_bonus_star", 1, undefined)
+                },(i+1)*300)
+            }
             document.getElementsByClassName("instructions_element_background")[0].style.fill = GenParam.background_fill_for_instructions_where_stars_can_be_earned
 
-            can_earn_stars_text = "<b>Please answer carefully, as you will earn a bonus star for each question you correctly answer! </b><br><br><br><br><br>";
+            let numtext = "a bonus star"
+            if(num_bonus_stars_per_question > 1){
+                numtext = num_bonus_stars_per_question + " bonus stars"
+            }
+            can_earn_stars_text = "<b> Please answer carefully, as you will earn " + numtext + " for each question you correctly answer! </b><br><br><br><br><br>";
             text_y = 100
             text_h = 700
         }
@@ -1180,6 +1307,17 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
 
         //Updating the number of days in the progress bar
         update_progress_new_day(current_block_num)
+
+        //Adding the closing button the bottom of the page
+        function delete_bonus_star_icons(){
+            let Stars = document.getElementsByClassName("deletable_bonus_star")
+            while(Stars.length > 0){
+                Stars[0].remove()
+            }
+        }
+        //Adding the closing button the bottom of the page=
+        add_closing_button_to_Parent(close_button_pos, false, delete_bonus_star_icons, continue_button_time)
+
 
 
     }
@@ -1623,7 +1761,6 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
         ParentElem.appendChild(CurrentInstructionsSVG)
         ParentElem.style.display = "inherit"
         //document.getElementById("Instructions_Title").innerHTML = "Please move each Fennimal to the region of Fenneland in which you saw it"
-        console.log(TaskData)
         //Updating the number of days in the progress bar
         update_progress_new_day(phasenum)
         that.update_progress_within_day(0)
@@ -1636,7 +1773,6 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
 
         let HeadToRegionSortCont = new FennimalAttributeSortingTask(CurrentInstructionsSVG, document.getElementById("Instructions_Title"),  TaskData, attributes_arr, max_earnable_stars, that, completed_sorting_task)
     }
-
 
     //CARD SORTING TASK
     ///////////////////////
@@ -1667,10 +1803,93 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
 
     }
 
+    //WAREHOUSE TASKS
+    this.start_warehouse_task = function(PhaseData,daynum, outputfun){
+        //Show the warehouse task instructions
+        current_instruction_type = "warehouse_task"
+
+        //Clearing any previous instructions
+        clear_instructions()
+        CurrentInstructionsSVG = create_basic_instruction_elements()
+        ParentElem.appendChild(CurrentInstructionsSVG)
+        ParentElem.style.display = "inherit"
+        let partner_name = WorldState.get_partner_icon_settings().name
+        document.getElementById("Instructions_Title").innerHTML = "Day " + daynum + ": collect some items at the warehouse"
+        const can_earn_stars = PhaseData.bonus_stars_per_correct_answer > 0
+        let text_y = 0.5 * GenParam.SVG_height
+        let button_appear_time = 500
+
+        let instruction_text = "Today we will go to warehouse to collect some things that the Fennimals will need. While collecting these items, you will be asked to answer some questions."
+
+        if(can_earn_stars){
+            text_y = 0.2 * GenParam.SVG_height
+            button_appear_time = 500 + 500 * PhaseData.bonus_stars_per_correct_answer
+            document.getElementsByClassName("instructions_element_background")[0].style.fill = GenParam.background_fill_for_instructions_where_stars_can_be_earned
+            instruction_text = instruction_text + "<br><br>Please pay close attention to these questions and take your time to think about your answer! For each question you correctly answer, you will earn "
+            if(PhaseData.bonus_stars_per_correct_answer === 1){
+                instruction_text = instruction_text + " a bonus star!"
+            }else{
+                instruction_text = instruction_text + PhaseData.bonus_stars_per_correct_answer + " bonus stars!"
+            }
+
+            //Now we display the number of bonus stars.
+            let center = 0.5*GenParam.SVG_width
+            let dx = 0.1 * GenParam.SVG_width
+            let AllStarPos  = {
+                1: [center],
+                2: [center - 0.5*dx, center + 0.5*dx],
+                3: [center - dx, center, center + dx],
+                4: [center - 1.5*dx,center - 0.5*dx, center + 0.5*dx, center + 1.5*dx],
+                5: [center - 2*dx,center - dx, center, center + dx, center + 2*dx],
+            }
+            let star_x_pos = AllStarPos[PhaseData.bonus_stars_per_correct_answer]
+
+            for(let i = 0; i<PhaseData.bonus_stars_per_correct_answer; i ++){
+                //new Animated_Starburst_star(CurrentInstructionsSVG, star_x_pos[i], 0.6 * GenParam.SVG_height, )
+                setTimeout(function(){
+                    show_bonus_star_on_screen(CurrentInstructionsSVG,star_x_pos[i], 0.6 * GenParam.SVG_height, true,undefined,1.25,undefined)
+                }, i * 500)
+
+            }
+
+        }
+
+
+        TextElem_Main_Instructions = create_SVG_text_in_foreign_element(instruction_text, 0.1 * GenParam.SVG_width, text_y, 0.8 * GenParam.SVG_width, 0.5 * GenParam.SVG_height, "instruction_element_text")
+        TextElem_Main_Instructions.classList.add("instruction_element_nonbackground")
+        TextElem_Main_Instructions.getElementsByClassName("instruction_element_text")[0].style.fontSize = "40px"
+        CurrentInstructionsSVG.appendChild(TextElem_Main_Instructions)
+
+        //Updating the number of days in the progress bar
+        update_progress_new_day(daynum)
+        that.update_progress_within_day(false)
+
+        //Add the start button
+        let ContinueButton = create_SVG_buttonElement(0.5 * GenParam.SVG_width, 0.85 * GenParam.SVG_height, 400, 75, "Continue", 40)
+        setTimeout(function(){
+            CurrentInstructionsSVG.appendChild(ContinueButton)
+            ContinueButton.onpointerdown = function () {
+                start_warehouse_task(PhaseData, outputfun)
+                clear_instructions()
+                AudioCont.play_sound_effect("button_click")
+            }
+
+        },button_appear_time)
+
+
+    }
+    function start_warehouse_task(PhaseData, outputfun){
+        let WarehouseController = new ItemsCollectionFromWarehouseController(PhaseData, outputfun)
+    }
+
     //PSEUDODAY CARDS
     ////////////////////
-    this.show_pseudo_day_information_page = function(information_type, OptionalInformation) {
-        console.log("HEREHERHERE")
+    this.show_pseudo_day_information_page = function(information_type,title, text, OptionalInformation) {
+        //Modifying text (if any is provided)
+        if(typeof text !== "undefined") {
+            text = text.replaceAll("%PARTNERNAME%", WorldState.get_partner_icon_settings().name)
+        }
+
         //Clearing any previous instructions
         clear_instructions()
         CurrentInstructionsSVG = create_basic_instruction_elements()
@@ -1774,6 +1993,103 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
             }
             CurrentInstructionsSVG.appendChild(ContinueButton)
 
+
+        }
+
+        if(information_type === "new_Fennimals_spotted"){
+            let text_w = 0.9 * GenParam.SVG_width, text_y = 0.4 * GenParam.SVG_height, text_align = "center"
+            if(typeof OptionalInformation !== "undefined"){
+                text_w = 0.4 * GenParam.SVG_width
+                text_y = 0.3 * GenParam.SVG_height
+                text_align = "left"
+            }
+            document.getElementById("Instructions_Title").innerHTML = title
+            let TextObj = create_SVG_text_in_foreign_element(text, 0.05 * GenParam.SVG_width, text_y, text_w, 0.3 * GenParam.SVG_height, undefined,undefined)
+            TextObj.style.textAlign = text_align
+            TextObj.style.fontSize = "40px"
+            CurrentInstructionsSVG.appendChild(TextObj)
+
+            //Show the continue button
+            let ContinueButton = create_SVG_buttonElement(0.5 * GenParam.SVG_width, 0.875 * GenParam.SVG_height, 400, 75, "Continue", 40)
+            ContinueButton.onpointerdown = function (event) {
+                ExpCont.general_instructions_page_completed()
+            }
+            CurrentInstructionsSVG.appendChild(ContinueButton)
+
+            //Optionally display the icons here (currently supports up X icons)
+            let AllIconPositions = {
+                1: [{x: 0, y: 0, rotation: 10}],
+                2: [
+                    {x: 100, y: 0, rotation: 10},
+                    {x: -100, y: 0, rotation: -10}
+                ],
+                3: [
+                    {x: 0, y: 0, rotation: 5},
+                    {x: 200, y: 0, rotation: 10},
+                    {x: -200, y: 0, rotation: -10}
+                ],
+                4: [
+                    {x: 200, y: 0, rotation: -10},
+                    {x: -200, y: 0, rotation: 10},
+                    {x: -75, y: -50, rotation: 0},
+                    {x: 150, y: 150, rotation: -10},
+                ],
+                5: [
+                    {x: 250, y: 0, rotation: -10},
+                    {x: -250, y: 0, rotation: 10},
+                    {x: -75, y: -50, rotation: 0},
+                    {x: 150, y: 150, rotation: -10},
+                    {x: -150, y: 150, rotation: 10},
+                ]
+            }
+            let icon_move_positions = AllIconPositions[OptionalInformation.length]
+            if(typeof OptionalInformation !== "undefined"){
+                let IconScreenStartCoords = {x:  0.85 * GenParam.SVG_width , y: 0.4 * GenParam.SVG_height}
+                for(let iconnum = 0; iconnum < OptionalInformation.length; iconnum++){
+                    let GroupTranslate = create_SVG_group(0,0,undefined,undefined);
+                    let GroupRotate = create_SVG_group(0,0,undefined,undefined);
+                    let GroupScale = create_SVG_group(0,0,undefined,undefined);
+                    GroupRotate.appendChild(GroupScale);
+                    GroupTranslate.appendChild(GroupRotate);
+                    CurrentInstructionsSVG.appendChild(GroupTranslate);
+
+                    //Adding the frame
+                    let Frame = copy_scale_and_move_object_to_position(document.getElementById("polaroid_frame"), GroupScale, IconScreenStartCoords.x, IconScreenStartCoords.y, 1)
+                    Frame.getElementsByTagName("rect")[0].style.fill = GenParam.RegionData[OptionalInformation[iconnum].region].surrounding_color
+                    Frame.getElementsByTagName("rect")[0].style.display = "inherit"
+                    Frame.getElementsByTagName("text")[0].childNodes[0].innerHTML = OptionalInformation[iconnum].name
+                    let TargetCircle = getSVGInternalCenter(Frame.getElementsByTagName("circle")[0])
+
+                    //Adding the Fennimal
+                    let Icon = create_Fennimal_SVG_object(OptionalInformation[iconnum], GenParam.Fennimal_head_size, true)
+                    GroupScale.appendChild(Icon)
+                    let FennimalScaleGroup = Icon.getElementsByClassName("Fennimal_scale_group")[0]
+                    let Box = Icon.getBBox()
+                    let delta_x = (TargetCircle.x) - (Box.x + 0.5 * Box.width)
+                    let delta_y = (TargetCircle.y) - (Box.y + 0.5 * Box.height) + 50
+
+                    let FrameBox = Frame.getElementsByTagName("rect")[0].getBBox()
+                    let scale_factor_w = 1 / (Box.width / FrameBox.width)
+                    let scale_factor_h = 1 / (Box.height / FrameBox.height)
+                    let min_scale_factor = Math.floor(Math.min(scale_factor_w, 0.8 * scale_factor_h) * 100) / 100
+
+                    FennimalScaleGroup.style.transform = "scale(" + min_scale_factor + ")"
+                    Icon.style.transform = "translate(" + delta_x + "px, " + delta_y + "px)"
+
+                    //Rescaling, rotating and setting transform to the box
+                    GroupScale.style.transformOrigin = "center"
+                    GroupRotate.style.transformOrigin =  (.6 * GenParam.SVG_width)  + "px " + (0.4 * GenParam.SVG_height) + "px"
+                    GroupScale.style.transform = "scale(0.5)"
+                    GroupTranslate.style.transition = "all 500ms ease-in-out"
+                    GroupRotate.style.transition = "all 500ms ease-in-out"
+
+                    if(iconnum < icon_move_positions.length){
+                        GroupRotate.style.transform = "rotate(" + icon_move_positions[iconnum].rotation + "deg)"
+                        GroupTranslate.style.transform = "translate(" + icon_move_positions[iconnum].x + "px, " + icon_move_positions[iconnum].y + "px)"
+                    }
+
+                }
+            }
 
         }
     }
@@ -2525,7 +2841,7 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
                     break
             }
 
-            top_text = "Day " + DayData.day + ": " + type_text
+            top_text = "Day " + DayData.day
 
             if (stars_have_been_earned) {
                 SVG.style.background = GenParam.background_fill_for_instructions_where_stars_can_be_earned
@@ -2565,12 +2881,11 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
             let ChildrenPaths = NewStar.getElementsByTagName("path")
             ChildrenPaths[0].style.fill = "lightgray"
             ChildrenPaths[0].style.stroke = "dimgray"
-            console.log(NewStar)
         }
 
         //Add the amount earned
         setTimeout(function () {
-            let AmountText = create_SVG_text_elem(0.75 * payment_card_width, 0.8 * payment_card_height, "× " + DayData.stars_earned, "instruction_element_text")
+            let AmountText = create_SVG_text_elem(0.5 * payment_card_width, 0.8 * payment_card_height, "×" + DayData.stars_earned, "instruction_element_text")
             AmountText.style.textAnchor = "middle"
             AmountText.style.fontSize = "90px"
             AmountText.style.fontWeight = 700
@@ -2581,7 +2896,7 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
 
         //Add the maximum number of stars
         setTimeout(function () {
-            let TotalText = create_SVG_text_elem(0.5 * payment_card_width, 0.95 * payment_card_height, "(out of " + DayData.maximum_possible_stars + ")", "instruction_element_text")
+            let TotalText = create_SVG_text_elem(0.4 * payment_card_width, 0.95 * payment_card_height, "(out of " + DayData.maximum_possible_stars + ")", "instruction_element_text")
             TotalText.style.textAnchor = "middle"
             TotalText.style.fontSize = "35px"
             TotalText.style.fontStyle = "italic"
@@ -2789,6 +3104,7 @@ Vertical_scollable_box = function (ParentElem, x, y, width, height) {
     }
 
     FennimalIcon = function (AreaElem, SVG, OtherProperties) {
+        console.log(OtherProperties)
 
         //Wrapping the SVG code into an SVG element, that one into a div, then appending that one to the Area
         let SVGElem = document.createElementNS("http://www.w3.org/2000/svg", 'svg')

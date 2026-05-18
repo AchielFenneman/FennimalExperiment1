@@ -76,9 +76,6 @@ DATACONTROLLER = function (Stimuli, AttentionCheckController, StartTime) {
         delete NewObj.question_options_toys
         delete NewObj.allowed_attempts_before_answer_given
 
-        let can_earn_bonus = NewObj.bonus_star_for_correct_answer === true
-        let total_bonus_stars_earned = 0, max_bonus_stars = 0
-        rename_object_key(NewObj,"bonus_star_for_correct_answer", "bonus_possible" )
 
         if(["jump_to_trial", "hint_and_search", "free_exploration"].includes(NewObj.type)){
             for(let trialnum = 0; trialnum < NewObj.Data.length; trialnum++) {
@@ -96,13 +93,6 @@ DATACONTROLLER = function (Stimuli, AttentionCheckController, StartTime) {
                     delete NewObj.Data[trialnum].interaction_type
                 }
 
-                if(can_earn_bonus){
-                    if(NewObj.Data[trialnum].bonus_star_earned){
-                        total_bonus_stars_earned++
-                    }
-                    max_bonus_stars++
-                }
-
                 delete NewObj.Data[trialnum].pos_on_screen
                 delete NewObj.Data[trialnum].search_status
                 delete NewObj.Data[trialnum].visited
@@ -118,11 +108,6 @@ DATACONTROLLER = function (Stimuli, AttentionCheckController, StartTime) {
 
         }
 
-        //Check and store if bonus stars could be earned. If so, store payment data
-        if(can_earn_bonus){
-            NewObj.bonus_stars_earned = total_bonus_stars_earned
-            this.record_stars_earned(NewObj.phasenum,phasetype,total_bonus_stars_earned, max_bonus_stars)
-        }
 
         ExperimentData.StoredData.push(NewObj)
         console.log(ExperimentData)
@@ -159,6 +144,8 @@ DATACONTROLLER = function (Stimuli, AttentionCheckController, StartTime) {
             stars_earned: stars_earned,
             maximum_possible_stars: maximum_possible_stars
         })))
+
+        console.log(PaymentInfo)
     }
 
     //Call at the end of the experiment to retrieve the payment data. This also generates a completion code
@@ -266,7 +253,7 @@ EXPCONTROLLER = function () {
     //Defining key variables
     let Remaining_experiment_phases = JSON.parse(JSON.stringify(Stimulus_settings.Experiment_Structure))
     let CurrentPhaseData, current_phase_type,
-        flag_exploration_phase_has_been_completed_after_instructions_closed, current_phase_num = 0, current_day_num = 0
+        flag_exploration_phase_has_been_completed_after_instructions_closed, current_phase_num = 0, current_day_num = 0, current_trial_num_in_day
 
     //GENERAL EXPERIMENT FLOW FUNCTIONS
     /////////////////////////////////////
@@ -275,6 +262,243 @@ EXPCONTROLLER = function () {
     this.start_experiment = function () {
         show_next_general_instructions_page()
         MapCont.disable_map_interactions()
+    }
+
+    function filter_only_possible_trials(FullSetOfTrials ){
+        console.log(FullSetOfTrials)
+        let PossibleSetOfTrials = []
+
+        //Note: we assume that all Fennimals have a body, head and name
+        const RequiredPropertiesPerInteractionType = {
+            give_food_active: ["food_preference"],
+            give_food_passive: ["food_preference"],
+            play_with_toy_active: ["toy"],
+            play_with_toy_passive: ["toy"],
+            ask_belief_partner_contents_box: ["toybox"],
+            ask_contents_box: ["toybox"],
+            ask_Fennimal_toy: ["toy"]
+        }
+
+        //Setting a flag for all Fennimals for which their properties CANNOT support the interaction type
+        for(let i = 0; i < FullSetOfTrials.length; i++) {
+            const required_set = RequiredPropertiesPerInteractionType[FullSetOfTrials[i].interaction_type]
+            for(let elemnum in required_set) {
+                if(typeof FullSetOfTrials[i][required_set[elemnum]] === "undefined"){
+                    FullSetOfTrials[i].flag = true
+                }
+            }
+        }
+
+        for(let i = 0; i < FullSetOfTrials.length; i++) {
+            if(typeof FullSetOfTrials[i].flag === "undefined"){
+                PossibleSetOfTrials.push(FullSetOfTrials[i])
+            }else{
+                console.warn("Removed impossible trial from phase creation")
+            }
+        }
+
+
+
+        return(PossibleSetOfTrials)
+    }
+
+    function filter_only_trials_with_possible_hints(TrialSet){
+        console.log(TrialSet)
+        let PossibleSetOfTrials = []
+
+        //Note: we assume that all Fennimals have a body, head and name
+        const RequiredPropertiesPerHintType = {
+            location: ["location"],
+            toy: ["toy"],
+            toybox: ["toybox"],
+            food: ["food_preference"],
+            food_preference: ["food_preference"],
+        }
+
+        //Setting a flag for all Fennimals for which their properties CANNOT support the interaction type
+        for(let i = 0; i < TrialSet.length; i++) {
+            const required_set = RequiredPropertiesPerHintType[TrialSet[i].hint_type]
+
+            for(let elemnum in required_set) {
+                if(typeof TrialSet[i][required_set[elemnum]] === "undefined"){
+                    console.log(required_set[elemnum])
+                    console.log(TrialSet[i])
+
+                    TrialSet[i].flag = true
+                }
+            }
+        }
+
+        for(let i = 0; i < TrialSet.length; i++) {
+            if(typeof TrialSet[i].flag === "undefined"){
+                PossibleSetOfTrials.push(TrialSet[i])
+            }else{
+                console.warn("Removed impossible trial from phase creation (based on hint type)")
+            }
+        }
+
+
+
+        return(PossibleSetOfTrials)
+    }
+
+    function get_trials_in_phase(){
+        console.log(CurrentPhaseData)
+        current_trial_num_in_day = 0
+
+        //First: finding all interaction types and setting them into an array
+        let interaction_types_arr = CurrentPhaseData.Fennimal_interaction_type
+        if(typeof CurrentPhaseData.Fennimal_interaction_type === "string" ) {interaction_types_arr = [CurrentPhaseData.Fennimal_interaction_type]}
+        console.log(interaction_types_arr)
+
+        //Storing a base set of Fennimals and an array to hold all the trials as we create them.
+        const BaseFennimalSet = Stimuli.get_Fennimals_in_array(CurrentPhaseData.Fennimals_encountered)
+        let TrialSet = []
+
+        //Now, for each interaction type we want to create a set of trials. But first, we need to determine the ordering so that two Fennimals with the same IDs are not back-to-back
+        const ordering = pseudo_randomize_order_of_ids_no_back_to_back(get_all_values_in_array_of_objects("id", BaseFennimalSet), interaction_types_arr.length)
+
+        for(let i = 0; i<interaction_types_arr.length; i++) {
+            let NewSet = JSON.parse(JSON.stringify(BaseFennimalSet))
+            NewSet = set_property_to_all_elem_in_arr("interaction_type", interaction_types_arr[i], NewSet)
+
+            //Now setting to the trials in their determined order
+            for(let ordnum = 0; ordnum < ordering[i].length; ordnum++) {
+                TrialSet.push(get_object_from_array_based_on_value("id", ordering[i][ordnum], NewSet, true))
+            }
+
+        }
+
+        //Now we have a maximalist set of all trials - but some of these may not be possible (the required elements of the Fennimal objects may not be specified in the stimulus data).
+        // Here we delete impossible trials: trials for which we cannot display a hint, and/or for which the interaction type is not supported
+        TrialSet = filter_only_possible_trials(TrialSet )
+
+
+        //These phase types optionally support multiple interaction types
+        /*if(Array.isArray(CurrentPhaseData.Fennimal_interaction_type)){
+            if(CurrentPhaseData.Fennimal_interaction_type.length > 1){
+                CurrentPhaseData.Fennimals_in_phase = []
+                for(let pnum = 0; pnum < CurrentPhaseData.Fennimal_interaction_type.length; pnum++){
+                    let SubArr = shuffleArray(  )
+                    SubArr = set_property_to_all_elem_in_arr("interaction_type", CurrentPhaseData.Fennimal_interaction_type[pnum], SubArr)
+                    CurrentPhaseData.Fennimals_in_phase = CurrentPhaseData.Fennimals_in_phase.concat(shuffleArray(SubArr))
+                }
+            }else{
+                CurrentPhaseData.Fennimal_interaction_type = CurrentPhaseData.Fennimal_interaction_type[0]
+                CurrentPhaseData.Fennimals_in_phase = shuffleArray( Stimuli.get_Fennimals_in_array(CurrentPhaseData.Fennimals_encountered) )
+                CurrentPhaseData.Fennimals_in_phase = set_property_to_all_elem_in_arr("interaction_type", CurrentPhaseData.Fennimal_interaction_type, CurrentPhaseData.Fennimals_in_phase)
+            }
+        }else{
+            CurrentPhaseData.Fennimals_in_phase = shuffleArray( Stimuli.get_Fennimals_in_array(CurrentPhaseData.Fennimals_encountered) )
+            CurrentPhaseData.Fennimals_in_phase = set_property_to_all_elem_in_arr("interaction_type", CurrentPhaseData.Fennimal_interaction_type, CurrentPhaseData.Fennimals_in_phase)
+        }
+
+         */
+
+
+        //Figuring out which (if any) trials can earn stars. Right now, this only applies to ask_ trials!
+        if(CurrentPhaseData.bonus_stars_for_correct_answer === true) { CurrentPhaseData.bonus_stars_for_correct_answer = 1 }
+        if(CurrentPhaseData.bonus_stars_for_correct_answer > 0){
+            let bonus_stars_per_correct_answer = CurrentPhaseData.bonus_stars_for_correct_answer
+
+            for(let feni = 0 ; feni < TrialSet.length; feni++){
+                if(TrialSet[feni].interaction_type.includes("ask_")){
+                    TrialSet[feni].bonus_stars_earnable = bonus_stars_per_correct_answer
+                }
+            }
+        }
+
+        //If the current day is hint and search, then we need to create one duplicate of these trials FOR EACH HINT TYPE
+        if(current_phase_type === "hint_and_search"){
+            let hint_type_arr = CurrentPhaseData.hint_type
+            if(typeof CurrentPhaseData.hint_type === "string"){
+                hint_type_arr = [CurrentPhaseData.hint_type]
+            }
+
+            let BaseTrialSet = JSON.parse(JSON.stringify(TrialSet))
+            console.log(BaseTrialSet)
+            TrialSet = []
+
+            //As before, we want to determine a pseudo-random ordering. In this case, we want to maintain the block ordering, but want to prevent
+            //Note: this ordering may not work as planned if there are multiple repetitions of each Fennimal in the TrialSet (ie. if there are multiple interaction types AND multiple hint types). In this case, throw a warning
+            const ids_in_trials = get_all_values_in_array_of_objects("id", BaseTrialSet)
+            const newordering = pseudo_randomize_order_of_ids_no_back_to_back(ids_in_trials, hint_type_arr.length)
+            console.log(newordering)
+            if(new Set(ids_in_trials).size !== ids_in_trials.length){
+                console.warn("There are multiple repetitions in interaction types AND hints. Please manually check ordering in phase")
+            }
+
+            for(let hintnum = 0; hintnum<hint_type_arr.length; hintnum++) {
+                let NewTrialSet = JSON.parse(JSON.stringify(BaseTrialSet))
+                NewTrialSet = set_property_to_all_elem_in_arr("hint_type", hint_type_arr[hintnum], NewTrialSet)
+
+                for(let ordnum = 0; ordnum < newordering[hintnum].length; ordnum++) {
+                    TrialSet.push(get_object_from_array_based_on_value("id", newordering[hintnum][ordnum], NewTrialSet, true))
+                }
+            }
+
+            //Filtering impossible trials: trials in which the hint type is not supported
+            TrialSet = filter_only_trials_with_possible_hints(TrialSet)
+            /*
+            console.log(TrialSet)
+
+
+
+
+
+
+            let phase_hint_type = CurrentPhaseData.hint_type
+            //Note: there could be multiple hint types. If so, then things get a little complicated.
+            if(typeof phase_hint_type === "object"){
+                let BaseFennimalSet = JSON.parse(JSON.stringify(CurrentPhaseData.Fennimals_in_phase))
+
+                // We need to expand the set of Fennimals, so that there is a different trial for each hint.
+                // Theres an edge case here: if there is only one Fennimal, then we dont care about the order of each Fennimal in the subgroups
+                // If there are multiple Fennimals then we want to pseudo-randomize the order of these so that the same IDs are not back-to-back
+                if(CurrentPhaseData.Fennimals_encountered.length > 1){
+
+                    //Another edge case: if there are multiple interaction types, then multiple hint types are NOT supported. Throw a warning and only use the first hint type
+                    if(typeof CurrentPhaseData.Fennimal_interaction_type === "object"){
+                        console.warn("WARNING: multiple hint types are not supported with multiple interaction types in hint-and-search. Defaulting to only the first hint type.")
+                        set_property_to_all_elem_in_arr("hint_type", phase_hint_type[0], CurrentPhaseData.Fennimals_in_phase)
+                    }else{
+                        //Alright, now the fun begins. There is one interaction type, and multiple hint types. Let first configure a set of orders, such that two IDs are never back-to-back
+                        const ordering = pseudo_randomize_order_of_ids_no_back_to_back(get_all_values_in_array_of_objects("id", BaseFennimalSet), phase_hint_type.length)
+                        CurrentPhaseData.Fennimals_in_phase = []
+                        for(let groupnum = 0; groupnum<ordering.length; groupnum++){
+                            for(let ordernum = 0; ordernum<ordering[groupnum].length; ordernum++){
+                                let NewFen = get_object_from_array_based_on_value("id", ordering[groupnum][ordernum], BaseFennimalSet, true)
+                                NewFen.hint_type = phase_hint_type[groupnum]
+                                CurrentPhaseData.Fennimals_in_phase.push( NewFen)
+                            }
+                        }
+                        console.log(CurrentPhaseData.Fennimals_in_phase)
+                    }
+
+                }else{
+                    CurrentPhaseData.Fennimals_in_phase = []
+                    for(let hintnum = 0; hintnum < phase_hint_type.length; hintnum++){
+                        for(let fennum = 0; fennum < BaseFennimalSet.length; fennum++){
+                            let NewTrial = JSON.parse(JSON.stringify(BaseFennimalSet[fennum]))
+                            NewTrial.hint_type = phase_hint_type[hintnum]
+                            CurrentPhaseData.Fennimals_in_phase.push(NewTrial)
+                        }
+                    }
+                }
+            }else{
+                CurrentPhaseData.Fennimals_in_phase = set_property_to_all_elem_in_arr("hint_type", phase_hint_type, CurrentPhaseData.Fennimals_in_phase)
+            }
+
+             */
+
+
+
+        }
+
+
+        return(TrialSet)
+
+
     }
 
     function start_next_experiment_phase() {
@@ -294,7 +518,9 @@ EXPCONTROLLER = function () {
 
             WorldState.clear_all_locations(true)
             if (GenParam.DisplayFoundFennimalIconsOnMap.show) {
-                MapCont.clear_all_Fennimal_icons_from_map()
+                if(GenParam.DisplayFoundFennimalIconsOnMap.clear_Fennimal_icons_from_map_at_start_of_new_day) {
+                    MapCont.clear_all_Fennimal_icons_from_map()
+                }
             }
 
             //Updating the partner behavior
@@ -307,7 +533,7 @@ EXPCONTROLLER = function () {
             //Adding the trials. Note that there could be MULTIPLE Fennimal interaction types supported.
             //  Note: ONLY works for the interaction types "hint_and_search" and/or "jump_to_trial".
             //      If any other types occur in the array, then select the first in array and print a warning.
-            if(typeof CurrentPhaseData.Fennimal_interaction_type === "object"){
+            /*if(typeof CurrentPhaseData.Fennimal_interaction_type === "object"){
                 if(Array.isArray(CurrentPhaseData.Fennimal_interaction_type)){
                     if(CurrentPhaseData.Fennimal_interaction_type.length > 1){
                         if(! (current_phase_type === "hint_and_search" || current_phase_type === "jump_to_trial")){
@@ -320,96 +546,36 @@ EXPCONTROLLER = function () {
                 }
             }
 
+             */
+
             //Check if there are any instructions to be shown
             CurrentPhaseData.instructions_to_be_shown = CurrentPhaseData.type
 
+            if(current_phase_type === "collect_items_in_warehouse"){
+                delete CurrentPhaseData.instructions_to_be_shown
+
+                //Currently, any attributes in this phase are coded with the ID variables. Exchanging these for the actual names
+                if(typeof CurrentPhaseData.question_options_toys !== "undefined"){
+                    CurrentPhaseData.question_options_toys = Stimuli.get_assigned_names_of_code_array("toy", CurrentPhaseData.question_options_toys)
+                }
+                if(typeof CurrentPhaseData.question_options_toyboxes !== "undefined"){
+                    CurrentPhaseData.question_options_toyboxes = Stimuli.get_assigned_names_of_code_array("toybox", CurrentPhaseData.question_options_toyboxes)
+                }
+                InstrCont.start_warehouse_task(CurrentPhaseData,current_day_num, warehouse_task_completed)
+
+            }
+
             //Special steps for the trial-based phases
             if(current_phase_type === "free_exploration" || current_phase_type === "hint_and_search" || current_phase_type === "jump_to_trial" || current_phase_type === "jump_to_trial_no_instructions"){
-
-                //These phase types optionally support multiple interaction types
-                if(Array.isArray(CurrentPhaseData.Fennimal_interaction_type)){
-                    if(CurrentPhaseData.Fennimal_interaction_type.length > 1){
-                        CurrentPhaseData.Fennimals_in_phase = []
-                        for(let pnum = 0; pnum < CurrentPhaseData.Fennimal_interaction_type.length; pnum++){
-                            let SubArr = shuffleArray( Stimuli.get_Fennimals_in_array(CurrentPhaseData.Fennimals_encountered) )
-                            SubArr = set_property_to_all_elem_in_arr("interaction_type", CurrentPhaseData.Fennimal_interaction_type[pnum], SubArr)
-                            CurrentPhaseData.Fennimals_in_phase = CurrentPhaseData.Fennimals_in_phase.concat(shuffleArray(SubArr))
-                        }
-                    }else{
-                        CurrentPhaseData.Fennimal_interaction_type = CurrentPhaseData.Fennimal_interaction_type[0]
-                        CurrentPhaseData.Fennimals_in_phase = shuffleArray( Stimuli.get_Fennimals_in_array(CurrentPhaseData.Fennimals_encountered) )
-                        CurrentPhaseData.Fennimals_in_phase = set_property_to_all_elem_in_arr("interaction_type", CurrentPhaseData.Fennimal_interaction_type, CurrentPhaseData.Fennimals_in_phase)
-                    }
-                }else{
-                    CurrentPhaseData.Fennimals_in_phase = shuffleArray( Stimuli.get_Fennimals_in_array(CurrentPhaseData.Fennimals_encountered) )
-                    CurrentPhaseData.Fennimals_in_phase = set_property_to_all_elem_in_arr("interaction_type", CurrentPhaseData.Fennimal_interaction_type, CurrentPhaseData.Fennimals_in_phase)
-                }
-
+                CurrentPhaseData.Fennimals_in_phase = get_trials_in_phase()
                 //Setting the trial data
                 CurrentPhaseData.number_interactions_in_phase = CurrentPhaseData.Fennimals_in_phase.length
-
-                //Figuring out which (if any) trials can earn stars
-                if(CurrentPhaseData.bonus_star_for_correct_answer === true){
-                    //CurrentPhaseData.Fennimals_in_phase[feni].bonus_star_earnable = CurrentPhaseData.bonus_star_for_correct_answer
-                    for(let feni = 0 ; feni < CurrentPhaseData.Fennimals_in_phase.length; feni++){
-                        if(CurrentPhaseData.Fennimals_in_phase[feni].interaction_type.includes("ask_")){
-                            CurrentPhaseData.Fennimals_in_phase[feni].bonus_star_earnable = true
-                        }
-                    }
-                }
+                console.log(CurrentPhaseData.Fennimals_in_phase)
             }
 
-            //If the current day is hint and search, copy the hint type as a property to all FennimalObjects.
-            if(current_phase_type === "hint_and_search"){
-
-                let phase_hint_type = CurrentPhaseData.hint_type
-                //Note: there could be multiple hint types. If so, then things get a little complicated.
-                if(typeof phase_hint_type === "object"){
-                    let BaseFennimalSet = JSON.parse(JSON.stringify(CurrentPhaseData.Fennimals_in_phase))
-
-                    // We need to expand the set of Fennimals, so that there is a different trial for each hint.
-                    // Theres an edge case here: if there is only one Fennimal, then we dont care about the order of each Fennimal in the subgroups
-                    // If there are multiple Fennimals then we want to pseudo-randomize the order of these so that the same IDs are not back-to-back
-                    if(CurrentPhaseData.Fennimals_encountered.length > 1){
-
-                        //Another edge case: if there are multiple interaction types, then multiple hint types are NOT supported. Throw a warning and only use the first hint type
-                        if(typeof CurrentPhaseData.Fennimal_interaction_type === "object"){
-                            console.warn("WARNING: multiple hint types are not supported with multiple interaction types in hint-and-search. Defaulting to only the first hint type.")
-                            set_property_to_all_elem_in_arr("hint_type", phase_hint_type[0], CurrentPhaseData.Fennimals_in_phase)
-                        }else{
-                            //Alright, now the fun begins. There is one interaction type, and multiple hint types. Let first configure a set of orders, such that two IDs are never back-to-back
-                            console.log(BaseFennimalSet)
-                            console.log(phase_hint_type)
-                            const ordering = pseudo_randomize_order_of_ids_no_back_to_back(get_all_values_in_array_of_objects("id", BaseFennimalSet), phase_hint_type.length)
-                            console.log(ordering)
-                            CurrentPhaseData.Fennimals_in_phase = []
-                            for(let groupnum = 0; groupnum<ordering.length; groupnum++){
-                                for(let ordernum = 0; ordernum<ordering[groupnum].length; ordernum++){
-                                    let NewFen = get_object_from_array_based_on_value("id", ordering[groupnum][ordernum], BaseFennimalSet, true)
-                                    NewFen.hint_type = phase_hint_type[groupnum]
-                                    CurrentPhaseData.Fennimals_in_phase.push( NewFen)
-                                }
-                            }
-                            console.log(CurrentPhaseData.Fennimals_in_phase)
-                        }
-
-                    }else{
-                        CurrentPhaseData.Fennimals_in_phase = []
-                        for(let hintnum = 0; hintnum < phase_hint_type.length; hintnum++){
-                            for(let fennum = 0; fennum < BaseFennimalSet.length; fennum++){
-                                let NewTrial = JSON.parse(JSON.stringify(BaseFennimalSet[fennum]))
-                                NewTrial.hint_type = phase_hint_type[hintnum]
-                                CurrentPhaseData.Fennimals_in_phase.push(NewTrial)
-                            }
-                        }
-                    }
-                }else{
-                    CurrentPhaseData.Fennimals_in_phase = set_property_to_all_elem_in_arr("hint_type", phase_hint_type, CurrentPhaseData.Fennimals_in_phase)
-                }
 
 
 
-            }
 
             //After loading instructions and trials, prepare the world
             switch (current_phase_type) {
@@ -426,7 +592,7 @@ EXPCONTROLLER = function () {
 
                 case("jump_to_trial"):
                     MapCont.disable_map_interactions()
-                    InstrCont.initialize_jump_to_trial_instructions(CurrentPhaseData.Fennimal_interaction_type,current_day_num, CurrentPhaseData.bonus_star_for_correct_answer === true,CurrentPhaseData.include_Fennefinder, CurrentPhaseData.Fennimals_in_phase)
+                    InstrCont.initialize_jump_to_trial_instructions(CurrentPhaseData.Fennimal_interaction_type,current_day_num, CurrentPhaseData.bonus_stars_for_correct_answer,CurrentPhaseData.include_Fennefinder, CurrentPhaseData.Fennimals_in_phase)
                     break
                 case("jump_to_trial_no_instructions"):
                     MapCont.disable_map_interactions()
@@ -436,7 +602,7 @@ EXPCONTROLLER = function () {
                 case("hint_and_search"):
                     flag_hint_and_search_phase_general_instructions_shown = false
                     MapCont.disable_map_interactions()
-                    InstrCont.initialize_hint_and_search_phase_general_instructions(CurrentPhaseData.Fennimal_interaction_type,CurrentPhaseData.hint_type,current_day_num, CurrentPhaseData.bonus_star_for_correct_answer === true,CurrentPhaseData.include_Fennefinder, CurrentPhaseData.Fennimals_in_phase)
+                    InstrCont.initialize_hint_and_search_phase_general_instructions(CurrentPhaseData.Fennimal_interaction_type,CurrentPhaseData.hint_type,current_day_num, CurrentPhaseData.bonus_stars_for_correct_answer,CurrentPhaseData.include_Fennefinder, CurrentPhaseData.Fennimals_in_phase)
                     break
 
                 case("name_recall_task"):
@@ -469,6 +635,8 @@ EXPCONTROLLER = function () {
                         case("partner_returns"):
                             InstrCont.show_pseudo_day_information_page(CurrentPhaseData.information)
                             break
+                        case("new_Fennimals_spotted"):
+                            InstrCont.show_pseudo_day_information_page(CurrentPhaseData.information, CurrentPhaseData.title, CurrentPhaseData.display_text, Stimuli.get_Fennimals_in_array(CurrentPhaseData.displayed_icons))
                     }
 
                     break
@@ -524,10 +692,13 @@ EXPCONTROLLER = function () {
 
     function start_next_trial_in_hint_and_search_phase() {
         if (CurrentPhaseData.Fennimals_in_phase.length > 0) {
+            current_trial_num_in_day ++
+            console.log(current_trial_num_in_day)
             CurrentTrial = CurrentPhaseData.Fennimals_in_phase.shift()
             WorldState.add_Fennimal_to_map(CurrentTrial)
 
-            InstrCont.initialize_hint_and_search_phase_trial_instructions(CurrentTrial, CurrentTrial.hint_type)
+
+            InstrCont.initialize_hint_and_search_phase_trial_instructions(CurrentTrial, CurrentTrial.hint_type, ( (current_trial_num_in_day-1) / (CurrentPhaseData.number_interactions_in_phase)) * 100)
             AudioCont.play_sound_effect("alert")
             MapCont.allow_participant_to_leave_location(true)
 
@@ -718,6 +889,7 @@ EXPCONTROLLER = function () {
         let FennimalObject = WorldState.get_reference_to_Fennimal_object_at_location(location)
 
         let AdditionalInformation = {}
+        console.log(FennimalObject)
         switch (FennimalObject.interaction_type) {
             case("polaroid_photo_active"):
                 AdditionalInformation.allowed_attempts_before_answer_given = CurrentPhaseData.allowed_attempts_before_answer_given
@@ -744,9 +916,6 @@ EXPCONTROLLER = function () {
         }
 
         //Some more additional information is needed if this is an ask_x interaction
-        //if(FennimalObject.bonus_star_for_correct_answer === true){
-        //    AdditionalInformation.bonus_star_earnable = CurrentPhaseData.bonus_star_for_correct_answer
-        //}
 
         if(FennimalObject.interaction_type.includes("ask_")){
             if(FennimalObject.interaction_type.includes("contents_box") ||FennimalObject.interaction_type.includes("toy") ){
@@ -754,13 +923,17 @@ EXPCONTROLLER = function () {
                 if(AdditionalInformation.Distractor_Toys === false){AdditionalInformation.Distractor_Toys = Stimuli.get_all_x_encountered_during_experiment("toy")}
             }
 
-            if(FennimalObject.bonus_star_for_correct_answer === true){
-                AdditionalInformation.bonus_star_earnable = CurrentPhaseData.bonus_star_for_correct_answer
+            /*if(typeof FennimalObject.bonus_star_for_correct_answer !== "undefined" ){
+                AdditionalInformation.bonus_stars_earnable = CurrentPhaseData.bonus_star_for_correct_answer
             }else{
-                AdditionalInformation.bonus_star_earnable = false
+                AdditionalInformation.bonus_stars_earnable = false
             }
 
+             */
+
         }
+
+
 
 
         if (typeof FennimalObject.visited === "undefined") {
@@ -1182,6 +1355,32 @@ EXPCONTROLLER = function () {
             CurrentFennimal.clear()
         }
 
+        //Check if we need to store payment data
+        console.log(CurrentPhaseData)
+        let can_earn_bonus = CurrentPhaseData.bonus_stars_for_correct_answer === true || CurrentPhaseData.bonus_stars_for_correct_answer > 0
+
+        let total_bonus_stars_earned = 0, max_bonus_stars = 0
+        //rename_object_key(CurrentPhaseData,"bonus_star_for_correct_answer", "bonus_possible" )
+
+        if(can_earn_bonus){
+
+            if(["jump_to_trial", "hint_and_search", "free_exploration"].includes(CurrentPhaseData.type)){
+                for(let trialnum = 0; trialnum < CurrentPhaseData.Data.length; trialnum++) {
+                    if(CurrentPhaseData.Data[trialnum].bonus_stars_earned !== false){
+                        if(CurrentPhaseData.Data[trialnum].bonus_stars_earned === true){
+                            total_bonus_stars_earned = total_bonus_stars_earned + 1
+                        }else{
+                            total_bonus_stars_earned = total_bonus_stars_earned + CurrentPhaseData.Data[trialnum].bonus_stars_earned
+                        }
+                    }
+                    max_bonus_stars = max_bonus_stars  + CurrentPhaseData.Data[trialnum].bonus_stars_earnable
+                }
+            }
+            CurrentPhaseData.bonus_stars_earned = total_bonus_stars_earned
+            DataCont.record_stars_earned(current_day_num,"", total_bonus_stars_earned, max_bonus_stars)
+        }
+
+
         MapCont.reset_map_to_player_in_center()
         start_next_experiment_phase()
 
@@ -1350,7 +1549,7 @@ EXPCONTROLLER = function () {
         DataCont.store_phase_data(CurrentPhaseData)
 
         if(CurrentPhaseData.maximum_earnable_stars > 0){
-            DataCont.record_stars_earned(current_phase_num, "Sorting Task", Math.max(0,CurrentPhaseData.maximum_earnable_stars - Data.length),CurrentPhaseData.maximum_earnable_stars)
+            DataCont.record_stars_earned(current_day_num, "Sorting Task", Math.max(0,CurrentPhaseData.maximum_earnable_stars - Data.length),CurrentPhaseData.maximum_earnable_stars)
         }
         start_next_experiment_phase()
     }
@@ -1362,6 +1561,15 @@ EXPCONTROLLER = function () {
     //END OF EXPERIMENT FUCNTIONS
     function show_payment_screen() {
         InstrCont.show_payment_screen(DataCont.get_payment_data())
+
+    }
+
+    //Warehouse task
+    function warehouse_task_completed(CollectedTaskData){
+        console.log(CollectedTaskData)
+        DataCont.store_phase_data(CollectedTaskData)
+        DataCont.record_stars_earned(current_day_num,"warehouse", CollectedTaskData.bonus_stars_earned, CollectedTaskData.max_bonus_stars)
+        start_next_experiment_phase()
 
     }
 

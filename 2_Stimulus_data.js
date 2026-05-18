@@ -4,7 +4,7 @@ let StimulusSettings = function () {
 
     //This defines which experiment will be run (definitions follow below).
     // NOTE: If there are multiple codes in an array, then one will be picked at random!
-    this.Experiment_Code = ["mentalizing_1B"] // "schema_experiment_offset"
+    this.Experiment_Code = ["mentalizing_network"] // "schema_experiment_offset"
 
     // SETTING THE INSTRUCTIONS SHOWN TO PARTICIPANTS AT THE START OF THE EXPERIMENT (BEFORE FIRST DAY)
     //  Allowed values:
@@ -18,7 +18,9 @@ let StimulusSettings = function () {
     const All_Instructions_At_Start = {
         test: [],
         mentalizing_1: [], //"browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"
-        mentalizing_1B : []
+        mentalizing_1B : [],
+        mentalizing_2: [], //"browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"
+        mentalizing_network: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"]
     }
 
     //DETERMINING FENNIMALS ENCOUNTERED DURING EXPERIMENT
@@ -33,63 +35,65 @@ let StimulusSettings = function () {
     //  toybox: if set, changes the behavior of toy interaction trials. If a toy box is present, the Fennimal will retrieve and/or place the toys from a box.
     const All_Fennimal_Sets = {
         test: [
-            {id: "A1", head: "A1", head_group: "A", head_cluster: "A", region: "A", hat: "A", food_preference: "A", toy: "A", toybox: "A" },
-            {id: "A2", head: "A2", head_group: "A", head_cluster: "A", region: "A", hat: "B", food_preference: "B", toy: "B", toybox: "B"},
-            {id: "A3", head: "A3", head_group: "A", head_cluster: "A", region: "B", hat: "C", food_preference: "C", toy: "C", toybox: "C"},
-            {id: "A4", head: "A4", head_group: "A", head_cluster: "A", region: "B", hat: "C", food_preference: "C"},
+            {id: "A1", head: "A1", head_group: "A", head_cluster: "A", region: "A", food_preference: "A" },
+            {id: "A2", head: "A2", head_group: "A", head_cluster: "A", region: "A", hat: "B",  toy: "B", toybox: "B"},
+            {id: "A3", head: "A3", head_group: "A", head_cluster: "A", region: "B", hat: "C", toy: "C", toybox: "C"},
+            {id: "A4", head: "A4", head_group: "A", head_cluster: "A", region: "B", hat: "C", food_preference: "C", toy: "D", toybox: "D"},
 
-            {id: "B", head: "A3", region: "B"},
-            {id: "B2", head: "A3", region: "B"},
-            {id: "C", head: "A3", region: "C"},
-            {id: "D", head: "A3", region: "D"},
+            {id: "B", head: "A3", region: "B", toy: "E", toybox: "E"},
+            {id: "B2", head: "A3", region: "B", toy: "F"},
+            {id: "C", head: "A3", region: "C", toy: "A"},
+            {id: "D", head: "A3", region: "D", toy: "H"},
             {id: "E", head: "A3", region: "E"},
             {id: "F", head: "A3", region: "F"},
 
 
         ],
-        mentalizing_1: [
+
+        mentalizing_2: [
             {id: "S1", head: "A", region: "A", toy: "A", toybox: "A"},
             {id: "S2", head: "B", region: "B", toy: "B", toybox: "B"},
-            {id: "S3", head: "C", region: "C", toy: "C", toybox: "C"},
-            {id: "S4", head: "D", region: "D", toy: "D", toybox: "D"},
+            //{id: "S3", head: "C", region: "C", toy: "C", toybox: "C"},
 
-            {id: "P1", head: "E", region: "E", toy: "E", toybox: "A"},
-            {id: "P2", head: "F", region: "E", toy: "F", toybox: "B"},
-            {id: "P3", head: "G", region: "F", toy: "G", toybox: "C"},
-            {id: "P4", head: "H", region: "F", toy: "H", toybox: "D"},
+            {id: "P1", head: "D", region: "D", toy: "D", toybox: "A"},
+            {id: "P2", head: "E", region: "E", toy: "E", toybox: "B"},
+            //{id: "P3", head: "F", region: "C", toy: "F", toybox: "C"},
 
-            {id: "W", head: "I", region: "A", food_preference: "A"},
-            {id: "X", head: "A", region: "G", food_preference: "A"},
-            {id: "Y", head: "J", region: "C", food_preference: "B"},
-            {id: "Z", head: "C", region: "H", food_preference: "B"},
+            {id: "X", head: "G", region: "A", food_preference: "A"},
+            {id: "Y", head: "H", region: "E", food_preference: "B"},
 
-            {id: "I1", head: "I", region: "G", hat: "A", toybox: "A"},
-            {id: "I2", head: "I", region: "G", hat: "B", toybox: "B"},
-            {id: "I3", head: "J", region: "H", hat: "C", toybox: "C"},
-            {id: "I4", head: "J", region: "H", hat: "D", toybox: "D"},
+            {id: "I1", head: "G", region: "F", toybox: "A"},
+            {id: "I2", head: "H", region: "G", toybox: "B"},
+           // {id: "I3", head: "I", region: "H", toybox: "C"},
 
 
         ],
-        mentalizing_1B: [
+        mentalizing_network: [
             {id: "S1", head: "A", region: "A", toy: "A", toybox: "A"},
             {id: "S2", head: "B", region: "B", toy: "B", toybox: "B"},
-            {id: "S3", head: "C", region: "C", toy: "C", toybox: "C"},
+            {id: "W", head: "C", region: "A", food_preference: "A"},
+            {id: "X", head: "D", region: "C", food_preference: "B"},
 
-            {id: "P1", head: "D", region: "D", toy: "D", toybox: "A"},
-            {id: "P2", head: "E", region: "H", toy: "E", toybox: "B"},
-           // {id: "P3", head: "F", region: "D", toy: "F", toybox: "C"},
+            {id: "P1", head: "E", region: "D", toy: "C", toybox: "A"},
+            {id: "P2", head: "D", region: "E", toy: "D", toybox: "B"},
+            {id: "Y", head: "A", region: "F", food_preference: "A"},
+            {id: "Z", head: "E", region: "E", food_preference: "B"},
 
-           // {id: "W", head: "A", region: "E", food_preference: "A"},
-            {id: "X", head: "G", region: "A", food_preference: "A"},
-           // {id: "Y", head: "C", region: "F", food_preference: "B"},
-            {id: "Z", head: "H", region: "C", food_preference: "B"},
+            /*
+            * {id: "S1", head: "A", region: "A", toy: "A", toybox: "A"},
+            {id: "S2", head: "B", region: "B", toy: "B", toybox: "B"},
+            {id: "W", head: "A", region: "C", food_preference: "A"},
+            {id: "X", head: "C", region: "A", hat:"A", food_preference: "B"},
 
-            {id: "I1", head: "G", region: "E", toybox: "A"},
-            {id: "I2", head: "H", region: "F", toybox: "B"},
-            {id: "I3", head: "I", region: "G", toybox: "C"},
+            {id: "P1", head: "D", region: "D", toy: "C", toybox: "A"},
+            {id: "P2", head: "E", region: "A", hat:"A", toy: "D", toybox: "B"},
+            {id: "Y", head: "A", region: "E", food_preference: "A"},
+            {id: "Z", head: "E", region: "E",hat:"A", food_preference: "C"},*/
+
 
 
         ]
+
 
     }
 
@@ -98,7 +102,7 @@ let StimulusSettings = function () {
     //  Fennimals_encountered: this should be an array of Fennimals.
     //  type: determines the structure of the phase. Supported types:
     //  *   jump-to-trial: participants do not interact with the map, but instead are sequentially teleported to all trials
-    //      jump_to_trial_no_instructions: used for testing only, goes stright into a trial
+    //      jump_to_trial_no_instructions: used for testing only, goes straight into a trial
     //  *   free_exploration: participants are given a list of icons and can freely explore the map to find all Fennimals.
     //  *   hint_and_search
     //          requires hint_type = "icon", "name", "toy", "toybox".
@@ -106,27 +110,38 @@ let StimulusSettings = function () {
     //          NOTE: multiple hint types does NOT co-exist with multiple interaction types! A warning will be thrown, and only the first hint type will be used.
     //      head_region_sorting_task (requires Fennimals_encountered)
     //      Fennimal_attribute_sorting_task
-    //          requires Fennimals_encountered and attribute_order = ["name", "region", "head", "toybox", "toy"]
+    //          requires Fennimals_encountered and attribute_order = ["name", "region", "head", "toybox", "toy", "food_preference"]
     //          optionally allowed for max_earnable_bonus_stars. Note that this is a negatively-scored task: participants lose one star for each mistake.
     //          Advised to include stars when asking name: allows participants to buy out mistakes.
+    //              Replaces text %PARTNERNAME% with partner's name
+    //      collect_items_in_warehouse: shows the warehouse background.
+    //          questions: ["ask_partner_belief_toyboxes"]: requires an array "questions_toyboxes" and an array "question_options_toys". For each toybox, shows the partner moving forward and grabbing the box. Participant is then asked to state which toy is in this box.
+    //              querries the world state to determine correct answer.
+    //          bonus_stars_per_correct_answer = int: defines the number of stars earned per correct answer.
+    //
     //      quiz
     //      name_recall_task
     //      pseudoday: these are used to include information screens without being a task in and by themselves.
     //          Requires an "information" property. Supported information types:
     //              partner_leaves:
     //              partner_returns: informs the participant that their partner is now back on the island (with no knowledge of what occured in-between leaving and returning)
+    //              new_Fennimals_spotted:
+    //                  Used to start new blocks of Fennimals.
+    //                  Takes a title and text to display.
+    //                  Optionally supports displayed_icons = [id,id...] to display outlined photographs of the Fennimals on the screen
     //  *Note: trial TYPES with a * suport multiple sets of different interations (but be careful with free-exlporation: multiple interactions in the same location can result in misleading instructions)
     //      If provided with an array of Fennimal_interaction_types, then this creates multiple interactions in the same day.
     //      Order will be randomized within a type, but the order of types will be maintained.
-    //      This only works for trial types with a *. For all others the software ignores this array and picks the first interaction.
+    //      This only works for trial types with a *. For all others the software ignores this array.
+    //      IF multiple hint types are specified, then first creates all combinations of interactions in a type, then duplicates per hint type. But check ordering if you want to do both
     //#####################################################################
     //NOTES ON EXPERIMENT STRUCTURE
     //Supported block types:
     //      free_exploration: the map is populated with Fennimals, and the participant can freely roam untill all Fennimals have been visited
     //      jump_trials: No travel on the map - participant goes from one location to another. TODO: not yet supported!
     //      hint_and_search: phase consists of tasks. In each task, participant get a hint and has to find a Fennimal. After interaction completed, participant gets the next hint. This continues untill all Fennimals have been interacted with
-    //          Additionally: this also requires a hint_type variable. This can be "location", "icon", "name", "toy".
-    //          Additionally: requires a "sort_trials_by" variable. This can be random, head_type or region. This governs the order in which trials are presented. Defaults to random.
+    //          Additionally: this also requires a hint_type variable. This can be "location", "icon", "name", "toy", "toybox", "food".
+    //          NOPE Additionally: requires a "sort_trials_by" variable. This can be random, head_type or region. This governs the order in which trials are presented. Defaults to random.
     //      name_recall_task: participants are prompted to list all the names of the Fennimals they remember.
     //          This task always has a plain background (to prevent any accidental cues).
     //          Assignment to an ID is done case-insensitive!
@@ -192,16 +207,72 @@ let StimulusSettings = function () {
     //          Call by the codes of the food/toys/boxes used in the Fennimal sets. Unused codes will be ignored. The software will always force-include the correct answer, even if not provided here!
     //          If these properties are not included (or included but set to false), then the software will default to all options encountered during the entire experiment.
     //      bonus_star_for_correct_answer (applies only to ask_x trials): if set to true, participants will earn a gold star if they answer all questions correctly.
+    //          if set to an integer, then this is the number of stars earned per correct answer
     //      include_Fennefinder (applies only to hint-and-search and free_exploration):
     //          if set to true, displays a radio beacon to the side of the screen during the map phase.
     //          if set to "low_power_mode", then the Fennefinder appears but is inoperable
     let All_Experiment_Structures = {
         test: [
             {
+                type: "collect_items_in_warehouse",
+                questions: ["ask_partner_belief_toyboxes"],
+                bonus_stars_per_correct_answer: 5,
+                question_options_toyboxes: ["C", "B"],
+                question_options_toys: ["A", "B"]
+            },
+            /*
+            {
+                type:"free_exploration",
+                Fennimal_interaction_type: ["play_with_toy_active", "give_food_active"], // "ask_contents_box", "play_with_toy_passive"
+                Fennimals_encountered: ["A1", "A2", "A3"],
+                partner_behavior: "absent",
+                question_options_food: ["A", "B", "C", "X"],
+                question_options_toys: ["A", "B", "C", "X"],
+                question_options_toyboxes: ["A", "B", "C", "X"],
+                bonus_stars_for_correct_answer: 3,
+                hint_type: ["food", "toybox"],
+                allowed_attempts_before_answer_given: 3,
+                include_Fennefinder: "low_power_mode"
+            },
+
+
+            {
+                type: "collect_items_in_warehouse",
+                questions: ["ask_partner_belief_toyboxes"],
+                bonus_stars_per_correct_answer: 5,
+                question_options_toyboxes: ["A"],
+                question_options_toys: ["A", "B", "C", "D"]
+            },
+            {
+                type: "pseudoday",
+                information: "new_Fennimals_spotted",
+                displayed_icons: ["A1", "A2", "A3", "A4", "B"],
+                title: "New Fennimals spotted on the island!",
+                display_text: "Exciting news! Some new Fennimals have previously been spotted on the island!" +
+                    " <br> They're still very shy, but this is the perfect moment to introduce yourself to them!"
+            },
+
+
+
+            {
+                type:"hint_and_search",
+                Fennimal_interaction_type: ["play_with_toy_passive"], // "ask_contents_box", "play_with_toy_passive"
+                Fennimals_encountered: ["A1", "A2" ],
+                partner_behavior: "absent",
+                question_options_food: ["A", "B", "C", "X"],
+                question_options_toys: ["A", "B", "C", "X"],
+                question_options_toyboxes: ["A", "B", "C", "X"],
+                bonus_star_for_correct_answer: true,
+                hint_type: ["icon"],
+                allowed_attempts_before_answer_given: 3,
+                include_Fennefinder: true
+            },
+
+            {
                 //Fennimal_attribute_sorting_task (requires Fennimals_encountered and
                 type: "Fennimal_attribute_sorting_task", // "head_region_sorting_task", "Fennimal_attribute_sorting_task",
                 Fennimals_encountered: ["A1" ],
-                attribute_order: ["name", "region", "head", "toybox", "toy"],
+                attribute_order: ["region", "head", "food_preference"],
                 maximum_earnable_stars: 5
             },
 
@@ -218,6 +289,8 @@ let StimulusSettings = function () {
                 allowed_attempts_before_answer_given: 3,
                 include_Fennefinder: true
             },
+
+             */
 
 
             /*
@@ -244,7 +317,6 @@ let StimulusSettings = function () {
 
 
              */
-
 
 
             /*
@@ -544,6 +616,209 @@ let StimulusSettings = function () {
 
 
 
+        ],
+        mentalizing_2: [
+
+            // PUBLIC INFORMATION PHASE
+            {
+                type: "pseudoday",
+                information: "new_Fennimals_spotted",
+                displayed_icons: ["S1", "S2"],
+                title: "Get to know some of the Fennimals on the island",
+                display_text: "There are some Fennimals on the island who would love to get to know you and %PARTNERNAME%! " +
+                    "Today, take %PARTNERNAME% with you to explore the island, find the Fennimals and play with them. "
+            },
+           /* {
+                type:"free_exploration",
+                Fennimal_interaction_type:"play_with_toy_passive",
+                Fennimals_encountered: ["S1" , "S2" ],
+                partner_behavior: "active",
+                include_Fennefinder: true
+            },
+
+            */
+            {
+                type:"hint_and_search",
+                Fennimal_interaction_type:"play_with_toy_active",
+                question_options_toys: ["A", "B"],
+                question_options_toyboxes: ["A", "B"],
+                Fennimals_encountered: ["S1" , "S2"],
+                partner_behavior: "active",
+                hint_type: ["icon", "toybox", "toy"],
+                include_Fennefinder: "low_power_mode"
+            },
+            {
+                //Fennimal_attribute_sorting_task (requires Fennimals_encountered and
+                type: "Fennimal_attribute_sorting_task", // "head_region_sorting_task", "Fennimal_attribute_sorting_task",
+                Fennimals_encountered: ["S1", "S2"],
+                attribute_order: ["region", "head", "toybox", "toy"],
+                maximum_earnable_stars: 5
+            },
+
+            //PRIVATE INFORMATION: BOXES
+            {
+                type: "pseudoday",
+                information: "partner_leaves"
+            },
+            {
+                type: "pseudoday",
+                information: "new_Fennimals_spotted",
+                displayed_icons: ["P1", "P2"],
+                title: "Get to know some more Fennimals on the island",
+                display_text: "While %PARTNERNAME% is away, there are some Fennimals on the island who would love to get to know you!" +
+                    "Unfortunately, we ran out of boxes to store the toys in, so we will have to reuse some of the boxes."
+            },
+            {
+                type:"free_exploration",
+                Fennimal_interaction_type:"play_with_toy_passive",
+                Fennimals_encountered: ["P1" , "P2" ],
+                partner_behavior: "absent",
+                include_Fennefinder: true
+            },
+            {
+                type:"hint_and_search",
+                Fennimal_interaction_type:"play_with_toy_active",
+                Fennimals_encountered: ["P1" , "P2"],
+                question_options_toys: ["D", "E" ],
+                question_options_toyboxes: ["A", "B" ],
+                partner_behavior: "absent",
+                hint_type: ["icon", "toybox", "toy", "name"],
+                include_Fennefinder: "low_power_mode"
+            },
+            {
+                type: "Fennimal_attribute_sorting_task", // "head_region_sorting_task", "Fennimal_attribute_sorting_task",
+                Fennimals_encountered: ["P1", "P2" ],
+                attribute_order: ["name", "region", "head", "toybox", "toy"],
+                maximum_earnable_stars: 5
+            },
+
+            //PRIVATE INFORMATION: FEEDING (NETWORK TASK)
+
+
+            //PARTNER RETURNS
+            {
+                type: "pseudoday",
+                information: "partner_returns"
+            },
+
+            //INFERENCE TRIALS
+            {
+                type:"hint_and_search",
+                Fennimal_interaction_type:"ask_belief_partner_contents_box",
+                Fennimals_encountered: ["I1" , "I2"],
+                partner_behavior: "active",
+                hint_type: "icon",
+                include_Fennefinder: true,
+                bonus_star_for_correct_answer: true,
+            },
+
+            {
+                type:"jump_to_trial",
+                Fennimal_interaction_type:"ask_Fennimal_toy",
+                Fennimals_encountered: ["S1" , "S2",   "P1" , "P2" ],
+                partner_behavior: false,
+                include_Fennefinder: false,
+                bonus_star_for_correct_answer: true,
+            },
+
+
+
+        ],
+        mentalizing_network: [
+
+            // PUBLIC INFORMATION PHASE
+            {
+                type: "pseudoday",
+                information: "new_Fennimals_spotted",
+                displayed_icons: ["S1", "S2", "W", "X"],
+                title: "Get to know some of the Fennimals on the island",
+                display_text: "There are some Fennimals on the island who would love to get to know you and %PARTNERNAME%! " +
+                    "Today, take %PARTNERNAME% with you to explore the island, find the Fennimals and play with them. "
+            },
+             {
+                 type:"free_exploration",
+                 Fennimal_interaction_type:["play_with_toy_passive", "give_food_passive"],
+                 Fennimals_encountered: ["S1" , "S2", "W", "X" ],
+                 partner_behavior: "active",
+                 include_Fennefinder: true
+             },
+
+            {
+                type:"hint_and_search",
+                Fennimal_interaction_type:["play_with_toy_active", "give_food_active"],
+                question_options_toys: ["A", "B"],
+                question_options_toyboxes: ["A", "B"],
+                Fennimals_encountered: ["S1" , "S2", "W", "X"],
+                partner_behavior: "active",
+                hint_type: ["icon", "toybox", "food", "toy"],
+                include_Fennefinder: "low_power_mode"
+            },
+            {
+                type: "Fennimal_attribute_sorting_task", // "head_region_sorting_task", "Fennimal_attribute_sorting_task",
+                Fennimals_encountered: ["S1", "S2", "W", "X"],
+                attribute_order: ["region", "head", "toybox", "toy", "food_preference"],
+                maximum_earnable_stars: 5
+            },
+
+            //PRIVATE INFORMATION: BOXES
+            {
+                type: "pseudoday",
+                information: "partner_leaves"
+            },
+            {
+                type: "pseudoday",
+                information: "new_Fennimals_spotted",
+                displayed_icons: ["P1", "P2", "Y", "Z"],
+                title: "Get to know some more Fennimals on the island",
+                display_text: "While %PARTNERNAME% is away, there are some Fennimals on the island who would love to get to know you!" +
+                    "Unfortunately, we ran out of boxes to store the toys in, so we will have to reuse some of the boxes."
+            },
+            {
+                type:"free_exploration",
+                Fennimal_interaction_type:["play_with_toy_passive", "give_food_passive"],
+                Fennimals_encountered: ["P1" , "P2", "Y", "Z" ],
+                partner_behavior: "absent",
+                include_Fennefinder: true
+            },
+            {
+                type:"hint_and_search",
+                Fennimal_interaction_type:["play_with_toy_active", "give_food_active"],
+                Fennimals_encountered: ["P1" , "P2", "Y", "Z"],
+                question_options_toys: ["C", "D" ],
+                question_options_toyboxes: ["A", "B" ],
+                partner_behavior: "absent",
+                hint_type: ["icon", "toybox","food","toy", "name"],
+                include_Fennefinder: "low_power_mode"
+            },
+            {
+                type: "Fennimal_attribute_sorting_task", // "head_region_sorting_task", "Fennimal_attribute_sorting_task",
+                Fennimals_encountered: ["P1", "P2", "Y", "Z" ],
+                attribute_order: ["name", "region", "head", "toybox", "toy", "food_preference"],
+                maximum_earnable_stars: 5
+            },
+
+            //PARTNER RETURNS
+            {
+                type: "pseudoday",
+                information: "partner_returns"
+            },
+
+            //INFERENCE TRIALS
+            {
+                type: "collect_items_in_warehouse",
+                questions: ["ask_partner_belief_toyboxes"],
+                bonus_stars_per_correct_answer: 5,
+                question_options_toyboxes: ["A", "B"],
+                question_options_toys: ["A", "B", "C", "D"]
+            },
+            {
+                type:"jump_to_trial",
+                Fennimal_interaction_type:"ask_Fennimal_toy",
+                Fennimals_encountered: ["S1" , "S2",   "P1" , "P2" ],
+                partner_behavior: false,
+                bonus_star_for_correct_answer: true,
+            }
+
         ]
 
     }
@@ -555,6 +830,8 @@ let StimulusSettings = function () {
         test: [],
         mentalizing_1: ["demographics_questionnaire"],
         mentalizing_1B: ["demographics_questionnaire"],
+        mentalizing_2: ["demographics_questionnaire"],
+        mentalizing_network: ["demographics_questionnaire"],
 
     }
 
@@ -574,6 +851,8 @@ let StimulusSettings = function () {
         test: false,
         mentalizing_1: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant", "fly", "shark", "blockhead"],
         mentalizing_1B: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant", "fly", "shark", "blockhead"],
+        mentalizing_2: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant", "fly", "shark", "blockhead"],
+        mentalizing_network: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant", "fly", "shark", "blockhead"],
     }
 
     //Same as for heads, but now on a group level.
@@ -587,10 +866,6 @@ let StimulusSettings = function () {
         test: false,
         mentalizing_1: false
     }
-
-
-    //this.excluded_head_types = ["chicken", "owl", "bird", "snowman", "elf", "candycane", "witch"]
-
 
     // STIMULUES CREATION AND MORE GENERAL STIMULUS SETTINGS
     ///////////////////////////////////////
@@ -1554,6 +1829,27 @@ let StimulusTransformer = function (StimTemplate) {
         return ([...new Set(Arr)])
     }
 
+    this.get_assigned_names_of_code_array = function(type, Arr){
+        console.log(type, Arr)
+        if(type in FeatureMap){
+            console.log(FeatureMap)
+            let OutArr = []
+            for(let i in Arr){
+                if(Arr[i] in FeatureMap[type]){
+                    OutArr.push(JSON.parse(JSON.stringify(FeatureMap[type][Arr[i]])))
+                }else{
+                    OutArr.push(false)
+                }
+
+            }
+            return OutArr
+        }else{
+            console.warn("Requesting assigned name of unknown property " + type)
+            return false
+        }
+
+    }
+
     //Returns an array with one element for each location visited. Each element is coded as [location, region]
     this.get_all_locations_visited_during_experiment_with_regions = function () {
         let Arr = []
@@ -1644,6 +1940,7 @@ let StimulusTransformer = function (StimTemplate) {
             }
 
             //The recalled names may earn a bonus for each correctly recalled name
+            //TODO update
             if (this.Experiment_Structure[i].type === "name_recall_task") {
                 if (typeof this.Experiment_Structure[i].award_star_for_each_correct_name !== "undefined") {
                     if (this.Experiment_Structure[i].award_star_for_each_correct_name) {
@@ -1653,10 +1950,25 @@ let StimulusTransformer = function (StimTemplate) {
             }
 
             //The attribute sorting task may be set with a maximum number of earnable stars
-            if (this.Experiment_Structure[i].type === "name_recall_task") {
+            if (this.Experiment_Structure[i].type === "Fennimal_attribute_sorting_task") {
                 if (typeof this.Experiment_Structure[i].maximum_earnable_stars !== "undefined") {
                     if (this.Experiment_Structure[i].maximum_earnable_stars !== false) {
                         max_stars = max_stars + this.Experiment_Structure[i].maximum_earnable_stars
+                    }
+                }
+            }
+
+            if(this.Experiment_Structure[i].type === "collect_items_in_warehouse") {
+                if(typeof this.Experiment_Structure[i].bonus_stars_per_correct_answer !== "undefined"){
+                    if(this.Experiment_Structure[i].bonus_stars_per_correct_answer !== false){
+                        //Going through all question types
+                        for(let qnum = 0; qnum < this.Experiment_Structure[i].questions.length; qnum++) {
+                            switch(this.Experiment_Structure[i].questions[qnum]){
+                                case("ask_partner_belief_toyboxes"):
+                                    max_stars = max_stars + this.Experiment_Structure[i].bonus_stars_per_correct_answer * this.Experiment_Structure[i].question_options_toyboxes.length
+                            }
+                        }
+
                     }
                 }
             }

@@ -593,7 +593,7 @@ FenneFinder = function(){
         setTimeout(function(){
             currently_powering_on = false
             Interface.Prompt.show_message("Oops! The FenneFinder is out of battery...", 1500)
-            AudioCont.play_sound_effect("battery_low")
+            //AudioCont.play_sound_effect("battery_low")
             power_off()
         },1150)
 
@@ -690,6 +690,7 @@ FenneFinder = function(){
             set_indicator_lights_to_value(0)
             current_level = 0
         }
+        //toggle_power_button()
     }
 
     //Updates the targets to which the Fennefinder responds
@@ -702,7 +703,7 @@ FenneFinder = function(){
         if(is_power_on && newmode === true){
             power_off()
         }
-        if( ! is_power_on && newmode === false ){
+        if( newmode === false ){
             power_on()
         }
     }

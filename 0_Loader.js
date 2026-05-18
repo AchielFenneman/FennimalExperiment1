@@ -99,7 +99,7 @@ async function extract_player_SVG(){
     HiddenDiv.style.display = "none"
     document.body.appendChild(HiddenDiv)
 
-    const response = await fetch("SVG/Player.svg")
+    const response = await fetch("./SVG/Player.svg")
     const string = await response.text()
     HiddenDiv.innerHTML  = string
 
@@ -222,6 +222,11 @@ loadMainElements()
 
 // Names and bonus to sorting task
 // Multiple types in same day for hint-and-search (prevent back-to-back dulicates)
+
+
+//Allow skipping trials with no hints
+// Allow shuffling hints in bracket
+
 
 
 

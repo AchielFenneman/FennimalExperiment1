@@ -621,6 +621,14 @@ function moveSVGCenterTo(element, targetX, targetY) {
     element.setAttribute("transform", `translate(${dx}, ${dy})`);
 }
 
+function moveElementRelative(Elem, dx, dy){
+    const currentTrans = Elem.style.transform || Elem.getAttribute("transform") ||"";
+    let matrix = new DOMMatrix(currentTrans);
+    matrix = matrix.translate(dx,dy)
+    Elem.style.transform = matrix.toString()
+}
+
+
 //Given a reference to an SVG object, sets the color classes for the Fennimal
 function set_Fennimal_color_classes(Obj) {
     //The Fennimal's colors are defined by their placeholder fills (as just in the inkscape format). Here we take these fill colors and append the correct classes
@@ -935,9 +943,9 @@ function capitalize_first_letter_in_string(str){
 function copy_scale_and_move_object_to_position(Elem,Parent, center_x, center_y, scale_factor){
     //Copying the object and creating the group structure
     let SVG = Elem.cloneNode(true);
-    let ZeroTranslationGroup = create_SVG_group(0,0,undefined,undefined);
-    let MainPosTranslationGroup = create_SVG_group(0,0,undefined,undefined);
-    let ScaleGroup = create_SVG_group(0,0,undefined,undefined);
+    let ZeroTranslationGroup = create_SVG_group(0,0,"zero_translate_group",undefined);
+    let MainPosTranslationGroup = create_SVG_group(0,0,"main_translate_group",undefined);
+    let ScaleGroup = create_SVG_group(0,0,"scale_group",undefined);
 
     ZeroTranslationGroup.appendChild(SVG);
     ScaleGroup.appendChild(ZeroTranslationGroup)
@@ -947,7 +955,6 @@ function copy_scale_and_move_object_to_position(Elem,Parent, center_x, center_y,
     //Zero the coordinates of the object first
     SVG.style.display = "inherit"
     const BaseCenter = getSVGInternalCenter(ZeroTranslationGroup)
-    console.log(BaseCenter);
     ZeroTranslationGroup.style.transform = "translate(" + (-BaseCenter.x) + "px, " + (-BaseCenter.y) + "px)";
 
     //Setting scale

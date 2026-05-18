@@ -196,7 +196,7 @@ MapController = function (ExpCont, WorldState) {
         Location_Layer = document.getElementById("Location_layer"), Sky_layer = document.getElementById("Sky_Layer"),
         Transition_Mask = document.getElementById("transition_mask"), RequestInstructionsButton,
         SVGShield = document.getElementById("SVG_background_shield"), PageContainer = document.getElementById("Scannimals_container_div")
-    SVGShield.style.transition = "all 3000ms ease-in-out"
+    SVGShield.style.transition = "opacity 3000ms ease-in-out"
     SVGShield.style.strokeWidth = "5px"
     SVGShield.style.stroke = "gray"
     PageContainer.style.transition = "all 3000ms ease-in-out"
@@ -324,6 +324,10 @@ MapController = function (ExpCont, WorldState) {
             AudioCont.stop_all_region_sounds()
         } else {
             AudioCont.play_region_sound(region_name)
+            //Color the background shield as well
+            SVGShield.style.fill = GenParam.RegionData[region_name].surrounding_color
+            SVGShield.style.stroke = GenParam.RegionData[region_name].darker_color
+            PageContainer.style.background = GenParam.RegionData[region_name].surrounding_color
             if (region_name !== "Home") {
                 document.getElementById("map_region_opacity_mask_" + region_name).style.opacity = 0
 
@@ -337,10 +341,9 @@ MapController = function (ExpCont, WorldState) {
             }
         }
 
-        //Color the background shield as well
-        SVGShield.style.fill = GenParam.RegionData[region_name].surrounding_color
-        SVGShield.style.stroke = GenParam.RegionData[region_name].darker_color
-        PageContainer.style.background = GenParam.RegionData[region_name].surrounding_color
+
+
+
     }
 
     //Resets the opacity masks for all regions

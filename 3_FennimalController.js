@@ -73,10 +73,6 @@ GENERAL_FENNIMAL_INTERACTION_SETTINGS = function () {
 
 //TODO: OptionalAdditionalInformation should contain {Distractor_Food_Items}
 FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) {
-    //WorldState.change_toybox_contents(FenObj.toybox, "car")
-   // WorldState.change_toybox_contents(FenObj.toybox, FenObj.toy)
-    //delete FenObj.toybox
-
     let that = this
     // GENERAL REFERENCES
     //////////////////////
@@ -281,6 +277,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
         //There is a special exception for the "ask" interaction types which include a partner. In this case there should ALWAYS be a partner, but it should be on the right facing in.
         if(FenObj.interaction_type.includes("ask") && FenObj.interaction_type.includes("partner")){
             show_partner_icon(false, "left")
+            partner_is_present = true
             PartnerIconOutline.classList.add("focus_on_SVG_outline")
 
             //Check if the partner has a name or not
@@ -303,7 +300,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
 
         }else{
             if(WorldState.get_current_partner_role() !== "undefined"  ){
-                if(WorldState.get_current_partner_role() !== null && WorldState.get_current_partner_role() !== false){
+                if(WorldState.get_current_partner_role() !== null && WorldState.get_current_partner_role() !== false && WorldState.get_current_partner_role() !== "absent"){
                     partner_is_present = true
                     Settings.FennimalVariablePositionLimits.xmax = 0.70 * GenParam.SVG_width
 
@@ -685,6 +682,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
         if(partner_is_present){
             PartnerIcon.style.transition = "all "+ Settings.step_speed + "ms ease-in-out"
             PartnerIcon.style.opacity = "0"
+            console.log(PartnerIcon)
         }
 
         //Fennimal
@@ -1344,7 +1342,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
 
         //Creating the itembar
         Settings.QuestionBar.backgroundcolor = GenParam.RegionData[FenObj.region].lighter_color
-        ItemObjects.questionbar = new QuestionBar(ItemLayerObj.Partner, get_array_of_toys_for_question(true), Settings.QuestionBar,FenObj.bonus_star_earnable, that.toy_question_answered)
+        ItemObjects.questionbar = new QuestionBar(ItemLayerObj.Partner, get_array_of_toys_for_question(true), Settings.QuestionBar,FenObj.bonus_stars_earnable, that.toy_question_answered)
 
         //Creating a new Questions object.
         register_start_new_question("toy_" + toy_question_type, AllToyOptions)
@@ -1421,7 +1419,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
 
         //Creating the itembar
         Settings.QuestionBar.backgroundcolor = GenParam.RegionData[FenObj.region].lighter_color
-        ItemObjects.questionbar = new QuestionBar(ItemLayerObj.Partner, Arr, Settings.QuestionBar,FenObj.bonus_star_earnable, that.box_question_answered)
+        ItemObjects.questionbar = new QuestionBar(ItemLayerObj.Partner, Arr, Settings.QuestionBar,FenObj.bonus_stars_earnable, that.box_question_answered)
 
         //Creating a new Questions object.
         register_start_new_question("box", AllBoxOptions)
@@ -1747,13 +1745,16 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
                 }
             }
 
+            //Highlight the box
+            ItemObjects.box.highlight_outline()
+
             //Creating the bubble
             ItemObjects.questionbubble = new QuestionBubble(ItemLayerObj.Partner, 0.485*GenParam.SVG_width, 0.275 * GenParam.SVG_height, false)
 
             //Then offer the questionbar
             setTimeout(function(){
                 Settings.QuestionBar.backgroundcolor = "gold"//"#faf8eb"
-                ItemObjects.questionbar = new QuestionBar(ItemLayerObj.Partner, get_array_of_toys_for_question(true), Settings.QuestionBar,FenObj.bonus_star_earnable, that.question_partner_belief_answered)
+                ItemObjects.questionbar = new QuestionBar(ItemLayerObj.Partner, get_array_of_toys_for_question(true), Settings.QuestionBar,FenObj.bonus_stars_earnable, that.question_partner_belief_answered)
 
                 //Creating a new Questions object.
                 register_start_new_question("partner_belief_box", OptionalAdditionalInformation.Distractor_Toys)
@@ -1772,15 +1773,16 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
         ItemObjects.questionbar.collapse_bar()
 
         let answer_correct = answer === WorldState.get_partner_belief_in_box_contents(FenObj.toybox)
+        console.log(answer, answer_correct)
 
         //Recording the answer
         record_current_question_answer(answer, answer_correct)
 
-        if(FenObj.bonus_star_earnable === true){
+        if(FenObj.bonus_stars_earnable > 0){
             if(answer_correct){
-                FenObj.bonus_star_earned = true
+                FenObj.bonus_stars_earned = FenObj.bonus_stars_earnable
             }else{
-                FenObj.bonus_star_earned = false
+                FenObj.bonus_stars_earned = false
             }
 
         }
@@ -1792,6 +1794,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
 
     function get_array_of_toys_for_question(shuffle){
         let Arr = []
+        console.log(OptionalAdditionalInformation)
         for(let toynum = 0; toynum < OptionalAdditionalInformation.Distractor_Toys.length; toynum++){
         //Getting the correct SVG
         let SVG =  document.getElementById("toy_" + OptionalAdditionalInformation.Distractor_Toys[toynum]).cloneNode(true);
@@ -1833,7 +1836,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
             Interface.Prompt.show_message("What toy is currently in the " +  GenParam.get_box_printed_name(FenObj.toybox) + "?")
 
             Settings.QuestionBar.backgroundcolor = "gold"//"#faf8eb"
-            ItemObjects.questionbar = new QuestionBar(ItemLayerObj.Partner, get_array_of_toys_for_question(true), Settings.QuestionBar,FenObj.bonus_star_earnable, that.question_contents_box_answered)
+            ItemObjects.questionbar = new QuestionBar(ItemLayerObj.Partner, get_array_of_toys_for_question(true), Settings.QuestionBar,FenObj.bonus_stars_earnable, that.question_contents_box_answered)
 
             //Creating a new Questions object.
             register_start_new_question("partner_belief_box", OptionalAdditionalInformation.Distractor_Toys)
@@ -1850,8 +1853,8 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
         //Recording the answer
         record_current_question_answer(answer, answer_correct)
 
-        if(FenObj.bonus_star_earnable === true){
-            FenObj.bonus_star_earned = answer_correct
+        if(FenObj.bonus_stars_earnable > 0){
+            FenObj.bonus_stars_earned = answer_correct
         }
 
         //Next step
@@ -1870,7 +1873,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
         Interface.Prompt.show_message("What toy did you previously see " + FenObj.name + " play with?")
 
         Settings.QuestionBar.backgroundcolor = "gold"
-        ItemObjects.questionbar = new QuestionBar(ItemLayerObj.Partner, get_array_of_toys_for_question(true), Settings.QuestionBar,FenObj.bonus_star_earnable, that.question_Fennimal_toy_answered)
+        ItemObjects.questionbar = new QuestionBar(ItemLayerObj.Partner, get_array_of_toys_for_question(true), Settings.QuestionBar,FenObj.bonus_stars_earnable, that.question_Fennimal_toy_answered)
 
         //Creating a new Questions object.
         register_start_new_question("Fennimal_toy", OptionalAdditionalInformation.Distractor_Toys)
@@ -1887,8 +1890,8 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
         //Recording the answer
         record_current_question_answer(answer, answer_correct)
 
-        if(FenObj.bonus_star_earnable === true){
-            FenObj.bonus_star_earned = answer_correct
+        if(FenObj.bonus_stars_earnable > 0){
+            FenObj.bonus_stars_earned = FenObj.bonus_stars_earnable
         }
 
         //Next step
@@ -1903,6 +1906,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
             options: JSON.parse(JSON.stringify(options)),
             ans: [],
         }
+
     }
     function record_current_question_partial_answer(ans){
         CurrentQuestion.ans.push(ans)
@@ -2598,7 +2602,7 @@ SmallFeedbackSymbol = function(Parent, feedback_type,speed,start_x, start_y, end
 
 }
 QuestionBubble = function(Parent, center_x, center_y, question_mark_only){
-    let SVG = document.getElementById("partner_thought_bubble").cloneNode(true);
+    let SVG = document.getElementById("partner_thought_bubble_right").cloneNode(true);
     if(question_mark_only){
         SVG = SVG.getElementsByClassName("partner_thought_bubble_questionmark")[0]
     }
@@ -2660,10 +2664,12 @@ QuestionBubble = function(Parent, center_x, center_y, question_mark_only){
 }
 
 
-QuestionBar = function(Parent, Array_of_choices, Settings, is_bonus_star_earnable, outputfun) {
-    if(typeof is_bonus_star_earnable == "undefined"){
-        is_bonus_star_earnable = false;
+QuestionBar = function(Parent, Array_of_choices, Settings, num_bonus_stars_reward, outputfun) {
+    let is_bonus_stars_earnable = false
+    if(num_bonus_stars_reward > 0){
+        is_bonus_stars_earnable = true;
     }
+    console.log(num_bonus_stars_reward)
 
     let BackgroundRectCont, ForeignElem, MainDiv,ButtonContainerDiv, Buttons=[], Barthat = this, BonusStarContainer
     let bar_total_width = 0.95 * GenParam.SVG_width
@@ -2672,21 +2678,30 @@ QuestionBar = function(Parent, Array_of_choices, Settings, is_bonus_star_earnabl
         let button_enabled = false
         let ButtonContainer = document.createElement("div");
         //ButtonContainer.style.height = "80%"
-        ButtonContainer.style.padding = "1%"
-        ButtonContainer.style.margin = "5px"
+        //ButtonContainer.style.padding = "1%"
         ButtonContainer.style.opacity = 0
-        //ButtonContainer.style.maxWidth = max_box_width + "px"
-        //ButtonContainer.style.flexGrow = 1;
-        //ButtonContainer.style.flexBasis = 0;
-        ButtonContainer.style.flex = 1
+        //ButtonContainer.style.flex = 1
         ButtonContainer.classList.add("questionbar_button")
+        ButtonContainer.style.maxHeight = "90%"
+        //ButtonContainer.style.width = "100%"
+        ButtonContainer.style.aspectRatio =  "1 / 1"
+        ButtonContainer.style.flex = "0 1 auto"
 
         let ButtonSVGElem = document.createElementNS("http://www.w3.org/2000/svg", 'svg')
-        //ButtonSVGElem.style.width = "100%"
-        //ButtonSVGElem.style.height = "100%"
+        ButtonSVGElem.style.width = "100%"
+        ButtonSVGElem.style.height = "100%"
+        ButtonSVGElem.setAttribute("viewBox", "0 0 150 150")
         ButtonSVGElem.style.display = "inherit"
         ButtonContainer.appendChild(ButtonSVGElem)
         Parent.appendChild(ButtonContainer)
+
+        ButtonSVGElem.appendChild(SVG)
+        let Box = SVG.getBBox()
+        let bordersize = 3
+        ButtonSVGElem.setAttribute("viewBox", (Math.floor(Box.x)-bordersize) + " " + (Math.floor(Box.y)-bordersize) + " " + (Math.ceil(Box.width) + 2* bordersize)+ " " + (Math.ceil(Box.height)+ 2*bordersize ));
+
+
+        /*
 
         //Adding the SVG elements
         let ToyZeroTranslationGroup = create_SVG_group(0,0,undefined,undefined);
@@ -2701,10 +2716,13 @@ QuestionBar = function(Parent, Array_of_choices, Settings, is_bonus_star_earnabl
         //Finding SVG dims
         let svgWidth = ButtonSVGElem.viewBox.baseVal.width || ButtonSVGElem.width.baseVal.value;
         const svgHeight = ButtonSVGElem.viewBox.baseVal.height || ButtonSVGElem.height.baseVal.value;
+        console.log(svgWidth)
 
         //Zeroing the toy coordinates
         const ToyBaseCenter = getSVGInternalCenter(ToyZeroTranslationGroup)
         ToyZeroTranslationGroup.style.transform = "translate(" + (-ToyBaseCenter.x) + "px, " + (-ToyBaseCenter.y) + "px)";
+        ToyZeroTranslationGroup.style.transform = "translate(75px 75px)";
+        console.log(ToyBaseCenter.x)
 
         //Scaling to just fit the box
         let ToyBBox = SVG.getBBox()
@@ -2712,15 +2730,18 @@ QuestionBar = function(Parent, Array_of_choices, Settings, is_bonus_star_earnabl
         const scale_w_max = ( (0.9*svgWidth) / ToyBBox.width)
         const scale_h_max = ( (0.9*svgHeight) / ToyBBox.height)
         const scale_factor = Math.min(scale_w_max, scale_h_max)
-        ScaleGroup.style.transform = "scale(" + scale_factor + ")"
+        //ScaleGroup.style.transform = "scale(" + scale_factor + ")"
 
-        ButtonSVGElem.style.width = 1.1* MainPosTranslationGroup.getBBox().width
+        //ButtonSVGElem.style.width = 1.1* MainPosTranslationGroup.getBBox().width
         svgWidth = ButtonSVGElem.viewBox.baseVal.width || ButtonSVGElem.width.baseVal.value;
 
         //Translating to the center of the box
         const delta_x = (0.5*svgWidth)
         const delta_y = (0.5*svgHeight)
-        MainPosTranslationGroup.style.transform = "translate(" + delta_x + "px, " + delta_y + "px)";
+        //MainPosTranslationGroup.style.transform = "translate(" + delta_x + "px, " + delta_y + "px)";
+        MainPosTranslationGroup.style.transform = "translate(75px,75px)";
+
+         */
 
         //Making the SVG invisible for pointer events
         SVG.style.pointerEvents = "none";
@@ -2730,13 +2751,7 @@ QuestionBar = function(Parent, Array_of_choices, Settings, is_bonus_star_earnabl
         setTimeout(function(){
             ButtonContainer.style.opacity = 1;
             button_enabled = true
-
-            //Setting event listener
-
             ButtonContainer.onpointerdown = function(){if(button_enabled){outputfun(name)}}
-
-
-
         },100)
 
         //Set to enable or disable button
@@ -2776,7 +2791,7 @@ QuestionBar = function(Parent, Array_of_choices, Settings, is_bonus_star_earnabl
 
     function create_basic_SVG_elem(){
         let foreignheigt = Settings.height
-        if(is_bonus_star_earnable){ foreignheigt = 1.25* foreignheigt }
+        if(is_bonus_stars_earnable){ foreignheigt = 1.25* foreignheigt }
 
         BackgroundRectCont = new BackgroundRect(Parent)
         ForeignElem = create_SVG_foreignElement(0.5 * ( GenParam.SVG_width - bar_total_width ), Settings.top_y,bar_total_width,foreignheigt, undefined,undefined)
@@ -2785,7 +2800,7 @@ QuestionBar = function(Parent, Array_of_choices, Settings, is_bonus_star_earnabl
         MainDiv = document.createElement("div")
         ForeignElem.appendChild(MainDiv)
         MainDiv.style.height = "100%"
-        if(is_bonus_star_earnable){MainDiv.style.height = "78%"}
+        if(is_bonus_stars_earnable){MainDiv.style.height = "78%"}
         MainDiv.style.display = "flex"
         MainDiv.style.justifyContent = "center"
         MainDiv.style.alignItems = "center"
@@ -2793,7 +2808,9 @@ QuestionBar = function(Parent, Array_of_choices, Settings, is_bonus_star_earnabl
         ButtonContainerDiv = document.createElement("div")
         MainDiv.appendChild(ButtonContainerDiv)
 
+        ButtonContainerDiv.style.gap = "10px"
         ButtonContainerDiv.style.height = "100%"
+        //ButtonContainerDiv.style.maxWidth = "100%"
         //ButtonContainerDiv.style.backgroundColor = "#FFFFFFAA"
         //ButtonContainerDiv.style.opacity = 0.45
         //ButtonContainerDiv.style.borderRadius = "50px"
@@ -2806,18 +2823,23 @@ QuestionBar = function(Parent, Array_of_choices, Settings, is_bonus_star_earnabl
 
         const max_width_per_box = 0
 
-        if(is_bonus_star_earnable){
+        if(is_bonus_stars_earnable){
             BonusStarContainer = document.createElement("div")
             BonusStarContainer.style.width = "100%"
             BonusStarContainer.style.textAlign = "center"
             //BonusStarContainer.style.paddingTop = "5px"
             //BonusStarContainer.style.fontStyle = "italic"
-            BonusStarContainer.innerHTML = "You can earn a bonus star"
+            if(num_bonus_stars_reward === 1 || num_bonus_stars_reward === true){
+                BonusStarContainer.innerHTML = "You can earn a bonus star"
+            }else{
+                BonusStarContainer.innerHTML = "Earn " + num_bonus_stars_reward + " stars for a correct answer!"
+            }
 
             BonusStarContainer.classList.add("questionbar_bonustext")
 
             //BonusStarContainer.style.height =
             ForeignElem.appendChild(BonusStarContainer)
+            AudioCont.play_sound_effect("alert_minor")
         }
 
 
@@ -2829,6 +2851,7 @@ QuestionBar = function(Parent, Array_of_choices, Settings, is_bonus_star_earnabl
     }
 
     this.button_pressed = function(name){
+        AudioCont.play_sound_effect("button_click")
         outputfun(name)
     }
 

@@ -320,7 +320,8 @@ GENERALPARAM = function () {
         show: true,
         icon_type: 'head', //Can be either "full" or "head"
         display_only_in_current_region: true,
-        display_all_icons_on_watchtower: true
+        display_all_icons_on_watchtower: true,
+        clear_Fennimal_icons_from_map_at_start_of_new_day: false
     }
 
     this.ToyData = {
@@ -409,7 +410,7 @@ GENERALPARAM = function () {
         width: 50,
         warmup_time: 750
     }
-    this.location_detection_distance = 30
+    this.location_detection_distance = 35
 
     this.Quiz_settings = {
         show_color_when_asking_for_region: true,
@@ -432,6 +433,9 @@ GENERALPARAM = function () {
 
     //In phases where stars can be earned, this color defined the background of the instructions
     this.background_fill_for_instructions_where_stars_can_be_earned = "#faf8eb"
+
+    //Determines whether the icons on the map should be cleared between days
+
 
 
 }

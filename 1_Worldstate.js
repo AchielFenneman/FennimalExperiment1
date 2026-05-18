@@ -297,6 +297,7 @@ WorldStateObject = function () {
 
     this.change_partner_belief_in_box_contents = function(box, contents){
         PartnerBeliefs_Boxes[box] = contents
+        console.log(PartnerBeliefs_Boxes)
     }
     this.get_partner_belief_in_box_contents = function(box){
         if(typeof PartnerBeliefs_Boxes[box] === "undefined"){

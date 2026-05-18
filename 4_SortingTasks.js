@@ -525,6 +525,7 @@ FennimalAttributeSortingTask = function(Parent, Title, FennimalObjectArray, attr
                 case("head"): set_card_head(); break
                 case("toybox"): set_card_toybox(); break
                 case("toy"): set_card_toy(); break
+                case("food_preference"): set_card_food(); break
             }
 
             setTimeout(function(){
@@ -597,6 +598,10 @@ FennimalAttributeSortingTask = function(Parent, Title, FennimalObjectArray, attr
         function set_card_toy(){
             append_SVG_and_element_on_card(document.getElementById("toy_" + value).cloneNode(true),0.9)
             set_toy_color_scheme(CardElem.SVGObj, value)
+        }
+        function set_card_food(){
+            append_SVG_and_element_on_card(document.getElementById("food_" + value + "_first").cloneNode(true),0.9)
+
         }
 
         function append_to_new_Elem(Elem) {
@@ -842,6 +847,7 @@ FennimalAttributeSortingTask = function(Parent, Title, FennimalObjectArray, attr
                 case("head"): show_Fennimal(); break
                 case("toybox"): show_toybox(); break
                 case("toy"): show_toy(); break
+                case("food_preference"): show_food(); break
             }
         }
 
@@ -868,8 +874,8 @@ FennimalAttributeSortingTask = function(Parent, Title, FennimalObjectArray, attr
             Elems.MiddleLayer.appendChild(FenSVG)
 
             //Scaling
-            const max_height = 2 * 230
-            const max_width = 2 * 230
+            const max_height = 2 * 210
+            const max_width = 2 * 210
             const FennimalScaleGroup = FenSVG.getElementsByClassName("Fennimal_scale_group")[0]
             const ScaleBox = FenSVG.getBBox()
             const scale_factor_w = 1 / (ScaleBox.width / max_width)
@@ -941,6 +947,30 @@ FennimalAttributeSortingTask = function(Parent, Title, FennimalObjectArray, attr
 
                 MainTGroup.style.transform = "translate(350px,150px)"
                 Toy.style.opacity = 1
+
+            },10)
+        }
+        function show_food(){
+            let Food = document.getElementById("food_" + FenObj.food_preference + "_first").cloneNode(true)
+            Food.style.display = "inherit"
+            Food.style.opacity = 0
+            Food.style.transition = "opacity 500ms ease-in-out"
+            let ZeroTGroup =  create_SVG_group(0,0,undefined,undefined)
+            let ScaleGroup = create_SVG_group(0,0,undefined,undefined)
+            let MainTGroup =  create_SVG_group(0,0,undefined,undefined)
+            ZeroTGroup.appendChild(Food)
+            ScaleGroup.appendChild(ZeroTGroup)
+            MainTGroup.appendChild(ScaleGroup)
+            Elems.TopLayer.appendChild(MainTGroup)
+
+            setTimeout(function(){
+                const Box = Food.getBBox()
+                ZeroTGroup.style.transform = "translate(" + ( -( 0.5* Box.width + Box.x) ) + "px, " +  ( -( 0.5* Box.height + Box.y) ) + "px)"
+
+                ScaleGroup.style.transform = "scale(4)"
+
+                MainTGroup.style.transform = "translate(100px,150px)"
+                Food.style.opacity = 1
 
             },10)
         }
@@ -1341,10 +1371,12 @@ FennimalAttributeSortingTask = function(Parent, Title, FennimalObjectArray, attr
                 case("toybox"): Title.innerHTML = "Which box contains each Fennimal's toy?"; break
                 case("toy"): Title.innerHTML = "Match each Fennimal with its correct toy"; break
                 case("name"): Title.innerHTML = "Write down all the names of the Fennimals"; break
+                case("food"): Title.innerHTML = "Match each Fennimal with the food that it eats"; break
             }
 
             //Get the values of this attribute
             values_in_set = shuffleArray(get_all_values_of_attribute(current_attribute_set))
+            console.log(values_in_set)
 
             if(current_attribute_set === "name"){
                 values_completed = []
@@ -1383,7 +1415,7 @@ FennimalAttributeSortingTask = function(Parent, Title, FennimalObjectArray, attr
     }
 
     //The name input needs an escape, to prevent participants from getting stuck on the task
-    let input_escape_minimum_time = 1000, EscapeTimeout
+    let input_escape_minimum_time = 10000, EscapeTimeout
     function show_escape_option(){
         //If there are starts to be earned AND there are more than one stars left, then present this is a buy option.
         //Otherwise, its a reveal option (no cost in stars
