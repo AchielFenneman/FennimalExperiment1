@@ -118,7 +118,6 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
 
     //Pass false to hide the entire progress bar
     this.update_progress_within_day = function (percentage_complete) {
-        console.log(percentage_complete)
         if (percentage_complete === false) {
             ProgressWithinDayBar.parentElement.style.display = "none"
         } else {
@@ -705,7 +704,6 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
         add_closing_button_to_Parent("top-right", false, undefined)
 
         //Setting all the text here
-        console.log(fennefinder_status)
         let Fennefinder_text = ""
         if(fennefinder_status === true){
             Fennefinder_text = "The Fennefinder on the bottom-right of the screen will help guide you to the different Fennimals. "
@@ -1107,7 +1105,7 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
             BonusText.classList.add("instruction_element_nonbackground")
 
             TextElem_Main_Instructions.appendChild(BonusText)
-            console.log(TextElem_Main_Instructions)
+
 
             //Bonus stars
             const dx = 0.06 * GenParam.SVG_width
@@ -1124,12 +1122,9 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
             for(let i =0 ; i <num_bonus_stars; i++){
                 setTimeout(function(){
                     let X = show_bonus_star_on_screen(TextElem_Main_Instructions,  starpos[i], 0.75* GenParam.SVG_height, true, "instruction_element_nonbackground", 0.75)
-                    console.log(X)
                 }, (i+1) * 400)
             }
 
-            console.log(ParentElem)
-            console.log(ParentElem.getElementsByClassName("button_element")[0])
             continue_button_time = num_bonus_stars * 500
 
         }else{
@@ -1210,7 +1205,6 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
 
         if(num_bonus_stars_per_question === true){num_bonus_stars_per_question = 1}
         let can_earn_stars = num_bonus_stars_per_question > 0
-        console.log(can_earn_stars)
 
         if(Array.isArray(interaction_type)){
             //Multiple types are included in this trial, which should be included in the instructions.
@@ -1286,19 +1280,10 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
             text_h = 700
         }
 
-        let Fennefinder_text = ""
-        if(fennefinder_status === true){
-            Fennefinder_text = "The Fennefinder on the bottom-right of the screen will help guide you to the different Fennimals. "
-        }
-        if(fennefinder_status === "low_power_mode"){
-            Fennefinder_text = "Unfortunately, the Fennefinder has run out of battery - so you'll have to find all Fennimals by memory! "
-        }
-
         let instruction_text = task_type_text + "To help speed things up, you will be driven across the island (you won't have to walk yourself). " +
             "You will then " + verb_text + " the Fennimals one at a time. " + ask_insert_text +
             "You will then be taken to the next Fennimal until you have " + verb_text + " all " + Fennimals_in_phase_Array.length + " Fennimals which " + Fennimal_state_text +" <br><br>" +
-            can_earn_stars_text +
-            Fennefinder_text + "<br>" + "<i>Tip: don't know where to go next? Try climbing the watchtower!</i>"
+            can_earn_stars_text
 
         TextElem_Main_Instructions = create_SVG_text_in_foreign_element(instruction_text, 100, text_y, (1920 - 2 * 100), text_h, "instruction_element_text")
         TextElem_Main_Instructions.classList.add("instruction_element_nonbackground")
@@ -2963,7 +2948,6 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
     }
 
     this.show_payment_screen = function (PaymentData) {
-        console.log(PaymentData)
         ExpPaymentData = PaymentData
         let timer = 1000
         //Create the empty screen
@@ -3104,7 +3088,6 @@ Vertical_scollable_box = function (ParentElem, x, y, width, height) {
     }
 
     FennimalIcon = function (AreaElem, SVG, OtherProperties) {
-        console.log(OtherProperties)
 
         //Wrapping the SVG code into an SVG element, that one into a div, then appending that one to the Area
         let SVGElem = document.createElementNS("http://www.w3.org/2000/svg", 'svg')

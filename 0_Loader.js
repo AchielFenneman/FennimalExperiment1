@@ -214,18 +214,9 @@ loadMainElements()
 //  SVG garbage collection (items, boxes, cc screen)
 // Loading screen
 
-// Reduce complexity
-// Turn on Fennefinder
 
 //Adapt head sorting task to two rows if more than 4 regions selected
-// Multi-hint days
-
-// Names and bonus to sorting task
-// Multiple types in same day for hint-and-search (prevent back-to-back dulicates)
-
-
-//Allow skipping trials with no hints
-// Allow shuffling hints in bracket
+console.log("Ready")
 
 
 

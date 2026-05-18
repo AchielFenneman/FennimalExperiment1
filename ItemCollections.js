@@ -1,5 +1,4 @@
 ItemsCollectionFromWarehouseController = function(TaskData, outputfunc){
-    console.log(TaskData)
 
     //The main elements are presented in the Fennimals layer
     let ParentLayer = document.getElementById("Fennimals_Layer")
@@ -444,7 +443,6 @@ ItemsCollectionFromWarehouseController = function(TaskData, outputfunc){
             }, 400)
         }else{
             currentstep = RemainingQuestionSteps.shift()
-            console.log(currentstep)
             switch(currentstep.type){
                 case("partner_moves_to_box"):
                     setTimeout(function(){

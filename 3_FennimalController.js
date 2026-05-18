@@ -682,7 +682,6 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
         if(partner_is_present){
             PartnerIcon.style.transition = "all "+ Settings.step_speed + "ms ease-in-out"
             PartnerIcon.style.opacity = "0"
-            console.log(PartnerIcon)
         }
 
         //Fennimal
@@ -1773,7 +1772,6 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
         ItemObjects.questionbar.collapse_bar()
 
         let answer_correct = answer === WorldState.get_partner_belief_in_box_contents(FenObj.toybox)
-        console.log(answer, answer_correct)
 
         //Recording the answer
         record_current_question_answer(answer, answer_correct)
@@ -1794,7 +1792,6 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
 
     function get_array_of_toys_for_question(shuffle){
         let Arr = []
-        console.log(OptionalAdditionalInformation)
         for(let toynum = 0; toynum < OptionalAdditionalInformation.Distractor_Toys.length; toynum++){
         //Getting the correct SVG
         let SVG =  document.getElementById("toy_" + OptionalAdditionalInformation.Distractor_Toys[toynum]).cloneNode(true);
@@ -2669,7 +2666,6 @@ QuestionBar = function(Parent, Array_of_choices, Settings, num_bonus_stars_rewar
     if(num_bonus_stars_reward > 0){
         is_bonus_stars_earnable = true;
     }
-    console.log(num_bonus_stars_reward)
 
     let BackgroundRectCont, ForeignElem, MainDiv,ButtonContainerDiv, Buttons=[], Barthat = this, BonusStarContainer
     let bar_total_width = 0.95 * GenParam.SVG_width
@@ -2699,49 +2695,6 @@ QuestionBar = function(Parent, Array_of_choices, Settings, num_bonus_stars_rewar
         let Box = SVG.getBBox()
         let bordersize = 3
         ButtonSVGElem.setAttribute("viewBox", (Math.floor(Box.x)-bordersize) + " " + (Math.floor(Box.y)-bordersize) + " " + (Math.ceil(Box.width) + 2* bordersize)+ " " + (Math.ceil(Box.height)+ 2*bordersize ));
-
-
-        /*
-
-        //Adding the SVG elements
-        let ToyZeroTranslationGroup = create_SVG_group(0,0,undefined,undefined);
-        let MainPosTranslationGroup = create_SVG_group(0,0,undefined,undefined);
-        let ScaleGroup = create_SVG_group(0,0,undefined,undefined);
-
-        ToyZeroTranslationGroup.appendChild(SVG);
-        ScaleGroup.appendChild(ToyZeroTranslationGroup)
-        MainPosTranslationGroup.appendChild(ScaleGroup)
-        ButtonSVGElem.appendChild(MainPosTranslationGroup);
-
-        //Finding SVG dims
-        let svgWidth = ButtonSVGElem.viewBox.baseVal.width || ButtonSVGElem.width.baseVal.value;
-        const svgHeight = ButtonSVGElem.viewBox.baseVal.height || ButtonSVGElem.height.baseVal.value;
-        console.log(svgWidth)
-
-        //Zeroing the toy coordinates
-        const ToyBaseCenter = getSVGInternalCenter(ToyZeroTranslationGroup)
-        ToyZeroTranslationGroup.style.transform = "translate(" + (-ToyBaseCenter.x) + "px, " + (-ToyBaseCenter.y) + "px)";
-        ToyZeroTranslationGroup.style.transform = "translate(75px 75px)";
-        console.log(ToyBaseCenter.x)
-
-        //Scaling to just fit the box
-        let ToyBBox = SVG.getBBox()
-
-        const scale_w_max = ( (0.9*svgWidth) / ToyBBox.width)
-        const scale_h_max = ( (0.9*svgHeight) / ToyBBox.height)
-        const scale_factor = Math.min(scale_w_max, scale_h_max)
-        //ScaleGroup.style.transform = "scale(" + scale_factor + ")"
-
-        //ButtonSVGElem.style.width = 1.1* MainPosTranslationGroup.getBBox().width
-        svgWidth = ButtonSVGElem.viewBox.baseVal.width || ButtonSVGElem.width.baseVal.value;
-
-        //Translating to the center of the box
-        const delta_x = (0.5*svgWidth)
-        const delta_y = (0.5*svgHeight)
-        //MainPosTranslationGroup.style.transform = "translate(" + delta_x + "px, " + delta_y + "px)";
-        MainPosTranslationGroup.style.transform = "translate(75px,75px)";
-
-         */
 
         //Making the SVG invisible for pointer events
         SVG.style.pointerEvents = "none";

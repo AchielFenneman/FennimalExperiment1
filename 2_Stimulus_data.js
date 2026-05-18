@@ -77,7 +77,7 @@ let StimulusSettings = function () {
             {id: "P1", head: "E", region: "D", toy: "C", toybox: "A"},
             {id: "P2", head: "D", region: "E", toy: "D", toybox: "B"},
             {id: "Y", head: "A", region: "F", food_preference: "A"},
-            {id: "Z", head: "E", region: "E", food_preference: "B"},
+            {id: "Z", head: "F", region: "E", food_preference: "B"},
 
             /*
             * {id: "S1", head: "A", region: "A", toy: "A", toybox: "A"},
@@ -214,12 +214,22 @@ let StimulusSettings = function () {
     let All_Experiment_Structures = {
         test: [
             {
+                type:"jump_to_trial",
+                Fennimal_interaction_type:"ask_Fennimal_toy",
+                Fennimals_encountered: ["A1", "A2" ],
+                partner_behavior: false,
+                bonus_stars_per_correct_answer: 1,
+            }
+
+            /*{
                 type: "collect_items_in_warehouse",
                 questions: ["ask_partner_belief_toyboxes"],
                 bonus_stars_per_correct_answer: 5,
                 question_options_toyboxes: ["C", "B"],
                 question_options_toys: ["A", "B"]
             },
+
+             */
             /*
             {
                 type:"free_exploration",
@@ -665,7 +675,7 @@ let StimulusSettings = function () {
                 information: "new_Fennimals_spotted",
                 displayed_icons: ["P1", "P2"],
                 title: "Get to know some more Fennimals on the island",
-                display_text: "While %PARTNERNAME% is away, there are some Fennimals on the island who would love to get to know you!" +
+                display_text: "While %PARTNERNAME% is away, there are some Fennimals on the island who would love to get to know you! " +
                     "Unfortunately, we ran out of boxes to store the toys in, so we will have to reuse some of the boxes."
             },
             {
@@ -756,7 +766,7 @@ let StimulusSettings = function () {
             {
                 type: "Fennimal_attribute_sorting_task", // "head_region_sorting_task", "Fennimal_attribute_sorting_task",
                 Fennimals_encountered: ["S1", "S2", "W", "X"],
-                attribute_order: ["region", "head", "toybox", "toy", "food_preference"],
+                attribute_order: ["name", "region", "head", "toybox", "toy", "food_preference"],
                 maximum_earnable_stars: 5
             },
 
@@ -770,7 +780,7 @@ let StimulusSettings = function () {
                 information: "new_Fennimals_spotted",
                 displayed_icons: ["P1", "P2", "Y", "Z"],
                 title: "Get to know some more Fennimals on the island",
-                display_text: "While %PARTNERNAME% is away, there are some Fennimals on the island who would love to get to know you!" +
+                display_text: "While %PARTNERNAME% is away, there are some Fennimals on the island who would love to get to know you! " +
                     "Unfortunately, we ran out of boxes to store the toys in, so we will have to reuse some of the boxes."
             },
             {
@@ -1304,11 +1314,6 @@ let StimulusTransformer = function (StimTemplate) {
                     MatchedHeads[RequestedHeadCodes[i]] = AvailableInSVG[i].name
                 }
 
-                console.log(MatchedHeads)
-
-
-
-
             }else{
                 //The best way to assign available groups/clusters to requested ones is in order of size.
                 //For each requested group (starting from the biggest number of total heads):
@@ -1782,7 +1787,6 @@ let StimulusTransformer = function (StimTemplate) {
     }
 
     let FeatureMap = create_feature_maps()
-    console.log(FeatureMap)
     let FeatureMapConstant = JSON.parse(JSON.stringify(FeatureMap))
 
     const FennimalObjArr = create_Fennimals_from_stimulus_template(StimTemplate, FeatureMap)
@@ -1830,9 +1834,7 @@ let StimulusTransformer = function (StimTemplate) {
     }
 
     this.get_assigned_names_of_code_array = function(type, Arr){
-        console.log(type, Arr)
         if(type in FeatureMap){
-            console.log(FeatureMap)
             let OutArr = []
             for(let i in Arr){
                 if(Arr[i] in FeatureMap[type]){
@@ -1978,14 +1980,18 @@ let StimulusTransformer = function (StimTemplate) {
             if( ["free_exploration", "hint_and_search", "jump_to_trial"].includes(this.Experiment_Structure[i].type)){
                 if(typeof this.Experiment_Structure[i].Fennimal_interaction_type === "string"){
                     if(this.Experiment_Structure[i].Fennimal_interaction_type.includes("ask_")){
-                        max_stars = max_stars + this.Experiment_Structure[i].Fennimals_encountered.length
+                        if(typeof this.Experiment_Structure[i].bonus_stars_per_correct_answer !== "undefined" && this.Experiment_Structure[i].bonus_stars_per_correct_answer !== false){
+                            max_stars = this.Experiment_Structure[i].bonus_stars_per_correct_answer * this.Experiment_Structure[i].Fennimals_encountered.length
+                        }
+
                     }
                 }
 
                 if(Array.isArray(this.Experiment_Structure[i].Fennimal_interaction_type)){
                     for(let intnum = 0; intnum<this.Experiment_Structure[i].Fennimal_interaction_type.length; intnum++) {
-                        if(this.Experiment_Structure[i].Fennimal_interaction_type[intnum].includes("ask_")){
-                            max_stars = max_stars + this.Experiment_Structure[i].Fennimals_encountered.length
+                        if(typeof this.Experiment_Structure[i].bonus_stars_per_correct_answer !== "undefined" && this.Experiment_Structure[i].bonus_stars_per_correct_answer !== false){
+                            max_stars = this.Experiment_Structure[i].bonus_stars_per_correct_answer * this.Experiment_Structure[i].Fennimals_encountered.length
+
                         }
                     }
                 }
@@ -2006,7 +2012,6 @@ let StimulusTransformer = function (StimTemplate) {
     }
 
     this.get_Fennimals_in_array = function (Arr_of_ids) {
-        console.log(Arr_of_ids)
         if(Arr_of_ids === "all"){
             return(JSON.parse(JSON.stringify(FennimalObjArr)))
         }else{
