@@ -110,10 +110,8 @@ DATACONTROLLER = function (Stimuli, AttentionCheckController, StartTime) {
         ExperimentData.StoredData.push(NewObj)
 
         //Storing a timestamp
-        ExperimentData.TimeStamps.push({
-            type: DataObj.type,
-            time: Math.round((Date.now() - StartTime) / 1000)
-        })
+        this.record_timestamp(DataObj.type)
+
 
     }
 
@@ -135,6 +133,7 @@ DATACONTROLLER = function (Stimuli, AttentionCheckController, StartTime) {
     //Call when stars have been earned
     let PaymentInfo = []
     this.record_stars_earned = function (daynum, phase_type, stars_earned, maximum_possible_stars) {
+
         PaymentInfo.push(JSON.parse(JSON.stringify({
             day: daynum,
             day_type: phase_type,
@@ -212,6 +211,15 @@ DATACONTROLLER = function (Stimuli, AttentionCheckController, StartTime) {
     //Call only after payment data has been determined by the function above
     this.get_completion_code = function () {
         return (ExperimentData.PaymentData.completion_code)
+    }
+
+    this.record_timestamp = function(event_string){
+        ExperimentData.TimeStamps.push(  {
+            type: event_string,
+            time: Math.round((Date.now() - StartTime) / 1000)
+        })
+
+
     }
 
 }
@@ -441,6 +449,7 @@ EXPCONTROLLER = function () {
 
         if (Remaining_experiment_phases.length === 0) {
             start_post_experiment_questionnaire()
+            DataCont.record_timestamp("main phase complete")
         } else {
             CurrentPhaseData = Remaining_experiment_phases.shift()
 
@@ -465,23 +474,6 @@ EXPCONTROLLER = function () {
                 WorldState.change_partner_role_behavior(CurrentPhaseData.partner_behavior)
             }
 
-            //Adding the trials. Note that there could be MULTIPLE Fennimal interaction types supported.
-            //  Note: ONLY works for the interaction types "hint_and_search" and/or "jump_to_trial".
-            //      If any other types occur in the array, then select the first in array and print a warning.
-            /*if(typeof CurrentPhaseData.Fennimal_interaction_type === "object"){
-                if(Array.isArray(CurrentPhaseData.Fennimal_interaction_type)){
-                    if(CurrentPhaseData.Fennimal_interaction_type.length > 1){
-                        if(! (current_phase_type === "hint_and_search" || current_phase_type === "jump_to_trial")){
-                            console.warn("Experiment phase contains Fennimal interactions in multiple types, which this phase type does NOT support. Ignoring all but the first interaction type. CHECK STIMULUS SETTINGS!")
-                            CurrentPhaseData.Fennimal_interaction_type = CurrentPhaseData.Fennimal_interaction_type[0]
-                        }
-                    }else{
-                        CurrentPhaseData.Fennimal_interaction_type = CurrentPhaseData.Fennimal_interaction_type[0]
-                    }
-                }
-            }
-
-             */
 
             //Check if there are any instructions to be shown
             CurrentPhaseData.instructions_to_be_shown = CurrentPhaseData.type
@@ -508,9 +500,6 @@ EXPCONTROLLER = function () {
             }
 
 
-
-
-
             //After loading instructions and trials, prepare the world
             switch (current_phase_type) {
                 case("free_exploration"):
@@ -519,9 +508,13 @@ EXPCONTROLLER = function () {
                     //Populating the entire map at once
                     //CurrentPhaseData.Fennimals_in_phase = Stimuli.get_Fennimals_in_array(CurrentPhaseData.Fennimals_encountered)
                     WorldState.populate_map_with_array_of_Fennimals(CurrentPhaseData.Fennimals_in_phase, true)
-                    InstrCont.initialize_free_exploration_instructions(CurrentPhaseData.Fennimal_interaction_type,current_day_num, CurrentPhaseData.bonus_stars_per_correct_answer === true, CurrentPhaseData.include_Fennefinder, CurrentPhaseData.Fennimals_in_phase)
+                    InstrCont.initialize_free_exploration_instructions(CurrentPhaseData.Fennimal_interaction_type,current_day_num, CurrentPhaseData.bonus_stars_per_correct_answer === true, CurrentPhaseData.include_Fennefinder,CurrentPhaseData.force_climbing_tower_first === true, CurrentPhaseData.Fennimals_in_phase)
                     MapCont.disable_map_interactions()
                     set_property_to_all_elem_in_arr("interaction_type", CurrentPhaseData.Fennimal_interaction_type, CurrentPhaseData.Fennimals_in_phase)
+
+                    if(CurrentPhaseData.force_climbing_tower_first === true){
+                        MapCont.enforce_dome_until_tower_climbed()
+                    }
                     break
 
                 case("jump_to_trial"):
@@ -541,7 +534,7 @@ EXPCONTROLLER = function () {
 
                 case("name_recall_task"):
                     MapCont.disable_map_interactions()
-                    InstrCont.start_name_recall_task(current_day_num, CurrentPhaseData.award_star_for_each_correct_name)
+                    InstrCont.start_name_recall_task(current_day_num, CurrentPhaseData.bonus_stars_per_correct_answer)
                     break
                 case("card_sorting_task"):
                     MapCont.disable_map_interactions()
@@ -734,6 +727,7 @@ EXPCONTROLLER = function () {
             // Also make sure that the attention check controller knows to get started measuring
             AtCheckCont.toggle_recording_state("active")
             start_next_experiment_phase()
+            DataCont.record_timestamp("instructions complete")
         }
 
     }
@@ -1060,9 +1054,9 @@ EXPCONTROLLER = function () {
         }
         Array_recalled_IDs = [...new Set(Array_recalled_IDs)]
         CurrentPhaseData.Array_of_recalled_IDs = Array_recalled_IDs
-        if (typeof CurrentPhaseData.award_star_for_each_correct_name !== "undefined") {
-            if (CurrentPhaseData.award_star_for_each_correct_name) {
-                DataCont.record_stars_earned(current_day_num, CurrentPhaseData.type, CurrentPhaseData.Array_of_recalled_IDs.length, Stimuli.get_all_Fennimals_objects_in_array().length)
+        if (typeof CurrentPhaseData.bonus_stars_per_correct_answer !== "undefined") {
+            if (CurrentPhaseData.bonus_stars_per_correct_answer > 0) {
+                DataCont.record_stars_earned(current_day_num, CurrentPhaseData.type, CurrentPhaseData.Array_of_recalled_IDs.length * CurrentPhaseData.bonus_stars_per_correct_answer, Stimuli.get_all_Fennimals_objects_in_array().length * CurrentPhaseData.bonus_stars_per_correct_answer)
             }
         }
 

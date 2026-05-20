@@ -16,7 +16,7 @@ let StimulusSettings = function () {
     //      character_creation
     //      partner_introduction
     const All_Instructions_At_Start = {
-        test: [],
+        test: ["overview"],
         mentalizing_1: [], //"browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"
         mentalizing_1B : [],
         mentalizing_2: [], //"browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"
@@ -104,6 +104,7 @@ let StimulusSettings = function () {
     //  *   jump-to-trial: participants do not interact with the map, but instead are sequentially teleported to all trials
     //      jump_to_trial_no_instructions: used for testing only, goes straight into a trial
     //  *   free_exploration: participants are given a list of icons and can freely explore the map to find all Fennimals.
+    //          force_climbing_tower_first: if set to true, raises a barrier around the center. This barrier only dissapears once the watchtower has been climbed
     //  *   hint_and_search
     //          requires hint_type = "icon", "name", "toy", "toybox".
     //          Supports multiple hint types, in which case the trials are presented in pseudorandom order with no two Fennimals of the same ID back-to-back.
@@ -146,7 +147,7 @@ let StimulusSettings = function () {
     //          This task always has a plain background (to prevent any accidental cues).
     //          Assignment to an ID is done case-insensitive!
     //          This task has the following parameters:
-    //              award_star_for_each_correct_name: if set to true, participants will earn a star for each name they correctly remembered. No punishment for errors or duplicates. Defaults to no award earned. Adjusts the instructions accordingly
+    //              bonus_stars_per_correct_answer: if set to non-zero, participants will earn a star for each name they correctly remembered. No punishment for errors or duplicates. Defaults to no award earned. Adjusts the instructions accordingly
     //              allowed_Levenshtein_distance_for_match: if set to a non-zero positive integer, this denotes the amount of typos allowed to still match a typed name to an ID.
     //                  note: be sure that all names are sufficiently different to prevent double IDs from being submitted by the participant (the data will include a flag if this occurs)
     //      quiz: this starts a card-quiz phase. Participants are given a set of cards, each of which contains a hint (targetting a specific Fennimal) and a set of questions.
@@ -214,12 +215,33 @@ let StimulusSettings = function () {
     let All_Experiment_Structures = {
         test: [
             {
+                type: "name_recall_task",
+                bonus_stars_per_correct_answer: 1,
+                allowed_Levenshtein_distance_for_match: 2,
+            },
+            /*
+            {
+                type:"free_exploration",
+                Fennimal_interaction_type: ["play_with_toy_active", "give_food_active"], // "ask_contents_box", "play_with_toy_passive"
+                Fennimals_encountered: ["A1", "A2", "A3"],
+                partner_behavior: "absent",
+                question_options_food: ["A", "B", "C", "X"],
+                question_options_toys: ["A", "B", "C", "X"],
+                question_options_toyboxes: ["A", "B", "C", "X"],
+                hint_type: ["food", "toybox"],
+                allowed_attempts_before_answer_given: 3,
+                include_Fennefinder: true,
+                force_climbing_tower_first: true
+            },
+            {
                 type:"jump_to_trial",
                 Fennimal_interaction_type:"ask_Fennimal_toy",
                 Fennimals_encountered: ["A1", "A2" ],
                 partner_behavior: false,
                 bonus_stars_per_correct_answer: 1,
             }
+
+             */
 
             /*{
                 type: "collect_items_in_warehouse",
@@ -239,7 +261,7 @@ let StimulusSettings = function () {
                 question_options_food: ["A", "B", "C", "X"],
                 question_options_toys: ["A", "B", "C", "X"],
                 question_options_toyboxes: ["A", "B", "C", "X"],
-                bonus_stars_for_correct_answer: 3,
+                bonus_stars_per_correct_answer: 3,
                 hint_type: ["food", "toybox"],
                 allowed_attempts_before_answer_given: 3,
                 include_Fennefinder: "low_power_mode"
@@ -750,7 +772,8 @@ let StimulusSettings = function () {
                  Fennimal_interaction_type:["play_with_toy_passive", "give_food_passive"],
                  Fennimals_encountered: ["S1" , "S2", "W", "X" ],
                  partner_behavior: "active",
-                 include_Fennefinder: true
+                 include_Fennefinder: true,
+                 force_climbing_tower_first: true
              },
 
             {
@@ -788,7 +811,8 @@ let StimulusSettings = function () {
                 Fennimal_interaction_type:["play_with_toy_passive", "give_food_passive"],
                 Fennimals_encountered: ["P1" , "P2", "Y", "Z" ],
                 partner_behavior: "absent",
-                include_Fennefinder: true
+                include_Fennefinder: true,
+                force_climbing_tower_first: true
             },
             {
                 type:"hint_and_search",
@@ -820,6 +844,11 @@ let StimulusSettings = function () {
                 bonus_stars_per_correct_answer: 5,
                 question_options_toyboxes: ["A", "B"],
                 question_options_toys: ["A", "B", "C", "D"]
+            },
+            {
+                type: "name_recall_task",
+                bonus_stars_per_correct_answer: 1,
+                allowed_Levenshtein_distance_for_match: 2,
             },
             {
                 type:"jump_to_trial",
@@ -1944,9 +1973,9 @@ let StimulusTransformer = function (StimTemplate) {
             //The recalled names may earn a bonus for each correctly recalled name
             //TODO update
             if (this.Experiment_Structure[i].type === "name_recall_task") {
-                if (typeof this.Experiment_Structure[i].award_star_for_each_correct_name !== "undefined") {
-                    if (this.Experiment_Structure[i].award_star_for_each_correct_name) {
-                        max_stars = max_stars + this.get_Fennimals_in_array("all").length
+                if (typeof this.Experiment_Structure[i].bonus_stars_per_correct_answer !== "undefined") {
+                    if (this.Experiment_Structure[i].bonus_stars_per_correct_answer > 0) {
+                        max_stars = max_stars + this.get_Fennimals_in_array("all").length * this.Experiment_Structure[i].bonus_stars_per_correct_answer
                     }
                 }
             }

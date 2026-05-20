@@ -12,7 +12,6 @@ WorldStateObject = function () {
     //////////////////////
 
     this.populate_map_with_array_of_Fennimals = function (Arr, require_search_before_entering) {
-        console.log(Arr)
         for (let i = 0; i < Arr.length; i++) {
             State[Arr[i].location] = Arr[i]
             if (require_search_before_entering) {
@@ -297,7 +296,6 @@ WorldStateObject = function () {
 
     this.change_partner_belief_in_box_contents = function(box, contents){
         PartnerBeliefs_Boxes[box] = contents
-        console.log(PartnerBeliefs_Boxes)
     }
     this.get_partner_belief_in_box_contents = function(box){
         if(typeof PartnerBeliefs_Boxes[box] === "undefined"){

@@ -45,6 +45,10 @@
     pointer-events: none;
 }
 
+.map_block {
+    opacity: 0
+}
+
 .icon_button_icon {
     opacity: 0;
     display: none;
@@ -772,5 +776,32 @@
     70% {transform: translate(150px,-350px); opacity: 1}
     95% {transform: translate(450px,450px); opacity: 0}
     100% {transform: translate(450px,450px); opacity: 0}
+}
+
+/* --- DOME ARROW ANIMATIONS --- */
+
+/* Bobs the entire arrow up and down gently */
+.hover-anim {
+    animation: hover 2.5s ease-in-out infinite;
+    transform-origin: center;
+}
+
+/* Pushes the energy trace up the center line */
+.trace-anim {
+    stroke-dasharray: 50 150;
+    animation: flowUp 1.5s linear infinite;
+}
+
+/* Keyframes for the bobbing motion */
+@keyframes hover {
+    0%   { transform: translateY(0px); opacity: 0.8; }
+    50%  { transform: translateY(-70px); opacity: 1; }
+    100% { transform: translateY(0px); opacity: 0.8; }
+}
+
+/* Keyframes for the flowing energy line */
+@keyframes flowUp {
+    from { stroke-dashoffset: 200; }
+    to   { stroke-dashoffset: 0; }
 }
 

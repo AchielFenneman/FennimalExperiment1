@@ -671,8 +671,9 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
     ///////////////////////////
     let Exploration_Array_Fennimal_Objects, Array_of_Locations_in_game, FennimalBox, LocationBox,
         TextElem_Main_Instructions, Fennimals_in_phase
-    this.initialize_free_exploration_instructions = function (interaction_type, current_block_num, can_earn_stars, fennefinder_status, Fennimals_in_phase_Array) {
+    this.initialize_free_exploration_instructions = function (interaction_type, current_block_num, can_earn_stars, fennefinder_status, forced_tower_climb_at_start, Fennimals_in_phase_Array) {
         Fennimals_in_phase = Fennimals_in_phase_Array
+        let box_start_y = 400
         current_instruction_type = "exploration"
         let NewArr = []
         for(let i = 0; i < Fennimals_in_phase_Array.length; i++) {
@@ -694,12 +695,6 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
         //Show instructions layer
         ParentElem.style.display = "inherit"
 
-        //Creating the scrollable box containing all the FENNIMALS
-        FennimalBox = new Vertical_scollable_box(ParentElem, (0.5 * 1920 - 0.5 * 1800), 400, 1800, 500)
-        FennimalBox.change_opacity(0)
-        FennimalBox.add_array_of_Fennimal_icons(Fennimals_in_phase_Array, 200, 200, true)
-        //LocationBox.add_array_of_Location_icons(WorldState.get_location_states_in_array(), 175,175, true )
-
         //Adding the closing button on the top-right
         add_closing_button_to_Parent("top-right", false, undefined)
 
@@ -711,11 +706,17 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
         if(fennefinder_status === "low_power_mode"){
             Fennefinder_text = "Unfortunately, the Fennefinder has run out of battery - so you'll have to find all Fennimals by memory! "
         }
+
+        let dometext = ""
+        if(forced_tower_climb_at_start){
+            dometext = "At the start of the day, you should first climb the watchtower to see the locations of all Fennimals. "
+        }
+
         document.getElementById("Instructions_Title").innerHTML = "Day " + current_block_num + ": find all the Fennimals on the island"
 
         let instruction_text = "Your task today is to explore the island and find all Fennimals on the island. There are currenly " + Fennimals_in_phase_Array.length + " Fennimals spread across the different regions of Fenneland.  <br>" +
             "You can search different locations. If there is a Fennimal present, then please enter the location and follow the instructions. " +
-            Fennefinder_text+  "<br>" +
+            Fennefinder_text+ dometext +   "<br>" +
             "Press the X to close this page and travel the island."
         TextElem_Main_Instructions = create_SVG_text_in_foreign_element(instruction_text, 100, 100, (GenParam.SVG_width - 2 * 100), 500, "instruction_element_text")
         TextElem_Main_Instructions.classList.add("instruction_element_nonbackground")
@@ -725,6 +726,13 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
         setTimeout(function () {
             FennimalBox.change_opacity(1)
         }, 5)
+
+        //Creating the scrollable box containing all the FENNIMALS
+        FennimalBox = new Vertical_scollable_box(ParentElem, (0.5 * 1920 - 0.5 * 1800), 450, 1800, 500)
+        FennimalBox.change_opacity(0)
+        FennimalBox.add_array_of_Fennimal_icons(Fennimals_in_phase_Array, 200, 200, true, true)
+        //LocationBox.add_array_of_Location_icons(WorldState.get_location_states_in_array(), 175,175, true )
+
 
         //Updating the number of days in the progress bar
         update_progress_new_day(current_block_num)
@@ -1139,8 +1147,18 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
 
     //NAME RECALL TASK
     ////////////////////////////
-    this.start_name_recall_task = function (current_block_num, can_earn_stars) {
+    this.start_name_recall_task = function (current_block_num, bonus_stars_per_correct_answer) {
         current_instruction_type = "name_recall_task"
+        let can_earn_stars, bonus_start = "", bonus_text = ""
+        if(bonus_stars_per_correct_answer > 0){
+            can_earn_stars = true
+            bonus_start = "Today you can earn some bonus stars! "
+            if(bonus_stars_per_correct_answer === 1){
+                bonus_text = "You will earn one star for each name you correctly enter!"
+            }else{
+                bonus_text = "You will earn " + bonus_stars_per_correct_answer + " stars for each name you correctly enter!"
+            }
+        }
 
         //Show the instructions background as usual
         clear_instructions()
@@ -1172,7 +1190,7 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
         document.getElementById("Instructions_Title").style.transform = "translate(0px, -50px)"
 
         //Setting the instructions text
-        let instruction_text = "Today you can earn some bonus stars! Please write down all the names of the different Fennimals which you can remember. <br>" +
+        let instruction_text = bonus_start + "Please write down all the names of the different Fennimals which you can remember. " + bonus_text + "<br>" +
             "<br> " +
             "<i>You can enter a name by typing in the box and clicking on the 'Add' button. " +
             "Your previous answers will be blurred, but if you made a mistake you can click on <span style='color:firebrick'> [x] </span> to remove an answer. " +
@@ -3286,7 +3304,7 @@ Vertical_scollable_box = function (ParentElem, x, y, width, height) {
         update_scroll_button_visibility()
     }
 
-    this.add_array_of_Fennimal_icons = function (FenObjArr, icon_width, icon_height, include_names) {
+    this.add_array_of_Fennimal_icons = function (FenObjArr, icon_width, icon_height, include_names, include_region_color) {
         //First a filtering pass: if a Fennimal object has no name, then it doesnt get a card (filters out empty entries)
         //Removing all empty locations (we dont need to provide instructions for these)
         let NewArr = []
@@ -3301,7 +3319,9 @@ Vertical_scollable_box = function (ParentElem, x, y, width, height) {
             //Creating the Fennimal object icon. Here we need to check if the Fennimal has a property lablled "visited". If so, and the value is true, then show the actual Fennimal.
             // Otherwise, show the outline.
             let background_color = "#DDDDDD44"
-
+            if(include_region_color === true){
+                background_color = GenParam.RegionData[FenObjArr[i].region].lighter_color
+            }
 
             let name_color
             let Fennimal_has_been_found = false

@@ -1029,6 +1029,18 @@ MapController = function (ExpCont, WorldState) {
         create_ripple(Map_Layer, Marker.getBBox().x, Marker.getBBox().y, true)
     }
 
+    //DOME
+    ////////////
+    let dome_visible_until_tower_climbed = false, dome_message_interval
+    this.enforce_dome_until_tower_climbed = function(){
+        Interface.Prompt.show_message("First climb the watchtower to get an overview of Fenneland")
+        DomeCont.raise_dome_with_arrow()
+        dome_visible_until_tower_climbed = true
+        dome_message_interval = setInterval(function () {
+            Interface.Prompt.show_message("First climb the watchtower to get an overview of Fenneland")
+        }, 1000)
+    }
+
 
     //On start
     ///////////////////
@@ -1446,6 +1458,16 @@ MapController = function (ExpCont, WorldState) {
                 }, watchtower_hint_speed)
             }
 
+
+            //Check if a dome is raised. If so, lower it
+            if(dome_visible_until_tower_climbed){
+                setTimeout(function () {
+                    clearInterval(dome_message_interval)
+                    dome_visible_until_tower_climbed = false
+                    DomeCont.collapse_dome()
+                }, 1000)
+            }
+
         }
 
         this.leave_watchtower = function () {
@@ -1677,6 +1699,54 @@ MapController = function (ExpCont, WorldState) {
 
     }
 
+    DomeController = function(){
+        //Get the dome elements
+        const Dome = document.getElementById("centerdome")
+        const DomeBlock = document.getElementById("dome_block_element")
+        const DomeArrow = document.getElementById("dome_arrow")
+
+        //On creation, disable the dome
+        Dome.style.opacity = 0
+        DomeBlock.style.opacity = 0
+        Dome.style.display = "none"
+        DomeBlock.classList.remove("map_block")
+        DomeArrow.style.display = "none"
+        DomeArrow.style.opacity = 0
+        Dome.style.transition = "all 500ms ease-in-out"
+        DomeArrow.style.transition = "all 500ms ease-in-out"
+
+        //Enables the dome
+        this.raise_dome_with_arrow = function(){
+            Dome.style.opacity = 0
+            Dome.style.display = "inherit"
+            DomeBlock.classList.add("map_block")
+            DomeArrow.style.display = "inherit"
+
+            Dome.style.opacity = 1
+            setTimeout(function(){DomeArrow.style.opacity = 1},500)
+        }
+
+        //Shows the dome fade out and then disables
+        this.collapse_dome = function(){
+            DomeArrow.style.opacity = 0
+
+            setTimeout(function(){
+                Dome.style.opacity = 0
+                DomeBlock.classList.remove("map_block")
+            },500)
+
+            setTimeout(function(){
+                Dome.style.display = "none"
+                DomeArrow.style.display = "none"
+            },1000)
+
+        }
+
+
+
+
+    }
+
     this.update_player_settings = function(){
         Partner.update_settings()
         Player.update_settings()
@@ -1691,6 +1761,7 @@ MapController = function (ExpCont, WorldState) {
     Partner.update_behavior()
 
     let Player = new PlayerIconController()
+    let DomeCont = new DomeController()
 
     //On start
     Player.jump_to_map_center()
