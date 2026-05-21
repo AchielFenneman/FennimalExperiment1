@@ -69,6 +69,18 @@ let StimulusSettings = function () {
 
         ],
         mentalizing_network: [
+            {id: "S1", head: "A", region: "A", toy: "A", toybox: "A", hat: "A"},
+            {id: "S2", head: "B", region: "A", toy: "B", toybox: "B", hat: "B"},
+            {id: "S3", head: "C", region: "B", toy: "C", toybox: "C"},
+            {id: "S4", head: "D", region: "C", toy: "D", toybox: "D"},
+
+            {id: "P1", head: "E", region: "D", toy: "E", toybox: "A"},
+            {id: "P2", head: "F", region: "E", toy: "F", toybox: "B"},
+            {id: "P3", head: "A", region: "F", toy: "G", toybox: "C", hat: "B"},
+            {id: "P4", head: "B", region: "F", toy: "H", toybox: "D", hat: "A"},
+
+
+            /*
             {id: "S1", head: "A", region: "A", toy: "A", toybox: "A"},
             {id: "S2", head: "B", region: "A", toy: "B", toybox: "B"},
             {id: "S3", head: "C", region: "B", toy: "C", toybox: "C"},
@@ -81,6 +93,8 @@ let StimulusSettings = function () {
 
             {id: "X", head: "G", region: "A", food_preference: "A"},
             {id: "Y", head: "B", region: "G", food_preference: "B"},
+
+             */
 
 
 
@@ -833,7 +847,7 @@ let StimulusSettings = function () {
             {
                 type: "pseudoday",
                 information: "new_Fennimals_spotted",
-                displayed_icons: ["P1", "P2", "P3", "P4", "X", "Y"],
+                displayed_icons: ["P1", "P2", "P3", "P4"],
                 title: "Get to know some more Fennimals on the island",
                 display_text: "While %PARTNERNAME% is away, there are some Fennimals on the island who would love to get to know you! " +
                     "Unfortunately, we ran out of boxes to store the toys in, so we will have to reuse some of the boxes."
@@ -841,7 +855,7 @@ let StimulusSettings = function () {
             {
                 type:"free_exploration",
                 Fennimal_interaction_type:["play_with_toy_passive", "give_food_passive"],
-                Fennimals_encountered: ["P1", "P2", "P3", "P4", "X", "Y" ],
+                Fennimals_encountered: ["P1", "P2", "P3", "P4" ],
                 partner_behavior: "absent",
                 include_Fennefinder: true,
                 force_climbing_tower_first: true
@@ -849,7 +863,7 @@ let StimulusSettings = function () {
             {
                 type:"hint_and_search",
                 Fennimal_interaction_type:["play_with_toy_active", "give_food_active"],
-                Fennimals_encountered: ["P1", "P2", "P3", "P4", "X", "Y"],
+                Fennimals_encountered: ["P1", "P2", "P3", "P4"],
                 question_options_toys: ["E", "F", "G", "H" ],
                 question_options_toyboxes: ["A", "B", "C", "D" ],
                 partner_behavior: "absent",
@@ -858,7 +872,7 @@ let StimulusSettings = function () {
             },
             {
                 type: "Fennimal_attribute_sorting_task", // "head_region_sorting_task", "Fennimal_attribute_sorting_task",
-                Fennimals_encountered: ["P1", "P2", "P3", "P4", "X", "Y"],
+                Fennimals_encountered: ["P1", "P2", "P3", "P4"],
                 attribute_order: ["region", "head", "toybox", "toy", "food_preference"],
                 maximum_earnable_stars: 5
             },
@@ -873,7 +887,7 @@ let StimulusSettings = function () {
             {
                 type: "collect_items_in_warehouse",
                 questions: ["ask_partner_belief_toyboxes"],
-                bonus_stars_per_correct_answer: 5,
+                bonus_stars_per_correct_answer: 4,
                 question_options_toyboxes: ["A", "B", "C", "D"],
                 question_options_toys: ["A", "B", "C", "D", "E", "F", "G", "H"]
             },
