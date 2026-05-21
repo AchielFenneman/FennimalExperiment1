@@ -139,7 +139,6 @@ async function load_additional_svg_assets(){
 
 //This sets all the global variables
 function set_all_global_variables(){
-    console.log("...........")
     //Loading SVG Elements
     //SVG_loader = new SVG_LOADER()
 
@@ -216,7 +215,7 @@ loadMainElements()
 
 
 //Adapt head sorting task to two rows if more than 4 regions selected
-console.log("Ready")
+console.log("Ready 2")
 
 
 

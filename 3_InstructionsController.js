@@ -2043,6 +2043,15 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
                     {x: -75, y: -50, rotation: 0},
                     {x: 150, y: 150, rotation: -10},
                     {x: -150, y: 150, rotation: 10},
+                ],
+                6: [
+                    {x: 250, y: 0, rotation: -10},
+                    {x: -250, y: 0, rotation: 10},
+                    {x: -75, y: -50, rotation: 0},
+                    {x: 150, y: 150, rotation: -10},
+                    {x: -150, y: 150, rotation: 10},
+                    {x: 400, y: 150, rotation: 20},
+
                 ]
             }
             let icon_move_positions = AllIconPositions[OptionalInformation.length]

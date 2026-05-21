@@ -1183,7 +1183,7 @@ FennimalAttributeSortingTask = function(Parent, Title, FennimalObjectArray, attr
 
     function mistake_made(id_of_target_fennimal, given_answer, correct_answer){
         number_of_mistakes_made++
-        Mistakes_Made.push({id: id_of_target_fennimal, correct: correct_answer, selected: correct_answer})
+        Mistakes_Made.push({id: id_of_target_fennimal, correct: correct_answer, selected: given_answer})
         if(can_earn_bonus_stars){
             if(remaining_earnable_stars > 0){
                 remaining_earnable_stars --
@@ -1289,10 +1289,6 @@ FennimalAttributeSortingTask = function(Parent, Title, FennimalObjectArray, attr
 
         EscapeForeign.style.display = "none"
 
-
-
-        console.log(EscapeForeign)
-
     }
 
     function match_name(input){
@@ -1328,7 +1324,7 @@ FennimalAttributeSortingTask = function(Parent, Title, FennimalObjectArray, attr
         if(matched_name === false || matched_name === true){
             if(matched_name === false){
                 AudioCont.play_sound_effect("rejected")
-                mistake_made("NA", name, "NA")
+                mistake_made(false, name, "NA")
             }
         }else{
             AudioCont.play_sound_effect("success")
@@ -1376,7 +1372,6 @@ FennimalAttributeSortingTask = function(Parent, Title, FennimalObjectArray, attr
 
             //Get the values of this attribute
             values_in_set = shuffleArray(get_all_values_of_attribute(current_attribute_set))
-            console.log(values_in_set)
 
             if(current_attribute_set === "name"){
                 values_completed = []

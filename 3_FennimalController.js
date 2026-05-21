@@ -206,7 +206,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
                     break
                 case("passive_Fennimal"):
                     fade_and_appear_Fennimal_center(true)
-                    Interface.Prompt.show_message(FenObj.name + " is happy to see you")
+                    Interface.Prompt.show_message(FenObj.name + " is happy to see you - but is not who you're looking for")
                     break
 
                 case("Fennimal_hungry"):
