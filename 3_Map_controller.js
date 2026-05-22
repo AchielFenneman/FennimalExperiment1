@@ -311,7 +311,8 @@ MapController = function (ExpCont, WorldState) {
         Map_Layer.style.transformOrigin = coords.x + "% " + coords.y + "%"
 
         //Setting the correct scale
-        Map_Layer.style.transform = "scale(" + scale_level + ")"
+        //Map_Layer.style.transform = "scale(" + scale_level + ")"
+        Map_Layer.style.transform = "scale3D(" + scale_level + "," + scale_level +  ",1)"
 
         //Setting the opacity masks (exception for "all")
         reset_all_region_opacity_masks()

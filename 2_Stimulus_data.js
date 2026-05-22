@@ -4,7 +4,7 @@ let StimulusSettings = function () {
 
     //This defines which experiment will be run (definitions follow below).
     // NOTE: If there are multiple codes in an array, then one will be picked at random!
-    this.Experiment_Code = ["mentalizing_network"] // "schema_experiment_offset"
+    this.Experiment_Code = ["test"] // "schema_experiment_offset"
 
     // SETTING THE INSTRUCTIONS SHOWN TO PARTICIPANTS AT THE START OF THE EXPERIMENT (BEFORE FIRST DAY)
     //  Allowed values:
@@ -16,7 +16,7 @@ let StimulusSettings = function () {
     //      character_creation
     //      partner_introduction
     const All_Instructions_At_Start = {
-        test: [],
+        test: ["overview"],
         mentalizing_1: [], //"browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"
         mentalizing_1B : [],
         mentalizing_2: [], //"browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"
@@ -246,6 +246,20 @@ let StimulusSettings = function () {
     //          if set to "low_power_mode", then the Fennefinder appears but is inoperable
     let All_Experiment_Structures = {
         test: [
+            {
+                type:"free_exploration",
+                Fennimal_interaction_type: ["play_with_toy_active", "give_food_active"], // "ask_contents_box", "play_with_toy_passive"
+                Fennimals_encountered: ["A1", "A2", "A3"],
+                partner_behavior: "absent",
+                question_options_food: ["A", "B", "C", "X"],
+                question_options_toys: ["A", "B", "C", "X"],
+                question_options_toyboxes: ["A", "B", "C", "X"],
+                hint_type: ["food", "toybox"],
+                allowed_attempts_before_answer_given: 3,
+                include_Fennefinder: true,
+                force_climbing_tower_first: true
+            },
+
             {
                 type: "pseudoday",
                 information: "new_Fennimals_spotted",
