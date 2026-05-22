@@ -257,7 +257,7 @@ let StimulusSettings = function () {
                 hint_type: ["food", "toybox"],
                 allowed_attempts_before_answer_given: 3,
                 include_Fennefinder: true,
-                force_climbing_tower_first: true
+                force_climbing_tower_first: false
             },
 
             {

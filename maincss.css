@@ -23,6 +23,10 @@
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
     will-change: transform;
+    transform-origin: 0 0;
+    opacity: 0.999;
+    isolation: isolate;
+    perspective: 2000px;
 }
 
 #Scannimals_Task_SVG {

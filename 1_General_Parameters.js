@@ -60,6 +60,19 @@ GENERALPARAM = function () {
     //Note: these are denoted in PERCENTAGES
     this.Map_Region_Centers_Percentage = {
         Home: {x: 50, y: 50},
+        North: {x: 50, y: 20},
+        Desert: {x: 50, y: 75},
+        Jungle: {x: 35, y: 50},
+        Village: {x: 67, y: 50},
+        Flowerfields: {x: 35, y: 30},
+        Mountains: {x: 65, y: 30},
+        Swamp: {x: 65, y: 70},
+        Beach: {x: 35, y: 70},
+    }
+
+    /*
+    this.Map_Region_Centers_Percentage = {
+        Home: {x: 50, y: 50},
         North: {x: 50, y: 10},
         Desert: {x: 50, y: 85},
         Jungle: {x: 25, y: 50},
@@ -69,6 +82,7 @@ GENERALPARAM = function () {
         Swamp: {x: 65, y: 80},
         Beach: {x: 35, y: 80},
     }
+     */
 
     //The environment may place additional constraints on speed. These are defined below
     this.Speedlimits = {
