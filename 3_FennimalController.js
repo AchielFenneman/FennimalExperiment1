@@ -2219,8 +2219,13 @@ Backpack = function(ParentElem, center_x,center_y, openfunc, open_automatically)
     let Box = TranslationGroup.getBBox()
     let delta_x = center_x - (Box.x + 0.5 * Box.width)
     let delta_y = center_y - (Box.y + 0.5 * Box.height)
+
+    if( open_automatically){
+        TranslationGroup.style.opacity = 0
+    }else{
+        setTimeout(function(){TranslationGroup.style.transition = "all 400ms ease-in"},100)
+    }
     TranslationGroup.style.transform = "translate(" + delta_x + "px ," + delta_y + "px)"
-    setTimeout(function(){TranslationGroup.style.transition = "all 400ms ease-in"},100)
 
     //Backpack is by default created closed
     let openstate = "closed"
@@ -2258,17 +2263,17 @@ Backpack = function(ParentElem, center_x,center_y, openfunc, open_automatically)
 
     if(open_automatically){
         //Move the backpack down and then animate it going up and opening
-        TranslationGroup.style.transition = ""
-        TranslationGroup.style.transform = "translate(" + delta_x + "px ," + (delta_y+500) + "px)"
 
         setTimeout(function(){
-            TranslationGroup.style.transition = "all 400ms ease-in"
+            TranslationGroup.style.transition = "all 200ms ease-in"
+            TranslationGroup.style.opacity = 1
             TranslationGroup.style.transform = "translate(" + delta_x + "px ," + (delta_y+200) + "px)"
 
             setTimeout(function(){
+                TranslationGroup.style.transition = "all 400ms ease-in"
                 try_open_backpack()
             },300)
-        },10)
+        },20)
 
 
 
