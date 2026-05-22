@@ -300,6 +300,7 @@ function create_SVG_text_in_foreign_element(text, x, y, width, height, text_clas
     TextElem.style.height = "100%"
     TextElem.classList.add(text_class_name)
     TextElem.innerHTML = text
+    TextElem.style.lineHeight = "95%"
     ForeignElem.appendChild(TextElem)
     return (ForeignElem)
 }

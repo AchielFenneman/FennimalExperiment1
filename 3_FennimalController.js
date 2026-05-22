@@ -2263,16 +2263,17 @@ Backpack = function(ParentElem, center_x,center_y, openfunc, open_automatically)
 
     if(open_automatically){
         //Move the backpack down and then animate it going up and opening
+        TranslationGroup.style.transform = "translate(" + delta_x + "px ," + (delta_y+200) + "px)"
 
         setTimeout(function(){
             TranslationGroup.style.transition = "all 200ms ease-in"
             TranslationGroup.style.opacity = 1
-            TranslationGroup.style.transform = "translate(" + delta_x + "px ," + (delta_y+200) + "px)"
+
 
             setTimeout(function(){
                 TranslationGroup.style.transition = "all 400ms ease-in"
                 try_open_backpack()
-            },300)
+            },200)
         },20)
 
 

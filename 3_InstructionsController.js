@@ -714,7 +714,7 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
 
         document.getElementById("Instructions_Title").innerHTML = "Day " + current_block_num + ": find all the Fennimals on the island"
 
-        let instruction_text = "Your task today is to explore the island and find all Fennimals on the island. There are currenly " + Fennimals_in_phase_Array.length + " Fennimals spread across the different regions of Fenneland.  <br>" +
+        let instruction_text = "Your task today is to explore the island and find all Fennimals on the island. There are currently " + Fennimals_in_phase_Array.length + " Fennimals spread across the different regions of Fenneland.  <br>" +
             "You can search different locations. If there is a Fennimal present, then please enter the location and follow the instructions. " +
             Fennefinder_text+ dometext +   "<br>" +
             "Press the X to close this page and travel the island."
@@ -992,7 +992,7 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
         if(hint_type === "toybox"){
             document.getElementById("Instructions_Title").innerHTML = "Bring this box to the correct Fennimal!"
         }
-        if(hint_type === "toybox"){
+        if(hint_type === "food"){
             document.getElementById("Instructions_Title").innerHTML = "Find the Fennimal which likes this food!"
         }
 

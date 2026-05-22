@@ -78,10 +78,10 @@ let StimulusSettings = function () {
             {id: "P2", head: "E", region: "E", toy: "E", toybox: "B"},
             {id: "P3", head: "F", region: "F", toy: "F", toybox: "C"},
 
-            {id: "W", head: "G", region: "A", food_preference: "A", hat: "A"},
-            {id: "X", head: "H", region: "A", food_preference: "A", hat: "A"},
-            {id: "Y", head: "I", region: "B", food_preference: "B", hat: "B"},
-            {id: "Z", head: "J", region: "B", food_preference: "B", hat: "B"},
+            {id: "W", head: "A", region: "A", food_preference: "A", hat: "C"},
+            {id: "X", head: "A", region: "A", food_preference: "B", hat: "D"},
+            {id: "Y", head: "E", region: "E", food_preference: "C", hat: "E"},
+            {id: "Z", head: "E", region: "E", food_preference: "D", hat: "F"},
 
             /*
             {id: "S1", head: "A", region: "A", toy: "A", toybox: "A", hat: "A"},

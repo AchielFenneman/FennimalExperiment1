@@ -163,6 +163,7 @@ ImageLoader = function(Array_of_visited_regions_and_locations, LocationHolderEle
 
     for(let i = 0; i < Array_of_visited_regions_and_locations.length; i++){
         let filename = Array_of_visited_regions_and_locations[i][1] + "_" + Array_of_visited_regions_and_locations[i][0].toLowerCase() + ".png"
+        console.log(filename)
         let NewGroup = create_SVG_group(0,0,"location","location_" + Array_of_visited_regions_and_locations[i][0] )
         let Img = document.createElementNS("http://www.w3.org/2000/svg", 'image')
         Img.setAttribute("href", "./Locations/" + filename)
