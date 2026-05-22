@@ -196,7 +196,6 @@ MapController = function (ExpCont, WorldState) {
         Location_Layer = document.getElementById("Location_layer"), Sky_layer = document.getElementById("Sky_Layer"),
         Transition_Mask = document.getElementById("transition_mask"), RequestInstructionsButton,
         SVGShield = document.getElementById("SVG_background_shield"), PageContainer = document.getElementById("Scannimals_container_div")
-    console.log(Map_Layer)
 
     SVGShield.style.transition = "opacity 3000ms ease-in-out"
     SVGShield.style.strokeWidth = "5px"

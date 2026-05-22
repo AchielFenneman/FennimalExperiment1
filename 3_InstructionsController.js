@@ -178,7 +178,7 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
     function add_closing_button_to_Parent(position, add_keyboard_shortcut_for_closing, optional_additional_function, optional_delay_time) {
         switch (position) {
             case("top-right"):
-                ClosingButton = create_SVG_buttonElement(1820, 3 * boundary_size, 75, 75, "🗙", 70)
+                ClosingButton = create_SVG_buttonElement(1820, 3 * boundary_size, 75, 75, "X", 70)
                 break;
             case("bottom-center"):
                 ClosingButton = create_SVG_buttonElement(0.5 * GenParam.SVG_width, 0.85 * GenParam.SVG_height, 400, 75, "Continue", 70)
