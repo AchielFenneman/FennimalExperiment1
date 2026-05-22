@@ -1888,6 +1888,7 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
     //PSEUDODAY CARDS
     ////////////////////
     this.show_pseudo_day_information_page = function(information_type,title, text, OptionalInformation) {
+        console.log(information_type)
         //Modifying text (if any is provided)
         if(typeof text !== "undefined") {
             text = text.replaceAll("%PARTNERNAME%", WorldState.get_partner_icon_settings().name)
@@ -1991,7 +1992,7 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
             //Continue button
             let ContinueButton = create_SVG_buttonElement(0.5 * GenParam.SVG_width, 0.875 * GenParam.SVG_height, 400, 75, "Continue", 40)
             ContinueButton.onpointerdown = function (event) {
-                ExpCont.general_instructions_page_completed()
+                //ExpCont.instructions_page_completed()
                 //CurrentInstructionsSVG.remove()
             }
             CurrentInstructionsSVG.appendChild(ContinueButton)

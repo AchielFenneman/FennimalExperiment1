@@ -196,6 +196,8 @@ MapController = function (ExpCont, WorldState) {
         Location_Layer = document.getElementById("Location_layer"), Sky_layer = document.getElementById("Sky_Layer"),
         Transition_Mask = document.getElementById("transition_mask"), RequestInstructionsButton,
         SVGShield = document.getElementById("SVG_background_shield"), PageContainer = document.getElementById("Scannimals_container_div")
+    console.log(Map_Layer)
+
     SVGShield.style.transition = "opacity 3000ms ease-in-out"
     SVGShield.style.strokeWidth = "5px"
     SVGShield.style.stroke = "gray"
@@ -308,11 +310,27 @@ MapController = function (ExpCont, WorldState) {
         let scale_level = 1 / zoom_level
 
         //Setting the correct origin point for the map
-        Map_Layer.style.transformOrigin = coords.x + "% " + coords.y + "%"
+        //Map_Layer.style.transformOrigin = coords.x + "% " + coords.y + "%"
+
 
         //Setting the correct scale
         //Map_Layer.style.transform = "scale(" + scale_level + ")"
-        Map_Layer.style.transform = "scale3D(" + scale_level + "," + scale_level +  ",1)"
+        //Map_Layer.style.transform = "scale3D(" + scale_level + "," + scale_level +  ",1)"
+        console.log(coords)
+
+        const targetX = GenParam.SVG_width  * (coords.x / 100); // The X coordinate of the region you want centered
+        const targetY = GenParam.SVG_height  * (coords.y / 100); // The Y coordinate of the region you want centered
+
+        // 2. Define the center of your viewable SVG canvas
+        const centerX = GenParam.SVG_width / 2;
+        const centerY = GenParam.SVG_height / 2;
+
+        // 3. The Math: Calculate how far to push the map so the target hits the center AFTER scaling
+        const shiftX = Math.round(centerX - (targetX * scale_level))
+        const shiftY = Math.round(centerY - (targetY * scale_level))
+
+        // 4. Apply it via the native attribute (Note: translate MUST come before scale)
+        Map_Layer.setAttribute('transform', `translate(${shiftX}, ${shiftY}) scale(${scale_level})`);
 
         //Setting the opacity masks (exception for "all")
         reset_all_region_opacity_masks()

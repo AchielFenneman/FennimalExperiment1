@@ -16,7 +16,7 @@ let StimulusSettings = function () {
     //      character_creation
     //      partner_introduction
     const All_Instructions_At_Start = {
-        test: ["overview"],
+        test: [],
         mentalizing_1: [], //"browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"
         mentalizing_1B : [],
         mentalizing_2: [], //"browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"
