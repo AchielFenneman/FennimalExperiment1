@@ -745,7 +745,6 @@ EXPCONTROLLER = function () {
 
     //Call when the instructions page has been closed
     this.instructions_page_closed = function () {
-        console.log(current_phase_type)
         switch (current_phase_type) {
             case("free_exploration"):
                 if (typeof flag_exploration_phase_has_been_completed_after_instructions_closed !== "undefined") {
@@ -781,6 +780,10 @@ EXPCONTROLLER = function () {
             case("jump_to_trial_no_instructions"):
                 jump_to_next_trial()
                 break
+            case("pseudoday"):
+                start_next_experiment_phase()
+                break
+
 
 
         }

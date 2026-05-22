@@ -316,7 +316,6 @@ MapController = function (ExpCont, WorldState) {
         //Setting the correct scale
         //Map_Layer.style.transform = "scale(" + scale_level + ")"
         //Map_Layer.style.transform = "scale3D(" + scale_level + "," + scale_level +  ",1)"
-        console.log(coords)
 
         const targetX = GenParam.SVG_width  * (coords.x / 100); // The X coordinate of the region you want centered
         const targetY = GenParam.SVG_height  * (coords.y / 100); // The Y coordinate of the region you want centered

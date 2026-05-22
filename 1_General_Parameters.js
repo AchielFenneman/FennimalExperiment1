@@ -60,7 +60,7 @@ GENERALPARAM = function () {
     //Note: these are denoted in PERCENTAGES
     this.Map_Region_Centers_Percentage = {
         Home: {x: 50, y: 50},
-        North: {x: 50, y: 20},
+        North: {x: 50, y: 24},
         Desert: {x: 50, y: 75},
         Jungle: {x: 35, y: 50},
         Village: {x: 67, y: 50},

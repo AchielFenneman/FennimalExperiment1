@@ -4,7 +4,7 @@ let StimulusSettings = function () {
 
     //This defines which experiment will be run (definitions follow below).
     // NOTE: If there are multiple codes in an array, then one will be picked at random!
-    this.Experiment_Code = ["test"] // "schema_experiment_offset"
+    this.Experiment_Code = ["mentalizing_network"] // "schema_experiment_offset"
 
     // SETTING THE INSTRUCTIONS SHOWN TO PARTICIPANTS AT THE START OF THE EXPERIMENT (BEFORE FIRST DAY)
     //  Allowed values:
@@ -69,6 +69,21 @@ let StimulusSettings = function () {
 
         ],
         mentalizing_network: [
+
+            {id: "S1", head: "A", region: "A", toy: "A", toybox: "A", hat: "A"},
+            {id: "S2", head: "B", region: "B", toy: "B", toybox: "B", hat: "B"},
+            {id: "S3", head: "C", region: "C", toy: "C", toybox: "C"},
+
+            {id: "P1", head: "D", region: "D", toy: "D", toybox: "A"},
+            {id: "P2", head: "E", region: "E", toy: "E", toybox: "B"},
+            {id: "P3", head: "F", region: "F", toy: "F", toybox: "C"},
+
+            {id: "W", head: "G", region: "A", food_preference: "A", hat: "A"},
+            {id: "X", head: "H", region: "A", food_preference: "A", hat: "A"},
+            {id: "Y", head: "I", region: "B", food_preference: "B", hat: "B"},
+            {id: "Z", head: "J", region: "B", food_preference: "B", hat: "B"},
+
+            /*
             {id: "S1", head: "A", region: "A", toy: "A", toybox: "A", hat: "A"},
             {id: "S2", head: "B", region: "A", toy: "B", toybox: "B", hat: "B"},
             {id: "S3", head: "C", region: "B", toy: "C", toybox: "C"},
@@ -78,6 +93,8 @@ let StimulusSettings = function () {
             {id: "P2", head: "F", region: "E", toy: "F", toybox: "B"},
             {id: "P3", head: "A", region: "F", toy: "G", toybox: "C", hat: "B"},
             {id: "P4", head: "B", region: "F", toy: "H", toybox: "D", hat: "A"},
+
+             */
 
 
             /*
@@ -247,14 +264,14 @@ let StimulusSettings = function () {
     let All_Experiment_Structures = {
         test: [
             {
-                type:"free_exploration",
-                Fennimal_interaction_type: ["play_with_toy_active", "give_food_active"], // "ask_contents_box", "play_with_toy_passive"
-                Fennimals_encountered: ["A1", "A2", "A3"],
+                type:"jump_to_trial",
+                Fennimal_interaction_type: ["play_with_toy_active"], // "ask_contents_box", "play_with_toy_passive"
+                Fennimals_encountered: ["A2", "A2"],
                 partner_behavior: "absent",
                 question_options_food: ["A", "B", "C", "X"],
                 question_options_toys: ["A", "B", "C", "X"],
                 question_options_toyboxes: ["A", "B", "C", "X"],
-                hint_type: ["food", "toybox"],
+                hint_type: ["icon"],
                 allowed_attempts_before_answer_given: 3,
                 include_Fennefinder: true,
                 force_climbing_tower_first: false
@@ -822,15 +839,15 @@ let StimulusSettings = function () {
             {
                 type: "pseudoday",
                 information: "new_Fennimals_spotted",
-                displayed_icons: ["S1", "S2", "S3", "S4"],
+                displayed_icons: ["S1", "S2", "S3"],
                 title: "Get to know some of the Fennimals on the island",
                 display_text: "There are some Fennimals on the island who would love to get to know you and %PARTNERNAME%! " +
                     "Today, take %PARTNERNAME% with you to explore the island, find the Fennimals and play with them. "
             },
              {
                  type:"free_exploration",
-                 Fennimal_interaction_type:["play_with_toy_passive", "give_food_passive"],
-                 Fennimals_encountered: ["S1" , "S2", "S3", "S4" ],
+                 Fennimal_interaction_type:["play_with_toy_passive"],
+                 Fennimals_encountered: ["S1" , "S2", "S3" ],
                  partner_behavior: "active",
                  include_Fennefinder: true,
                  force_climbing_tower_first: true
@@ -838,18 +855,18 @@ let StimulusSettings = function () {
 
             {
                 type:"hint_and_search",
-                Fennimal_interaction_type:["play_with_toy_active", "give_food_active"],
-                question_options_toys: ["A", "B", "C", "D"],
-                question_options_toyboxes: ["A", "B", "C", "D"],
-                Fennimals_encountered: ["S1" , "S2", "S3", "S4"],
+                Fennimal_interaction_type:["play_with_toy_active"],
+                question_options_toys: ["A", "B", "C"],
+                question_options_toyboxes: ["A", "B", "C"],
+                Fennimals_encountered: ["S1" , "S2", "S3"],
                 partner_behavior: "active",
-                hint_type: ["icon", "toybox", "food", "toy"],
+                hint_type: ["icon", "toybox", "toy"],
                 include_Fennefinder: "low_power_mode"
             },
             {
                 type: "Fennimal_attribute_sorting_task", // "head_region_sorting_task", "Fennimal_attribute_sorting_task",
-                Fennimals_encountered: ["S1", "S2", "S3", "S4"],
-                attribute_order: ["region", "head", "toybox", "toy", "food_preference"],
+                Fennimals_encountered: ["S1", "S2", "S3"],
+                attribute_order: ["region", "head", "toybox", "toy"],
                 maximum_earnable_stars: 5
             },
 
@@ -861,35 +878,61 @@ let StimulusSettings = function () {
             {
                 type: "pseudoday",
                 information: "new_Fennimals_spotted",
-                displayed_icons: ["P1", "P2", "P3", "P4"],
+                displayed_icons: ["P1", "P2", "P3"],
                 title: "Get to know some more Fennimals on the island",
                 display_text: "While %PARTNERNAME% is away, there are some Fennimals on the island who would love to get to know you! " +
                     "Unfortunately, we ran out of boxes to store the toys in, so we will have to reuse some of the boxes."
             },
             {
                 type:"free_exploration",
-                Fennimal_interaction_type:["play_with_toy_passive", "give_food_passive"],
-                Fennimals_encountered: ["P1", "P2", "P3", "P4" ],
+                Fennimal_interaction_type:["play_with_toy_passive"],
+                Fennimals_encountered: ["P1", "P2", "P3" ],
                 partner_behavior: "absent",
                 include_Fennefinder: true,
                 force_climbing_tower_first: true
             },
             {
                 type:"hint_and_search",
-                Fennimal_interaction_type:["play_with_toy_active", "give_food_active"],
-                Fennimals_encountered: ["P1", "P2", "P3", "P4"],
-                question_options_toys: ["E", "F", "G", "H" ],
-                question_options_toyboxes: ["A", "B", "C", "D" ],
+                Fennimal_interaction_type:["play_with_toy_active"],
+                Fennimals_encountered: ["P1", "P2", "P3"],
+                question_options_toys: ["D", "E", "F" ],
+                question_options_toyboxes: ["A", "B", "C"],
                 partner_behavior: "absent",
-                hint_type: ["icon", "toybox","food","toy"],
+                hint_type: ["icon", "toybox","toy"],
                 include_Fennefinder: "low_power_mode"
             },
             {
-                type: "Fennimal_attribute_sorting_task", // "head_region_sorting_task", "Fennimal_attribute_sorting_task",
-                Fennimals_encountered: ["P1", "P2", "P3", "P4"],
-                attribute_order: ["region", "head", "toybox", "toy", "food_preference"],
+                type: "Fennimal_attribute_sorting_task",
+                Fennimals_encountered: ["P1", "P2", "P3"],
+                attribute_order: ["region", "head", "toybox", "toy"],
                 maximum_earnable_stars: 5
             },
+
+            //FEEDING TRIALS
+            {
+                type: "pseudoday",
+                information: "new_Fennimals_spotted",
+                displayed_icons: ["W", "X", "Y", "Z"],
+                title: "Get to know some more Fennimals on the island",
+                display_text: "While %PARTNERNAME% is away, there are some Fennimals on the island who would love to get to know you! They look hungry..."
+            },
+            {
+                type:"free_exploration",
+                Fennimal_interaction_type:["give_food_passive"],
+                Fennimals_encountered: ["W", "X", "Y", "Z"],
+                partner_behavior: "absent",
+                include_Fennefinder: true,
+                force_climbing_tower_first: true
+            },
+            {
+                type:"hint_and_search",
+                Fennimal_interaction_type:["give_food_active"],
+                Fennimals_encountered: ["W", "X", "Y", "Z"],
+                partner_behavior: "absent",
+                hint_type: ["icon", "food"],
+                include_Fennefinder: "low_power_mode"
+            },
+
 
             //PARTNER RETURNS
             {
@@ -902,8 +945,8 @@ let StimulusSettings = function () {
                 type: "collect_items_in_warehouse",
                 questions: ["ask_partner_belief_toyboxes"],
                 bonus_stars_per_correct_answer: 4,
-                question_options_toyboxes: ["A", "B", "C", "D"],
-                question_options_toys: ["A", "B", "C", "D", "E", "F", "G", "H"]
+                question_options_toyboxes: ["A", "B", "C"],
+                question_options_toys: ["A", "B", "C", "D", "E", "F"]
             },
             {
                 type: "name_recall_task",
@@ -913,7 +956,7 @@ let StimulusSettings = function () {
             {
                 type:"jump_to_trial",
                 Fennimal_interaction_type:"ask_Fennimal_toy",
-                Fennimals_encountered: ["S1" , "S2", "S3", "S4",  "P1" , "P2", "P3", "P4" ],
+                Fennimals_encountered: ["S1" , "S2", "S3",  "P1" , "P2", "P3"],
                 partner_behavior: false,
                 bonus_stars_per_correct_answer: 1,
             }
@@ -951,7 +994,7 @@ let StimulusSettings = function () {
         mentalizing_1: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant", "fly", "shark", "blockhead"],
         mentalizing_1B: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant", "fly", "shark", "blockhead"],
         mentalizing_2: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant", "fly", "shark", "blockhead"],
-        mentalizing_network: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant", "fly", "shark", "blockhead"],
+        mentalizing_network: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant", "fly", "shark", "blockhead", "parrot", "stocking"],
     }
 
     //Same as for heads, but now on a group level.
@@ -983,7 +1026,6 @@ let StimulusSettings = function () {
 
     this.Pages_at_end = false
     if(typeof All_Questionnaire_Page_sets[this.Experiment_Code] !== "undefined"){ this.Pages_at_end  = All_Questionnaire_Page_sets[this.Experiment_Code] }
-
 
     this.allowed_heads = false
     if(typeof All_Allowed_Head_Lists[this.Experiment_Code] !== "undefined"){ this.allowed_heads = All_Allowed_Head_Lists[this.Experiment_Code] }

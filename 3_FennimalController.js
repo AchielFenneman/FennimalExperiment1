@@ -6,7 +6,7 @@ GENERAL_FENNIMAL_INTERACTION_SETTINGS = function () {
         give_food: ["Fennimal_appear_left", "Fennimal_hungry", "open_backpack_food"],
         play_with_toy_no_box_active: ["fade_and_Fennimal_appear_center", "ask_toy", "play_with_toy"],
         play_with_toy_no_box_passive: ["fade_and_Fennimal_appear_center", "play_with_toy"],
-        play_with_toy_box_active: ["Fennimal_appear_left", "ask_box", "open_backpack_box", "ask_toy", "request_open_box","play_with_toy", "place_toy_in_box", "request_close_box", "take_box_away"],
+        play_with_toy_box_active: ["Fennimal_appear_left", "ask_box", "open_backpack_box", "ask_toy", "open_box","play_with_toy", "place_toy_in_box", "request_close_box", "take_box_away"],
         play_with_toy_box_passive: ["Fennimal_appear_left","open_backpack_box", "request_open_box", "play_with_toy", "place_toy_in_box", "request_close_box", "take_box_away"],
         ask_belief_partner_contents_box: ["show_Fennimal_and_box",  "ask_belief_partner", "fade_elements_out"],
         ask_contents_box: ["show_Fennimal_and_box",  "ask_contents_box", "fade_elements_out"],
@@ -53,7 +53,7 @@ GENERAL_FENNIMAL_INTERACTION_SETTINGS = function () {
         relative_appearance_speed: 0.5
     }
 
-    this.step_speed = 1000
+    this.step_speed = 900
 
     this.photo_camera_allowed_error = 200
 
@@ -214,7 +214,6 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
                     add_foodbowl_below_Fennimal()
                     break
                 case("open_backpack_food"):
-                    Interface.Prompt.show_message("Click to open your backpack")
                     open_backpack_food()
                     break
                 case("ask_toy"):
@@ -227,7 +226,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
                     play_with_toy()
                     break
                 case("open_backpack_box"):
-                    request_open_backpack_box(0.65);
+                    open_backpack_box(0.65);
                     break
                 case("box_appears"):
                     show_box(true)
@@ -237,6 +236,9 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
                     break
                 case("place_toy_in_box"):
                     place_toy_in_box()
+                    break
+                case("open_box"):
+                    that.box_has_been_opened()
                     break
                 case("request_close_box"):
                     request_participant_to_close_box()
@@ -1093,8 +1095,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
         //TODO: if there is a partner, move the backpack a bit to the left
         let xpos = 0.75*GenParam.SVG_width
         if(partner_is_present) { xpos = 0.68 * GenParam.SVG_width}
-        ItemObjects.backpack = new Backpack(ItemLayerObj.Main, xpos , 0.8*GenParam.SVG_height, that.backpack_food_opened)
-        ItemObjects.backpack.highlight_outline()
+        ItemObjects.backpack = new Backpack(ItemLayerObj.Main, xpos , 0.8*GenParam.SVG_height, that.backpack_food_opened, true)
         ItemObjects.foodbowl.setblur(2)
     }
 
@@ -1297,12 +1298,12 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
 
     // FUNCTIONS FOR THE TOY INTERACTION TYPE
     ////////////////////////////////////////////
-    function request_open_backpack_box(rel_x_pos){
-        Interface.Prompt.show_message("Click to open your backpack")
-        AudioCont.play_sound_effect("alert_minor")
+    function open_backpack_box(rel_x_pos){
+        //Interface.Prompt.show_message("Click to open your backpack")
 
-        ItemObjects.backpack = new Backpack(ItemLayerObj.Main,rel_x_pos*GenParam.SVG_width , 0.8*GenParam.SVG_height, that.backpack_box_opened)
-        ItemObjects.backpack.highlight_outline()
+
+        ItemObjects.backpack = new Backpack(ItemLayerObj.Main,rel_x_pos*GenParam.SVG_width , 0.8*GenParam.SVG_height, that.backpack_box_opened, true)
+        //ItemObjects.backpack.highlight_outline()
     }
 
     function ask_toy_questionbar(){
@@ -1496,7 +1497,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
         ItemObjects.toy.animate_play()
 
         //Then finish the interation
-        setTimeout(function(){start_next_interaction_step()},5000)
+        setTimeout(function(){start_next_interaction_step()},4000)
     }
 
     function show_box(highligh_outline){
@@ -1589,20 +1590,20 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
 
         //Move the Fennimal over to the box
         let movement_x = (Settings.BoxPosition.center_x - getSVGInternalCenter(FennimalSVGObj).x) - 100
-        animate_Fennimal_moving_to_relative_position(movement_x,0,500)
+        animate_Fennimal_moving_to_relative_position(movement_x,0,400)
 
         //Animate picking up the toy
         setTimeout(function () {
-            ItemObjects.toy.animate_move_relative(0,-300,500)
+            ItemObjects.toy.animate_move_relative(0,-300,400)
             setTimeout(function(){
-                animate_Fennimal_returning_to_base_position(500)
+                animate_Fennimal_returning_to_base_position(400)
                 ItemObjects.toy.animate_move_to_position(FennimalBaseHandCoords.x, FennimalBaseHandCoords.y,500)
                 setTimeout(function(){
                     ItemObjects.box.setblur(2)
                     show_play_with_toy_then_continue()
-                },500)
+                },400)
             },500)
-        }, 700)
+        }, 500)
     }
 
     function place_toy_in_box(){
@@ -1612,7 +1613,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
         ItemObjects.box.setblur(0)
 
         let movement_x = (Settings.BoxPosition.center_x - getSVGInternalCenter(FennimalSVGObj).x) - 350
-        let animation_duration = 800
+        let animation_duration = 650
         animate_Fennimal_moving_to_relative_position(movement_x,0,animation_duration)
         ItemObjects.toy.animate_move_relative(movement_x,0,animation_duration)
 
@@ -1710,7 +1711,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
 
         //Draw the box in the middle after a brief introduction
         setTimeout(function(){
-            request_open_backpack_box(0.5)
+            open_backpack_box(0.5)
             Settings.BoxPosition.center_x = 0.5 * GenParam.SVG_width
         }, Settings.step_speed)
     }
@@ -2201,7 +2202,7 @@ Foodbowl = function(ParentElem,FennimalSVG, center_x,center_y){
     }
 
 }
-Backpack = function(ParentElem, center_x,center_y, openfunc){
+Backpack = function(ParentElem, center_x,center_y, openfunc, open_automatically){
     let that = this
     //On creation, copy the foodbowl into the parent element and move it to the right location
     let BackpackSVG = document.getElementById("backpack").cloneNode(true);
@@ -2255,7 +2256,29 @@ Backpack = function(ParentElem, center_x,center_y, openfunc){
         TranslationGroup.style.opacity = 0
     }
 
-    BackpackSVG.onclick = try_open_backpack
+    if(open_automatically){
+        //Move the backpack down and then animate it going up and opening
+        TranslationGroup.style.transition = ""
+        TranslationGroup.style.transform = "translate(" + delta_x + "px ," + (delta_y+500) + "px)"
+
+        setTimeout(function(){
+            TranslationGroup.style.transition = "all 400ms ease-in"
+            TranslationGroup.style.transform = "translate(" + delta_x + "px ," + (delta_y+200) + "px)"
+
+            setTimeout(function(){
+                try_open_backpack()
+            },300)
+        },10)
+
+
+
+    }else{
+        AudioCont.play_sound_effect("alert_minor")
+        Interface.Prompt.show_message("Click to open your backpack")
+        this.highlight_outline()
+        BackpackSVG.onclick = try_open_backpack
+    }
+
 
     function try_open_backpack(){
         if(openstate === "closed"){
@@ -2446,7 +2469,8 @@ Box = function(ItemLayerObj, type, size, center_x, center_y){
         MainTransGroup.style.transform = "translate(" + center_x + "px, " + center_y + "px)";
 
         //Now set a transition
-        SVG.style.transition = "all 500ms ease-in-out"
+        //SVG.style.transition = "all 500ms ease-in-out"
+        MainTransGroup.style.opacity = 0
 
         //Setting event handler
         SVG.onpointerdown = box_clicked
@@ -2458,8 +2482,28 @@ Box = function(ItemLayerObj, type, size, center_x, center_y){
         create_single_SVG_elem(ItemLayerObj.Plus1, "front")
         create_single_SVG_elem(ItemLayerObj.Plus2, "lid")
 
-        SVGRefs.outline.SVG.getElementsByClassName("box_outline")[0].style.fill = "none"
-        SVGRefs.lid.SVG.style.transition = "all 500ms ease-in-out"
+        for(let key in SVGRefs){
+            SVGRefs[key].TranslateGroup.style.opacity = 0
+        }
+
+
+
+        setTimeout(function(){
+            for(let key in SVGRefs){
+                SVGRefs[key].TranslateGroup.style.opacity = 0
+                SVGRefs[key].TranslateGroup.style.transition = "all 100ms ease-in-out"
+
+                setTimeout(function(){
+                    SVGRefs[key].TranslateGroup.style.opacity = 1
+                },10)
+
+            }
+        },30)
+
+        setTimeout(function(){
+            SVGRefs.outline.SVG.getElementsByClassName("box_outline")[0].style.fill = "none"
+            SVGRefs.lid.SVG.style.transition = "all 500ms ease-in-out"
+        },250)
     }
 
     this.highlight_outline = function(){

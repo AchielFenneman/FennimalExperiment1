@@ -1902,6 +1902,15 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
         show_empty_page(true)
         AudioCont.play_sound_effect("alert")
 
+        //Continue button
+        let ContinueButton = create_SVG_buttonElement(0.5 * GenParam.SVG_width, 0.875 * GenParam.SVG_height, 400, 75, "Continue", 40)
+        ContinueButton.onpointerdown = function (event) {
+            ExpCont.instructions_page_closed()
+            //CurrentInstructionsSVG.remove()
+        }
+        CurrentInstructionsSVG.appendChild(ContinueButton)
+
+
         //Contents of the card depend on the type of information
         if(information_type === "partner_leaves" || information_type === "partner_returns"){
             //Getting partner details
@@ -1989,13 +1998,8 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
             if(information_type === "partner_returns"){IconAnimationGroup.classList.add("pseudoday_player_icon_returning_to_island_translate_group")}
 
 
-            //Continue button
-            let ContinueButton = create_SVG_buttonElement(0.5 * GenParam.SVG_width, 0.875 * GenParam.SVG_height, 400, 75, "Continue", 40)
-            ContinueButton.onpointerdown = function (event) {
-                //ExpCont.instructions_page_completed()
-                //CurrentInstructionsSVG.remove()
-            }
-            CurrentInstructionsSVG.appendChild(ContinueButton)
+
+
 
 
         }
@@ -2013,12 +2017,7 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
             TextObj.style.fontSize = "40px"
             CurrentInstructionsSVG.appendChild(TextObj)
 
-            //Show the continue button
-            let ContinueButton = create_SVG_buttonElement(0.5 * GenParam.SVG_width, 0.875 * GenParam.SVG_height, 400, 75, "Continue", 40)
-            ContinueButton.onpointerdown = function (event) {
-                ExpCont.general_instructions_page_completed()
-            }
-            CurrentInstructionsSVG.appendChild(ContinueButton)
+
 
             //Optionally display the icons here (currently supports up X icons)
             let AllIconPositions = {
