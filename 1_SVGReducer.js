@@ -154,7 +154,7 @@ SVGREDUCER = function (Stimuli) {
    // remove_unused_locations()
     remove_unused_heads()
     remove_unused_bodies()
-    remove_unused_hats()
+    //remove_unused_hats()
     remove_unused_items()
 
 

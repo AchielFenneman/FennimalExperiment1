@@ -941,7 +941,7 @@ function capitalize_first_letter_in_string(str){
     return String(str).charAt(0).toUpperCase() + String(str).slice(1);
 }
 
-function copy_scale_and_move_object_to_position(Elem,Parent, center_x, center_y, scale_factor){
+function copy_scale_and_move_object_to_position(Elem,Parent, center_x, center_y, scale_factor, optional_new_id){
     //Copying the object and creating the group structure
     let SVG = Elem.cloneNode(true);
     let ZeroTranslationGroup = create_SVG_group(0,0,"zero_translate_group",undefined);
@@ -966,6 +966,10 @@ function copy_scale_and_move_object_to_position(Elem,Parent, center_x, center_y,
     //Translate the entire group to the correct x and y
     MainPosTranslationGroup.style.transform = "translate(" + center_x + "px, " + center_y+ "px)";
 
+    if(typeof optional_new_id !== "undefined"){
+        MainPosTranslationGroup.id = optional_new_id
+    }
+
 
 
     return MainPosTranslationGroup
@@ -981,17 +985,27 @@ function get_all_values_in_array_of_objects(key, Arr){
     return Out;
 }
 
-function set_toy_color_scheme(ToySVG, toy_type){
+function set_toy_color_scheme(ToySVG, toy_type, use_alternate_color){
     let LightElem = ToySVG.getElementsByClassName("item_col_light")
     for(let i =0;i<LightElem.length;i++){
-        LightElem[i].style.fill = GenParam.ToyData[toy_type].ColorScheme.light_color
+        if(use_alternate_color === true){
+            LightElem[i].style.fill = GenParam.ToyData[toy_type].AlternateColorScheme.light_color
+        }else{
+            LightElem[i].style.fill = GenParam.ToyData[toy_type].ColorScheme.light_color
+        }
     }
 
     let DarkElem = ToySVG.getElementsByClassName("item_col_dark")
     for(let i =0;i<DarkElem.length;i++){
-        DarkElem[i].style.fill = GenParam.ToyData[toy_type].ColorScheme.dark_color
+        if(use_alternate_color === true){
+            DarkElem[i].style.fill = GenParam.ToyData[toy_type].AlternateColorScheme.dark_color
+        }else{
+            DarkElem[i].style.fill = GenParam.ToyData[toy_type].ColorScheme.dark_color
+        }
     }
 }
+
+
 
 //Randomization functions
 function pseudo_randomize_order_of_ids_no_back_to_back(Arr_ids, num_samples){
@@ -1014,13 +1028,17 @@ function pseudo_randomize_order_of_ids_no_back_to_back(Arr_ids, num_samples){
 
 }
 
-function get_object_from_array_based_on_value(key,value, Arr, copy){
+function get_object_from_array_based_on_value(key,value, Arr, copy, remove_from_parent){
     for(let i =0;i<Arr.length;i++){
         if(Arr[i][key] === value){
             if(copy){
                 return(JSON.parse(JSON.stringify(Arr[i])))
             }else{
-                return(Arr[i])
+                if(remove_from_parent){
+                    return(Arr.splice(i,1)[0])
+                }else{
+                    return(Arr[i])
+                }
             }
         }
     }

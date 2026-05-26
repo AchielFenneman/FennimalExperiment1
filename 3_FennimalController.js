@@ -6,13 +6,14 @@ GENERAL_FENNIMAL_INTERACTION_SETTINGS = function () {
         give_food: ["Fennimal_appear_left", "Fennimal_hungry", "open_backpack_food"],
         play_with_toy_no_box_active: ["fade_and_Fennimal_appear_center", "ask_toy", "play_with_toy"],
         play_with_toy_no_box_passive: ["fade_and_Fennimal_appear_center", "play_with_toy"],
-        play_with_toy_box_active: ["Fennimal_appear_left", "ask_box", "open_backpack_box", "ask_toy", "open_box","play_with_toy", "place_toy_in_box", "request_close_box", "take_box_away"],
-        play_with_toy_box_passive: ["Fennimal_appear_left","open_backpack_box", "request_open_box", "play_with_toy", "place_toy_in_box", "request_close_box", "take_box_away"],
+        play_with_toy_box_active: ["Fennimal_appear_left", "ask_box", "box_appears", "ask_toy", "open_box","play_with_toy", "place_toy_in_box", "request_close_box", "take_box_away"],
+        play_with_toy_box_passive: ["Fennimal_appear_left","box_appears", "request_open_box", "play_with_toy", "place_toy_in_box", "request_close_box", "take_box_away"],
         ask_belief_partner_contents_box: ["show_Fennimal_and_box",  "ask_belief_partner", "fade_elements_out"],
         ask_contents_box: ["show_Fennimal_and_box",  "ask_contents_box", "fade_elements_out"],
         ask_Fennimal_toy: ["fade_and_Fennimal_appear_center",  "ask_Fennimal_toy",  "fade_elements_out"],
-
-
+        lost_hat: ["show_Fennimal_no_hat", "go_to_lost_and_found"],
+        replacement_toy: ["Fennimal_appear_left", "Fennimal_bored_with_toy"],
+        hide_and_seek: ["hide_and_seek"],
 
     }
 
@@ -46,7 +47,6 @@ GENERAL_FENNIMAL_INTERACTION_SETTINGS = function () {
 
     }
 
-
     this.OpacityMaskSettings = {
         opacity: 0.85,
         color: "white",
@@ -78,6 +78,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
     //////////////////////
     let Settings = new GENERAL_FENNIMAL_INTERACTION_SETTINGS()
     let ParentLayer = document.getElementById("Fennimals_Layer")
+    let BackgroundLayer, FennimalLayer, ItemLayer
     let Clean_Up_Steps = []
     let OpacityMask, FennimalSVGObj, FennimalTranslationGroup, FennimalScaleGroup,
         FennimalBaseTransform, FennimalBaseCenterCoords, FennimalBaseHandCoords,
@@ -174,6 +175,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
     function start_next_interaction_step() {
         if (InteractionSequence.length > 0) {
             let next_step = InteractionSequence.shift()
+            console.log(next_step)
             switch (next_step) {
                 case("enter_location"):
                     enter_location()
@@ -185,7 +187,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
                     Fennimal_appear_variable(true)
                     break
                 case("Fennimal_appear_left"):
-                    fade_and_appear_Fennimal_left(true)
+                    fade_and_appear_Fennimal_left(true, true, false)
                     break
                 case("take_photo_passive"):
                     show_camera_button("head", "passive")
@@ -197,15 +199,15 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
                     show_camera_button("head", "active")
                     break
                 case("fade_and_Fennimal_appear_center"):
-                    fade_and_appear_Fennimal_center(true)
+                    fade_and_appear_Fennimal_center(true,true, false)
                     //Interface.Prompt.show_message("This Fennimal is named " + FenObj.name)
                     break
                 case("photo_already_collected"):
-                    fade_and_appear_Fennimal_center(true)
+                    fade_and_appear_Fennimal_center(true,true, false)
                     Interface.Prompt.show_message("You already took a photo of " + FenObj.name)
                     break
                 case("passive_Fennimal"):
-                    fade_and_appear_Fennimal_center(true)
+                    fade_and_appear_Fennimal_center(true,true, false)
                     Interface.Prompt.show_message(FenObj.name + " is happy to see you - but is not who you're looking for")
                     break
 
@@ -222,6 +224,11 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
                 case("ask_box"):
                     ask_box_questionbar()
                     break
+                case("show_box"):{
+                    show_box()
+                    break
+
+                }
                 case("play_with_toy"):
                     play_with_toy()
                     break
@@ -262,6 +269,22 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
 
                 case("fade_elements_out"):
                     fade_out_all_elements()
+                    break
+
+                case("show_Fennimal_no_hat"):
+                    fade_and_appear_Fennimal_left(false,true, true)
+                    Interface.Prompt.show_message("Uh oh! " + FenObj.name + "'s hat is missing...")
+                    AudioCont.play_sound_effect("sad")
+                    break
+                case("go_to_lost_and_found"):
+                    show_lost_and_found_button()
+                    break
+
+                case("Fennimal_bored_with_toy"):
+                    show_Fennimal_bored();
+                    break
+                case("hide_and_seek"):
+                    play_hide_and_seek();
                     break
 
                 default:
@@ -387,7 +410,13 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
                 start_next_interaction_step()
             }
         }
-
+    }
+    function check_for_toybox_presence(){
+        if(typeof FenObj.toybox !== "undefined"){
+            if(! ( FenObj.interaction_type.includes("box") || FenObj.interaction_type.includes("toy_active") ) ){
+                //show_box_not_focus()
+            }
+        }
     }
 
     function show_partner_icon(outline_only, direction){
@@ -469,7 +498,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
 
     //LAYER CREATION FUNCTIONS
     ////////////////////////////
-    function create_item_layers(){
+    function create_SVG_layers(){
         let ItemLayer = create_SVG_group(0,0,undefined,"ItemLayer")
         let ItemLayer_depth_minus_one = create_SVG_group(0,0,undefined,"ItemLayer_neg1")
         let ItemLayer_main = create_SVG_group(0,0,undefined,"ItemLayer_main")
@@ -477,6 +506,8 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
         let ItemLayer_depth_plus_two = create_SVG_group(0,0,undefined,"ItemLayer_plus2")
         let ItemLayer_partner = create_SVG_group(0,0,undefined,"ItemLayer_partner")
         let ItemLayer_questions = create_SVG_group(0,0,undefined,"ItemLayer_partner")
+        BackgroundLayer = create_SVG_group(0,0, undefined,"BackgroundLayer",)
+        FennimalLayer = create_SVG_group(0,0,undefined,"FennimalLayer",)
 
         ItemLayer.appendChild(ItemLayer_depth_minus_one)
         ItemLayer.appendChild(ItemLayer_main)
@@ -485,7 +516,10 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
         ItemLayer.appendChild(ItemLayer_partner)
         ItemLayer.appendChild(ItemLayer_questions)
 
+        ParentLayer.appendChild(BackgroundLayer)
+        ParentLayer.appendChild(FennimalLayer)
         ParentLayer.appendChild(ItemLayer)
+
         Clean_Up_Steps.push("remove_items")
 
         // For ease of reference, place them all into a single object
@@ -540,16 +574,38 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
     }
 
     //These two functions show the Fennimal on a fixed location on the screen, WITH the opacity mask
-    function fade_and_appear_Fennimal_center(auto_continue) {
+    function fade_and_appear_Fennimal_center(show_introduction, auto_continue, hide_hat) {
         show_opacity_mask()
         draw_Fennimal_on_screen(Settings.FennimalCenterPosition.center_x, Settings.FennimalCenterPosition.center_y, Settings.FennimalCenterPosition.size, Settings.FennimalCenterPosition.max_width, Settings.FennimalCenterPosition.max_height)
-        introduce_Fennimal(auto_continue)
+        if(show_introduction){
+            introduce_Fennimal(auto_continue)
+        }
+        if(hide_hat){
+            FennimalSVGObj.getElementsByClassName("hat")[0].style.opacity = 0
+        }
+        if(!show_introduction && auto_continue){
+            setTimeout(function () {
+                start_next_interaction_step()
+            },  Settings.step_speed)
+
+        }
     }
 
-    function fade_and_appear_Fennimal_left(auto_continue) {
+    function fade_and_appear_Fennimal_left(show_introduction, auto_continue, hide_hat) {
         show_opacity_mask()
         draw_Fennimal_on_screen(Settings.FennimalLeftPosition.center_x, Settings.FennimalLeftPosition.center_y, Settings.FennimalLeftPosition.size , Settings.FennimalLeftPosition.max_width, Settings.FennimalLeftPosition.max_height)
-        introduce_Fennimal(auto_continue)
+        if(show_introduction){
+            introduce_Fennimal(auto_continue)
+        }
+        if(hide_hat){
+            FennimalSVGObj.getElementsByClassName("hat")[0].style.opacity = 0
+        }
+        if(!show_introduction && auto_continue){
+            setTimeout(function () {
+                start_next_interaction_step()
+            },  Settings.step_speed)
+
+        }
 
     }
 
@@ -607,7 +663,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
 
         //Create
         FennimalSVGObj = create_Fennimal_SVG_object(FenObj, GenParam.Fennimal_head_size, false)
-        ParentLayer.appendChild(FennimalSVGObj)
+        FennimalLayer.appendChild(FennimalSVGObj)
         FennimalTranslationGroup = FennimalSVGObj
         FennimalScaleGroup = FennimalSVGObj.getElementsByClassName("Fennimal_scale_group")[0]
         move_item_layers_to_top()
@@ -1388,6 +1444,12 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
     }
 
     function ask_box_questionbar(){
+        //Drawing the box on screen
+        //ItemObjects.box = new Box(ItemLayerObj, FenObj.toybox,  Settings.BoxPosition.size, Settings.BoxPosition.center_x, Settings.BoxPosition.center_y)
+
+        //Hide it behind a curtain
+        ItemObjects.curtain = new Curtain(ItemLayerObj.Plus2,Settings.BoxPosition.center_x, Settings.BoxPosition.center_y, 2* Settings.BoxPosition.size, FenObj.region )
+
         //Setting the text. This depends on whether this is a trial with a box or not
         Interface.Prompt.show_message("Which box has " + FenObj.name+ "'s toy?")
 
@@ -1436,11 +1498,17 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
         if(answer === FenObj.toybox){
             //Store the Question data
             record_current_question_answer(undefined,true)
-
             Interface.Prompt.show_message("Correct!")
             AudioCont.play_sound_effect("success")
-            setTimeout(function(){
+            ItemObjects.curtain.reveal(function(){
                 start_next_interaction_step()
+                ItemObjects.curtain.remove()
+                delete ItemObjects.curtain
+            })
+
+            setTimeout(function(){
+                //start_next_interaction_step()
+
                 ItemObjects.questionbar.remove()
                 delete ItemObjects.questionbar
             },Math.max(Settings.step_speed, 500))
@@ -1474,7 +1542,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
         //If theres is not toy object yet, then create a toy on top of the Fennimal
         if(typeof ItemObjects.toy === "undefined" ){
 
-            ItemObjects.toy = new Toy(ItemLayerObj.Main,ItemLayerObj.Neg1, FenObj.toy, FennimalBaseHandCoords.x, FennimalBaseHandCoords.y )
+            ItemObjects.toy = new Toy(ItemLayerObj.Main,ItemLayerObj.Neg1, FenObj.toy, FennimalBaseHandCoords.x, FennimalBaseHandCoords.y, false )
             Interface.Prompt.show_message(FenObj.name + " brought a " + FenObj.toy + " to play with")
         }
 
@@ -1502,8 +1570,10 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
 
     function show_box(highligh_outline){
         Interface.Prompt.show_message("You place the " +  GenParam.get_box_printed_name(FenObj.toybox) + " on the ground...")
-        FennimalSVGObj.style.filter = "blur(4px)"
         ItemObjects.box = new Box(ItemLayerObj, FenObj.toybox,  Settings.BoxPosition.size, Settings.BoxPosition.center_x, Settings.BoxPosition.center_y)
+
+        FennimalSVGObj.style.filter = "blur(4px)"
+
         AudioCont.play_sound_effect("thumb")
 
         if(highligh_outline){
@@ -1513,6 +1583,13 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
         setTimeout(function () {
             start_next_interaction_step()
         }, Math.max(500, Settings.step_speed))
+    }
+    function show_box_not_focus(){
+        //We draw a smaller version of the box behind the Fennimal. This box does not have any possible interaction functions.
+        let BoxGroup = create_SVG_group(0,0,undefined,undefined);
+        BackgroundLayer.appendChild(BoxGroup)
+        let BoxObj = copy_scale_and_move_object_to_position(document.getElementById("toybox_" + FenObj.toybox), BoxGroup, 0.40 * GenParam.SVG_width,0.72 * GenParam.SVG_height, 3.5 )
+        BoxObj.style.filter = "blur(5px)"
     }
 
     function request_participant_to_open_box(){
@@ -1533,10 +1610,10 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
             case("empty"):
                 break
             case("swap"):
-                ItemObjects.swapped_toy = new Toy(ItemLayerObj.Main,ItemLayerObj.Neg1, WorldState.get_toybox_contents(FenObj.toybox), Settings.BoxPosition.center_x, Settings.BoxPosition.center_y )
+                ItemObjects.swapped_toy = new Toy(ItemLayerObj.Main,ItemLayerObj.Neg1, WorldState.get_toybox_contents(FenObj.toybox), Settings.BoxPosition.center_x, Settings.BoxPosition.center_y , false)
                 break
             case("retrieve"):
-                ItemObjects.toy = new Toy(ItemLayerObj.Main,ItemLayerObj.Neg1, WorldState.get_toybox_contents(FenObj.toybox), Settings.BoxPosition.center_x, Settings.BoxPosition.center_y )
+                ItemObjects.toy = new Toy(ItemLayerObj.Main,ItemLayerObj.Neg1, WorldState.get_toybox_contents(FenObj.toybox), Settings.BoxPosition.center_x, Settings.BoxPosition.center_y , false)
                 break
         }
 
@@ -1685,13 +1762,21 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
         ItemObjects.box.set_all_SVG_transitions(1000)
         ItemObjects.box.setblur(0)
 
-        setTimeout(function () {
-            ItemObjects.backpack.close(true)
-            ItemObjects.backpack.setblur(0)
-            setTimeout(function(){
+        if(typeof ItemObjects.backpack !== "undefined"){
+            setTimeout(function () {
+                ItemObjects.backpack.close(true)
+                ItemObjects.backpack.setblur(0)
+                setTimeout(function(){
+                    start_next_interaction_step()
+                }, Math.max(1000, 0.5*Settings.step_speed))
+            }, 350)
+        }else{
+            setTimeout(function () {
                 start_next_interaction_step()
             }, Math.max(1000, 0.5*Settings.step_speed))
-        }, 350)
+        }
+
+
 
 
 
@@ -1700,11 +1785,229 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
 
     }
 
+    //LOST AND FOUND AND ALTERNATE TOY //
+    ////////////////////
+    function show_lost_and_found_button(){
+        //Showing the button
+        ItemObjects.lost_and_found_button = create_SVG_buttonElement(0.5*GenParam.SVG_width, 0.9 * GenParam.SVG_height, 0.4 * GenParam.SVG_width, 0.1 * GenParam.SVG_height, "Go to the lost & found", 50)
+        ItemLayerObj.Plus2.appendChild(ItemObjects.lost_and_found_button)
+        ItemObjects.lost_and_found_button.onpointerdown = function(){
+            AudioCont.play_sound_effect("button_click")
+            ItemObjects.lost_and_found_button.remove()
+            delete ItemObjects.lost_and_found_button
+
+            let qtext
+            switch(FenObj.interaction_type){
+                case("lost_hat"): qtext = "Do you see " + FenObj.name + "'s hat in the lost and found?"
+                    break
+                case("lost_toy"): qtext = "Do you see " + FenObj.name + "'s favorite toy in the lost and found?"
+                    break
+            }
+            new HomeRoomController("lost_found", ParentLayer, WorldState.get_all_items_in_lost_and_found_array(), qtext, FenObj.hat, FenObj.region, FenObj.location, hat_retrieved_from_lost_and_found )
+        }
+    }
+    function hat_retrieved_from_lost_and_found(){
+        //Show the hat on the screen
+        ItemObjects.hat = {}
+        ItemObjects.hat.group = create_SVG_group(0,0)
+        ItemLayerObj.Plus2.append(ItemObjects.hat.group)
+        ItemObjects.hat.svg = copy_scale_and_move_object_to_position(document.getElementById("hat_" + FenObj.hat), ItemObjects.hat.group, 0.7 * GenParam.SVG_width, 0.8 * GenParam.SVG_height, 4, "dragging_hat")
+
+        Interface.Prompt.show_message("Hand the " + FenObj.hat + " to " + FenObj.name)
+
+        //Remove from the lost and found
+        WorldState.remove_item_from_lost_and_found(FenObj.hat)
+
+        //Make it draggable
+        new SingleDraggableObject(ItemLayerObj.Plus2,ItemObjects.hat.group, "drag_to_Fennimal", FennimalSVGObj.getElementsByClassName("Fennimal_head_hat_point")[0], hat_handed_to_Fennimal)
+    }
+    function hat_handed_to_Fennimal(){
+        AudioCont.play_sound_effect("positive")
+        Interface.Prompt.show_message(FenObj.name + " is very grateful that you found the hat!")
+        FennimalSVGObj.getElementsByClassName("hat")[0].style.transition = "all 750ms ease-in-out"
+        FennimalSVGObj.getElementsByClassName("hat")[0].style.opacity = 1
+
+        let number_of_hearts = 10
+        let heart_start_coords = getSVGInternalCenter(FennimalSVGObj)
+
+        setTimeout(function () {
+            for(let i = 0; i < number_of_hearts; i++){
+                let x_delta = randomIntFromInterval(-400,400)
+                let y_delta = randomIntFromInterval(-750,-500)
+                new SmallFeedbackSymbol(ItemLayerObj.Plus2,"heart",2000, heart_start_coords.x, heart_start_coords.y, heart_start_coords.x+ x_delta, heart_start_coords.y + y_delta)
+            }
+        }, 1000)
+
+
+        setTimeout(function () {
+            Interface.Prompt.hide()
+            start_next_interaction_step()
+        }, 3500)
+    }
+
+    function show_Fennimal_bored(){
+        Interface.Prompt.show_message( FenObj.name + " has gotten a bit bored and would like to play with a different, but similar, toy")
+        AudioCont.play_sound_effect("sad")
+
+        //Animate Z's
+        let ZGenerator = setInterval(function(){
+            let x_delta = randomIntFromInterval(-1000,200)
+            let y_delta = randomIntFromInterval(-950,-500)
+            let heart_start_coords = getSVGInternalCenter(FennimalSVGObj.getElementsByClassName("Fennimal_head_mouth_point")[0])
+            new SmallFeedbackSymbol( ItemLayerObj.Plus2,"bored",2000, heart_start_coords.x, heart_start_coords.y, heart_start_coords.x+ x_delta, heart_start_coords.y + y_delta)
+        }, 0.5 *Settings.step_speed)
+
+        //After a brief timeout, show the new message and the button
+        setTimeout(function () {
+            Interface.Prompt.show_message( "Let's go to the Toy Room to see if we can find something for " + FenObj.name + " to play with")
+
+            //Showing the button
+            ItemObjects.toy_room_button = create_SVG_buttonElement(0.5*GenParam.SVG_width, 0.9 * GenParam.SVG_height, 0.4 * GenParam.SVG_width, 0.1 * GenParam.SVG_height, "Go to the toy room", 50)
+            ItemLayerObj.Plus2.appendChild(ItemObjects.toy_room_button)
+            ItemObjects.toy_room_button.onpointerdown = function(){
+                AudioCont.play_sound_effect("button_click")
+                ItemObjects.toy_room_button.remove()
+                delete ItemObjects.toy_room_button
+                clearInterval(ZGenerator)
+
+                let qtext = "Which of these is similar to " + FenObj.name + "'s previous toy?"
+                new HomeRoomController("toy_room",ParentLayer,WorldState.get_all_items_in_toy_room_array(), qtext, FenObj.toy, FenObj.region, FenObj.location, new_toy_selected_from_toy_room )
+            }
+
+        },2*Settings.step_speed)
+
+    }
+    function new_toy_selected_from_toy_room(){
+        //Show the hat on the screen
+        ItemObjects.newtoy = {}
+        ItemObjects.newtoy.group = create_SVG_group(0,0)
+        ItemLayerObj.Plus2.append(ItemObjects.newtoy.group)
+        ItemObjects.newtoy.svg = copy_scale_and_move_object_to_position(document.getElementById("toy_" + FenObj.toy), ItemObjects.newtoy.group, 0.7 * GenParam.SVG_width, 0.8 * GenParam.SVG_height, 5, "dragging_newtoy")
+        set_toy_color_scheme(ItemObjects.newtoy.svg, FenObj.toy, true)
+
+        Interface.Prompt.show_message("Hand the new " + FenObj.toy + " to " + FenObj.name)
+
+        //Remove from the room
+        WorldState.remove_item_from_toy_room(FenObj.toy)
+
+        //Make it draggable
+        new SingleDraggableObject(ItemLayerObj.Plus2,ItemObjects.newtoy.group, "drag_to_Fennimal", FennimalSVGObj, new_toy_handed_to_Fennimal, 200)
+    }
+    function new_toy_handed_to_Fennimal(){
+        Interface.Prompt.hide()
+
+        //Create a new interactive toy on top of the Fennimal
+        ItemObjects.toy = new Toy(ItemLayerObj.Main,ItemLayerObj.Neg1, FenObj.toy, FennimalBaseHandCoords.x, FennimalBaseHandCoords.y, true )
+
+        setTimeout(function(){
+            AudioCont.play_sound_effect("positive")
+            Interface.Prompt.show_message(FenObj.name + " also loves to play with this different " + FenObj.toy)
+            ItemObjects.toy.animate_play()
+        }, 0.5 * Settings.step_speed)
+
+        setTimeout(function(){
+            start_next_interaction_step()
+        }, 0.5*Settings.step_speed + 3000)
+
+
+
+    }
+
+    // HIDE AND SEEK
+    function play_hide_and_seek(){
+        //First we hide the Fennimal somehwere on the screen, and give it an event listener
+        Interface.Prompt.show_message(FenObj.name + " is playing hide and seek!")
+        let xmin = 0.1 * GenParam.SVG_width
+        let xmax = 0.7 * GenParam.SVG_width
+        let ypos = 0.575 * GenParam.SVG_height
+
+        let site_positions = shuffleArray([0.2 * GenParam.SVG_width,0.4 * GenParam.SVG_width,0.6 * GenParam.SVG_width,0.8 * GenParam.SVG_width])
+
+        let xpos =  shuffleArray(JSON.parse(JSON.stringify(site_positions)))[0]
+
+        let size = 1.5
+        let max_height = 0.4 * GenParam.SVG_height
+        let max_width = 0.3 * GenParam.SVG_width
+        draw_Fennimal_on_screen(xpos, ypos, size , max_width, max_height)
+
+        //Adding interaction elements
+        let HideAndSeekObjects = [new HideAndSeekObject(ItemLayerObj.Plus2, "curtain", site_positions[0], ypos + 0.05 * GenParam.SVG_height, 4.5, FenObj.region),
+            new HideAndSeekObject(ItemLayerObj.Plus1, "barrel", site_positions[2], ypos, 4.5, FenObj.region),
+            new HideAndSeekObject(ItemLayerObj.Plus2, "barrel", site_positions[3], ypos + 100, 4, FenObj.region),
+            new HideAndSeekObject(ItemLayerObj.Plus2, "balloon", site_positions[1], ypos + 0.05 * GenParam.SVG_height, 4.5, FenObj.region)]
+
+        //After a brief delay, show a new message
+        setTimeout(function(){
+            Interface.Prompt.show_message("Can you find " + FenObj.name + "?")
+            //Now we set an event listener to the Fennimal - but this only counts if the mouse click is sufficiently close to its central mass
+            FennimalSVGObj.style.cursor = "pointer"
+            let FennimalCenterPoint = getSVGInternalCenter(FennimalSVGObj)
+            FennimalSVGObj.onpointerdown = function(event) {
+                let mouse_center = getMousePosition(event)
+                let dist_to_center = EUDistPoints(FennimalCenterPoint, mouse_center)
+                if(dist_to_center< 100){
+                    FennimalSVGObj.onpointerdown = ""
+
+                    //Fennimal has been found: clean up all the objects and continue onwards
+                    for(let i in HideAndSeekObjects){
+                        setTimeout(function(){
+                            HideAndSeekObjects[i].remove()
+                        }, i * 200)
+                    }
+
+                    setTimeout(function(){
+                        AudioCont.play_sound_effect("success")
+                        Interface.Prompt.show_message("You found " + FenObj.name + "!")
+                        //Animate the Fennimal to the front
+                        let NewGroup = create_SVG_group(0,0)
+                        let ScaleGroup = create_SVG_group(0,0)
+
+                        FennimalSVGObj.parentNode.appendChild(NewGroup)
+                        NewGroup.appendChild(ScaleGroup)
+                        ScaleGroup.appendChild(FennimalSVGObj)
+
+                        NewGroup.style.transition = "all 750ms ease-in-out"
+                        ScaleGroup.style.transition = "all 750ms ease-in-out"
+
+                        let FennimalPos = getSVGInternalCenter(FennimalSVGObj)
+                        let dx =   (0.45 * GenParam.SVG_width) - FennimalPos.x
+                        ScaleGroup.style.transform = "scale(1.8)"
+                        ScaleGroup.style.transformOrigin = "50% 50%"
+                        NewGroup.style.transform = "translate(" + dx + "px, " + (- 0.15 * GenParam.SVG_height) + "px) ";
+
+                        //Show some hearts
+                        let HGenerator = setInterval(function(){
+                            let x_delta = randomIntFromInterval(-1000,200)
+                            let y_delta = randomIntFromInterval(-950,-500)
+                            let heart_start_coords = getSVGInternalCenter(FennimalSVGObj.getElementsByClassName("Fennimal_head_mouth_point")[0])
+                            heart_start_coords.x += randomIntFromInterval(-200,200)
+                            heart_start_coords.y += randomIntFromInterval(-200,200)
+                            new SmallFeedbackSymbol( ItemLayerObj.Plus2,"heart",2000, heart_start_coords.x, heart_start_coords.y, heart_start_coords.x+ x_delta, heart_start_coords.y + y_delta)
+                        }, 250)
+
+                        //Set an interval to continue
+                        setTimeout(function(){
+                            clearInterval(HGenerator)
+                            start_next_interaction_step()
+                        }, 3000)
+
+
+                    }, 750)
+
+
+                }
+
+            }
+        }, 1500)
+
+
+    }
+
     //FUNCTIONS FOR THE ASK_X QUESTIONS
     //////////////////////////////////////
     function show_Fennimal_and_box(){
         //Draw the Fennimal on the left
-        fade_and_appear_Fennimal_left(false)
+        fade_and_appear_Fennimal_left(true, false, false)
 
         //Move the Fennimal over to make some space
         animate_Fennimal_moving_to_relative_position(-100,0,500)
@@ -1923,10 +2226,13 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
     ParentLayer.style.display = "inherit"
     Interface.Prompt.hide()
     create_opacity_mask()
-    create_item_layers()
+    create_SVG_layers()
 
     //At the start of the interaction, check if there is a partner present.
     check_for_partner_presence()
+
+    //Check if there is a toybox present. If the Fennimal object has a toybox AND the trial type does not include a specific interaction with the box, then display it on the side
+    check_for_toybox_presence()
 
     //If a toybox is defined, store which toy is currently in the box. We will store this as an object with two values: start and end
     if(typeof FenObj.toybox !== 'undefined'){
@@ -2318,7 +2624,7 @@ Backpack = function(ParentElem, center_x,center_y, openfunc, open_automatically)
 
 }
 
-Toy = function(ParentElem,HeartLayerElem, type,start_x, start_y){
+Toy = function(ParentElem,HeartLayerElem, type,start_x, start_y, use_alternate_colorscheme){
 
     let ToySVG, ToyZeroTranslationGroup,MainPosTranslationGroup,AnimationTranslationGroup, ScaleGroup, RotationGroup,
         HeartGenerator, current_x, current_y, Outline, showing_hearts = false
@@ -2357,7 +2663,6 @@ Toy = function(ParentElem,HeartLayerElem, type,start_x, start_y){
         MainPosTranslationGroup.style.transform = "translate(" + current_x + "px, " + current_y+ "px)";
 
     }
-
 
     //Shows the animation of the toy being placed with (defined in the CSS)
     this.animate_play = function(){
@@ -2425,7 +2730,7 @@ Toy = function(ParentElem,HeartLayerElem, type,start_x, start_y){
     }
 
     create_SVG_elements()
-    set_toy_color_scheme(ToySVG, type)
+    set_toy_color_scheme(ToySVG, type, use_alternate_colorscheme)
 
 
 }
@@ -2581,13 +2886,82 @@ Box = function(ItemLayerObj, type, size, center_x, center_y){
     create_all_SVG_elements()
 
 }
+Curtain = function(ParentLayer,  center_x,center_y, size, region){
+    let that = this
+    let CurtainObj = copy_scale_and_move_object_to_position(document.getElementById("box_hidden_curtain"), ParentLayer, center_x,center_y, size)
+    let Tarp = CurtainObj.getElementsByClassName("tarp")[0]
+    let TarpRopes = CurtainObj.getElementsByClassName("tarp_ropes")[0]
+    let TarpShadow = CurtainObj.getElementsByClassName("tarp_shadow")[0]
+    let Posts = CurtainObj.getElementsByClassName("tarp_posts")[0]
+
+    //Coloring the tarp correctly
+    Tarp.getElementsByClassName("tarp_canvas")[0].style.fill = GenParam.RegionData[region].surrounding_color
+    Tarp.getElementsByClassName("tarp_canvas")[0].style.stroke =GenParam.RegionData[region].darker_color
+    Tarp.getElementsByClassName("tarp_questionmark")[0].style.fill = GenParam.RegionData[region].color
+    Tarp.getElementsByClassName("tarp_details")[0].style.stroke = GenParam.RegionData[region].darker_color
+
+    Tarp.style.transition = "all 500ms ease-in-out"
+    TarpRopes.style.transition = "all 100ms ease-in-out"
+    TarpShadow.style.transition = "all 500ms ease-in-out"
+    Posts.style.transition = "all 500ms ease-in-out"
+
+    this.reveal = function(returnfunc){
+        TarpRopes.style.opacity = 0
+        TarpShadow.style.opacity = 0
+        Tarp.style.transform = "translateY(200px)"
+        Tarp.style.opacity = 0
+        AudioCont.play_sound_effect("curtain")
+
+        setTimeout(function(){
+            Posts.style.opacity = 0
+            setTimeout(function(){
+                returnfunc()
+            },400)
+        },400)
+
+
+    }
+    this.remove = function(){
+        setTimeout(function(){
+            CurtainObj.remove()
+        },400)
+    }
+
+    this.set_click_to_reveal = function(){
+        Tarp.style.cursor = "pointer"
+        Tarp.onpointerdown = function(){that.reveal()}
+    }
+    this.set_click_to_open = function(){
+        Tarp.style.cursor = "pointer"
+        Tarp.onpointerdown = function(){
+            AudioCont.play_sound_effect("curtain")
+            TarpRopes.style.opacity = 0
+            TarpShadow.style.opacity = 0
+            Tarp.style.transform = "translateY(200px)"
+            Tarp.style.opacity = 0
+
+        }
+    }
+}
 
 SmallFeedbackSymbol = function(Parent, feedback_type,speed,start_x, start_y, end_x, end_y){
     let ScaleGroup = create_SVG_group(0,0,undefined,undefined);
     let TranslationGroup = create_SVG_group(0,0,undefined,undefined);
 
     //Copy the heart svg element
-    let Elem = document.getElementById("feedback_" + feedback_type + "_small").cloneNode(true)
+    let Elem
+    switch(feedback_type){
+        case("heart"):
+            Elem = document.getElementById("feedback_" + feedback_type + "_small").cloneNode(true)
+            Elem.style.fill = "pink";
+            break
+        case("bored"):
+            Elem = document.getElementById("feedback_bored").cloneNode(true)
+            Elem.style.fill = "dimgray";
+            Elem.style.stroke = "none"
+            Elem.style.opacity = 0.5
+            break
+    }
     ScaleGroup.appendChild(Elem);
     TranslationGroup.appendChild(ScaleGroup);
     Parent.appendChild(TranslationGroup);
@@ -2595,14 +2969,6 @@ SmallFeedbackSymbol = function(Parent, feedback_type,speed,start_x, start_y, end
 
     ScaleGroup.style.transformOrigin = "350px 300px"
     ScaleGroup.style.transform = "scale(3)"
-
-    switch(feedback_type){
-        case("heart"): Elem.style.fill = "pink"; break
-        case("bites"): Elem.style.fill = "gold"; break
-        case("frown"): Elem.style.fill = "red"; break
-        case("smile"): Elem.style.fill = "lightgreen"; Elem.style.stroke = "lightgreen"; break
-    }
-
 
     moveSVGCenterTo(Elem, start_x, start_y)
     Elem.style.opacity = .85
@@ -2945,3 +3311,423 @@ QuestionBar = function(Parent, Array_of_choices, Settings, num_bonus_stars_rewar
 
 }
 
+HomeRoomController = function(room_type, ParentElem, Itemdetails, questiontext, target_item_name, original_region, original_location, returnfunction){
+    let ContainerElem,Background, IntroMask, Outlines = [], ObjectSVGs = []
+
+    function set_all_elements(){
+        ContainerElem = create_SVG_group(0,0)
+        ParentElem.appendChild(ContainerElem)
+
+        show_background()
+
+        Interface.player_moved_to_new_region("Home")
+
+        switch(room_type){
+            case("lost_found"): Interface.Locator.change_locator_name("Lost & Found"); break
+            case("toy_room"): Interface.Locator.change_locator_name("Toy Room")
+        }
+
+    }
+
+    function show_background(){
+        Background = document.createElementNS("http://www.w3.org/2000/svg", 'image')
+        switch(room_type){
+            case("lost_found"): Background.setAttribute("href", "./Locations/Home_lostfound.png"); break
+            case("toy_room"): Background.setAttribute("href", "./Locations/Home_toyroom.png"); break
+        }
+        Background.setAttribute("width", "100%")
+        Background.setAttribute("height", "100%")
+        Background.setAttribute('preserveAspectRatio', 'none')
+        ContainerElem.appendChild( Background )
+
+        IntroMask = create_SVG_rect(0,0,GenParam.SVG_width, GenParam.SVG_height);
+        IntroMask.style.fill = GenParam.RegionData["Home"].surrounding_color
+        IntroMask.style.opacity = 0
+        IntroMask.style.transition = "all 500ms ease-in-out"
+        IntroMask.style.pointerEvents = "none"
+
+
+        ContainerElem.appendChild(IntroMask)
+    }
+
+    function display_all_items_on_shelf(){
+
+        for(let i = 0;i < Itemdetails.length; i++){
+            let SVGObj = copy_scale_and_move_object_to_position(document.getElementById(Itemdetails[i].SVG_name), ContainerElem, Itemdetails[i].shelf_position.x, Itemdetails[i].shelf_position.y,4)
+            SVGObj.id = "LF_ELEM_" + i
+            ObjectSVGs.push(SVGObj)
+            let Outline = create_SVG_outline_of_group_ID(SVGObj)
+            Outlines.push(Outline)
+
+            // Inserting the outline
+            SVGObj.parentNode.insertBefore(Outline, SVGObj);
+            SVGObj.style.cursor = "pointer"
+
+            //Setting event handler
+            SVGObj.onpointerdown = function(){
+                if(item_selection_enabled){
+                    item_selected(Itemdetails[i].name)
+                }
+
+            }
+
+            switch(Itemdetails[i].type){
+                case("toy"): set_toy_color_scheme(SVGObj, Itemdetails[i].name, false); break
+                case("alternate_toy"):set_toy_color_scheme(SVGObj, Itemdetails[i].name, true);  break
+
+            }
+        }
+
+        //Set the opacity mask in front again
+        ContainerElem.appendChild(IntroMask)
+    }
+
+    function enable_item_selection(){
+        Interface.Prompt.show_message(questiontext)
+        item_selection_enabled = true
+        for(let i = 0; i<Outlines.length; i++){
+            Outlines[i].classList.add("focus_on_SVG_outline")
+            ObjectSVGs[i].style.cursor = "pointer"
+        }
+    }
+    function disable_item_selection(){
+        item_selection_enabled = false
+        for(let i = 0; i<Outlines.length; i++){
+            Outlines[i].classList.remove("focus_on_SVG_outline")
+            ObjectSVGs[i].style.cursor = "auto"
+        }
+    }
+
+    function item_selected(name){
+
+        disable_item_selection()
+
+        //Check whether this was correct
+        if(name === target_item_name){
+            AudioCont.play_sound_effect("success")
+            Interface.Prompt.show_message("Correct!")
+            setTimeout(function(){
+                leave_room()
+            }, 750)
+
+        }else{
+            AudioCont.play_sound_effect("rejected")
+            Interface.Prompt.show_message("Oops, that's not correct...")
+            setTimeout(function(){enable_item_selection()},1500)
+        }
+    }
+
+    //Leave after succesfull completion
+    function leave_room(){
+        //Fade out
+        //ContainerElem.appendChild(IntroMask)
+        IntroMask.style.opacity = 1
+        setTimeout(function(){
+            Interface.Prompt.hide()
+            // Remove all items
+            for(let i = 0; i<Outlines.length; i++){
+                Outlines[i].remove()
+            }
+            for(let i = 0; i<ObjectSVGs.length; i++){
+                ObjectSVGs[i].remove()
+            }
+
+            //Remove the background
+            Background.remove()
+
+
+            //Return the interface colors back to normal
+            Interface.player_moved_to_new_region(original_region)
+            Interface.Locator.change_locator_name(GenParam.get_display_name_of_location(original_location))
+
+            //Fade out the opacity mask
+            IntroMask.style.opacity = 0
+
+            setTimeout(function(){
+                ContainerElem.remove()
+                returnfunction()
+            },500)
+
+
+        }, 500)
+
+    }
+
+    //On creation
+    set_all_elements()
+    let item_selection_enabled = false
+    IntroMask.style.opacity = 1
+    Interface.Prompt.hide()
+    setTimeout(function(){
+
+
+        display_all_items_on_shelf()
+        switch(room_type){
+            case("lost_found"): Interface.Prompt.show_message("We are now at the Lost and Found department"); break
+            case("toy_room"): Interface.Prompt.show_message("We are now at the Toy Room"); break
+        }
+
+
+        IntroMask.style.opacity = 0
+
+        setTimeout(function(){
+
+            setTimeout(function(){
+                enable_item_selection()
+            },1000)
+        }, 500)
+    }, 500)
+
+}
+
+SingleDraggableObject = function(ParentElem, DraggableElem, type, Target, returnfunc, optional_max_distance){
+    let Mask, dragging_is_enabled = false, currentlydragging = false
+    let maximum_allowed_distance_to_target = 150
+    if(optional_max_distance > 0){ maximum_allowed_distance_to_target = optional_max_distance}
+
+    let DragGroup = create_SVG_group(0,0)
+    DragGroup.appendChild(DraggableElem)
+    ParentElem.appendChild(DragGroup)
+
+    if(typeof DraggableElem.id === "undefined" ){
+        DraggableElem.id = "DragControllerTargetID1112"
+    }
+    let Outline = create_SVG_outline_of_group_ID(DraggableElem)
+    DraggableElem.parentNode.insertBefore(Outline, DraggableElem);
+
+
+    let OriginalPos = getSVGInternalCenter(DraggableElem)
+
+    //For the object, create an event that triggers dragging mode
+    function enable_object_draggable(){
+        DraggableElem.style.cursor = "pointer"
+        Outline.classList.add("focus_on_SVG_outline")
+        DraggableElem.onpointerdown = start_dragging
+        dragging_is_enabled = true
+    }
+    function disable_object_draggable(){
+        DraggableElem.style.cursor = "auto"
+        Outline.classList.remove("focus_on_SVG_outline")
+        dragging_is_enabled = false
+    }
+
+    function start_dragging(){
+        if(dragging_is_enabled){
+
+            currentlydragging = true
+            Outline.classList.remove("focus_on_SVG_outline")
+            Mask = create_SVG_rect(0,0,GenParam.SVG_width,GenParam.SVG_height)
+            Mask.style.opacity = 0
+            ParentElem.appendChild(Mask)
+            Mask.onpointermove = function(event){ pointer_moved(event)}
+            Mask.onpointerup = function(event){ release_dragging(event)}
+            Mask.onpointerdown = function(event){ release_dragging(event)}
+
+            Mask.onpointercancel = function(event){ drag_cancelled()}
+            Mask.onpointerleave = function(event){ drag_cancelled()}
+
+        }
+    }
+
+    function pointer_moved(event){
+        move_elem_to_location(getMousePosition(event))
+    }
+
+    function drag_cancelled(){
+        AudioCont.play_sound_effect("rejected")
+        //Return the element to its original position. While doing so, no new drags are allowed
+        Mask.remove()
+        disable_object_draggable()
+        DragGroup.style.transition = "all 300ms ease-in-out"
+        DragGroup.style.transform = ""
+        setTimeout(function(){
+            DragGroup.style.transition = ""
+            enable_object_draggable()
+        },350)
+
+    }
+
+    function release_dragging(event){
+        let dist_to_target = EUDistPoints(getMousePosition(event), getSVGInternalCenter(Target))
+        if(dist_to_target < maximum_allowed_distance_to_target){
+            //Success! Delete all elements and execute the return function
+            AudioCont.play_sound_effect("success")
+            Mask.remove()
+            disable_object_draggable()
+            DragGroup.style.transition = "all 500ms ease-in-out"
+            DragGroup.style.opacity = 0
+            returnfunc()
+
+            setTimeout(function(){DragGroup.remove()},500)
+
+
+        }else{
+            drag_cancelled()
+        }
+
+    }
+
+    function move_elem_to_location(NewPos){
+        let new_delta_x =  NewPos.x - OriginalPos.x
+        let new_delta_y =  NewPos.y - OriginalPos.y
+
+        DragGroup.style.transform = "translate(" + new_delta_x + "px ," + new_delta_y + "px)"
+    }
+
+    //When dragging, create a mask to catch all pointer events
+
+
+    //The exact interaction depends on the type of draging objective.
+    // Drag_to_Fennimal: assumes that the Target is the Fennimal SVG object. If released sufficiently close, then triggers a success.
+    // Clean_Fennimal: assumes that the Target is a list of elements of class "dirt". Each element is deleted when sufficiently close. Triggers a success if all dirt has been removed.
+    // Movable object: Can be released anywhere on the screen
+
+    //On creation
+    enable_object_draggable()
+
+
+}
+
+Balloon = function(ParentElem, center_x, center_y, size,){
+    let BalloonObj = copy_scale_and_move_object_to_position(document.getElementById("balloon"), ParentElem, center_x,center_y, size)
+    BalloonObj.classList.add("balloon")
+
+    this.pop_on_click = function(){
+        BalloonObj.onpointerdown = function(){
+            AudioCont.play_sound_effect("balloon_pop")
+            BalloonObj.classList.add('is-popped')
+            setTimeout(function(){
+                BalloonObj.remove()
+            }, 300)
+        }
+
+    }
+
+    this.remove = function(){
+        //AudioCont.play_sound_effect("balloon_pop")
+        BalloonObj.classList.add('is-popped')
+        setTimeout(function(){
+            BalloonObj.remove()
+        }, 300)
+
+
+    }
+
+}
+
+MovableBarrel = function(ParentElem, center_x, center_y, size){
+    const move_speed = 0.05 * GenParam.SVG_width
+
+    let currentpos = 0, currently_moving = false
+    let BarrelObj = copy_scale_and_move_object_to_position(document.getElementById("barrel"), ParentElem, center_x,center_y, size)
+    let TranslationGroup = create_SVG_group(0,0)
+    TranslationGroup.appendChild(BarrelObj)
+    ParentElem.appendChild(TranslationGroup)
+
+    TranslationGroup.style.cursor = "pointer"
+    TranslationGroup.style.transition = "all 500ms ease-in-out"
+    let Centerpos = getSVGInternalCenter(TranslationGroup)
+
+    function move_left(){
+        currentpos -= move_speed
+        update_position()
+        AudioCont.play_sound_effect("drag_wood")
+    }
+    function move_right(){
+        currentpos += move_speed
+        update_position()
+        AudioCont.play_sound_effect("drag_wood")
+    }
+    function update_position(){
+        TranslationGroup.style.pointer = "auto"
+        currently_moving = true
+        TranslationGroup.style.transform = "translateX(" + currentpos + "px)"
+        setTimeout(function(){
+            TranslationGroup.style.pointer = "cursor"
+            Centerpos = getSVGInternalCenter(TranslationGroup)
+            currently_moving = false
+        }, 500)
+    }
+
+    TranslationGroup.onpointerdown  = function(event){
+        if(!currently_moving){
+            let mouse_coords = getMousePosition(event)
+            if(mouse_coords.x > Centerpos.x){
+                move_left()
+            }else{
+                move_right()
+            }
+        }
+    }
+
+    this.remove = function(){
+        currently_moving = true
+        Centerpos = getSVGInternalCenter(TranslationGroup)
+        if(Centerpos.x > 0.5 * GenParam.SVG_width){
+            TranslationGroup.style.transform = "translateX(" + (currentpos + (GenParam.SVG_width - Centerpos.x) )  + "px)"
+        }else{
+            TranslationGroup.style.transform = "translateX(" + (currentpos - (Centerpos.x + currentpos) )  + "px)"
+        }
+        TranslationGroup.style.opacity = 0
+        setTimeout(function(){
+            TranslationGroup.remove()
+        }, 500)
+
+    }
+
+}
+
+HideAndSeekObject = function(ParentElem,object_type, start_x, start_y, size, region ){
+    //Barrel: draggable
+    //Curtain and balloon: click to dissapear
+    let Object
+
+    switch(object_type){
+        case("curtain"):
+            Object = new Curtain(ParentElem,start_x,start_y, size, region )
+            Object.set_click_to_open()
+            break
+        case("balloon"):
+            Object = new Balloon(ParentElem,start_x,start_y, size, region )
+            Object.pop_on_click()
+            break
+        case("barrel"):
+            Object = new MovableBarrel(ParentElem,start_x,start_y, size, region )
+            break
+    }
+
+    this.remove = function(){
+        Object.remove()
+    }
+
+}
+
+
+function create_SVG_outline_of_group_ID(Group){
+    // 2. Create the <use> element (must use the SVG namespace!)
+    // 1. Physically clone the group and all its children
+    const outlineGroup = Group.cloneNode(true);
+
+    // 2. Change the ID so you don't have duplicates in the DOM
+    outlineGroup.id = Group.id + '-outline';
+
+    // 3. Find EVERY element inside the clone and strip its original styling
+    const allChildren = outlineGroup.querySelectorAll('*');
+    allChildren.forEach(child => {
+        // Strip the hardcoded colors
+        child.removeAttribute('stroke');
+        child.style.stroke = '';
+
+        // NEW: Strip the hardcoded thicknesses so they can inherit!
+        child.removeAttribute('stroke-width');
+        child.style.strokeWidth = '';
+    });
+
+// 4. (Optional but recommended) Remove the inline JS attributes completely
+// and let your CSS class handle everything.
+
+    outlineGroup.setAttribute('stroke-linejoin', 'round'); // Keep this, it makes thick corners look nice
+    outlineGroup.setAttribute('class', 'dynamic-outline');
+
+    return(outlineGroup)
+}

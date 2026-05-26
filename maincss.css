@@ -823,3 +823,53 @@
     to   { stroke-dashoffset: 0; }
 }
 
+/*Tarp to reveal box*/
+.reveal-tarp {
+    animation: flyUp 0.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+}
+
+@keyframes flyUp {
+    0% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-40px); /* Lifts the tarp up into the air */
+        visibility: hidden;
+    }
+}
+
+/*Poppable balloon*/
+/* 1. Make the balloon vanish quickly */
+.is-popped .balloon-group {
+    animation: vanish 0.1s forwards;
+}
+
+/* 2. Make the hidden lines explode outward */
+.is-popped .burst-group {
+    animation: explode 0.3s ease-out forwards;
+}
+
+/* The Keyframes */
+@keyframes vanish {
+    0%   { transform: scale(1); opacity: 1; }
+    40%  { transform: scale(1.1); opacity: 1; } /* Brief stretch before popping */
+    100% { transform: scale(0); opacity: 0; }
+}
+
+@keyframes explode {
+    0%   { transform: scale(0.5); opacity: 1; }
+    100% { transform: scale(1.5); opacity: 0; }
+}
+
+
+#balloon{
+    cursor: pointer;
+    animation: balloon_bob 2s ease-in-out infinite;
+}
+@keyframes balloon_bob {
+    0% {transform: translateY(0px)}
+    60% {transform: translateY(-15px)}
+    100% {transform: translateY(0px)}
+}

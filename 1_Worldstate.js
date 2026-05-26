@@ -366,6 +366,123 @@ WorldStateObject = function () {
 
     }
 
+    // LOST AND FOUND
+    ///////////////////////
+    const w = GenParam.SVG_width, h = GenParam.SVG_height
+    const FreeItemPositionsInLostAndFound = [
+        //Middle shelf (not in front of sign)
+        {x: 0.23 * w, y: 0.5*h},
+        {x: 0.45 * w, y: 0.5*h},
+
+        //Bottom shelf
+        {x: 0.23 * w, y: 0.83*h},
+        {x: 0.45 * w, y: 0.83*h},
+        {x: 0.70 * w, y: 0.83*h},
+        {x: 0.9 * w, y: 0.83*h},
+
+        //Top shelf
+        {x: 0.33 * w, y: 0.2*h},
+        {x: 0.8 * w, y: 0.2*h},
+
+        //Middle, in front of sign
+        {x: 0.9 * w, y: 0.5*h},
+        {x: 0.70 * w, y: 0.5*h},
+
+    ]
+
+    let ItemsInLostAndFound = {}, ItemsInLostAndFoundArr = []
+    this.set_items_in_lost_and_found = function(arr){
+        //Assumes an array of objects, with each object having the following properties:\
+        //  name:
+        //  type
+        //  SVG_name
+        for(let i = 0;i < arr.length; i++){
+            ItemsInLostAndFound[arr[i].name] = arr[i]
+        }
+    }
+    this.add_item_to_lost_and_found = function(Item){
+        //Assumes the following properties
+        //  name:
+        //  type
+        //  SVG_name
+        ItemsInLostAndFoundArr = ItemsInLostAndFoundArr.filter(function( obj ) {
+            return obj.name !== Item.name;
+        });
+
+        ItemsInLostAndFound[Item.name] = Item
+        ItemsInLostAndFoundArr.push(Item)
+    }
+    this.remove_item_from_lost_and_found = function(item_name){
+        delete ItemsInLostAndFound[item_name];
+        ItemsInLostAndFoundArr = ItemsInLostAndFoundArr.filter(function( obj ) {
+            return obj.name !== item_name;
+        });
+    }
+    this.shuffle_lost_and_found_order_and_assign_positions = function(){
+        const RemainingPositions = JSON.parse(JSON.stringify(FreeItemPositionsInLostAndFound))
+        ItemsInLostAndFoundArr = shuffleArray(ItemsInLostAndFoundArr)
+        for(let i = 0; i < ItemsInLostAndFoundArr.length; i++){
+            let name = ItemsInLostAndFoundArr[i].name
+            let pos = RemainingPositions.shift()
+
+            ItemsInLostAndFoundArr[i].shelf_position = pos
+            ItemsInLostAndFound[name].shelf_position = pos
+        }
+
+    }
+    this.get_all_items_in_lost_and_found_array = function(){
+        return(JSON.parse(JSON.stringify(ItemsInLostAndFoundArr)))
+    }
+
+    // REPLACEMENT TOYS
+    ///////////////////////
+    const FreeItemPositionsToyRoom = shuffleArray([
+        //Top
+        {x: 0.27 * w, y: 0.2*h},
+        {x: 0.5 * w, y: 0.2*h},
+        {x: 0.73 * w, y: 0.2*h},
+
+        //Middle
+        {x: 0.27 * w, y: 0.5*h},
+        {x: 0.5 * w, y: 0.5*h},
+        {x: 0.73 * w, y: 0.5*h},
+
+        //Bottom
+        {x: 0.27 * w, y: 0.85*h},
+        {x: 0.5 * w, y: 0.85*h},
+        {x: 0.73 * w, y: 0.85*h},
+
+    ])
+    let ItemsInToyRoom = {}, ItemsInToyRoomArr = []
+    this.add_item_to_toy_room = function(Item){
+        ItemsInToyRoomArr = ItemsInToyRoomArr.filter(function( obj ) {
+            return obj.name !== Item.name;
+        });
+
+        ItemsInToyRoom[Item.name] = Item
+        ItemsInToyRoomArr.push(Item)
+    }
+    this.shuffle_toy_room_order_and_assign_positions = function(){
+        const RemainingPositions = JSON.parse(JSON.stringify(FreeItemPositionsToyRoom))
+        for(let i = 0; i < ItemsInToyRoomArr.length; i++){
+            let name = ItemsInToyRoomArr[i].name
+            let pos = RemainingPositions.shift()
+
+            ItemsInToyRoomArr[i].shelf_position = pos
+            ItemsInToyRoom[name].shelf_position = pos
+        }
+    }
+    this.remove_item_from_toy_room= function(item_name){
+        delete ItemsInToyRoom[item_name];
+        ItemsInToyRoomArr = ItemsInToyRoomArr.filter(function( obj ) {
+            return obj.name !== item_name;
+        });
+    }
+    this.get_all_items_in_toy_room_array = function(){
+        return(JSON.parse(JSON.stringify(ItemsInToyRoomArr)))
+    }
+
+
 
 
 }

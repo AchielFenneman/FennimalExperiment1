@@ -1,6 +1,7 @@
 AudioControllerObject = function () {
     //Creates soundcontrollers for the files in the Audio subfolder
     let pathname = "" // "https://achielfenneman.github.io/FennimalExperiment1//"
+    //TODO: load dynamically
 
     let RegionSoundScapes = {
         North: new Audio(pathname + "./Audio/North.wav", loop = true),
@@ -46,6 +47,11 @@ AudioControllerObject = function () {
         box_open_container: new Audio(pathname + "./Audio/plastic_box_open.wav"),
         box_open_giftbox: new Audio(pathname + "./Audio/giftbox_open.wav"),
         box_open_picknick: new Audio(pathname + "./Audio/wicker.wav"),
+
+        balloon_pop: new Audio(pathname + "./Audio/balloon_pop.wav"),
+        drag_wood: new Audio(pathname + "./Audio/drag_wood.wav"),
+        curtain: new Audio(pathname + "./Audio/curtain.wav"),
+        sad: new Audio(pathname + "./Audio/sad.wav"),
 
 
     }
@@ -103,6 +109,7 @@ AudioControllerObject = function () {
                 case("battery_low"):
                     SoundEffects[effect].volume = 0.20;
                     break
+
             }
 
             SoundEffects[effect].pause()

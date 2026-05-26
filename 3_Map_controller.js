@@ -197,10 +197,10 @@ MapController = function (ExpCont, WorldState) {
         Transition_Mask = document.getElementById("transition_mask"), RequestInstructionsButton,
         SVGShield = document.getElementById("SVG_background_shield"), PageContainer = document.getElementById("Scannimals_container_div")
 
-    SVGShield.style.transition = "opacity 3000ms ease-in-out"
+    SVGShield.style.transition = "opacity 1000ms ease-in-out"
     SVGShield.style.strokeWidth = "5px"
     SVGShield.style.stroke = "gray"
-    PageContainer.style.transition = "all 3000ms ease-in-out"
+    PageContainer.style.transition = "all 1000ms ease-in-out"
     Map_Layer.style.transition = "all " + GenParam.map_zoom_animation_speed + "ms ease-in-out"
     let that = this
 

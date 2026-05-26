@@ -597,7 +597,7 @@ FennimalAttributeSortingTask = function(Parent, Title, FennimalObjectArray, attr
         }
         function set_card_toy(){
             append_SVG_and_element_on_card(document.getElementById("toy_" + value).cloneNode(true),0.9)
-            set_toy_color_scheme(CardElem.SVGObj, value)
+            set_toy_color_scheme(CardElem.SVGObj, value, false)
         }
         function set_card_food(){
             append_SVG_and_element_on_card(document.getElementById("food_" + value + "_first").cloneNode(true),0.9)
@@ -930,7 +930,7 @@ FennimalAttributeSortingTask = function(Parent, Title, FennimalObjectArray, attr
             Toy.style.display = "inherit"
             Toy.style.opacity = 0
             Toy.style.transition = "opacity 500ms ease-in-out"
-            set_toy_color_scheme(Toy, FenObj.toy)
+            set_toy_color_scheme(Toy, FenObj.toy, false)
             let ZeroTGroup =  create_SVG_group(0,0,undefined,undefined)
             let ScaleGroup = create_SVG_group(0,0,undefined,undefined)
             let MainTGroup =  create_SVG_group(0,0,undefined,undefined)

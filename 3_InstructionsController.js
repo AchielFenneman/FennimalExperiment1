@@ -1055,7 +1055,7 @@ INSTRUCTIONSCONTROLLER = function (ExpCont, WorldState, Stimuli) {
                 TextElem_Main_Instructions = create_SVG_group(0,0,undefined,undefined)
                 CurrentInstructionsSVG.appendChild(TextElem_Main_Instructions)
                 let ToyIcon = copy_scale_and_move_object_to_position(document.getElementById("toy_" + FenObj.toy), TextElem_Main_Instructions, 0.5 * GenParam.SVG_width, 0.5 * GenParam.SVG_height, 4 )
-                set_toy_color_scheme(ToyIcon, FenObj.toy)
+                set_toy_color_scheme(ToyIcon, FenObj.toy, false)
                 ToyIcon.style.display = "none"
                 ToyIcon.classList.add("instruction_element_nonbackground")
                 CurrentInstructionsSVG.appendChild(TextElem_Main_Instructions)

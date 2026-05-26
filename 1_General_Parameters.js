@@ -343,54 +343,90 @@ GENERALPARAM = function () {
             ColorScheme: {
                 light_color: "#e3dbde",
                 dark_color: "#48373e"
-            }
+            },
+            AlternateColorScheme: {
+                light_color: "#c87137",
+                dark_color: "#006680"
+            },
         },
         ball: {
             ColorScheme: {
                 light_color: "#c87137",
                 dark_color: "#808080"
+            },
+            AlternateColorScheme: {
+                light_color: "#0000ff",
+                dark_color: "#c8c8c8"
             }
         },
         car: {
             ColorScheme: {
                 light_color: "#a9efac",
                 dark_color: "#457834"
+            },
+            AlternateColorScheme: {
+                light_color: "#8080ff",
+                dark_color: "#d400aa"
             }
         },
         shovel: {
             ColorScheme: {
                 light_color: "#b5bbe3",
                 dark_color: "#7581d0"
+            },
+            AlternateColorScheme: {
+                light_color: "#ffcc00",
+                dark_color: "#554400"
             }
         },
         boomerang: {
             ColorScheme: {
                 light_color: "#e99598",
                 dark_color: "#602ead"
+            },
+            AlternateColorScheme: {
+                light_color: "#00aa88",
+                dark_color: "#93ac93"
             }
         },
         trumpet: {
             ColorScheme: {
                 light_color: "#e6e6e6",
                 dark_color: "#999999"
+            },
+            AlternateColorScheme: {
+                light_color: "#4d4d4d",
+                dark_color: "#f2f2f2"
             }
         },
         plane: {
             ColorScheme: {
                 light_color: "#7ad6d1",
                 dark_color: "#ac7e19"
+            },
+            AlternateColorScheme: {
+                light_color: "#d40000",
+                dark_color: "#666666"
             }
         },
         duck: {
             ColorScheme: {
                 light_color: "#eeda22",
                 dark_color: "#bd5555"
+            },
+            AlternateColorScheme: {
+                light_color: "#008000",
+                dark_color: "#002b00"
             }
         },
         spinner: {
             ColorScheme: {
                 light_color: "#d7a4d4",
                 dark_color: "#a03da5"
+            },
+            AlternateColorScheme: {
+                light_color: "#d4aa00",
+                dark_color: "#00aad4"
             }
         },
     }

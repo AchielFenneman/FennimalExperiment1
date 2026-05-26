@@ -20,7 +20,7 @@ let StimulusSettings = function () {
         mentalizing_1: [], //"browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"
         mentalizing_1B : [],
         mentalizing_2: [], //"browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"
-        mentalizing_network: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"]
+        mentalizing_network: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"] //
     }
 
     //DETERMINING FENNIMALS ENCOUNTERED DURING EXPERIMENT
@@ -35,7 +35,7 @@ let StimulusSettings = function () {
     //  toybox: if set, changes the behavior of toy interaction trials. If a toy box is present, the Fennimal will retrieve and/or place the toys from a box.
     const All_Fennimal_Sets = {
         test: [
-            {id: "A1", head: "A1", head_group: "A", head_cluster: "A", region: "A", food_preference: "A" },
+            {id: "A1", head: "A1", head_group: "A", head_cluster: "A", region: "A", food_preference: "A", toy: "A", toybox: "A", hat: "A" },
             {id: "A2", head: "A2", head_group: "A", head_cluster: "A", region: "A", hat: "B",  toy: "B", toybox: "B"},
             {id: "A3", head: "A3", head_group: "A", head_cluster: "A", region: "B", hat: "C", toy: "C", toybox: "C"},
             {id: "A4", head: "A4", head_group: "A", head_cluster: "A", region: "B", hat: "C", food_preference: "C", toy: "D", toybox: "D"},
@@ -71,17 +71,19 @@ let StimulusSettings = function () {
         mentalizing_network: [
 
             {id: "S1", head: "A", region: "A", toy: "A", toybox: "A", hat: "A"},
-            {id: "S2", head: "B", region: "B", toy: "B", toybox: "B", hat: "B"},
+            {id: "S2", head: "B", region: "B", toy: "B", toybox: "B"},
             {id: "S3", head: "C", region: "C", toy: "C", toybox: "C"},
 
             {id: "P1", head: "D", region: "D", toy: "D", toybox: "A"},
-            {id: "P2", head: "E", region: "E", toy: "E", toybox: "B"},
+            {id: "P2", head: "E", region: "E", toy: "E", toybox: "B", hat: "B"},
             {id: "P3", head: "F", region: "F", toy: "F", toybox: "C"},
 
-            {id: "W", head: "A", region: "A", food_preference: "A", hat: "C"},
+            /*{id: "W", head: "A", region: "A", food_preference: "A", hat: "C"},
             {id: "X", head: "A", region: "A", food_preference: "B", hat: "D"},
             {id: "Y", head: "E", region: "E", food_preference: "C", hat: "E"},
             {id: "Z", head: "E", region: "E", food_preference: "D", hat: "F"},
+
+             */
 
             /*
             {id: "S1", head: "A", region: "A", toy: "A", toybox: "A", hat: "A"},
@@ -245,6 +247,12 @@ let StimulusSettings = function () {
     // +     ask_contents_box: asks contents of box, then ends trial
     // +     ask_food: TODO
     // +     ask_Fennimal_toy: ask which toy was previously associated to Fennimal, then ends trial.
+    //      lost_hat (requires that the Fennimals have a hat). Shows the Fennimal without a hat, then teleports participant to lost & found to select this previous Fennimal's hat.
+    //          Takes the hat options from question_options_hat. If there are less than 5, adds some random hats.
+    //          Relies on the lost-and-found variables in the WorldState.
+    //      replacement_toy: informs the participants that the Fennimal is bored. Then teleports to the Toy Storage Room, where there are alternatively colored toys on display. Particpnat has to select the same type of toy prevoiusly associated to this Fenniml, with different color.
+    //          Takes the toys option from question_options_toys. If there are less than 5, adds some random toys.
+    //      TODO Safety checks in trial generation
     //      NOTE: only interaction types with a + can be set to earn bonus stars.
     //############################################################################################################
     //Optional additional settings:
@@ -261,20 +269,35 @@ let StimulusSettings = function () {
     //      include_Fennefinder (applies only to hint-and-search and free_exploration):
     //          if set to true, displays a radio beacon to the side of the screen during the map phase.
     //          if set to "low_power_mode", then the Fennefinder appears but is inoperable
+    //      shuffle_interaction_types_order: if set to true and there are multiple interaction types, then the order of interaction types is randomized (whilst still observing the pseudo-randomization of IDs, so that the same Fennimal is not back-to-back).
+    //      skip_instructions: if set to true, then the instructions page is skipped (DOES NOT WORK FOR FREE EXLPORATION)
     let All_Experiment_Structures = {
         test: [
+
             {
-                type:"jump_to_trial",
-                Fennimal_interaction_type: ["play_with_toy_active"], // "ask_contents_box", "play_with_toy_passive"
-                Fennimals_encountered: ["A2", "A2"],
-                partner_behavior: "absent",
+                type: "pseudoday",
+                information: "new_Fennimals_spotted",
+                displayed_icons: ["A1", "A2"],
+                title: "Some Fennimals need a little love",
+                display_text: "There are some Fennimals on the island who seem a bit down. Maybe you could go over to them and see what's wrong with them?"
+            },
+
+
+            {
+                type:"hint_and_search",
+                Fennimal_interaction_type: ["lost_hat", "hide_and_seek", "replacement_toy" ], // "ask_contents_box", "play_with_toy_passive"
+                Fennimals_encountered: ["A1", "A2"],
+                partner_behavior: "active",
                 question_options_food: ["A", "B", "C", "X"],
                 question_options_toys: ["A", "B", "C", "X"],
                 question_options_toyboxes: ["A", "B", "C", "X"],
+                question_options_hats: ["A", "B", "C", "X"],
                 hint_type: ["icon"],
                 allowed_attempts_before_answer_given: 3,
                 include_Fennefinder: true,
-                force_climbing_tower_first: false
+                force_climbing_tower_first: false,
+                shuffle_interaction_types_order: true,
+                skip_instructions: true
             },
 
             {
@@ -908,30 +931,29 @@ let StimulusSettings = function () {
                 maximum_earnable_stars: 5
             },
 
-            //FEEDING TRIALS
+            //MANIPULATION
             {
                 type: "pseudoday",
                 information: "new_Fennimals_spotted",
-                displayed_icons: ["W", "X", "Y", "Z"],
-                title: "Get to know some more Fennimals on the island",
-                display_text: "While %PARTNERNAME% is away, there are some Fennimals on the island who would love to get to know you! They look hungry..."
+                displayed_icons: ["S1", "P2"],
+                title: "Some Fennimals need a little love",
+                display_text: "There are some Fennimals on the island who seem a bit down. Maybe you could go over to them and see what's wrong with them?"
             },
-            {
-                type:"free_exploration",
-                Fennimal_interaction_type:["give_food_passive"],
-                Fennimals_encountered: ["W", "X", "Y", "Z"],
-                partner_behavior: "absent",
-                include_Fennefinder: true,
-                force_climbing_tower_first: true
-            },
+
             {
                 type:"hint_and_search",
-                Fennimal_interaction_type:["give_food_active"],
-                Fennimals_encountered: ["W", "X", "Y", "Z"],
+                Fennimal_interaction_type: ["lost_hat", "hide_and_seek", "replacement_toy" ],
+                Fennimals_encountered: ["S1", "P2"],
                 partner_behavior: "absent",
-                hint_type: ["icon", "food"],
-                include_Fennefinder: "low_power_mode"
+                question_options_toys: ["A", "B", "C", "D", "E", "F"],
+                question_options_hats: ["A", "B"],
+                hint_type: ["icon"],
+                include_Fennefinder: true,
+                shuffle_interaction_types_order: true,
+                skip_instructions: true
             },
+
+
 
 
             //PARTNER RETURNS
@@ -1653,6 +1675,7 @@ let StimulusTransformer = function (StimTemplate) {
         //NOTE: here we assume that all SVG heads and bodies have been loaded!
         function assign_map_values() {
             let Map = {}
+            let UnMappedItems = {}
 
             for (let variable_feature_type in Variable_Features) {
                 switch (variable_feature_type) {
@@ -1723,6 +1746,7 @@ let StimulusTransformer = function (StimTemplate) {
                         for(let key in Variable_Features.hat) {
                             Map.hat[key] = Available_Hats.splice(0,1)[0]
                         }
+                        UnMappedItems.hat = Available_Hats
                         break
                     case("food_preference"):
                         //Shorthand for all required flavors
@@ -1737,9 +1761,11 @@ let StimulusTransformer = function (StimTemplate) {
                         }else{
                             Map.food_preference = {}
                             for(let foodnum =0; foodnum<Required_Flavors.length; foodnum++){
-                                Map.food_preference[Required_Flavors[foodnum]] = Available_Bags[foodnum]
+                                Map.food_preference[Required_Flavors[foodnum]] = Available_Bags.shift()
                             }
                         }
+
+                        UnMappedItems.food_preference =Available_Bags
 
                         break
                     case("toy"):
@@ -1750,9 +1776,10 @@ let StimulusTransformer = function (StimTemplate) {
                         }else{
                             Map.toy = {}
                             for(let toynum = 0; toynum<Required_Toys.length; toynum++){
-                                Map.toy[Required_Toys[toynum]] = Available_Toys[toynum]
+                                Map.toy[Required_Toys[toynum]] = Available_Toys.shift()
                             }
                         }
+                        UnMappedItems.toy =Available_Toys
 
                         break
                     case("toybox"):
@@ -1763,9 +1790,10 @@ let StimulusTransformer = function (StimTemplate) {
                         }else{
                             Map.toybox = {}
                             for(let boxnum = 0; boxnum<Required_Boxes.length; boxnum++){
-                                Map.toybox[Required_Boxes[boxnum]] = Available_Boxes[boxnum]
+                                Map.toybox[Required_Boxes[boxnum]] = Available_Boxes.shift()
                             }
                         }
+                        UnMappedItems.toybox =Available_Boxes
 
                         break
 
@@ -1775,7 +1803,7 @@ let StimulusTransformer = function (StimTemplate) {
 
                 }
             }
-            return (Map)
+            return ({Map: Map, Free: UnMappedItems})
         }
 
         find_all_variable_features()
@@ -1917,8 +1945,16 @@ let StimulusTransformer = function (StimTemplate) {
 
     }
 
-    let FeatureMap = create_feature_maps()
+    let Maps =  create_feature_maps()
+    let FeatureMap = Maps.Map
     let FeatureMapConstant = JSON.parse(JSON.stringify(FeatureMap))
+    console.log(Maps)
+
+    //Keep track of the SVG names of unmapped hats and toys (these can be used as distractor items.
+    let Unmapped = {
+
+    }
+    console.log(FeatureMap)
 
     const FennimalObjArr = create_Fennimals_from_stimulus_template(StimTemplate, FeatureMap)
 
@@ -2217,6 +2253,16 @@ let StimulusTransformer = function (StimTemplate) {
                 }
             }
             return (Out)
+        }
+
+    }
+
+    this.get_unused_items_of_type = function(type, number){
+        let Available = JSON.parse(JSON.stringify( shuffleArray(Maps.Free[type]) ))
+        if(Available.length >= number){
+            return(Available.slice(0, number));
+        }else{
+            return(Available);
         }
 
     }
