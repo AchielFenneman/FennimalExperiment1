@@ -873,3 +873,78 @@
     60% {transform: translateY(-15px)}
     100% {transform: translateY(0px)}
 }
+
+/*Particle effects for the chopping*/
+.wood-splinter {
+    pointer-events: none;
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: splinterFly 0.5s ease-in-out forwards;
+}
+
+@keyframes splinterFly {
+    0% {
+        transform: translate(0, 0) scale(1) rotate(0deg);
+        opacity: 1;
+    }
+    30% {
+        /* THE PEAK: Moves part-way horizontally, jumps UP, and scales up slightly */
+        transform: translate(calc(var(--x) * 0.4), var(--jump)) scale(1.2) rotate(calc(var(--rot) * 0.4));
+        opacity: 1;
+    }
+    100% {
+        /* THE FALL: Reaches final X/Y, falls DOWN, spins, and fades out */
+        transform: translate(var(--x), var(--y)) scale(0) rotate(var(--rot));
+        opacity: 0;
+    }
+}
+
+/*Swattable fly task*/
+/* Ensure flies are clickable anywhere on their group */
+.swattable_fly {
+    cursor: pointer;
+    /* Smooth out the JavaScript movement slightly */
+    transition: transform 0.05s linear;
+}
+
+/* --- Flapping Animation --- */
+/* --- Flapping Animation --- */
+@keyframes flapLeft {
+    0%, 100% { transform: rotate(-30deg) scaleY(1); }
+    50% { transform: rotate(-30deg) scaleY(0.2); }
+}
+@keyframes flapRight {
+    0%, 100% { transform: rotate(30deg) scaleY(1); }
+    50% { transform: rotate(30deg) scaleY(0.2); }
+}
+
+.wing-left {
+    animation: flapLeft 0.05s infinite;
+    /* Pin the rotation exactly to the wing's SVG coordinates */
+    transform-origin: -2px -6px;
+}
+
+.wing-right {
+    animation: flapRight 0.05s infinite;
+    /* Pin the rotation exactly to the wing's SVG coordinates */
+    transform-origin: -2px 6px;
+}
+/* --- The Splat Effect --- */
+.swattable_fly.dead .wing {
+    display: none; /* Hide wings instantly */
+}
+
+.swattable_fly.dead .fly-body {
+    fill: #8a0303; /* Turn it a dark red/brown */
+    transform: scale(1.5, 0.3); /* Squish it flat and wide */
+    transition: all 0.1s ease-out;
+}
+
+.swattable_fly.dead circle {
+    display: none; /* Hide the eyes */
+}
+
+.swattable_fly.dead .splat-mark {
+    opacity: 1; /* Show splat lines */
+    transition: opacity 0.1s ease-in;
+}

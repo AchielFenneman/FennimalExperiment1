@@ -52,6 +52,9 @@ AudioControllerObject = function () {
         drag_wood: new Audio(pathname + "./Audio/drag_wood.wav"),
         curtain: new Audio(pathname + "./Audio/curtain.wav"),
         sad: new Audio(pathname + "./Audio/sad.wav"),
+        chop: new Audio(pathname + "./Audio/chop.wav"),
+        jump: new Audio(pathname + "./Audio/jump.wav"),
+        splat: new Audio(pathname + "./Audio/splat.wav"),
 
 
     }
@@ -136,6 +139,18 @@ AudioControllerObject = function () {
     this.close_audio_for_unused_region = function(region){
         delete RegionSoundScapes[region]
     }
+
+    this.load_audio = function(audio_name, filename, looped){
+        SoundEffects[audio_name] = new Audio(pathname + "./Audio/" + filename)
+        SoundEffects[audio_name].loop = looped
+    }
+    this.unload_audio = function(audio_name){
+        delete SoundEffects[audio_name]
+    }
+    this.stop_audio = function(audio_name){
+        SoundEffects[audio_name].pause()
+    }
+
 
 
 }

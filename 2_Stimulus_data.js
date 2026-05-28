@@ -20,7 +20,7 @@ let StimulusSettings = function () {
         mentalizing_1: [], //"browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"
         mentalizing_1B : [],
         mentalizing_2: [], //"browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"
-        mentalizing_network: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"] //
+        mentalizing_network: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"] //"browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"
     }
 
     //DETERMINING FENNIMALS ENCOUNTERED DURING EXPERIMENT
@@ -33,10 +33,11 @@ let StimulusSettings = function () {
     //  food_preference
     //  toy:
     //  toybox: if set, changes the behavior of toy interaction trials. If a toy box is present, the Fennimal will retrieve and/or place the toys from a box.
+    //  play_orthogonal_tasks: if set to true, these Fennimals are selected for orthogonal tasks. Otherwise, these Fennimals skip this task entirely.
     const All_Fennimal_Sets = {
         test: [
-            {id: "A1", head: "A1", head_group: "A", head_cluster: "A", region: "A", food_preference: "A", toy: "A", toybox: "A", hat: "A" },
-            {id: "A2", head: "A2", head_group: "A", head_cluster: "A", region: "A", hat: "B",  toy: "B", toybox: "B"},
+            {id: "A1", head: "A1", head_group: "A", head_cluster: "A", region: "A", food_preference: "A", toy: "A", toybox: "A", hat: "A" , play_orthogonal_tasks: true},
+            {id: "A2", head: "A2", head_group: "A", head_cluster: "A", region: "A", hat: "B",  toy: "B", toybox: "B",  play_orthogonal_tasks: true},
             {id: "A3", head: "A3", head_group: "A", head_cluster: "A", region: "B", hat: "C", toy: "C", toybox: "C"},
             {id: "A4", head: "A4", head_group: "A", head_cluster: "A", region: "B", hat: "C", food_preference: "C", toy: "D", toybox: "D"},
 
@@ -70,12 +71,12 @@ let StimulusSettings = function () {
         ],
         mentalizing_network: [
 
-            {id: "S1", head: "A", region: "A", toy: "A", toybox: "A", hat: "A"},
+            {id: "S1", head: "A", region: "A", toy: "A", toybox: "A", hat: "A", play_orthogonal_tasks: true},
             {id: "S2", head: "B", region: "B", toy: "B", toybox: "B"},
             {id: "S3", head: "C", region: "C", toy: "C", toybox: "C"},
 
             {id: "P1", head: "D", region: "D", toy: "D", toybox: "A"},
-            {id: "P2", head: "E", region: "E", toy: "E", toybox: "B", hat: "B"},
+            {id: "P2", head: "E", region: "E", toy: "E", toybox: "B", hat: "B", play_orthogonal_tasks: true},
             {id: "P3", head: "F", region: "F", toy: "F", toybox: "C"},
 
             /*{id: "W", head: "A", region: "A", food_preference: "A", hat: "C"},
@@ -254,6 +255,7 @@ let StimulusSettings = function () {
     //          Takes the toys option from question_options_toys. If there are less than 5, adds some random toys.
     //      TODO Safety checks in trial generation
     //      NOTE: only interaction types with a + can be set to earn bonus stars.
+
     //############################################################################################################
     //Optional additional settings:
     //      partner_behavior (active / passive / false): determines whether the partner :
@@ -271,8 +273,29 @@ let StimulusSettings = function () {
     //          if set to "low_power_mode", then the Fennefinder appears but is inoperable
     //      shuffle_interaction_types_order: if set to true and there are multiple interaction types, then the order of interaction types is randomized (whilst still observing the pseudo-randomization of IDs, so that the same Fennimal is not back-to-back).
     //      skip_instructions: if set to true, then the instructions page is skipped (DOES NOT WORK FOR FREE EXLPORATION)
+
+    //  included_orthogonal_tasks: ["find_box", "hat_blown_away", "fly_swatting"], if set to true will add orthoginal tasks for some Fennimals.
+    //      "find_box", "hat_blown_away" and "fly_swatting" are orthogonal tasks. Only performed by Fennimals which have "play_orthogonal_tasks = true"
+    //  orthogonal_tasks_possible_after_trial: if set, makes sure that the first X trials do not include an orthoginal tasks. The rest are pseudo-randomly shuffled in (attempted not to have two trails with same ID back-to-back).
+    //      all hint types for these tasks are icons
     let All_Experiment_Structures = {
         test: [
+            {
+                type:"jump_to_trial",
+                Fennimal_interaction_type: ["fly_swatting"], // "ask_contents_box", "play_with_toy_passive" // "find_box", "hat_blown_away" "fly_swatting"
+                Fennimals_encountered: ["A1", "A2"],
+                partner_behavior: "active",
+                question_options_food: ["A", "B", "C", "X"],
+                question_options_toys: ["A", "B", "C", "X"],
+                question_options_toyboxes: ["A", "B", "C", "X"],
+                question_options_hats: ["A", "B", "C", "X"],
+                hint_type: ["icon"],
+                allowed_attempts_before_answer_given: 3,
+                include_Fennefinder: true,
+                force_climbing_tower_first: false,
+                shuffle_interaction_types_order: true,
+                skip_instructions: true
+            },
 
             {
                 type: "pseudoday",
@@ -513,350 +536,11 @@ let StimulusSettings = function () {
 
 
         ],
-        mentalizing_1: [
 
-
-
-
-
-            // PUBLIC INFORMATION PHASE
-            {
-                type:"free_exploration",
-                Fennimal_interaction_type:"play_with_toy_passive",
-                Fennimals_encountered: ["S1" , "S2", "S3", "S4" ],
-                partner_behavior: "active",
-                include_Fennefinder: true
-            },
-
-            {
-                type:"hint_and_search",
-                Fennimal_interaction_type:"play_with_toy_active",
-                question_options_toys: ["A", "B", "C", "D"],
-                question_options_toyboxes: ["A", "B", "C", "D"],
-                Fennimals_encountered: ["S1" , "S2", "S3", "S4" ],
-                partner_behavior: "active",
-                hint_type: "icon",
-                include_Fennefinder: "low_power_mode"
-            },
-
-            //PARTNER LEAVES
-            {
-                type: "pseudoday",
-                information: "partner_leaves"
-            },
-
-            //PRIVATE INFORMATION: BOXES
-            {
-                type:"free_exploration",
-                Fennimal_interaction_type:"play_with_toy_passive",
-                Fennimals_encountered: ["P1" , "P2", "P3", "P4" ],
-                partner_behavior: "absent",
-                include_Fennefinder: true
-            },
-            {
-                type:"hint_and_search",
-                Fennimal_interaction_type:"play_with_toy_active",
-                Fennimals_encountered: ["P1" , "P2", "P3", "P4" ],
-                question_options_toys: ["E", "F", "G", "H"],
-                question_options_toyboxes: ["A", "B", "C", "D"],
-                partner_behavior: "absent",
-                hint_type: "icon",
-                include_Fennefinder: "low_power_mode"
-            },
-
-            //PRIVATE INFORMATION: FEEDING (NETWORK TASK)
-            {
-                type:"free_exploration",
-                Fennimal_interaction_type:"give_food_passive",
-                Fennimals_encountered: ["W" , "X", "Y", "Z" ],
-                partner_behavior: "absent",
-                include_Fennefinder: true
-            },
-            {
-                type:"hint_and_search",
-                Fennimal_interaction_type:"give_food_active",
-                Fennimals_encountered: ["W" , "X", "Y", "Z" ],
-                question_options_food: ["A", "B", ],
-                partner_behavior: "absent",
-                hint_type: "icon",
-                include_Fennefinder: "low_power_mode"
-            },
-
-            //PARTNER RETURNS
-            {
-                type: "pseudoday",
-                information: "partner_returns"
-            },
-
-            //INFERENCE TRIALS
-            {
-                type:"hint_and_search",
-                Fennimal_interaction_type:"ask_belief_partner_contents_box",
-                Fennimals_encountered: ["I1" , "I2", "I3", "I4" ],
-                partner_behavior: "active",
-                hint_type: "icon",
-                include_Fennefinder: "low_power_mode"
-            },
-
-            {
-                type:"jump_to_trial",
-                Fennimal_interaction_type:"ask_Fennimal_toy",
-                Fennimals_encountered: ["S1" , "S2", "S3", "S4", "P1" , "P2", "P3", "P4"  ],
-                partner_behavior: "active",
-                hint_type: "icon",
-                include_Fennefinder: true,
-                bonus_star_for_correct_answer: true,
-            },
-
-
-
-        ],
-        mentalizing_1B: [
-            // PUBLIC INFORMATION PHASE
-            {
-                type:"free_exploration",
-                Fennimal_interaction_type:"play_with_toy_passive",
-                Fennimals_encountered: ["S1" , "S2", "S3" ],
-                partner_behavior: "active",
-                include_Fennefinder: true
-            },
-
-            {
-                type:"hint_and_search",
-                Fennimal_interaction_type:"play_with_toy_active",
-                question_options_toys: ["A", "B", "C"],
-                question_options_toyboxes: ["A", "B", "C"],
-                Fennimals_encountered: ["S1" , "S2", "S3"],
-                partner_behavior: "active",
-                hint_type: "icon",
-                include_Fennefinder: "low_power_mode"
-            },
-
-            {
-                type:"hint_and_search",
-                Fennimal_interaction_type:"play_with_toy_active",
-                question_options_toys: ["A", "B", "C"],
-                question_options_toyboxes: ["A", "B", "C"],
-                Fennimals_encountered: ["S1" , "S2", "S3"],
-                partner_behavior: "active",
-                hint_type: "toybox",
-                include_Fennefinder: "low_power_mode"
-            },
-
-            {
-                type:"hint_and_search",
-                Fennimal_interaction_type:"play_with_toy_active",
-                question_options_toys: ["A", "B", "C"],
-                question_options_toyboxes: ["A", "B", "C"],
-                Fennimals_encountered: ["S1" , "S2", "S3"],
-                partner_behavior: "active",
-                hint_type: "toy",
-                include_Fennefinder: "low_power_mode"
-            },
-
-
-            //PARTNER LEAVES
-            {
-                type: "pseudoday",
-                information: "partner_leaves"
-            },
-
-            //PRIVATE INFORMATION: BOXES
-            {
-                type:"free_exploration",
-                Fennimal_interaction_type:"play_with_toy_passive",
-                Fennimals_encountered: ["P1" , "P2" ],
-                partner_behavior: "absent",
-                include_Fennefinder: true
-            },
-            {
-                type:"hint_and_search",
-                Fennimal_interaction_type:"play_with_toy_active",
-                Fennimals_encountered: ["P1" , "P2",],
-                question_options_toys: ["D", "E", "F"],
-                question_options_toyboxes: ["A", "B", "C"],
-                partner_behavior: "absent",
-                hint_type: "icon",
-                include_Fennefinder: "low_power_mode"
-            },
-            {
-                type:"hint_and_search",
-                Fennimal_interaction_type:"play_with_toy_active",
-                Fennimals_encountered: ["P1" , "P2",],
-                question_options_toys: ["D", "E", "F"],
-                question_options_toyboxes: ["A", "B", "C"],
-                partner_behavior: "absent",
-                hint_type: "toybox",
-                include_Fennefinder: "low_power_mode"
-            },
-            {
-                type:"hint_and_search",
-                Fennimal_interaction_type:"play_with_toy_active",
-                Fennimals_encountered: ["P1" , "P2",],
-                question_options_toys: ["D", "E", "F"],
-                question_options_toyboxes: ["A", "B", "C"],
-                partner_behavior: "absent",
-                hint_type: "toy",
-                include_Fennefinder: "low_power_mode"
-            },
-
-
-            //PRIVATE INFORMATION: FEEDING (NETWORK TASK)
-            {
-                type:"free_exploration",
-                Fennimal_interaction_type:"give_food_passive",
-                Fennimals_encountered: ["W" , "X", "Y", "Z" ],
-                partner_behavior: "absent",
-                include_Fennefinder: true
-            },
-            {
-                type:"hint_and_search",
-                Fennimal_interaction_type:"give_food_active",
-                Fennimals_encountered: ["W" , "X", "Y", "Z" ],
-                question_options_food: ["A", "B", ],
-                partner_behavior: "absent",
-                hint_type: "icon",
-                include_Fennefinder: "low_power_mode"
-            },
-
-            //PARTNER RETURNS
-            {
-                type: "pseudoday",
-                information: "partner_returns"
-            },
-
-            //INFERENCE TRIALS
-            {
-                type:"hint_and_search",
-                Fennimal_interaction_type:"ask_belief_partner_contents_box",
-                Fennimals_encountered: ["I1" , "I2", "I3" ],
-                partner_behavior: "active",
-                hint_type: "icon",
-                include_Fennefinder: "low_power_mode",
-                bonus_star_for_correct_answer: true,
-            },
-
-            {
-                type:"jump_to_trial",
-                Fennimal_interaction_type:"ask_Fennimal_toy",
-                Fennimals_encountered: ["S1" , "S2", "S3",  "P1" , "P2", "P3"  ],
-                partner_behavior: "active",
-                hint_type: "icon",
-                include_Fennefinder: true,
-                bonus_star_for_correct_answer: true,
-            },
-
-
-
-        ],
-        mentalizing_2: [
-
-            // PUBLIC INFORMATION PHASE
-            {
-                type: "pseudoday",
-                information: "new_Fennimals_spotted",
-                displayed_icons: ["S1", "S2"],
-                title: "Get to know some of the Fennimals on the island",
-                display_text: "There are some Fennimals on the island who would love to get to know you and %PARTNERNAME%! " +
-                    "Today, take %PARTNERNAME% with you to explore the island, find the Fennimals and play with them. "
-            },
-           /* {
-                type:"free_exploration",
-                Fennimal_interaction_type:"play_with_toy_passive",
-                Fennimals_encountered: ["S1" , "S2" ],
-                partner_behavior: "active",
-                include_Fennefinder: true
-            },
-
-            */
-            {
-                type:"hint_and_search",
-                Fennimal_interaction_type:"play_with_toy_active",
-                question_options_toys: ["A", "B"],
-                question_options_toyboxes: ["A", "B"],
-                Fennimals_encountered: ["S1" , "S2"],
-                partner_behavior: "active",
-                hint_type: ["icon", "toybox", "toy"],
-                include_Fennefinder: "low_power_mode"
-            },
-            {
-                //Fennimal_attribute_sorting_task (requires Fennimals_encountered and
-                type: "Fennimal_attribute_sorting_task", // "head_region_sorting_task", "Fennimal_attribute_sorting_task",
-                Fennimals_encountered: ["S1", "S2"],
-                attribute_order: ["region", "head", "toybox", "toy"],
-                maximum_earnable_stars: 5
-            },
-
-            //PRIVATE INFORMATION: BOXES
-            {
-                type: "pseudoday",
-                information: "partner_leaves"
-            },
-            {
-                type: "pseudoday",
-                information: "new_Fennimals_spotted",
-                displayed_icons: ["P1", "P2"],
-                title: "Get to know some more Fennimals on the island",
-                display_text: "While %PARTNERNAME% is away, there are some Fennimals on the island who would love to get to know you! " +
-                    "Unfortunately, we ran out of boxes to store the toys in, so we will have to reuse some of the boxes."
-            },
-            {
-                type:"free_exploration",
-                Fennimal_interaction_type:"play_with_toy_passive",
-                Fennimals_encountered: ["P1" , "P2" ],
-                partner_behavior: "absent",
-                include_Fennefinder: true
-            },
-            {
-                type:"hint_and_search",
-                Fennimal_interaction_type:"play_with_toy_active",
-                Fennimals_encountered: ["P1" , "P2"],
-                question_options_toys: ["D", "E" ],
-                question_options_toyboxes: ["A", "B" ],
-                partner_behavior: "absent",
-                hint_type: ["icon", "toybox", "toy", "name"],
-                include_Fennefinder: "low_power_mode"
-            },
-            {
-                type: "Fennimal_attribute_sorting_task", // "head_region_sorting_task", "Fennimal_attribute_sorting_task",
-                Fennimals_encountered: ["P1", "P2" ],
-                attribute_order: ["name", "region", "head", "toybox", "toy"],
-                maximum_earnable_stars: 5
-            },
-
-            //PRIVATE INFORMATION: FEEDING (NETWORK TASK)
-
-
-            //PARTNER RETURNS
-            {
-                type: "pseudoday",
-                information: "partner_returns"
-            },
-
-            //INFERENCE TRIALS
-            {
-                type:"hint_and_search",
-                Fennimal_interaction_type:"ask_belief_partner_contents_box",
-                Fennimals_encountered: ["I1" , "I2"],
-                partner_behavior: "active",
-                hint_type: "icon",
-                include_Fennefinder: true,
-                bonus_star_for_correct_answer: true,
-            },
-
-            {
-                type:"jump_to_trial",
-                Fennimal_interaction_type:"ask_Fennimal_toy",
-                Fennimals_encountered: ["S1" , "S2",   "P1" , "P2" ],
-                partner_behavior: false,
-                include_Fennefinder: false,
-                bonus_star_for_correct_answer: true,
-            },
-
-
-
-        ],
         mentalizing_network: [
+
+
+
 
             // PUBLIC INFORMATION PHASE
             {
@@ -875,7 +559,6 @@ let StimulusSettings = function () {
                  include_Fennefinder: true,
                  force_climbing_tower_first: true
              },
-
             {
                 type:"hint_and_search",
                 Fennimal_interaction_type:["play_with_toy_active"],
@@ -884,8 +567,12 @@ let StimulusSettings = function () {
                 Fennimals_encountered: ["S1" , "S2", "S3"],
                 partner_behavior: "active",
                 hint_type: ["icon", "toybox", "toy"],
-                include_Fennefinder: "low_power_mode"
+                include_Fennefinder: "low_power_mode",
+                included_orthogonal_tasks: ["find_box", "hat_blown_away", "fly_swatting"],
+                orthogonal_tasks_possible_after_trial: 3,
             },
+
+
             {
                 type: "Fennimal_attribute_sorting_task", // "head_region_sorting_task", "Fennimal_attribute_sorting_task",
                 Fennimals_encountered: ["S1", "S2", "S3"],
@@ -922,7 +609,9 @@ let StimulusSettings = function () {
                 question_options_toyboxes: ["A", "B", "C"],
                 partner_behavior: "absent",
                 hint_type: ["icon", "toybox","toy"],
-                include_Fennefinder: "low_power_mode"
+                include_Fennefinder: "low_power_mode",
+                included_orthogonal_tasks: ["find_box", "hat_blown_away", "fly_swatting"],
+                orthogonal_tasks_possible_after_trial: 3,
             },
             {
                 type: "Fennimal_attribute_sorting_task",
@@ -930,29 +619,6 @@ let StimulusSettings = function () {
                 attribute_order: ["region", "head", "toybox", "toy"],
                 maximum_earnable_stars: 5
             },
-
-            //MANIPULATION
-            {
-                type: "pseudoday",
-                information: "new_Fennimals_spotted",
-                displayed_icons: ["S1", "P2"],
-                title: "Some Fennimals need a little love",
-                display_text: "There are some Fennimals on the island who seem a bit down. Maybe you could go over to them and see what's wrong with them?"
-            },
-
-            {
-                type:"hint_and_search",
-                Fennimal_interaction_type: ["lost_hat", "hide_and_seek", "replacement_toy" ],
-                Fennimals_encountered: ["S1", "P2"],
-                partner_behavior: "absent",
-                question_options_toys: ["A", "B", "C", "D", "E", "F"],
-                question_options_hats: ["A", "B"],
-                hint_type: ["icon"],
-                include_Fennefinder: true,
-                shuffle_interaction_types_order: true,
-                skip_instructions: true
-            },
-
 
 
 
@@ -969,11 +635,6 @@ let StimulusSettings = function () {
                 bonus_stars_per_correct_answer: 4,
                 question_options_toyboxes: ["A", "B", "C"],
                 question_options_toys: ["A", "B", "C", "D", "E", "F"]
-            },
-            {
-                type: "name_recall_task",
-                bonus_stars_per_correct_answer: 1,
-                allowed_Levenshtein_distance_for_match: 2,
             },
             {
                 type:"jump_to_trial",
@@ -1016,7 +677,7 @@ let StimulusSettings = function () {
         mentalizing_1: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant", "fly", "shark", "blockhead"],
         mentalizing_1B: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant", "fly", "shark", "blockhead"],
         mentalizing_2: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant", "fly", "shark", "blockhead"],
-        mentalizing_network: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant", "fly", "shark", "blockhead", "parrot", "stocking"],
+        mentalizing_network: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant",  "shark", "blockhead", "parrot", "stocking"],
     }
 
     //Same as for heads, but now on a group level.
@@ -1937,6 +1598,11 @@ let StimulusTransformer = function (StimTemplate) {
                 if(FenTemplates[i].toybox!== false){
                     FenObj.toybox = Map.toybox[FenTemplates[i].toybox]
                 }
+            }
+
+            //Setting special markers
+            if(FenTemplates[i].play_orthogonal_tasks === true){
+                FenObj.play_orthogonal_tasks = true
             }
 
             Arr.push(FenObj)

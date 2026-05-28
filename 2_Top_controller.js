@@ -342,6 +342,63 @@ EXPCONTROLLER = function () {
         return(PossibleSetOfTrials)
     }
 
+    function get_all_orthogonal_task_trials(){
+        let Otrials = []
+        let FenObjs = Stimuli.get_Fennimals_in_array(CurrentPhaseData.Fennimals_encountered)
+        let SpecialFens = []
+        for(let i = 0; i < FenObjs.length; i++){
+            if(FenObjs[i].play_orthogonal_tasks === true){
+                SpecialFens.push(FenObjs[i])
+            }
+        }
+
+        for(let tasknum in CurrentPhaseData.included_orthogonal_tasks){
+            for(let fennum in SpecialFens){
+                let NewFen = JSON.parse(JSON.stringify(SpecialFens[fennum]))
+                NewFen.hint_type = "icon"
+                NewFen.interaction_type = CurrentPhaseData.included_orthogonal_tasks[tasknum]
+                Otrials.push(NewFen)
+            }
+
+        }
+        return Otrials
+    }
+
+    function merge_sets_of_trials(baseArray, insertArray, protectedCount) {
+        const result = [...baseArray];
+        const itemsToInsert = shuffleArray(insertArray);
+
+        // Cap the protected count so it doesn't exceed the base array's actual length
+        const startIndex = Math.min(protectedCount, baseArray.length);
+
+        for (const item of itemsToInsert) {
+            const validIndices = [];
+
+            // Evaluate insertion points starting ONLY from the startIndex
+            for (let i = startIndex; i <= result.length; i++) {
+                const prevId = i > 0 ? result[i - 1].id : null;
+                const nextId = i < result.length ? result[i].id : null;
+
+                if (item.id !== prevId && item.id !== nextId) {
+                    validIndices.push(i);
+                }
+            }
+
+            let targetIndex;
+
+            if (validIndices.length > 0) {
+                targetIndex = validIndices[Math.floor(Math.random() * validIndices.length)];
+            } else {
+                // Fallback: Drop it randomly, but strictly AT or AFTER the startIndex
+                targetIndex = startIndex + Math.floor(Math.random() * (result.length - startIndex + 1));
+            }
+
+            result.splice(targetIndex, 0, item);
+        }
+
+        return result;
+    }
+
     function get_trials_in_phase(){
         current_trial_num_in_day = 0
 
@@ -355,7 +412,6 @@ EXPCONTROLLER = function () {
 
         //Now, for each interaction type we want to create a set of trials. But first, we need to determine the ordering so that two Fennimals with the same IDs are not back-to-back
         const ordering = pseudo_randomize_order_of_ids_no_back_to_back(get_all_values_in_array_of_objects("id", BaseFennimalSet), interaction_types_arr.length)
-
 
         for(let i = 0; i<interaction_types_arr.length; i++) {
             let NewSet = JSON.parse(JSON.stringify(BaseFennimalSet))
@@ -449,6 +505,17 @@ EXPCONTROLLER = function () {
                 TrialSet = set_property_to_all_elem_in_arr("hint_type", hint_type_arr[0], TrialSet)
             }
 
+
+        }
+
+        //Finally, this phase may include some orthogonal tasks. If so, then create a list of all tasks and pseudorandomly shuffle them in
+        if(typeof CurrentPhaseData.included_orthogonal_tasks !== "undefined"){
+            let OrthogonalTrials = get_all_orthogonal_task_trials()
+            let first_x_trials_from_base_set = 0
+            if(CurrentPhaseData.orthogonal_tasks_possible_after_trial> 0){
+                first_x_trials_from_base_set = CurrentPhaseData.orthogonal_tasks_possible_after_trial
+            }
+            TrialSet = merge_sets_of_trials(TrialSet, OrthogonalTrials, first_x_trials_from_base_set)
 
         }
 

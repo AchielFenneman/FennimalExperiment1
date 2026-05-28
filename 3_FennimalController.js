@@ -14,6 +14,9 @@ GENERAL_FENNIMAL_INTERACTION_SETTINGS = function () {
         lost_hat: ["show_Fennimal_no_hat", "go_to_lost_and_found"],
         replacement_toy: ["Fennimal_appear_left", "Fennimal_bored_with_toy"],
         hide_and_seek: ["hide_and_seek"],
+        find_box: ["find_box_task"],
+        hat_blown_away: ["reach_hat_task"],
+        fly_swatting: ["fly_swatting_task"],
 
     }
 
@@ -73,6 +76,7 @@ GENERAL_FENNIMAL_INTERACTION_SETTINGS = function () {
 
 //TODO: OptionalAdditionalInformation should contain {Distractor_Food_Items}
 FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) {
+    console.log(FenObj)
     let that = this
     // GENERAL REFERENCES
     //////////////////////
@@ -286,6 +290,15 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
                 case("hide_and_seek"):
                     play_hide_and_seek();
                     break
+                case("find_box_task"):
+                    play_find_box_task()
+                    break
+                case("reach_hat_task"):
+                    play_reach_hat_task()
+                    break
+                case("fly_swatting_task"):
+                    play_fly_swatting_task()
+                    break
 
                 default:
                     console.error("Attempting to execute unknown interaction step: " + next_step + ". Skipping...")
@@ -473,19 +486,24 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
     //Clean-up at the end of the interaction execute before leaving)
     function cleanup() {
         for (let i = 0; i < Clean_Up_Steps.length; i++) {
-            switch (Clean_Up_Steps[i]) {
-                case("remove_opacity_mask"):
-                    OpacityMask.remove();
-                    break
-                case("remove_Fennimal"):
-                    FennimalSVGObj.remove()
-                    break
-                case("remove_camera_button"):
-                    CameraButton.remove()
-                    break
-                case("remove_items"):
-                    ItemLayerObj.Layer.remove();
-                    break
+            if(typeof Clean_Up_Steps[i] === "string"){
+                switch (Clean_Up_Steps[i]) {
+                    case("remove_opacity_mask"):
+                        OpacityMask.remove();
+                        break
+                    case("remove_Fennimal"):
+                        FennimalSVGObj.remove()
+                        break
+                    case("remove_camera_button"):
+                        CameraButton.remove()
+                        break
+                    case("remove_items"):
+                        ItemLayerObj.Layer.remove();
+                        break
+                }
+            }
+            if(typeof Clean_Up_Steps[i] === "object"){
+                Clean_Up_Steps[i].target.clean_up()
             }
         }
 
@@ -1913,7 +1931,7 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
 
     }
 
-    // HIDE AND SEEK
+    // VARIOUS ORTHOGONAL TASKS
     function play_hide_and_seek(){
         //First we hide the Fennimal somehwere on the screen, and give it an event listener
         Interface.Prompt.show_message(FenObj.name + " is playing hide and seek!")
@@ -2001,6 +2019,25 @@ FENNIMALCONTROLLER = function (FenObj, ExpCont,  OptionalAdditionalInformation) 
         }, 1500)
 
 
+    }
+
+    function play_find_box_task(){
+        let BoxTask = new FindBoxTaskController(ItemLayerObj, FenObj, that.external_task_completed)
+        Clean_Up_Steps.push({type: "clear_task", target: BoxTask})
+    }
+
+    function play_reach_hat_task(){
+        let ReachHatTask = new ReachHatTaskController(ItemLayerObj, FenObj, that.external_task_completed)
+        Clean_Up_Steps.push({type: "clear_task", target: ReachHatTask})
+    }
+
+    function play_fly_swatting_task(){
+        let FlySwattingTask = new FlySwatController(ItemLayerObj, FenObj, that.external_task_completed)
+        Clean_Up_Steps.push({type: "clear_task", target: FlySwattingTask})
+    }
+
+    this.external_task_completed = function(){
+        start_next_interaction_step()
     }
 
     //FUNCTIONS FOR THE ASK_X QUESTIONS
@@ -3702,6 +3739,786 @@ HideAndSeekObject = function(ParentElem,object_type, start_x, start_y, size, reg
 
 }
 
+FindBoxTaskController = function(ItemLayers, FenObj, returnfunc){
+    let Fennimal, Box, box_layer, box_x_pos, FoliageControllers = []
+    const W = GenParam.SVG_width, H = GenParam.SVG_height
+    const Spots = {
+        Main: [.25, .35, .45, .55, .65, .75 ],
+        Plus1: [.2, .4,.6, .8],
+        Plus2: [.10, .40, .70, .90],
+    }
+    const layer_y_pos = {
+        Main: .6,
+        Plus1: .7,
+        Plus2: .75
+    }
+    const BoxSizes = {
+        Main: 1.25,
+        Plus1: 1.75,
+        Plus2: 2.25,
+    }
+    const FoliageSizes = {
+        Main: 2.25,
+        Plus1: 2.75,
+        Plus2: 3.25,
+    }
+
+    FoliageSubController = function(Layer, xpos, ypos, size){
+        let Foliage = copy_scale_and_move_object_to_position(document.getElementById("foliage_" + FenObj.region), Layer, xpos, ypos, size)
+        Foliage.style.cursor = "pointer"
+        let health = 5
+
+        let Cut_Elem = Foliage.getElementsByClassName("cut_foliage")[0]
+        let Uncut_Elem = Foliage.getElementsByClassName("uncut_foliage")[0]
+
+        Cut_Elem.style.opacity = 0
+        Uncut_Elem.style.transition = "all 300ms ease-out"
+        //Cut_Elem.style.transition = "all 300ms ease-in"
+
+        let is_cuttable = false, has_been_cut = false
+        function cut(event){
+            AudioCont.play_sound_effect("chop")
+            if(health > 1){
+                health--
+
+                const pt = GenParam.SVGObject.createSVGPoint();
+                pt.x = event.clientX;
+                pt.y = event.clientY;
+
+                const svgPos = pt.matrixTransform(GenParam.SVGObject.getScreenCTM().inverse());
+
+                // 3. Spawn particles at the calculated canvas position
+                spawnParticles(svgPos.x, svgPos.y, GenParam.SVGObject);
+            }else{
+                has_been_cut = true
+                Cut_Elem.style.opacity = 1
+                Uncut_Elem.style.opacity = 0
+                Foliage.style.pointerEvents = "none"
+                Foliage.style.cursor = "auto"
+            }
+        }
+
+        this.toggle_cuttable = function(bool){
+            is_cuttable = bool
+        }
+
+
+        Foliage.onpointerdown = function(event){
+            if(is_cuttable && ! has_been_cut){
+                cut(event)
+            }
+        }
+
+        this.remove = function(){
+            Foliage.style.transition = "all 300ms ease-in"
+            Foliage.style.opacity = 0
+            is_cuttable = false
+            setTimeout(function(){
+                Foliage.remove()
+            }, 400)
+
+        }
+
+    }
+
+    //On creation, we create a Fennimal on the left
+    function create_Fennimal_object(){
+        //Create
+        Fennimal = create_Fennimal_SVG_object(FenObj, GenParam.Fennimal_head_size, false)
+        ItemLayers.Neg1.appendChild(Fennimal)
+
+        let ScaleGroup = Fennimal.getElementsByClassName("Fennimal_scale_group")[0]
+        ScaleGroup.style.transform = "scale(1.25)"
+
+        //Translate
+        let Box = Fennimal.getBBox()
+        let delta_x = (0.10 *W) - (Box.x + 0.5 * Box.width)
+        let delta_y = (0.5*H)- (Box.y + 0.5 * Box.height)
+        Fennimal.style.transform = "translate(" + delta_x + "px, " + delta_y + "px)"
+
+
+    }
+
+    function place_box(){
+        //Randomly finding a layer (here we only allow Neg1 and Main
+        box_layer = "Main"
+
+        box_x_pos = shuffleArray(Spots[box_layer])[0]
+
+        //Finding a x_position
+        Box = copy_scale_and_move_object_to_position(document.getElementById("toybox_" + FenObj.toybox), ItemLayers[box_layer], box_x_pos * W, (layer_y_pos[box_layer]+0.05) * H, BoxSizes[box_layer] )
+        Box.onpointerdown = box_found
+        Box.style.cursor = "pointer"
+    }
+
+    function box_found(){
+        Box.onpointerdown = ""
+        Box.style.cursor = "auto"
+        AudioCont.play_sound_effect("success")
+        //Remove all elements
+        for(let contnum in FoliageControllers){
+            FoliageControllers[contnum].remove()
+        }
+
+        //After a brief delay, move the box and Fennimal to the front
+        setTimeout(function(){
+            Interface.Prompt.show_message("Yay! You found the " +  GenParam.get_box_printed_name(FenObj.toybox) + "!" )
+
+
+            //Moving the box
+            Box.style.transition = "all 500ms ease-in-out"
+            let Boxcenter = getSVGInternalCenter(Box)
+            let delta_x = (0.6 *W) - (Boxcenter.x)
+            let delta_y = (0.7*H)- (Boxcenter.y)
+            Box.style.transform += "translate(" + delta_x + "px, " + delta_y + "px) scale(3)";
+
+            //After a brief delay, move the Fennimal
+            setTimeout(function(){
+                AudioCont.play_sound_effect("positive")
+                Interface.Prompt.show_message(FenObj.name + " is very grateful that you found the " +   GenParam.get_box_printed_name(FenObj.toybox) + "!" )
+                Fennimal.style.transition = "all 500ms ease-in-out"
+                let Fencenter = getSVGInternalCenter(Fennimal)
+                let delta_x = (0.35 *W) - (Fencenter.x)
+                let delta_y = (0.4*H)- (Fencenter.y)
+                Fennimal.style.transform += "translate(" + delta_x + "px, " + delta_y + "px) scale(1.5)";
+
+                //After the Fennimal finished moving, show some hearts
+                setTimeout(function(){
+                    //Show some hearts
+                    let HGenerator = setInterval(function(){
+                        let x_delta = randomIntFromInterval(-1000,200)
+                        let y_delta = randomIntFromInterval(-950,-500)
+                        let heart_start_coords = getSVGInternalCenter(Fennimal.getElementsByClassName("Fennimal_head_mouth_point")[0])
+                        heart_start_coords.x += randomIntFromInterval(-200,200)
+                        heart_start_coords.y += randomIntFromInterval(-200,200)
+                        new SmallFeedbackSymbol( ItemLayers.Plus2,"heart",2000, heart_start_coords.x, heart_start_coords.y, heart_start_coords.x+ x_delta, heart_start_coords.y + y_delta)
+                    }, 250)
+
+                    //Set an interval to continue
+                    setTimeout(function(){
+                        clearInterval(HGenerator)
+                        //Done with the task!
+                        returnfunc()
+
+                    }, 3000)
+
+                },500)
+
+            }, 750)
+
+        },750)
+
+    }
+
+    function create_foliage(){
+        for(let layer in Spots){
+            for(let spotnum in Spots[layer]){
+                FoliageControllers.push(new FoliageSubController(ItemLayers[layer], Spots[layer][spotnum] * W, layer_y_pos[layer] * H, FoliageSizes[layer]))
+            }
+        }
+    }
+
+    function make_foliage_cuttable(){
+        Interface.Prompt.show_message("Please cut down the plants until you find the " +  GenParam.get_box_printed_name(FenObj.toybox) )
+        for(let contnum in FoliageControllers){
+            FoliageControllers[contnum].toggle_cuttable(true)
+        }
+    }
+
+    //Call when a trial is over to clean up
+    this.clean_up = function(){
+        Fennimal.remove()
+        Box.remove()
+        FoliageControllers = ""
+    }
+
+    create_Fennimal_object()
+    place_box()
+    create_foliage()
+
+    Interface.Prompt.show_message("Uh oh! " + FenObj.name + " has lost the " + GenParam.get_box_printed_name(FenObj.toybox) + "!" )
+    AudioCont.play_sound_effect("sad")
+
+    setTimeout(function(){make_foliage_cuttable()}, 1000)
+
+}
+
+ReachHatTaskController = function(ItemLayers, FenObj, returnfunc){
+    let boxname = GenParam.get_box_printed_name(FenObj.toybox)
+    let Fennimal, Pole, Hat, Box, BackgroundMask, BoxOutline
+    const W = GenParam.SVG_width, H = GenParam.SVG_height
+    let baseline_y = 0.85 * H, pole_dx = 0.7 * W, Fen_base_x = 0.1 * W, box_base_x = 0.2 * W,
+        hat_starting_point, FennimalBaseTransform, PoleHatTarget
+    let number_of_dragging_steps = 5, draggin_step_counter = 0, drag_time = 500, box_is_movable = false,
+        box_moving_step_distance = 0
+    const AllPoleNames = {
+        North: "Pine tree",
+        Mountains: "rock",
+        Village: "telephone pole",
+        Swamp: "dead tree",
+        Desert: "ruin",
+        Beach: "palm tree",
+        Jungle: "tree",
+        Flowerfields: "pillar",
+    }
+    const polename = AllPoleNames[FenObj.region]
+
+    function create_background_mask(){
+        BackgroundMask = create_SVG_rect(0,0,W,H)
+        BackgroundMask.style.fill = "white"
+        ItemLayers.Neg1.appendChild(BackgroundMask)
+        BackgroundMask.style.opacity = 0
+        BackgroundMask.style.transition = "all 500ms ease-in-out"
+
+        setTimeout(function(){
+            BackgroundMask.style.opacity = 0.8
+        },5)
+
+    }
+
+    function create_Fennimal(){
+        Fennimal = create_Fennimal_SVG_object(FenObj, GenParam.Fennimal_head_size, false)
+        ItemLayers.Plus2.appendChild(Fennimal)
+
+        let ScaleGroup = Fennimal.getElementsByClassName("Fennimal_scale_group")[0]
+        ScaleGroup.style.transform = "scale(1.5)"
+
+        //Translate
+        let Box = Fennimal.getBBox()
+        let delta_x = (Fen_base_x) - (Box.x + 0.5 * Box.width)
+        let delta_y = (baseline_y)- (Box.y +  Box.height)
+        Fennimal.style.transform = "translate(" + delta_x + "px, " + delta_y + "px)"
+
+        //Hide hat
+        Fennimal.getElementsByClassName("hat")[0].style.opacity = 0
+
+        //Store the basic starting position
+        FennimalBaseTransform = Fennimal.style.transform
+
+    }
+
+    function create_pole(){
+        Pole = copy_scale_and_move_object_to_position(document.getElementById("tall_post_" + FenObj.region), ItemLayers.Neg1, Fen_base_x, 0.4* H, 6 )
+        let Box = Pole.getBBox()
+        PoleHatTarget = Pole.getElementsByClassName("tall_post_target")[0]
+        let TargetBox = getSVGInternalCenter(PoleHatTarget)
+        let delta_x = (Fen_base_x + pole_dx) - (TargetBox.x )
+        let delta_y = (baseline_y)- (Box.y +  Box.height)
+
+        Pole.style.transform = "translate(" + delta_x + "px, " + (delta_y - 20 ) + "px)"
+    }
+
+    function create_box(){
+        Box = copy_scale_and_move_object_to_position(document.getElementById("toybox_" + FenObj.toybox), ItemLayers.Plus1, box_base_x, baseline_y , 3 )
+        Box.id = "reach_hat_task_box"
+
+        let trash = Box.getElementsByClassName("alignment_field")
+        while(trash.length > 0){
+            trash[0].remove()
+        }
+
+        let BBox = Box.getBBox()
+        let Centerpoint = getSVGInternalCenter(Box)
+
+
+        let delta_y = (baseline_y)- (Centerpoint.y + 0.5* BBox.height)
+        Box.style.transform += "translateY(" + (delta_y) + "px)"
+
+
+
+    }
+
+    function create_hat(){
+        hat_starting_point = getSVGInternalCenter(Pole.getElementsByClassName("tall_post_target")[0])
+        Hat = copy_scale_and_move_object_to_position(document.getElementById("hat_" + FenObj.hat), ItemLayers.Plus1, hat_starting_point.x, hat_starting_point.y, 2 )
+    }
+
+    function Fennimal_jump(amount){
+        return new Promise(resolve => {
+            let prejump_transform = Fennimal.style.transform
+            AudioCont.play_sound_effect("jump")
+            Fennimal.style.transition = "all 200ms ease-out"
+            Fennimal.style.transform += "translateY(-" + amount + "px)"
+            setTimeout(function(){
+                Fennimal.style.transform = prejump_transform
+
+            }, 200)
+
+            // 2. Resolve the promise when the duration is up
+            setTimeout(() => {
+                resolve(); // This signals that the animation is done!
+            }, 500);
+        });
+
+    }
+
+    function move_Fennimal_to_box(){
+        return new Promise(resolve => {
+            Fennimal.style.transition = "all 500ms ease-in-out"
+            let x_distance_to_hat =  getSVGInternalCenter(PoleHatTarget).x - getSVGInternalCenter(Fennimal).x
+            Fennimal.style.transform += "translateX(" + x_distance_to_hat+ "px)"
+
+            // 2. Resolve the promise when the duration is up
+            setTimeout(() => {
+                resolve();
+            }, 750);
+        });
+
+    }
+
+    function Fennimal_return_to_start(){
+        return new Promise(resolve => {
+            Fennimal.style.transition = "all 700ms ease-in-out"
+            Fennimal.style.transform = FennimalBaseTransform
+
+            // 2. Resolve the promise when the duration is up
+            setTimeout(() => {
+                resolve();
+            }, 850);
+        });
+    }
+
+    async function show_first_attempt_to_reach_box(){
+        //First: Fennimal moves to pole
+        await wait(1000)
+        await move_Fennimal_to_box()
+        await Fennimal_jump(200)
+        await Fennimal_jump(275)
+        await Fennimal_jump(250)
+        Interface.Prompt.show_message("Oh no, " + FenObj.name + " can't reach the " + FenObj.hat + "!")
+        AudioCont.play_sound_effect("sad")
+        await Fennimal_return_to_start()
+        Interface.Prompt.show_message("The " + boxname + " can be used as a step-stool!" )
+        await wait(1500)
+        Interface.Prompt.show_message("Help " + FenObj.name + " by moving the " + boxname + " to the " + polename)
+
+        //Now participant can start moving the box
+        allow_box_being_moved()
+    }
+
+    function allow_box_being_moved(){
+        box_is_movable = true
+        Box.style.cursor = "pointer"
+        Box.onpointerdown = try_moving_box
+        box_moving_step_distance = Math.round((getSVGInternalCenter(PoleHatTarget).x - getSVGInternalCenter(Box).x) / number_of_dragging_steps)
+
+        BoxOutline = create_SVG_outline_of_group_ID(Box)
+        Box.parentNode.insertBefore(BoxOutline, Box);
+        BoxOutline.classList.add("focus_on_SVG_outline")
+
+        Box.style.transition = "all " + drag_time + "ms ease-in-out"
+        BoxOutline.style.transition = "all " + drag_time + "ms ease-in-out"
+    }
+
+    async function try_moving_box(){
+        if(box_is_movable){
+            box_is_movable = false
+            BoxOutline.classList.remove("focus_on_SVG_outline")
+            await move_box()
+
+            if(draggin_step_counter === number_of_dragging_steps){
+                box_moved_to_final_position()
+            }else{
+                box_is_movable = true
+                Box.style.cursor = "pointer"
+                BoxOutline.classList.add("focus_on_SVG_outline")
+            }
+        }
+    }
+    function move_box(){
+        return new Promise(resolve => {
+
+            AudioCont.play_sound_effect("drag_wood")
+            draggin_step_counter++
+            Box.style.cursor = "auto"
+
+            Box.style.transform += "translateX(" + box_moving_step_distance + "px)"
+            BoxOutline.style.transform += "translateX(" + box_moving_step_distance + "px)"
+
+            setTimeout(() => {
+                resolve();
+            }, 750);
+        });
+
+
+    }
+
+    function Fennimal_jump_on_box(amount){
+        return new Promise(resolve => {
+            AudioCont.play_sound_effect("jump")
+            Fennimal.style.transition = "all 200ms ease-out"
+            Fennimal.style.transform += "translateY(-" + (2*amount) + "px)"
+            setTimeout(function(){
+                Fennimal.style.transition = "all 100ms ease-out"
+                Fennimal.style.transform += "translateY(" + (amount) + "px)"
+            }, 200)
+
+            // 2. Resolve the promise when the duration is up
+            setTimeout(() => {
+                resolve(); // This signals that the animation is done!
+            }, 500);
+        });
+    }
+
+    function Fennimal_grabs_hat(){
+        return new Promise(resolve => {
+            let start_transform = Fennimal.style.transform
+
+            //Jump and grab
+            AudioCont.play_sound_effect("jump")
+            Fennimal.style.transition = "all 200ms ease-out"
+            Fennimal.style.transform += "translateY(-" + (250) + "px)"
+
+            setTimeout(function(){
+                Hat.style.transform = "all 50ms ease-out"
+                Hat.style.opacity = 0
+                Fennimal.style.transition = "all 100ms ease-out"
+                Fennimal.style.transform = start_transform
+            }, 200)
+
+            setTimeout(function(){
+                AudioCont.play_sound_effect("success")
+                Fennimal.getElementsByClassName("hat")[0].style.opacity = 1
+            }, 300)
+
+            // 2. Resolve the promise when the duration is up
+            setTimeout(() => {
+                resolve(); // This signals that the animation is done!
+            }, 500);
+        });
+    }
+
+    function Fennimal_jumps_back_to_ground(ground_transform){
+        return new Promise(resolve => {
+            AudioCont.play_sound_effect("jump")
+            Fennimal.style.transition = "all 200ms ease-out"
+            Fennimal.style.transform += "translateY(-" + (50) + "px)"
+            setTimeout(function(){
+                Fennimal.style.transform = ground_transform
+            }, 200)
+
+
+            setTimeout(() => {
+                resolve(); // This signals that the animation is done!
+            }, 500);
+        });
+    }
+
+    function Fennimal_moves_to_center(){
+        return new Promise(resolve => {
+            let delta_x = (0.5*W) - getSVGInternalCenter(Fennimal).x
+            Fennimal.style.transition = "all 500ms ease-out"
+            Fennimal.style.transform += "translateX(" + Math.round(delta_x) + "px)"
+
+            setTimeout(() => {
+                resolve();
+            }, 500);
+        });
+    }
+
+    async function box_moved_to_final_position(){
+        AudioCont.play_sound_effect("success")
+        Interface.Prompt.hide()
+
+        await wait(1000)
+        await move_Fennimal_to_box()
+
+
+        let prejump_transform = Fennimal.style.transform
+
+        await Fennimal_jump_on_box(175)
+        await wait(500)
+        await Fennimal_jump(250)
+        await wait(100)
+        await Fennimal_grabs_hat()
+        await wait(300)
+        await Fennimal_jumps_back_to_ground(prejump_transform)
+        await wait(200)
+        await Fennimal_moves_to_center()
+
+        //Showing appreciation
+        AudioCont.play_sound_effect("positive")
+        Interface.Prompt.show_message(FenObj.name + " really appreciates your help!")
+        let HGenerator = setInterval(function(){
+            let x_delta = randomIntFromInterval(-1000,200)
+            let y_delta = randomIntFromInterval(-950,-500)
+            let heart_start_coords = getSVGInternalCenter(Fennimal.getElementsByClassName("Fennimal_head_mouth_point")[0])
+            heart_start_coords.x += randomIntFromInterval(-200,200)
+            heart_start_coords.y += randomIntFromInterval(-200,200)
+            new SmallFeedbackSymbol( ItemLayers.Plus2,"heart",2000, heart_start_coords.x, heart_start_coords.y, heart_start_coords.x+ x_delta, heart_start_coords.y + y_delta)
+        }, 250)
+        await Fennimal_jump(100)
+        await Fennimal_jump(100)
+        await Fennimal_jump(100)
+        await wait(2000)
+        clearInterval(HGenerator)
+        returnfunc()
+
+    }
+
+    //Call when a trial is over to clean up
+    this.clean_up = function(){
+        Fennimal.remove()
+        Box.remove()
+        Hat.remove()
+        Pole.remove()
+        BackgroundMask.remove()
+    }
+
+    create_background_mask()
+    create_pole()
+    create_Fennimal()
+    create_hat()
+    create_box()
+    Interface.Prompt.show_message("Oh no! " + FenObj.name + "'s " + FenObj.hat + " has blown onto a " + polename)
+    AudioCont.play_sound_effect("sad")
+
+    show_first_attempt_to_reach_box()
+
+
+}
+
+SwattableFly = function(Parent, TargetObject, returnfunc) {
+    const TargetCoords = getSVGInternalCenter(TargetObject);
+    const targetX = TargetCoords.x +  (Math.random() - 0.5) * 200
+    const targetY = TargetCoords.y - 200 - (Math.random() - 0.5) * 100
+
+    const StartPos = {
+        x: targetX + (Math.random() - 0.5) * 200,
+        y: targetY + (Math.random() - 0.5) * 200
+    };
+
+    let vx = 0, vy = 0;
+    let x = StartPos.x, y = StartPos.y;
+    let is_dead = false;
+    const flyScale = 3;
+
+    // NEW: Give the fly an initial random heading (in radians)
+    let wanderAngle = Math.random() * Math.PI * 2;
+
+    const templateFly = document.getElementById("swattable_fly");
+    const Fly = templateFly.cloneNode(true);
+
+    Fly.removeAttribute("id");
+    Fly.classList.add("swattable_fly")
+    Fly.style.display = "";
+    Parent.appendChild(Fly);
+
+    function animate_fly() {
+        if (is_dead) return;
+
+        // 1. SMOOTH STEERING: Randomly drift the steering wheel left or right
+        // A smaller number means wider, lazier turns.
+        wanderAngle += (Math.random() - 0.5) * 0.3;
+
+        // 2. FORWARD THRUST: Push the fly forward in the direction it's facing
+        // Lower numbers = slower fly
+        vx += Math.cos(wanderAngle) * 2;
+        vy += Math.sin(wanderAngle) * 2;
+
+        // 3. GRAVITY: Keep the bias toward the box
+        // Reduced from 0.01 to 0.005 so it doesn't "snap" back to the center as harshly
+        const distanceX = targetX - x;
+        const distanceY = targetY - y;
+        vx += distanceX * 0.007;
+        vy += distanceY * 0.007;
+
+        // 4. FRICTION: Determines how much "glide" the fly has
+        // Increased from 0.85 to 0.90 for a smoother, floatier feel
+        vx *= 0.95;
+        vy *= 0.95;
+
+        x += vx;
+        y += vy;
+
+        const angle = Math.atan2(vy, vx) * (180 / Math.PI);
+
+        Fly.setAttribute('transform', `translate(${x}, ${y}) rotate(${angle}) scale(${flyScale})`);
+
+        requestAnimationFrame(animate_fly);
+    }
+
+    Fly.onpointerdown = function(){
+        if (is_dead) return;
+        is_dead = true;
+        AudioCont.play_sound_effect("splat")
+
+        // Add the CSS class to trigger the visual splat
+        Fly.classList.add('dead');
+
+        //Fly is dead!
+        returnfunc()
+
+        // Optional: Fade out and remove the fly from the DOM after 2 seconds
+        setTimeout(() => {
+            Fly.style.transition = 'opacity 1s';
+            Fly.style.opacity = '0';
+            setTimeout(() => Fly.remove(), 1000);
+
+        }, 2000);
+    }
+
+    animate_fly();
+}
+FlySwatController = function(ItemLayers, FenObj, returnfunc){
+    let Fennimal, Box,  BackgroundMask
+    let boxname = GenParam.get_box_printed_name(FenObj.toybox)
+    const W = GenParam.SVG_width, H = GenParam.SVG_height
+    AudioCont.load_audio("splat", "splat.wav", false);
+    AudioCont.load_audio("fly_buzzing", "fly_buzzing.wav", true);
+
+    let number_of_flies = 5, FlyControllers = [], current_fly_count
+
+    function create_background_mask(){
+        BackgroundMask = create_SVG_rect(0,0,W,H)
+        BackgroundMask.style.fill = "white"
+        ItemLayers.Neg1.appendChild(BackgroundMask)
+        BackgroundMask.style.opacity = 0
+        BackgroundMask.style.transition = "all 500ms ease-in-out"
+
+        setTimeout(function(){
+            BackgroundMask.style.opacity = 0.8
+        },5)
+
+    }
+
+    function create_Fennimal(){
+        Fennimal = create_Fennimal_SVG_object(FenObj, GenParam.Fennimal_head_size, false)
+        ItemLayers.Neg1.appendChild(Fennimal)
+
+        let ScaleGroup = Fennimal.getElementsByClassName("Fennimal_scale_group")[0]
+        ScaleGroup.style.transform = "scale(1.8)"
+
+        //Translate
+        let Box = Fennimal.getBBox()
+        let delta_x = (0.35*W) - (Box.x + 0.5 * Box.width)
+        let delta_y = (0.85*H)- (Box.y +  Box.height)
+        Fennimal.style.transform = "translate(" + delta_x + "px, " + delta_y + "px)"
+
+    }
+
+    function create_box(){
+        Box = copy_scale_and_move_object_to_position(document.getElementById("toybox_" + FenObj.toybox), ItemLayers.Main, 0.5*W, 0.7*H, 4 )
+        Box.id = "reach_hat_task_box"
+
+        let trash = Box.getElementsByClassName("alignment_field")
+        while(trash.length > 0){
+            trash[0].remove()
+        }
+
+    }
+
+    create_background_mask()
+    create_Fennimal()
+    create_box()
+
+    function move_Fennimal_x(dx, time){
+        return new Promise(resolve => {
+            Fennimal.style.transition = "all " + time + "ms ease-in-out"
+            Fennimal.style.transform += "translateX(" + dx+ "px)"
+
+            // 2. Resolve the promise when the duration is up
+            setTimeout(() => {
+                resolve();
+            }, time);
+        });
+
+    }
+    function fly_swatted(){
+        current_fly_count--
+        if(current_fly_count <= 0){
+            all_flies_swatted()
+        }
+    }
+
+    function all_flies_swatted(){
+        AudioCont.play_sound_effect("success")
+        AudioCont.stop_audio("fly_buzzing")
+        Interface.Prompt.show_message("All the flies are gone!")
+        task_completed()
+    }
+
+    async function show_starting_animation(){
+        Interface.Prompt.hide()
+        await wait(1000)
+        Interface.Prompt.show_message("Ew! There's a bunch of flies around the " + boxname + "! Gross!")
+        AudioCont.play_sound_effect("sad")
+        await wait(100)
+        current_fly_count = number_of_flies
+        for(let i = 0;i < number_of_flies;i++){
+            FlyControllers.push(new SwattableFly(ItemLayers.Plus2, Box, fly_swatted))
+        }
+        AudioCont.play_sound_effect("fly_buzzing")
+        await wait(500)
+        await move_Fennimal_x(-0.2*W, 250)
+        await wait(500)
+        Interface.Prompt.show_message("Help " + FenObj.name + " by swatting all the flies!")
+
+
+    }
+
+    function Fennimal_jump(amount){
+        return new Promise(resolve => {
+            let prejump_transform = Fennimal.style.transform
+            AudioCont.play_sound_effect("jump")
+            Fennimal.style.transition = "all 200ms ease-out"
+            Fennimal.style.transform += "translateY(-" + amount + "px)"
+            setTimeout(function(){
+                Fennimal.style.transform = prejump_transform
+
+            }, 200)
+
+            // 2. Resolve the promise when the duration is up
+            setTimeout(() => {
+                resolve(); // This signals that the animation is done!
+            }, 500);
+        });
+
+    }
+
+    async function task_completed(){
+        //Move the Fennimal back
+        await wait(1000)
+        await move_Fennimal_x(0.2*W, 500)
+        await wait(500)
+
+        //Showing appreciation
+        AudioCont.play_sound_effect("positive")
+        Interface.Prompt.show_message(FenObj.name + " really appreciates your help!")
+        let HGenerator = setInterval(function(){
+            let x_delta = randomIntFromInterval(-1000,200)
+            let y_delta = randomIntFromInterval(-950,-500)
+            let heart_start_coords = getSVGInternalCenter(Fennimal.getElementsByClassName("Fennimal_head_mouth_point")[0])
+            heart_start_coords.x += randomIntFromInterval(-200,200)
+            heart_start_coords.y += randomIntFromInterval(-200,200)
+            new SmallFeedbackSymbol( ItemLayers.Plus2,"heart",2000, heart_start_coords.x, heart_start_coords.y, heart_start_coords.x+ x_delta, heart_start_coords.y + y_delta)
+        }, 250)
+        await Fennimal_jump(100)
+        await Fennimal_jump(100)
+        await Fennimal_jump(100)
+        await wait(2000)
+        clearInterval(HGenerator)
+        returnfunc()
+
+        //End task
+    }
+
+    this.clean_up = function(){
+        Fennimal.remove()
+        Box.remove()
+        BackgroundMask.remove()
+    }
+
+    show_starting_animation()
+
+
+
+
+
+
+
+
+}
 
 function create_SVG_outline_of_group_ID(Group){
     // 2. Create the <use> element (must use the SVG namespace!)
@@ -3730,4 +4547,49 @@ function create_SVG_outline_of_group_ID(Group){
     outlineGroup.setAttribute('class', 'dynamic-outline');
 
     return(outlineGroup)
+}
+
+function spawnParticles(clickX, clickY, svgElement) {
+    // Cartoonish wood colors
+    const colors = ['#8B4513', '#A0522D', '#CD853F', '#D2B48C'];
+    const numParticles = 9; // How many chips fly out per hit
+
+    for (let i = 0; i < numParticles; i++) {
+        // Create an SVG rectangle to act as a wood chip
+        const particle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+
+        // 1. Set the Object's Size and Starting Position
+        const size = Math.random() * 20 + 20; // Random size between 10px and 12px
+        particle.setAttribute('width', size);
+        particle.setAttribute('height', size);
+        // Offset the x/y by half the size so the particle centers on the click
+        particle.setAttribute('x', clickX - size / 2);
+        particle.setAttribute('y', clickY - size / 2);
+
+        // Pick a random wood color
+        particle.setAttribute('fill', colors[Math.floor(Math.random() * colors.length)]);
+
+        // Add the CSS class
+        particle.classList.add('wood-splinter');
+
+        // 2. Generate Random Trajectory Variables for the Arc
+        const endX = (Math.random() - 0.5) * 650;
+        const endY = Math.random() * 150 + 80;
+        const jump = -(Math.random() * 140 + 20);
+        const rot = (Math.random() - 0.5) * 720;
+
+        // 3. Inject the CSS Variables into the element's inline style
+        particle.style.setProperty('--x', `${endX}px`);
+        particle.style.setProperty('--y', `${endY}px`);
+        particle.style.setProperty('--jump', `${jump}px`);
+        particle.style.setProperty('--rot', `${rot}deg`);
+
+        // 4. Add to the SVG
+        svgElement.appendChild(particle);
+
+        // 5. Cleanup: Remove the element from the DOM after the animation finishes
+        setTimeout(() => {
+            particle.remove();
+        }, 500); // Matches the 0.5s animation duration
+    }
 }

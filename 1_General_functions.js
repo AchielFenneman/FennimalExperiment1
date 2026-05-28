@@ -1044,3 +1044,7 @@ function get_object_from_array_based_on_value(key,value, Arr, copy, remove_from_
     }
     return(false)
 }
+
+function wait(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
