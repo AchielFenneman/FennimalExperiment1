@@ -1,3 +1,12 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden; /* Hard-stops any scrollbars from appearing */
+    background: #e6e6e6;
+}
+
 #Scannimals_container_div {
     width: 100%;
     height: 100vh;
@@ -6,16 +15,13 @@
 
     display: flex;
     justify-content: center;
+    align-items: center;
     background: #e6e6e6
 
 }
 
 #Scannimals_container_div * {
     outline: none;
-    /* Move all your anti-flicker rules here */
-
-
-
 }
 
 #Map {
@@ -35,10 +41,10 @@
     -webkit-user-select: none; /* Safari */
     -ms-user-select: none; /* IE 10 and IE 11 */
     user-select: none; /* Standard syntax */
-    max-height: 99dvh;
     background: white;
     touch-action: none;
     max-width: 2560px;
+    max-height: 1440px;
 
 }
 
