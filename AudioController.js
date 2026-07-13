@@ -1,158 +1,233 @@
-AudioControllerObject = function () {
-    //Creates soundcontrollers for the files in the Audio subfolder
-    let pathname = "" // "https://achielfenneman.github.io/FennimalExperiment1//"
-    //TODO: load dynamically
+class AudioControllerObject {
+    constructor() {
+        this.pathname = ""; // "https://achielfenneman.github.io/FennimalExperiment1//"
 
-    let RegionSoundScapes = {
-        North: new Audio(pathname + "./Audio/North.wav", loop = true),
-        Jungle: new Audio(pathname + "./Audio/Jungle.mp3", loop = true),
-        Desert: new Audio(pathname + "./Audio/Desert.mp3", loop = true),
-        Mountains: new Audio(pathname + "./Audio/Mountains.wav", loop = true),
-        Beach: new Audio(pathname + "./Audio/Beach.wav", loop = true),
-        Flowerfields: new Audio(pathname + "./Audio/Flowerfields.mp3", loop = true),
-        Village: new Audio(pathname + "./Audio/Village.mp3", loop = true),
-        Swamp: new Audio(pathname + "./Audio/Swamp.wav", loop = true),
-        Home: new Audio(pathname + "./Audio/Home.mp3", loop = true),
-    }
+        // 1. CORE AMBIENCE: We still preload regions because they play immediately and constantly
+        this.RegionSoundScapes = {
+            North: new Audio(this.pathname + "./Audio/North.wav"),
+            Jungle: new Audio(this.pathname + "./Audio/Jungle.mp3"),
+            Desert: new Audio(this.pathname + "./Audio/Desert.mp3"),
+            Mountains: new Audio(this.pathname + "./Audio/Mountains.wav"),
+            Beach: new Audio(this.pathname + "./Audio/Beach.wav"),
+            Flowerfields: new Audio(this.pathname + "./Audio/Flowerfields.mp3"),
+            Village: new Audio(this.pathname + "./Audio/Village.mp3"),
+            Swamp: new Audio(this.pathname + "./Audio/Swamp.wav"),
+            Home: new Audio(this.pathname + "./Audio/Home.mp3")
+        };
 
-    let SoundEffects = {
-        rejected: new Audio(pathname + "./Audio/rejected.wav"),
-        positive: new Audio(pathname + "./Audio/positive.wav"),
-        mystery: new Audio(pathname + "./Audio/mystery.wav"),
-        button_click: new Audio(pathname + "./Audio/button_click.wav"),
-        success: new Audio(pathname + "./Audio/success.wav"),
-        photo: new Audio(pathname + "./Audio/photo.wav"),
-        camera_pickup: new Audio(pathname + "./Audio/camera_pickup.mp3"),
-        star_earned: new Audio(pathname + "./Audio/star_earned.mp3"),
-        Fennimal_appears: new Audio(pathname + "./Audio/Fennimal_appears.mp3"),
-        close_menu: new Audio(pathname + "./Audio/close_menu.mp3"),
-        search_loop: new Audio(pathname + "./Audio/search.wav", loop = true),
-        alert: new Audio(pathname + "./Audio/alert.wav"),
-        alert_minor: new Audio(pathname + "./Audio/alert_minor.wav"),
-        alert_minimal: new Audio(pathname + "./Audio/alert_minimal.wav"),
-        thud: new Audio(pathname + "./Audio/thud.wav"),
-        thumb: new Audio(pathname + "./Audio/thumb.wav"),
-        card_placed: new Audio(pathname + "./Audio/card_placed.wav"),
-        nearby_location: new Audio(pathname + "./Audio/nearby_location.mp3"),
-        chew: new Audio(pathname + "./Audio/chew.wav"),
-        pop: new Audio(pathname + "./Audio/pop.wav"),
-        zipper: new Audio(pathname + "./Audio/zipper.wav"),
-        absent_chime: new Audio(pathname + "./Audio/absent_chime.wav"),
-        beep: new Audio(pathname + "./Audio/beep.wav"),
-        battery_low: new Audio(pathname + "./Audio/battery_low.wav"),
-
-        box_open_cardboard: new Audio(pathname + "./Audio/cardboard_open.wav"),
-        box_open_chest: new Audio(pathname + "./Audio/chest_open.wav"),
-        box_open_crate: new Audio(pathname + "./Audio/crate_open.wav"),
-        box_open_container: new Audio(pathname + "./Audio/plastic_box_open.wav"),
-        box_open_giftbox: new Audio(pathname + "./Audio/giftbox_open.wav"),
-        box_open_picknick: new Audio(pathname + "./Audio/wicker.wav"),
-
-        balloon_pop: new Audio(pathname + "./Audio/balloon_pop.wav"),
-        drag_wood: new Audio(pathname + "./Audio/drag_wood.wav"),
-        curtain: new Audio(pathname + "./Audio/curtain.wav"),
-        sad: new Audio(pathname + "./Audio/sad.wav"),
-        chop: new Audio(pathname + "./Audio/chop.wav"),
-        jump: new Audio(pathname + "./Audio/jump.wav"),
-        splat: new Audio(pathname + "./Audio/splat.wav"),
-
-
-    }
-
-
-    //Call to play a region sound
-    let ActiveRegionSounds = [], ActiveSoundEffects = []
-    this.play_region_sound = function (region_name) {
-        switch (region_name) {
-            case("Desert"):
-                RegionSoundScapes[region_name].volume = 0.025;
-                break
-            case("Beach"):
-                RegionSoundScapes[region_name].volume = 0.15;
-                break
-            case("North"):
-                RegionSoundScapes[region_name].volume = 0.25;
-                break
-            case("Jungle"):
-                RegionSoundScapes[region_name].volume = 0.5;
-                break
-            case("Swamp"):
-                RegionSoundScapes[region_name].volume = 0.05;
-                break
-            case("Home"):
-                RegionSoundScapes[region_name].volume = 0.025;
-                break
+        // Ensure all region tracks loop
+        for (let region in this.RegionSoundScapes) {
+            this.RegionSoundScapes[region].loop = true;
         }
 
-        RegionSoundScapes[region_name].play()
-        RegionSoundScapes[region_name].loop = true
-        ActiveRegionSounds.push(RegionSoundScapes[region_name])
+        // 2. THE MANIFEST: Just the filenames! No memory is used here.
+        this.SoundEffectManifest = {
+            rejected: "rejected.wav",
+            positive: "positive.wav",
+            mystery: "mystery.wav",
+            button_click: "button_click.wav",
+            close_menu: "close_menu.mp3",
+            alert_minimal: "alert_minimal.wav",
+            stars_earned: "star_earned.mp3",
+            success: "success.wav",
+            photo: "photo.mp3",
+            click: "click.wav",
+            notification: "notification.wav",
+            alert: "alert.wav",
+            alert_minor: "alert_minor.wav",
+            phone_ring: "phone_ringing.wav",
+
+            search_loop: "search.wav",
+            beep: "beep.wav",
+
+            robot_play: "robot_play.wav",
+            chop: "chop.wav",
+            box_open_A: "box_open_A.wav",
+            box_open_B: "box_open_B.wav",
+            box_open_C: "box_open_C.wav",
+            box_open_cardboard: "cardboard_open.wav",
+            box_open_chest: "chest_open.wav",
+            box_open_crate: "crate_open.wav",
+            box_open_container: "plastic_box_open.wav",
+            box_open_giftbox: "giftbox_open.wav",
+            box_open_picknick: "wicker.wav",
 
 
+            fly_buzzing: "fly_buzzing.wav",
+            splat: "splat.wav",
+            water_splash: "water_splash.wav",
+
+            pop: "pop.wav",
+            jump: "jump.wav",
+            thud: "thud.wav",
+            star_earned: "star_earned.wav",
+            drag_wood: "drag_wood.wav",
+            sad: "sad.wav",
+            toy_car_windup: "toy_car_windup.wav",
+            toy_car_move: "toy_car_roll.wav",
+            electric_zap_single: "electric_zap_single.wav",
+            electric_zap_discharge: "electric_zap_discharge.wav",
+            plane_buzz: "plane_buzz.wav",
+            trumpet_note_A: "trumpet_note_A.wav",
+            trumpet_note_B: "trumpet_note_B.wav",
+            trumpet_note_C: "trumpet_note_C.wav",
+            heartbeat: "heartbeat.wav",
+            radar_blip: "radar_blip.wav",
+            battery_low: "battery_low.wav",
+            teleport: "teleport.wav",
+            scanner_start: "scanner_start.wav",
+            scanner_loop: "scanner_loop.wav",
+            scanner_success: "scanner_success.wav",
+            wrong_buzz: "wrong_buzz.wav",
+            drawer_open: "drawer_open.wav",
+            drawer_close: "drawer_close.wav",
+            wind_up_plane: "wind_up_prop.wav",
+            switch_flicked: "switch.wav",
+
+            plastic_cap_open: "plastic_cap_open.wav",
+            bubble_pop_small: "bubble_pop_small.wav",
+
+            wind_up_spring: "wind_up_spring.wav",
+            spring_release: "spring_release.wav",
+
+            scrub: "scrub.wav",
+
+        };
+
+        // 3. MEMORY MANAGEMENT
+        this.ActiveSoundCache = {}; // Holds the actual Audio objects
+        this.LastPlayedTimestamps = {}; // Tracks when they were last used
+
+        this.ActiveRegionSounds = [];
+        this.ActiveSoundEffects = []; // History array for the "stop all" function
+
+        this.start_garbage_collector();
     }
 
-    //Call to play a sound effect
-    this.play_sound_effect = function (effect) {
-        if (Object.hasOwn(SoundEffects, effect)) {
-            ActiveSoundEffects.push(SoundEffects[effect])
+    // ----------------------------------------------------
+    // BACKGROUND GARBAGE COLLECTOR
+    // ----------------------------------------------------
+    start_garbage_collector() {
+        // Runs every 60 seconds
+        setInterval(() => {
+            let now = Date.now();
+            for (let effect in this.ActiveSoundCache) {
+                let audioObj = this.ActiveSoundCache[effect];
 
-            switch (effect) {
-                case("success"):
-                    SoundEffects[effect].volume = 0.25;
-                    break
-                case("search_loop"):
-                    SoundEffects[effect].volume = 0.25;
-                    break
-                case("Fennimal_appears"):
-                    SoundEffects[effect].volume = 0.25;
-                    break
-                case("pop"):
-                    SoundEffects[effect].volume = 0.10;
-                    break
-                case("battery_low"):
-                    SoundEffects[effect].volume = 0.20;
-                    break
+                // NEVER unload a sound that is actively set to loop, or currently playing
+                if (audioObj.loop || !audioObj.paused) continue;
 
+                // If the sound hasn't been played in 3 minutes, free up the memory!
+                if (now - this.LastPlayedTimestamps[effect] > 180000) {
+                    this.unload_audio(effect);
+                }
             }
+        }, 60000);
+    }
 
-            SoundEffects[effect].pause()
-            SoundEffects[effect].currentTime = 0
-            SoundEffects[effect].play()
+    // ----------------------------------------------------
+    // EXPOSED PUBLIC API
+    // ----------------------------------------------------
+
+    play_region_sound(region) {
+        if (this.RegionSoundScapes[region]) {
+            this.RegionSoundScapes[region].play().catch(e => console.warn("Audio blocked:", e));
+            this.ActiveRegionSounds.push(this.RegionSoundScapes[region]);
         }
     }
 
-    //Stop playing all sounds
-    this.stop_all_region_sounds = function () {
-        for (let i = 0; i < ActiveRegionSounds.length; i++) {
-            ActiveRegionSounds[i].pause()
+    play_sound_effect(effect) {
+        // LAZY LOAD: If it's not in RAM, load it right now!
+        if (!this.ActiveSoundCache[effect]) {
+            if (this.SoundEffectManifest[effect]) {
+                this.load_audio(effect, this.SoundEffectManifest[effect], false);
+            } else {
+                console.warn("Unknown sound effect requested: " + effect);
+                return;
+            }
+        }
+
+        let audio = this.ActiveSoundCache[effect];
+
+        // Update the timestamp so the garbage collector knows it was just used
+        this.LastPlayedTimestamps[effect] = Date.now();
+
+        // Specific volume logic
+        audio.volume = 1.0;
+        if (effect === "heartbeat") audio.volume = 0.10;
+        if (effect === "battery_low") audio.volume = 0.20;
+
+        // Reset and play
+        audio.pause();
+        audio.currentTime = 0;
+        audio.play().catch(e => console.warn("[" + effect + "] Audio blocked:", e));
+
+        // Keep track of recent sounds for the "stop all" function (Limit to 10)
+        this.ActiveSoundEffects.push(audio);
+        if (this.ActiveSoundEffects.length > 10) {
+            this.ActiveSoundEffects.shift();
         }
     }
 
-    //Stops playing all sound effects
-    this.stop_all_sound_effects = function () {
-        for (let i = 0; i < ActiveSoundEffects.length; i++) {
-            ActiveSoundEffects[i].pause()
+    start_looping_sound_effect(effect) {
+        if (!this.ActiveSoundCache[effect]) {
+            if (this.SoundEffectManifest[effect]) {
+                this.load_audio(effect, this.SoundEffectManifest[effect], true);
+            } else {
+                console.warn("Unknown sound effect requested: " + effect);
+                return;
+            }
+        }
+
+        let audio = this.ActiveSoundCache[effect];
+        this.LastPlayedTimestamps[effect] = Date.now();
+        audio.loop = true;
+        audio.play().catch(e => console.warn("Audio blocked:", e));
+    }
+
+    stop_looping_sound_effect(effect) {
+        if (this.ActiveSoundCache[effect]) {
+            let audio = this.ActiveSoundCache[effect];
+            audio.pause();
+            audio.currentTime = 0;
+            audio.loop = false;
         }
     }
 
-    //Call to unload (close) the sound effects of unvisted regions
-    this.close_audio_for_unused_region = function(region){
-        delete RegionSoundScapes[region]
+    stop_all_region_sounds() {
+        for (let i = 0; i < this.ActiveRegionSounds.length; i++) {
+            this.ActiveRegionSounds[i].pause();
+        }
+        this.ActiveRegionSounds = [];
     }
 
-    this.load_audio = function(audio_name, filename, looped){
-        SoundEffects[audio_name] = new Audio(pathname + "./Audio/" + filename)
-        SoundEffects[audio_name].loop = looped
-    }
-    this.unload_audio = function(audio_name){
-        delete SoundEffects[audio_name]
-    }
-    this.stop_audio = function(audio_name){
-        SoundEffects[audio_name].pause()
+    stop_all_sound_effects() {
+        for (let i = 0; i < this.ActiveSoundEffects.length; i++) {
+            this.ActiveSoundEffects[i].pause();
+        }
     }
 
+    close_audio_for_unused_region(region) {
+        if (this.RegionSoundScapes[region]) {
+            this.RegionSoundScapes[region].pause();
+            this.RegionSoundScapes[region].src = ""; // Force garbage collection of the audio buffer
+            delete this.RegionSoundScapes[region];
+        }
+    }
 
+    load_audio(audio_name, filename, looped) {
+        let newAudio = new Audio(this.pathname + "./Audio/" + filename);
+        newAudio.loop = looped;
+        this.ActiveSoundCache[audio_name] = newAudio;
+        this.LastPlayedTimestamps[audio_name] = Date.now();
+    }
 
+    unload_audio(audio_name) {
+        if (this.ActiveSoundCache[audio_name]) {
+            this.ActiveSoundCache[audio_name].pause();
+            this.ActiveSoundCache[audio_name].src = ""; // Severs the connection to the file, freeing RAM
+            delete this.ActiveSoundCache[audio_name];
+            delete this.LastPlayedTimestamps[audio_name];
+        }
+    }
 }
-
-console.log("%c RESOURCES - LOADED AUDIOCONTROLLER", "color:darkgreen")

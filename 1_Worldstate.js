@@ -306,7 +306,7 @@ WorldStateObject = function () {
     }
 
     //Returns an SVG element. Person can be "player" or "partner", direction can be front,back,left,right
-    this.get_person_icon = function(person, direction){
+    this.get_person_icon = function(person, direction, applied_scale_factor){
         let IconSettings
         if(person === "player"){
             IconSettings = PlayerIcon_Settings
@@ -315,7 +315,7 @@ WorldStateObject = function () {
             IconSettings = PartnerIcon_Settings
         }
 
-        let Elem = create_SVG_group(false,false,false,false)
+        let Elem = create_SVG_group(0,0,false,false)
         let Contents = document.getElementById("icon_player_" + IconSettings.type + "_" + direction).cloneNode(true)
         Contents.id = ""
         Contents.style.display = "inherit"
@@ -323,9 +323,9 @@ WorldStateObject = function () {
         Elem.appendChild(Contents);
 
         //Setting optional scale
-        if(Object.hasOwn(IconSettings, "scale_factor")){
-            if(typeof IconSettings.scale_factor === "number"){
-                Elem.style.transform = "scale(" + IconSettings.scale_factor + ")"
+        if(applied_scale_factor !== "undefined"){
+            if(typeof applied_scale_factor === "number"){
+                Elem.style.transform = "scale(" + applied_scale_factor + ")"
             }
         }
 

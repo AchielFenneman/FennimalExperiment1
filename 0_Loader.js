@@ -1,5 +1,5 @@
 //Defining global variables here.
-let  GenParam, AudioCont, Interface,  WorldState, ExperimentController
+let GenParam, AudioCont, Interface, WorldState, topController;
 
 //Defining extraction and loading functions
 // Transforms the heads SVG data into an array of strings (one string per head)
@@ -89,9 +89,6 @@ async function extract_SVG_elements_by_type(path, source_class_name, new_layer_i
     }
 
     HiddenDiv.remove()
-
-
-
 }
 
 async function extract_player_SVG(){
@@ -118,8 +115,6 @@ async function extract_player_SVG(){
     SVG_Target.appendChild(SVG_Target_Group)
 
     HiddenDiv.remove()
-
-
 }
 
 async function load_additional_svg_assets(){
@@ -132,9 +127,50 @@ async function load_additional_svg_assets(){
     await extract_SVG_elements_by_type("./SVG/Items.svg", "misc", "Misc",document.getElementById("Fennimal_Templates_Layer") )
     await extract_SVG_elements_by_type("./SVG/Items.svg", "toybox", "All_Boxes",document.getElementById("Fennimal_Templates_Layer") )
     await extract_player_SVG()
+}
 
+// --- OPTIMIZATION: BAKE REGIONS TO RASTER ---
+async function attempt_raster_swap_for_regions(regions_array) {
+    let promises = regions_array.map(region => {
+        return new Promise((resolve) => {
+            let img = new Image();
 
+            // IF THE PNG EXISTS:
+            img.onload = () => {
+                let bottomLayer = document.getElementById(`map_layer_${region}_bottom`);
+                if (bottomLayer) {
+                    // 1. Delete the millions of vector points
+                    bottomLayer.innerHTML = "";
 
+                    // 2. Create the SVG image tag
+                    let svgImg = document.createElementNS("http://www.w3.org/2000/svg", 'image');
+                    svgImg.setAttribute("href", `./Regions/${region}.png`);
+                    svgImg.setAttribute("width", "1920"); // Assuming your master SVG viewbox is 1920x1080
+                    svgImg.setAttribute("height", "1080");
+                    svgImg.setAttribute("x", "0");
+                    svgImg.setAttribute("y", "0");
+                    svgImg.setAttribute("preserveAspectRatio", "none");
+
+                    // 3. Drop it in!
+                    bottomLayer.appendChild(svgImg);
+                    console.log(`%c ✓ Raster optimization loaded for ${region}`, "color:teal");
+                }
+                resolve();
+            };
+
+            // IF THE PNG DOES NOT EXIST (or was deleted during dev):
+            img.onerror = () => {
+                console.log(`%c - Vector fallback used for ${region} (No PNG found)`, "color:gray");
+                resolve();
+            };
+
+            // Trigger the network request to check for the file
+            img.src = `./Regions/${region}.png`;
+        });
+    });
+
+    // Wait for all image checks to finish before continuing the boot sequence
+    await Promise.all(promises);
 }
 
 //This sets all the global variables
@@ -153,9 +189,9 @@ function set_all_global_variables(){
 
     WorldState = new WorldStateObject()
 
-    ExperimentController = new EXPCONTROLLER()
-    ExperimentController.start_experiment()
-    //let AudioController = new AudioControllerObject()
+    // MINIMAL FIXES: Updated to prevent naming collision and use camelCase initialization
+    topController = new ExperimentController()
+    topController.startExperiment()
 }
 
 //This object loads all the location images to their correct place (called after stimulus determination)
@@ -181,13 +217,23 @@ ImageLoader = function(Array_of_visited_regions_and_locations, LocationHolderEle
 //Loading the main SVG
 async function loadMainElements(){
     try {
-        //Loading main map elements
+        //1. Loading main map elements
         const response = await fetch('./SVG/Main.svg')
         const SVG_main_string = await response.text()
         document.getElementById("Scannimals_container_div").innerHTML = SVG_main_string;
         document.getElementById("Scannimals_container_div").getElementsByTagName("svg")[0].id = "Scannimals_Task_SVG"
 
         await load_additional_svg_assets()
+
+        // ----------------------------------------------------
+        // 2. Attempt to swap heavy vectors for PNGs
+        //  Looks in the Regions subfolder to see if there is a PNG for each region.
+        //  If so, then swap the SVG for the map bottom layer of this region with the PNG.
+        //  If no such file exists, keep the SVG.
+        // ----------------------------------------------------
+        let regions_to_check = ["North", "Jungle", "Desert", "Mountains", "Beach", "Flowerfields", "Village", "Swamp", "Home"];
+        await attempt_raster_swap_for_regions(regions_to_check);
+
 
 
         //Setting all globals
@@ -199,14 +245,7 @@ async function loadMainElements(){
     }
 }
 
-
-
 loadMainElements()
-
-
-
-
-
 
 //TODO:
 //  re-enable quiz questions
@@ -216,8 +255,3 @@ loadMainElements()
 
 //Adapt head sorting task to two rows if more than 4 regions selected
 console.log("Ready new!")
-
-
-
-
-

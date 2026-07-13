@@ -1,1792 +1,1348 @@
-ActionButton = function (ParentElem, button_icon, TargetObject, warmup_time, keyboard_shortcut_arr, activationfunc) {
-    //If this element has a warmup time, then we need to include a circle on the icon to represent this
-
-    let Button, Countdown_Timer, CountdownCircle
-    let button_functional = true
-
-    //If there is no target object (set to false), then create the button on a fixed position on the screen
-    if (TargetObject === false) {
-        Button = create_Action_Button_SVG_Element(button_icon, GenParam.ActionButtonParameters_Default, false, warmup_time)
-        ParentElem.appendChild(Button)
-    } else {
-        if (TargetObject === "center") {
-            Button = create_Action_Button_SVG_Element(button_icon, GenParam.ActionButtonParameters_Center, false, warmup_time)
-            ParentElem.appendChild(Button)
-
-        } else {
-            if (typeof TargetObject === "object") {
-                //Check if we are referring to a DOM element or to a JSON object
-                if (typeof TargetObject.nodeName === "undefined") {
-                    //Now its a JSON element, and we will just assume that it has a center_x, center_y, width and height attribute
-                    Button = create_Action_Button_SVG_Element(button_icon, TargetObject, false, warmup_time)
-                    ParentElem.appendChild(Button)
-                } else {
-                    //Now we need to present the button on the center of the target location
-                    let TargetCenter = get_center_coords_of_SVG_object(TargetObject)
-                    let Dims = {
-                        center_x: TargetCenter.x,
-                        center_y: TargetCenter.y,
-                        height: GenParam.ActionButtonParameters_OnObject.height,
-                        width: GenParam.ActionButtonParameters_OnObject.width,
-                    }
-
-                    Button = create_Action_Button_SVG_Element(button_icon, Dims, true, warmup_time)
-                    document.getElementById("Map").appendChild(Button)
-                }
-            }
-
-
-        }
-
-
-    }
-
-    //Fetching the coundown circle
-    CountdownCircle = Button.getElementsByClassName("warmup_circle")
-    if (CountdownCircle.length === 1) {
-        CountdownCircle = CountdownCircle[0]
-    }
-
-
-    function start_countdown() {
-        AudioCont.play_sound_effect("search_loop")
-        CountdownCircle.classList.add("warmup_circle_active")
-        CountdownCircle.style.animation = "warmup_circle_animation " + warmup_time + "ms linear"
-        Countdown_Timer = setTimeout(function () {
-            if (button_functional) {
-                activationfunc();
-            }
-        }, warmup_time)
-
-    }
-
-    function break_countdown() {
-        if (warmup_time !== undefined) {
-            if (warmup_time !== false) {
-                clearTimeout(Countdown_Timer)
-                CountdownCircle.classList.remove("warmup_circle_active")
-                CountdownCircle.style.animation = ""
-            }
-        }
-
-    }
-
-    Button.onpointerdown = function () {
-        let sound_effect = "button_click"
-        if (button_icon === "return_arrow") {
-            sound_effect = "close_menu"
-        }
-
-        if (warmup_time === undefined) {
-            AudioCont.play_sound_effect(sound_effect)
-            activationfunc()
-        } else {
-            if (warmup_time === false) {
-                AudioCont.play_sound_effect(sound_effect)
-                activationfunc()
-            } else {
-                if (warmup_time <= 0) {
-                    AudioCont.play_sound_effect(sound_effect)
-                    activationfunc()
-                } else {
-                    start_countdown()
-                }
-            }
-        }
-    }
-
-    Button.onpointerup = function () {
-        break_countdown()
-    }
-    Button.onpointerleave = function () {
-        break_countdown()
-    }
-
-    //Call to remove this button
-    this.delete = function () {
-        //Delete the icon from the screen
-        Button.remove()
-    }
-
-    //Call to disable the button functionality
-    this.disable_functionality = function () {
-        button_functional = false
-    }
-
-    //Call to retrieve a reference to the button element
-    this.getButtonElem = function () {
-        return (Button)
-    }
-
-    //Optionally adding keyboard shortcuts
-    if (typeof keyboard_shortcut_arr !== "undefined") {
-        if (Array.isArray(keyboard_shortcut_arr)) {
-            add_keyboard_shortcuts_to_object(Button, keyboard_shortcut_arr, 500, activationfunc)
-        }
-    }
-
-}
-
-//Creates a ripple-out circle effect at the given coordinates. See CSS for anmiation.
+// --- RIPPLE EFFECTS ---
 function create_ripple(ParentElem, x, y, is_large) {
-    let C1, C2, C3
-    if (is_large) {
-        C1 = create_SVG_circle(x, y, 1, "ripple_circle_large", undefined)
-        C2 = create_SVG_circle(x, y, 1, "ripple_circle_large", undefined)
-        C3 = create_SVG_circle(x, y, 1, "ripple_circle_large", undefined)
-    } else {
-        C1 = create_SVG_circle(x, y, 1, "ripple_circle", undefined)
-        C2 = create_SVG_circle(x, y, 1, "ripple_circle", undefined)
-        C3 = create_SVG_circle(x, y, 1, "ripple_circle", undefined)
+    let ripple_animation_time = 1500;
+    let ripple_offset = 250;
+    let base_class = is_large ? "ripple_circle_large" : "ripple_circle";
+
+    for (let i = 0; i < 3; i++) {
+        setTimeout(() => {
+            let circle = create_SVG_circle(x, y, 1, base_class, undefined);
+            ParentElem.appendChild(circle);
+            setTimeout(() => circle.remove(), ripple_animation_time);
+        }, i * ripple_offset);
     }
-
-    //Starting the three circles with a small offset
-    let ripple_animation_time = 1500
-    let ripple_offset = 250
-
-
-    //First
-    ParentElem.appendChild(C1)
-    setTimeout(function () {
-        C1.remove()
-    }, ripple_animation_time)
-
-    //Second
-    setTimeout(function () {
-        ParentElem.appendChild(C2)
-    }, ripple_offset)
-    setTimeout(function () {
-        C2.remove()
-    }, ripple_animation_time + ripple_offset)
-
-    //Third
-    setTimeout(function () {
-        ParentElem.appendChild(C3)
-    }, 2 * ripple_offset)
-    setTimeout(function () {
-        C3.remove()
-    }, ripple_animation_time + 2 * ripple_offset)
-
 }
 
 function create_ripple_single(ParentElem, x, y, is_large, speed) {
-    let C1
-    if (is_large) {
-        C1 = create_SVG_circle(x, y, 1, "ripple_circle_large", undefined)
-    } else {
-        C1 = create_SVG_circle(x, y, 1, "ripple_circle", undefined)
-
-    }
-
-    //Starting the three circles with a small offset
-    let ripple_offset = 250
-
-
-    //First
-    ParentElem.appendChild(C1)
-    setTimeout(function () {
-        C1.remove()
-    }, speed)
-
-
+    let base_class = is_large ? "ripple_circle_large" : "ripple_circle";
+    let circle = create_SVG_circle(x, y, 1, base_class, undefined);
+    ParentElem.appendChild(circle);
+    setTimeout(() => circle.remove(), speed);
 }
 
-MapController = function (ExpCont, WorldState) {
-    let Map_Layer = document.getElementById("Map"), Interface_Layer = document.getElementById("Interface"),
-        Location_Layer = document.getElementById("Location_layer"), Sky_layer = document.getElementById("Sky_Layer"),
-        Transition_Mask = document.getElementById("transition_mask"), RequestInstructionsButton,
-        SVGShield = document.getElementById("SVG_background_shield"), PageContainer = document.getElementById("Scannimals_container_div")
+// A global utility to firmly lock animated SVG parts to their pivot points
+/*function apply_Fennimal_animation_pivots(FennimalSVG) {
+    if (!FennimalSVG) return;
 
-    SVGShield.style.transition = "opacity 1000ms ease-in-out"
-    SVGShield.style.strokeWidth = "5px"
-    SVGShield.style.stroke = "gray"
-    PageContainer.style.transition = "all 1000ms ease-in-out"
-    Map_Layer.style.transition = "all " + GenParam.map_zoom_animation_speed + "ms ease-in-out"
-    let that = this
-
-    //Keeps track of which region we are presently in
-    let current_region, CurrentPlayerPos, current_action_key_status, previous_action_key_status,
-        Current_Action_Focal_Target
-    let player_allowed_to_move = false
-    let current_player_status = false
-    let currently_in_location = false
-
-    //Returns an array containing the names of all the locations on the map (that is, those having a valid marker element). Each element contains a name and a region
-    this.get_all_present_location_names = function () {
-        let AllMarkers = document.getElementsByClassName("location_marker")
-        let Arr = []
-
-        for (let i = 0; i < AllMarkers.length; i++) {
-            //We can get the name from the ID
-            let name = AllMarkers[i].getAttribute("id").split("_")[2]
-
-            //The region is encoded in the classlist. In particular, we want the second classname
-            let region = AllMarkers[i].classList[1].split("_")[2]
-            Arr.push([name, region])
-
+    let animatedParts = FennimalSVG.querySelectorAll('.animated_part');
+    animatedParts.forEach(part => {
+        let pivot = part.querySelector('.pivot_point');
+        if (pivot) {
+            let px = parseFloat(pivot.getAttribute("cx"));
+            let py = parseFloat(pivot.getAttribute("cy"));
+            part.style.transformOrigin = `${px}px ${py}px`;
+            part.style.transformBox = "fill-box";
         }
+    });
 
-        return (Arr)
-    }
+    let eyes = FennimalSVG.querySelectorAll(".eye_gaze");
+    eyes.forEach(eye => {
+        eye.style.transformOrigin = "center";
+        eye.style.transformBox = "fill-box";
+    });
+}
 
-    //Call on creation to assign the correct ID codes to all the location outlines.
-    function assign_outline_IDs() {
-        let AllMarkers = document.getElementsByClassName("location_marker")
-        for (let i = 0; i < AllMarkers.length; i++) {
-            //Find out if the marker has a unique ID
-            let marker_id = AllMarkers[i].getAttribute("id")
-            let marker_region = AllMarkers[i].classList[1].split("_")[2]
+ */
 
-            //If it does: then find the closest outline element
-            if (marker_id !== null && marker_id !== "undefined") {
-                //Finding the marker coordinates
-                let MarkerBox = AllMarkers[i].getBBox()
-                let MarkerCoords = {x: MarkerBox.x + 0.5 * MarkerBox.width, y: MarkerBox.y + 0.5 * MarkerBox.height}
+// --- ACTION BUTTON CLASS ---
+class ActionButton {
+    constructor(ParentElem, button_icon, TargetObject, warmup_time, keyboard_shortcut_arr, activationfunc) {
+        this.button_functional = true;
+        this.warmup_time = warmup_time;
+        this.activationfunc = activationfunc;
+        this.Countdown_Timer = null;
 
-                //Finding all marker outlines in this region
-                let OutlinesInRegion = document.getElementsByClassName("map_location_outline_" + marker_region)
-                let ClosestOutline = get_closest_object(MarkerCoords, OutlinesInRegion)
-
-                if (ClosestOutline !== false) {
-                    //Now we will assign the correct ID to this outline object. However, we also do some checks
-                    if (ClosestOutline.Object.getAttribute("id") !== "null") {
-                        if (ClosestOutline.dist > 150) {
-                            console.error("The outline for " + marker_id + " has a suspicious distance of " + ClosestOutline.dist + ". Check map data!")
-                        }
-
-                        let marker_name = marker_id.split("_")[2]
-
-                        ClosestOutline.Object.setAttribute("id", "location_outline_" + marker_name)
-
-                        //Now we also update the RegionData in the General Parameters object
-                        if (typeof GenParam.RegionData[marker_region].Locations === "undefined") {
-                            GenParam.RegionData[marker_region].Locations = []
-                        }
-                        GenParam.RegionData[marker_region].Locations.push(marker_name)
-
-
-                    } else {
-                        console.error("Double-assigned a location outline ID! " + marker_id)
-                    }
-                }
+        if (!TargetObject) {
+            this.Button = create_Action_Button_SVG_Element(button_icon, GenParam.ActionButtonParameters_Default, false, warmup_time);
+            ParentElem.appendChild(this.Button);
+        } else if (TargetObject === "center") {
+            this.Button = create_Action_Button_SVG_Element(button_icon, GenParam.ActionButtonParameters_Center, false, warmup_time);
+            ParentElem.appendChild(this.Button);
+        } else {
+            let Dims = TargetObject;
+            if (TargetObject.nodeName) { // It's a DOM element
+                let TargetCenter = get_center_coords_of_SVG_object(TargetObject);
+                Dims = {
+                    center_x: TargetCenter.x,
+                    center_y: TargetCenter.y,
+                    height: GenParam.ActionButtonParameters_OnObject.height,
+                    width: GenParam.ActionButtonParameters_OnObject.width,
+                };
+                this.Button = create_Action_Button_SVG_Element(button_icon, Dims, true, warmup_time);
+                document.getElementById("Map").appendChild(this.Button);
             } else {
-                console.error("Found a marker without a valid ID. Check map data! (Ignoring this marker for now)")
+                this.Button = create_Action_Button_SVG_Element(button_icon, Dims, false, warmup_time);
+                ParentElem.appendChild(this.Button);
             }
-
         }
 
+        let circles = this.Button.getElementsByClassName("warmup_circle");
+        this.CountdownCircle = circles.length > 0 ? circles[0] : null;
+
+        this.Button.onpointerdown = () => this.handle_pointer_down(button_icon);
+        this.Button.onpointerup = () => this.break_countdown();
+        this.Button.onpointerleave = () => this.break_countdown();
+
+        if (Array.isArray(keyboard_shortcut_arr)) {
+            add_keyboard_shortcuts_to_object(this.Button, keyboard_shortcut_arr, 500, activationfunc);
+        }
     }
 
-    function set_all_map_regions_to_visible(){
-        let RegionElems = document.getElementById("Map_bottom_level").childNodes
-        for(let i = 0; i < RegionElems.length; i++) {
-            if(typeof RegionElems[i].id !== "undefined"){
-                if(RegionElems[i].id.includes("map_layer")){
-                    RegionElems[i].style.display = "inherit"
+    start_countdown() {
+        AudioCont.play_sound_effect("search_loop");
+        if (this.CountdownCircle) {
+            this.CountdownCircle.classList.add("warmup_circle_active");
+            this.CountdownCircle.style.animation = `warmup_circle_animation ${this.warmup_time}ms linear`;
+        }
+        this.Countdown_Timer = setTimeout(() => {
+            if (this.button_functional) this.activationfunc();
+        }, this.warmup_time);
+    }
+
+    break_countdown() {
+        if (this.warmup_time) {
+            clearTimeout(this.Countdown_Timer);
+            if (this.CountdownCircle) {
+                this.CountdownCircle.classList.remove("warmup_circle_active");
+                this.CountdownCircle.style.animation = "";
+            }
+        }
+    }
+
+    handle_pointer_down(button_icon) {
+        let sound_effect = button_icon === "return_arrow" ? "close_menu" : "button_click";
+        if (!this.warmup_time || this.warmup_time <= 0) {
+            AudioCont.play_sound_effect(sound_effect);
+            this.activationfunc();
+        } else {
+            this.start_countdown();
+        }
+    }
+
+    delete() { this.Button.remove(); }
+    disable_functionality() { this.button_functional = false; }
+    getButtonElem() { return this.Button; }
+}
+
+class MapController {
+
+    constructor(ExpCont, WorldState) {
+        this.ExpCont = ExpCont;
+        this.WorldState = WorldState;
+
+        // Cache DOM Elements
+        this.Map_Layer = document.getElementById("Map");
+        this.Interface_Layer = document.getElementById("Interface");
+        this.Location_Layer = document.getElementById("Location_layer");
+        this.Sky_layer = document.getElementById("Sky_Layer");
+        this.Transition_Mask = document.getElementById("transition_mask");
+        this.SVGShield = document.getElementById("SVG_background_shield");
+        this.PageContainer = document.getElementById("Scannimals_container_div");
+
+        // Apply Base Styles
+        this.SVGShield.style.transition = "opacity 1000ms ease-in-out";
+        this.SVGShield.style.strokeWidth = "5px";
+        this.SVGShield.style.stroke = "gray";
+        this.PageContainer.style.transition = "all 1000ms ease-in-out";
+        this.Map_Layer.style.transition = `all ${GenParam.map_zoom_animation_speed}ms ease-in-out`;
+
+        // State Tracking
+        this.current_region = "All";
+        this.current_action_key_status = false;
+        this.previous_action_key_status = false;
+        this.Current_Action_Focal_Target = null;
+        this.current_nearest_location = false;
+        this.currently_in_location = false;
+
+        this.ActiveActionButtonArr = [];
+        this.CurrentFennimalIconsOnMap = [];
+        this.Arr_IDs_of_Fennimals_currently_on_map = [];
+
+        // Initialize Sub-Controllers
+        this.DomeCont = new this.DomeController();
+        this.Partner = new this.PartnerIconController(this);
+        this.Player = new this.PlayerIconController(this);
+
+        // Setup the Map
+        this.register_map_locations()
+        this.initialize_phone_booth();
+        this.set_all_map_regions_to_visible();
+        this.reset_all_region_opacity_masks();
+        this.create_request_instructions_button();
+
+        // Boot Sequence
+        this.Partner.jump_to_position(0.5 * GenParam.SVG_width, 0.48 * GenParam.SVG_height);
+        this.Partner.update_behavior();
+
+        this.Player.jump_to_map_center();
+        this.Player.allow_movement();
+
+        this.Map_Layer.style.display = "inherit";
+    }
+
+    // ----------------------------------------------------
+    // SETUP & INITIALIZATION
+    // ----------------------------------------------------
+
+    register_map_locations() {
+        let AllMarkers = document.getElementsByClassName("location_marker");
+
+        for (let i = 0; i < AllMarkers.length; i++) {
+            let marker_id = AllMarkers[i].getAttribute("id"); // e.g., "location_marker_lake"
+
+            if (marker_id) {
+                // e.g., from "map_marker_Jungle"
+                let marker_region = AllMarkers[i].classList[1].split("_")[2];
+                let marker_name = marker_id.split("_")[2]; // "lake"
+
+                // DEFENSIVE: Restore the GenParam array!
+                if (!GenParam.RegionData[marker_region].Locations) {
+                    GenParam.RegionData[marker_region].Locations = [];
+                }
+
+                // Prevent duplicates just in case
+                if (!GenParam.RegionData[marker_region].Locations.includes(marker_name)) {
+                    GenParam.RegionData[marker_region].Locations.push(marker_name);
                 }
             }
         }
     }
 
-    //Moves and zooms the map to a given region. Special case: "All" zooms the map out
-    function zoom_map_to_region(region_name) {
-        AudioCont.stop_all_region_sounds()
-
-        //Get coordinates of center
-        let coords = GenParam.Map_Region_Centers_Percentage[region_name]
-
-        //Find the correct zoom level
-        let zoom_level = GenParam.map_zoom_level
-        if (region_name === "All") {
-            zoom_level = 1
-            coords = {x: 50, y: 50}
+    set_all_map_regions_to_visible() {
+        let RegionElems = document.getElementById("Map_bottom_level").childNodes;
+        for (let i = 0; i < RegionElems.length; i++) {
+            if (RegionElems[i].id && RegionElems[i].id.includes("map_layer")) {
+                RegionElems[i].style.display = "inherit";
+            }
         }
-        if (region_name === "Home") {
-            zoom_level = GenParam.map_zoom_level_center
-        }
+    }
 
-        //Setting zoom level to the correct scale level
-        let scale_level = 1 / zoom_level
+    // ----------------------------------------------------
+    // MAP VIEW MANAGEMENT
+    // ----------------------------------------------------
+    zoom_map_to_region(region_name) {
+        AudioCont.stop_all_region_sounds();
 
-        //Setting the correct origin point for the map
-        //Map_Layer.style.transformOrigin = coords.x + "% " + coords.y + "%"
+        let coords = GenParam.Map_Region_Centers_Percentage[region_name] || { x: 50, y: 50 };
+        let zoom_level = region_name === "All" ? 1 : (region_name === "Home" ? GenParam.map_zoom_level_center : GenParam.map_zoom_level);
+        let scale_level = 1 / zoom_level;
 
-
-        //Setting the correct scale
-        //Map_Layer.style.transform = "scale(" + scale_level + ")"
-        //Map_Layer.style.transform = "scale3D(" + scale_level + "," + scale_level +  ",1)"
-
-        const targetX = GenParam.SVG_width  * (coords.x / 100); // The X coordinate of the region you want centered
-        const targetY = GenParam.SVG_height  * (coords.y / 100); // The Y coordinate of the region you want centered
-
-        // 2. Define the center of your viewable SVG canvas
+        const targetX = GenParam.SVG_width * (coords.x / 100);
+        const targetY = GenParam.SVG_height * (coords.y / 100);
         const centerX = GenParam.SVG_width / 2;
         const centerY = GenParam.SVG_height / 2;
 
-        // 3. The Math: Calculate how far to push the map so the target hits the center AFTER scaling
-        const shiftX = Math.round(centerX - (targetX * scale_level))
-        const shiftY = Math.round(centerY - (targetY * scale_level))
+        const shiftX = Math.round(centerX - (targetX * scale_level));
+        const shiftY = Math.round(centerY - (targetY * scale_level));
 
-        // 4. Apply it via the native attribute (Note: translate MUST come before scale)
-        Map_Layer.setAttribute('transform', `translate(${shiftX}, ${shiftY}) scale(${scale_level})`);
+        // STRATEGY 1 REMAINS: Offload math to the GPU via CSS
+        this.Map_Layer.style.transform = `translate(${shiftX}px, ${shiftY}px) scale(${scale_level})`;
 
-        //Setting the opacity masks (exception for "all")
-        reset_all_region_opacity_masks()
+        // (Strategy 2 Culling has been entirely removed)
+
+        this.reset_all_region_opacity_masks();
+
         if (region_name === "All") {
-            //Hide all opacity masks
-            let Masks = document.getElementsByClassName("map_region_opacity_mask")
-            for (let i = 0; i < Masks.length; i++) {
-                Masks[i].style.opacity = 0
-            }
-            AudioCont.stop_all_region_sounds()
+            Array.from(document.getElementsByClassName("map_region_opacity_mask")).forEach(m => m.style.opacity = 0);
         } else {
-            AudioCont.play_region_sound(region_name)
-            //Color the background shield as well
-            SVGShield.style.fill = GenParam.RegionData[region_name].surrounding_color
-            SVGShield.style.stroke = GenParam.RegionData[region_name].darker_color
-            PageContainer.style.background = GenParam.RegionData[region_name].surrounding_color
+            AudioCont.play_region_sound(region_name);
+            this.SVGShield.style.fill = GenParam.RegionData[region_name].surrounding_color;
+            this.SVGShield.style.stroke = GenParam.RegionData[region_name].darker_color;
+            this.PageContainer.style.background = GenParam.RegionData[region_name].surrounding_color;
+
             if (region_name !== "Home") {
-                document.getElementById("map_region_opacity_mask_" + region_name).style.opacity = 0
-
+                let activeMask = document.getElementById("map_region_opacity_mask_" + region_name);
+                if (activeMask) activeMask.style.opacity = 0;
             }
         }
 
-        //Optionally show some of the icons
-        if (GenParam.DisplayFoundFennimalIconsOnMap.show) {
-            if (GenParam.DisplayFoundFennimalIconsOnMap.display_only_in_current_region) {
-                display_all_Fennimal_icon_on_map_for_region(region_name)
-            }
-        }
-
-
-
-
-    }
-
-    //Resets the opacity masks for all regions
-    function reset_all_region_opacity_masks() {
-        let Masks = document.getElementsByClassName("map_region_opacity_mask")
-        for (let i = 0; i < Masks.length; i++) {
-            Masks[i].style.opacity = GenParam.RegionMaskSetings.base_opacity
-            //Masks[i].style.fill = GenParam.RegionMaskSetings.color
-            Masks[i].style.transition = "all 1000ms ease-in-out"
-        }
-
-    }
-
-    //Run this periodically to check the proximity of the player to various objects (for performance reasons, only run this rather infrequently)
-    let Check_Proximity_Interval, current_nearest_location = false
-
-    function home_area_set_opacity_masks() {
-        let RegionBoundaryElements = document.getElementsByClassName("map_region_enter")
-        //Find the closest region boundary
-        let ClosestRegionBoundary = get_closest_object(CurrentPlayerPos, RegionBoundaryElements)
-
-        //If we are sufficiently nearby, then start reducing the opacity for the mask of the target region
-        reset_all_region_opacity_masks()
-        if (ClosestRegionBoundary.dist < 75) {
-            //Find the name of the closest region
-            let region_name = ClosestRegionBoundary.Object.getAttribute("id").split("_")[3]
-
-            let Mask = document.getElementById("map_region_opacity_mask_" + region_name)
-            if (Mask !== null) {
-                Mask.style.opacity = 0
-            }
-
-
+        if (GenParam.DisplayFoundFennimalIconsOnMap.show && GenParam.DisplayFoundFennimalIconsOnMap.display_only_in_current_region) {
+            this.display_all_Fennimal_icon_on_map_for_region(region_name);
         }
     }
 
-    function home_area_check_distance_to_function_buildings() {
-        let PointObj = GenParam.SVGObject.createSVGPoint()
-        PointObj.x = CurrentPlayerPos.x
-        PointObj.y = CurrentPlayerPos.y
+    reset_all_region_opacity_masks() {
+        Array.from(document.getElementsByClassName("map_region_opacity_mask")).forEach(m => {
+            // Reverted back to your smooth, semi-transparent masks!
+            m.style.opacity = GenParam.RegionMaskSetings.base_opacity;
+            m.style.transition = "all 1000ms ease-in-out";
+        });
+    }
 
-        //For computational efficiency, we perform checks only for the relevant region.
-        current_action_key_status = false
+    // ----------------------------------------------------
+    // PLAYER PROXIMITY & INTERACTION
+    // ----------------------------------------------------
+    test_player_proximity_to_map_elements() {
+        if (this.currently_in_location || this.current_region === "All") return;
 
-        //Check if the player is sufficiently close to the watchtower
-        /*if(document.getElementById("map_watchtower_action_region").isPointInFill(PointObj) === true){
-            if(current_player_status !== "transition"){
-                current_action_key_status = "watchtower"
-            }
+        if (this.current_region === "Home") {
+            this.home_area_set_opacity_masks();
+            this.home_area_check_distance_to_function_buildings();
+        } else {
+            this.check_location_marker_proximity();
         }
 
-         */
+        this.update_action_button();
+    }
 
+    home_area_set_opacity_masks() {
+        let RegionBoundaryElements = document.getElementsByClassName("map_region_enter");
+        let ClosestRegionBoundary = get_closest_object(this.Player.CurrentPlayerPos, RegionBoundaryElements);
 
-        //If no locations are nearby, then maybe the watchtower is (but only if there are no nearby locations...)
-        let dist_to_watchtower = get_distance_to_object(CurrentPlayerPos, document.getElementById("watchtower"))
+        this.reset_all_region_opacity_masks();
+        if (ClosestRegionBoundary && ClosestRegionBoundary.dist < 75) {
+            let region_name = ClosestRegionBoundary.Object.getAttribute("id").split("_")[3];
+            let Mask = document.getElementById("map_region_opacity_mask_" + region_name);
+            if (Mask) Mask.style.opacity = 0;
+        }
+    }
+
+    home_area_check_distance_to_function_buildings() {
+        this.current_action_key_status = false;
+
+        let dist_to_watchtower = get_distance_to_object(this.Player.CurrentPlayerPos, document.getElementById("watchtower"));
         if (dist_to_watchtower < 200) {
-            current_action_key_status = "watchtower"
-
+            this.current_action_key_status = "watchtower";
         }
 
+        let phone_marker = document.getElementById("map_phone_booth_marker");
+        if (phone_marker) {
+            let dist_to_phone = get_distance_to_object(this.Player.CurrentPlayerPos, phone_marker);
+
+            // It only becomes an active button IF it is currently ringing!
+            if (dist_to_phone < 150 && this.ExpCont.isPhoneRinging) {
+                this.current_action_key_status = "phone_booth";
+            }
+        }
     }
 
-    function check_location_marker_proximity() {
-        //If any other region we want to find the distance to all of the location markers
-        let LocationMarkers = document.getElementsByClassName("location_marker_" + current_region)
+    check_location_marker_proximity() {
+        let LocationMarkers = document.getElementsByClassName("location_marker_" + this.current_region);
+        let ClosestMarker = get_closest_object(this.Player.CurrentPlayerPos, LocationMarkers);
 
-        //Finding the closest marker
-        let ClosestMarker = get_closest_object(CurrentPlayerPos, LocationMarkers)
+        if (ClosestMarker && ClosestMarker.dist < 2 * GenParam.location_detection_distance) {
+            let location_name = ClosestMarker.Object.getAttribute("id").split("_")[2];
+            this.highlight_nearest_location(location_name);
 
-        if (ClosestMarker.dist < 2 * GenParam.location_detection_distance) {
-            //We are within the sphere of influence for a location
-            let location_name = ClosestMarker.Object.getAttribute("id").split("_")[2]
-            highlight_nearest_location(location_name)
-
-            //If we are sufficiently close, we can maybe search this location
             if (ClosestMarker.dist < GenParam.location_detection_distance) {
-                //Finding the status of the location name in terms of searchability.
-                let location_search_status = WorldState.get_search_status_of_location(location_name)
-
-                switch (location_search_status) {
-                    case("unsearched"):
-                        current_action_key_status = "search";
-                        break
-                    case("searched_empty"):
-                        current_action_key_status = "empty_location";
-                        break
-                    case("searched_Fennimal_not_visited"):
-                        current_action_key_status = "enter_location_with_unvisited_Fennimal";
-                        break
-                    case("searched_Fennimal_visited"):
-                        current_action_key_status = "enter_location_with_already_visited_Fennimal";
-                        break
-                    case(false):
-                        current_action_key_status = false
+                let status = this.WorldState.get_search_status_of_location(location_name);
+                switch (status) {
+                    case "unsearched": this.current_action_key_status = "search"; break;
+                    case "searched_empty": this.current_action_key_status = "empty_location"; break;
+                    case "searched_Fennimal_not_visited": this.current_action_key_status = "enter_location_with_unvisited_Fennimal"; break;
+                    case "searched_Fennimal_visited": this.current_action_key_status = "enter_location_with_already_visited_Fennimal"; break;
+                    default: this.current_action_key_status = false;
                 }
-
             } else {
-
-                current_action_key_status = false
+                this.current_action_key_status = false;
             }
-
-            //Storing the reference to this closest marker
-            Current_Action_Focal_Target = ClosestMarker.Object
-
-
+            this.Current_Action_Focal_Target = ClosestMarker.Object;
         } else {
-            highlight_nearest_location(false)
-            current_action_key_status = false
-
+            this.highlight_nearest_location(false);
+            this.current_action_key_status = false;
         }
     }
 
-    function test_player_proximity_to_map_elements() {
-        if (!currently_in_location) {
-            //If we're in the All region, then nothing happens
-            if (current_region === "All") {
-                return false
-            }
-
-            //These functions will update all the proximity-related status settings. This includes the action key status.
-            if (current_region === "Home") {
-                home_area_set_opacity_masks()
-                home_area_check_distance_to_function_buildings()
-            } else {
-                check_location_marker_proximity()
-            }
-
-            //Update the action button
-            update_action_button()
+    highlight_nearest_location(location_name) {
+        if (location_name !== this.current_nearest_location) {
+            this.current_nearest_location = location_name;
+            this.update_nearest_location_highlights();
         }
     }
 
-    function reset_active_location_highlights() {
-        let AllActiveOutlines = document.getElementsByClassName("map_location_outline_active")
+    update_nearest_location_highlights() {
+        // 1. Remove the glow from ALL location graphics
+        Array.from(document.getElementsByClassName("map_location_graphic_active")).forEach(icon => {
+            icon.classList.remove("map_location_graphic_active");
+            icon.style.filter = "none"; // Strip the CSS drop-shadow
+        });
 
-        for (let i = 0; i < AllActiveOutlines.length; i++) {
-            AllActiveOutlines[i].classList.add("map_location_outline")
-            AllActiveOutlines[i].classList.remove("map_location_outline_active")
-        }
-
-    }
-
-    function highlight_nearest_location(location_name) {
-
-        //For efficiency, only apply this process if the current nearest location is not the one which has previously been updated
-        if (location_name !== current_nearest_location) {
-            current_nearest_location = location_name
-            update_nearest_location_highlights()
-        }
-        current_nearest_location = location_name
-    }
-
-    function update_nearest_location_highlights() {
-        // Remove the active status of all locations (resets)
-        reset_active_location_highlights()
-
-        //Update the locator
-        if (current_nearest_location === false) {
-            Interface.Locator.change_locator_name(GenParam.RegionData[current_region].display_name)
-            //AudioCont.play_sound_effect("nearby_location")
+        if (!this.current_nearest_location) {
+            Interface.Locator.change_locator_name(GenParam.RegionData[this.current_region].display_name);
         } else {
-            //Check if the location is searchable, or has been searched
-            let location_search_status = WorldState.get_search_status_of_location(current_nearest_location)
+            let status = this.WorldState.get_search_status_of_location(this.current_nearest_location);
+            if (status !== false) {
+                Interface.Locator.change_locator_name(GenParam.get_display_name_of_location(this.current_nearest_location));
 
-            if (location_search_status !== false) {
-                //We're now near a location, so lets update the locator and highlight the location
-                Interface.Locator.change_locator_name(GenParam.get_display_name_of_location(current_nearest_location))
-                let Location_Outline = document.getElementById("location_outline_" + current_nearest_location)
+                // 2. Find the actual visual graphic!
+                // --- THE FIX: Force the location name to lowercase to match your SVG IDs! ---
+                let search_id = "map_location_icon_" + String(this.current_nearest_location).toLowerCase();
+                let iconGraphic = document.getElementById(search_id);
+                // ----------------------------------------------------------------------------
 
-                Location_Outline.classList.remove("map_location_outline")
+                if (iconGraphic && status !== "searched_empty") {
+                    iconGraphic.classList.add("map_location_graphic_active");
 
-                if (location_search_status === "searched_empty") {
-                    //Location_Outline.classList.add("map_location_outline_searched")
-                } else {
-                    Location_Outline.classList.add("map_location_outline_active")
-                }
-
-            }
-        }
-
-
-    }
-
-    //Keep track of which icons are displayed on the map (if enabled)
-    let CurrentFennimalIconsOnMap = [], Arr_IDs_of_Fennimals_currently_on_map = []
-
-    FennimalIconOnMap = function (FenObj) {
-        let BoxSettings = {
-            width: 60,
-            height: 60,
-            offset_x: -5,
-            offset_y: -50,
-            inner_size_factor: 0.9,
-            max_opacity: 0.8
-        }
-
-        //Some locations needs a manual tweak for fit
-        switch (FenObj.location) {
-            case("Lake"):
-                BoxSettings.offset_x = -30;
-                BoxSettings.offset_y = 10;
-                break
-            case("Statue"):
-                BoxSettings.offset_x = 20;
-                break
-            case("Fountain"):
-                BoxSettings.offset_y = 0;
-                BoxSettings.offset_x = -30;
-                break
-            case("Farm"):
-                BoxSettings.offset_y = 0;
-                BoxSettings.offset_x = 30;
-                break
-            case("Dam"):
-                BoxSettings.offset_y = -60;
-                BoxSettings.offset_x = 10;
-                break
-            case("Waterfall"):
-                BoxSettings.offset_x = -20;
-                break
-            case("Cliff"):
-                BoxSettings.offset_x = 30;
-                BoxSettings.offset_y = 30;
-                break
-            case("Rainforest"):
-                BoxSettings.offset_x = -20;
-                break
-            case("Bush"):
-                BoxSettings.offset_y = 0;
-                BoxSettings.offset_x = -20;
-                break
-            case("Port"):
-                BoxSettings.offset_y = 0;
-                break
-            case("Iceberg"):
-                BoxSettings.offset_y = -10;
-                BoxSettings.offset_x = -25;
-                break
-            case("Igloo"):
-                BoxSettings.offset_y = 0;
-                BoxSettings.offset_x = -25;
-                break
-            case("Pineforest"):
-                BoxSettings.offset_y = -10;
-                break
-
-        }
-
-        //First we want to grab the target coordinates of the location. For this we can piggy-back off of the location markers
-        let TargetLocationMaker = document.getElementById("location_marker_" + FenObj.location)
-        let MapCoords = {x: TargetLocationMaker.getBBox().x, y: TargetLocationMaker.getBBox().y}
-
-        //Now we create a small Fennimal icon in a box
-        let FennimalIconGroup = create_SVG_group(0, 0, 0, 0, undefined, undefined)
-        let FennimalIconBoxOuter = create_SVG_rect(0, 0, BoxSettings.width + "px", BoxSettings.height + "px", undefined, undefined)
-        FennimalIconBoxOuter.style.fill = GenParam.RegionData[FenObj.region].color
-        FennimalIconBoxOuter.style.rx = "5px"
-        let FennimalIconBoxInner = create_SVG_rect((0.5 * (1 - BoxSettings.inner_size_factor) * BoxSettings.width) + "px", (0.5 * (1 - BoxSettings.inner_size_factor) * BoxSettings.height) + "px", (BoxSettings.inner_size_factor * BoxSettings.width) + "px", (BoxSettings.inner_size_factor * BoxSettings.height) + "px", undefined, undefined)
-        FennimalIconBoxInner.style.fill = GenParam.RegionData[FenObj.region].lighter_color
-        FennimalIconBoxInner.style.rx = "3px"
-
-
-        //Creating and adding the correct icon
-        let Icon
-        switch (GenParam.DisplayFoundFennimalIconsOnMap.icon_type) {
-            case("full"):
-                Icon = create_Fennimal_SVG_object(FenObj, GenParam.Fennimal_head_size, false)
-                break
-            case("head"):
-                Icon = create_Fennimal_SVG_object_head_only(FenObj, false)
-                break
-        }
-
-
-        //Adding elements on the map
-        FennimalIconGroup.appendChild(FennimalIconBoxOuter)
-        FennimalIconGroup.appendChild(FennimalIconBoxInner)
-        FennimalIconGroup.appendChild(Icon)
-        Map_Layer.appendChild(FennimalIconGroup)
-
-        //Scaling the icon
-        let scale_factor_w = 1 / (Icon.getBBox().width / (BoxSettings.inner_size_factor * BoxSettings.width))
-        let scale_factor_h = 1 / (Icon.getBBox().height / (BoxSettings.inner_size_factor * BoxSettings.height))
-        let min_scale_factor = Math.floor(Math.min(scale_factor_w, scale_factor_h) * 100) / 100
-
-        //Applying to the Fennimal icon scale group
-        let ScaleGroup = Icon.getElementsByClassName("Fennimal_scale_group")[0]
-        ScaleGroup.style.transform = "scale(" + min_scale_factor + ")"
-
-        //Translation. This depends on whether there is a name. If no, center icon in the middle of the card. If yes, align it to the top instead
-        let NewBox = Icon.getBBox()
-        let TargetCenter = {x: Math.round(0.5 * BoxSettings.width), y: Math.round(0.5 * BoxSettings.height)}
-        let delta_x = TargetCenter.x - (NewBox.x + 0.5 * NewBox.width)
-        let delta_y = TargetCenter.y - (NewBox.y + 0.5 * NewBox.height)
-        Icon.style.transform = "translate(" + delta_x + "px, " + delta_y + "px)"
-
-        //Moving the box to the right location
-        FennimalIconGroup.style.transform = "translate(" + Math.round(MapCoords.x + BoxSettings.offset_x) + "px," + Math.round(MapCoords.y + BoxSettings.offset_y) + "px)"
-        FennimalIconGroup.style.opacity = BoxSettings.max_opacity
-
-        //Setting transform
-        FennimalIconGroup.style.transition = "all 1000ms ease-in-out"
-
-        this.remove = function () {
-            FennimalIconGroup.remove()
-
-        }
-
-        this.display_only_if_in_region = function (region) {
-            let should_display = false
-            if (FenObj.region === region) {
-                should_display = true
-            } else {
-                if (GenParam.DisplayFoundFennimalIconsOnMap.display_all_icons_on_watchtower && region === "All") {
-                    should_display = true
+                    // 3. Apply a dynamic, perfectly contoured glow!
+                    let glowColor = GenParam.RegionData[this.current_region].darker_color || "gold";
+                    iconGraphic.style.filter = `drop-shadow(0px 0px 8px ${glowColor}) drop-shadow(0px 0px 30px ${glowColor})`;
+                    iconGraphic.style.transition = "filter 300ms ease-in-out";
+                } else if (!iconGraphic && status !== "searched_empty") {
+                    // DEFENSIVE DEBUGGING: If it fails, print exactly what it was looking for!
+                    console.warn(`Glow failed: Could not find element with ID '${search_id}'`);
                 }
             }
-
-            if (should_display) {
-                FennimalIconGroup.style.opacity = BoxSettings.max_opacity
-            } else {
-                FennimalIconGroup.style.opacity = 0
-            }
         }
     }
 
-    this.clear_all_Fennimal_icons_from_map = function () {
-        Arr_IDs_of_Fennimals_currently_on_map = []
+    // ----------------------------------------------------
+    // ACTION BUTTON MANAGEMENT
+    // ----------------------------------------------------
+    update_action_button() {
+        if (this.previous_action_key_status !== this.current_action_key_status) {
+            this.remove_all_action_buttons();
 
-        for (let i = 0; i < CurrentFennimalIconsOnMap.length; i++) {
-            CurrentFennimalIconsOnMap[i].remove()
-        }
-
-        CurrentFennimalIconsOnMap = []
-
-
-    }
-
-    function display_all_Fennimal_icon_on_map_for_region(region) {
-        for (let i = 0; i < CurrentFennimalIconsOnMap.length; i++) {
-            CurrentFennimalIconsOnMap[i].display_only_if_in_region(region)
-        }
-
-    }
-
-    this.add_Fennimal_icon_on_map = function (FenObj) {
-        //Check if this Fennimal is already displayed (prevents duplicates)
-        if (!Arr_IDs_of_Fennimals_currently_on_map.includes(FenObj.id)) {
-            CurrentFennimalIconsOnMap.push(new FennimalIconOnMap(FenObj))
-            Arr_IDs_of_Fennimals_currently_on_map.push(FenObj.id)
-        }
-    }
-
-    //ACTION BUTTON FUNCTIONS
-    //////////////////////////////
-    function update_action_button() {
-
-        //Check if there is a change is status. If not, then we don't have to change anything
-        if (previous_action_key_status !== current_action_key_status) {
-            remove_all_action_buttons()
-
-            //Upddating the action key status.
-            switch (current_action_key_status) {
-                case(false):
-                    Interface.Prompt.hide()
+            switch (this.current_action_key_status) {
+                case false:
+                    Interface.Prompt.hide();
                     break;
-                case("search"):
-                    Interface.Prompt.show_message("You can search around for Fennimals in this area", false)
-                    show_action_button("magnifier", Current_Action_Focal_Target, false, GenParam.ActionButtonParameters_OnObject.warmup_time)
+                case "search":
+                    Interface.Prompt.show_message("You can search around for Fennimals in this area", false);
+                    this.show_action_button("magnifier", this.Current_Action_Focal_Target, false, GenParam.ActionButtonParameters_OnObject.warmup_time);
                     break;
-                case("watchtower"):
-                    Interface.Prompt.show_message("You can climb up the tower to get a better view of Fenneland", false)
-                    //show_action_button("binoculars", false, false);
-                    show_action_button("binoculars", document.getElementById("watchtower"), ["Enter"], false);
-                    break
-
-                case("watchtower_down"):
-                    Interface.Prompt.show_message("Click anywhere to go back down again", 1500)
-                    show_action_button("downstairs", false, ["Escape"], false);
+                case "watchtower":
+                    Interface.Prompt.show_message("You can climb up the tower to get a better view of Fenneland", false);
+                    this.show_action_button("binoculars", document.getElementById("watchtower"), ["Enter"], false);
                     break;
-                case("empty_location"):
-                    Interface.Prompt.show_message("There is nothing here at the moment...", false)
-                    AudioCont.play_sound_effect("rejected")
+                case "watchtower_down":
+                    Interface.Prompt.show_message("Click anywhere to go back down again", 1500);
+                    this.show_action_button("downstairs", false, ["Escape"], false);
+                    break;
+                case "empty_location":
+                    Interface.Prompt.show_message("There is nothing here at the moment...", false);
+                    AudioCont.play_sound_effect("rejected");
                     if (GenParam.can_enter_empty_locations) {
-                        show_action_button("enter_location_" + current_nearest_location, Current_Action_Focal_Target, ["Enter"], false)
+                        this.show_action_button("enter_location_" + this.current_nearest_location, this.Current_Action_Focal_Target, ["Enter"], false);
                     }
-                    break
+                    break;
+                case "enter_location_with_unvisited_Fennimal":
+                    Interface.Prompt.show_message("There is a Fennimal present at this location!", false);
+                    AudioCont.play_sound_effect("success");
+                    this.show_action_button("enter_location_" + this.current_nearest_location, this.Current_Action_Focal_Target, ["Enter"], false);
+                    break;
+                case "enter_location_with_already_visited_Fennimal":
+                    Interface.Prompt.show_message("You have already visited this Fennimal.", false);
+                    break;
+                case "phone_booth":
+                    Interface.Prompt.show_message("Answer the call", false);
+                    // Changed "magnifier" to "phone" to use your new icon!
+                    this.show_action_button("phone", document.getElementById("phone_booth"), ["Enter"], false);
+                    break;
+            }
+            this.previous_action_key_status = this.current_action_key_status;
+        }
+    }
 
-                //case("Fennimal_present_but_not_visited"):
-                //     Interface.Prompt.show_message("There is a Fennimal in this location!", false)
-                //     show_action_button("enter_location_" + current_nearest_location, Current_Action_Focal_Target,false )
-                //
-                case("enter_location_with_unvisited_Fennimal"):
-                    Interface.Prompt.show_message("There is a Fennimal present at this location!", false)
-                    AudioCont.play_sound_effect("success")
-                    show_action_button("enter_location_" + current_nearest_location, Current_Action_Focal_Target, ["Enter"], false)
-                    break
+    show_action_button(button_icon, TargetObject, keyboard_shortcuts_arr, warmup_time) {
+        this.remove_all_action_buttons();
+        if (button_icon !== false) {
+            this.ActiveActionButtonArr.push(new ActionButton(this.Interface_Layer, button_icon, TargetObject, warmup_time, keyboard_shortcuts_arr, () => this.action_key_pressed()));
+            AudioCont.play_sound_effect("alert_minimal");
+        }
+    }
+
+    remove_all_action_buttons() {
+        this.ActiveActionButtonArr.forEach(b => b.delete());
+        this.ActiveActionButtonArr = [];
+    }
+
+    action_key_pressed() {
+        this.remove_all_action_buttons();
+        switch (this.current_action_key_status) {
+            case "watchtower": this.Player.climb_watchtower(); break;
+            case "watchtower_down": this.Player.leave_watchtower(); break;
+            case "search": this.perform_search_at_current_location(); break;
+            case "empty_location":
+            case "enter_location_with_unvisited_Fennimal":
+                this.enter_location(this.current_nearest_location); // <-- Restored this command!
+                break;
+            case "return_to_map": this.return_to_map(); break;
+            case "phone_booth": this.ExpCont.phoneBoothAnswered(); break;
+        }
+    }
+
+    perform_search_at_current_location() {
+        let Closest_Marker = get_closest_object(this.Player.CurrentPlayerPos, document.getElementsByClassName("location_marker_" + this.current_region));
+        let location_name = Closest_Marker.Object.getAttribute("id").split("_")[2];
+
+        // Matrix Projection to bypass the Map's Zoom/Pan!
+        let pt = GenParam.SVGObject.createSVGPoint();
+        let bbox = Closest_Marker.Object.getBBox();
+        pt.x = bbox.x + bbox.width / 2;
+        pt.y = bbox.y + bbox.height / 2;
+
+        let screenPt = pt.matrixTransform(Closest_Marker.Object.getScreenCTM());
+        let localPt = screenPt.matrixTransform(this.Interface_Layer.getScreenCTM().inverse());
+
+        // Append the ripple to the static Interface_Layer so it doesn't get massive!
+        setTimeout(() => create_ripple(this.Interface_Layer, localPt.x, localPt.y, false), 100);
+
+        // FIX: Perform the search, then use the standard proximity check to perfectly map the new button state!
+        this.WorldState.perform_search_at_location(location_name);
+        this.check_location_marker_proximity();
+        this.update_action_button();
+    }
+
+    // ----------------------------------------------------
+    // WATCHTOWER RIPPLE LOGIC
+    // ----------------------------------------------------
+    start_watchtower_ripples() {
+        // Wait 1000ms for the map to finish zooming out before firing the first wave
+        this.watchtower_ripple_timeout = setTimeout(() => {
+            this.trigger_watchtower_ripples();
+            this.watchtower_ripple_interval = setInterval(() => this.trigger_watchtower_ripples(), 3000);
+        }, 900);
+    }
+
+    stop_watchtower_ripples() {
+        // Clear both the initial delay and the ongoing interval!
+        if (this.watchtower_ripple_timeout) {
+            clearTimeout(this.watchtower_ripple_timeout);
+            this.watchtower_ripple_timeout = null;
+        }
+        if (this.watchtower_ripple_interval) {
+            clearInterval(this.watchtower_ripple_interval);
+            this.watchtower_ripple_interval = null;
+        }
+    }
+    trigger_watchtower_ripples() {
+        // Filter out only the Fennimals we still need to visit
+        let unvisitedFennimals = this.WorldState.get_array_of_Fennimals_on_map().filter(f => !f.visited);
+
+        unvisitedFennimals.forEach(f => {
+            let marker = document.getElementById("location_marker_" + f.location);
+            if (marker) {
+                // Calculate the exact center of the marker
+                let pt = GenParam.SVGObject.createSVGPoint();
+                let bbox = marker.getBBox();
+                pt.x = bbox.x + bbox.width / 2;
+                pt.y = bbox.y + bbox.height / 2;
+
+                // Project from the zoomed-out Map layer onto the static Interface layer!
+                // This ensures the ripples are drawn at a consistent size regardless of zoom.
+                let screenPt = pt.matrixTransform(marker.getScreenCTM());
+                let localPt = screenPt.matrixTransform(this.Interface_Layer.getScreenCTM().inverse());
+
+                create_ripple(this.Interface_Layer, localPt.x, localPt.y, true);
+            }
+        });
+    }
+
+    // ----------------------------------------------------
+    // PHONE BOOTH
+    // ----------------------------------------------------
+    initialize_phone_booth() {
+        let assembly = document.getElementById("phone_booth_antenna_assembly");
+        let pivot = document.getElementById("phone_booth_dish_pivot_point");
+
+        if (assembly && pivot) {
+            // 1. Get the LOCAL coordinates directly from the pivot's bounding box
+            let box = pivot.getBBox();
+            let px = box.x + (box.width / 2);
+            let py = box.y + (box.height / 2);
+
+            // Set the origin using those precise local coordinates
+            assembly.style.transformOrigin = `${px}px ${py}px`;
+            assembly.classList.add("scanning_antenna");
+        }
+
+        let light = document.getElementById("phone_booth_light");
+        let tip = document.getElementById("phone_booth_dish_antenna_tip");
+
+        if (light) {
+            light.style.opacity = 1;
+            light.classList.remove("ringing_police_light");
+        }
+        if (tip) {
+            tip.style.opacity = 1;
+            tip.classList.remove("ringing_antenna_tip");
+        }
+    }
+
+    start_phone_ringing() {
+        let assembly = document.getElementById("phone_booth_antenna_assembly");
+        if (assembly) assembly.classList.remove("scanning_antenna");
+
+        let light = document.getElementById("phone_booth_light");
+        let tip = document.getElementById("phone_booth_dish_antenna_tip");
+        if (light) light.classList.add("ringing_police_light");
+        if (tip) tip.classList.add("ringing_antenna_tip");
+
+        this.phone_ring_interval = setInterval(() => {
+            AudioCont.play_sound_effect("phone_ring");
+
+            if (tip && tip.parentNode) {
+                // 1. Get the local bounding box BEFORE any Inkscape transforms
+                let box = tip.getBBox();
+                let tipCenterX = box.x + (box.width / 2);
+                let tipCenterY = box.y + (box.height / 2);
+
+                // 2. THE FIX: Check if Inkscape baked a transform onto the tip!
+                let tipTransform = tip.getAttribute("transform");
+
+                const spawnWave = (delayTime) => {
+                    setTimeout(() => {
+                        let ripple = document.createElementNS("http://www.w3.org/2000/svg", 'circle');
+                        ripple.setAttribute("cx", tipCenterX);
+                        ripple.setAttribute("cy", tipCenterY);
+                        ripple.setAttribute("r", "5");
+
+                        if (tipTransform) {
+                            ripple.setAttribute("transform", tipTransform);
+                        }
+
+                        ripple.style.fill = "none";
+                        ripple.style.stroke = "#80e5ff"; // Your cyan
+                        ripple.style.strokeWidth = "12px";
+                        ripple.style.opacity = "0.9";
+                        ripple.style.transition = "all 1.2s cubic-bezier(0.1, 0.8, 0.3, 1)";
+                        ripple.style.pointerEvents = "none";
+
+                        tip.parentNode.insertBefore(ripple, tip);
+
+                        ripple.getBoundingClientRect();
+
+                        setTimeout(() => {
+                            ripple.setAttribute("r", "250"); // Back to the clean, local radius
+                            ripple.style.strokeWidth = "1px";
+                            ripple.style.opacity = "0";
+                        }, 10);
+
+                        setTimeout(() => ripple.remove(), 1300);
+                    }, delayTime);
+                };
+
+                // Fire 3 waves in rapid succession to create the ((( ))) effect!
+                spawnWave(0);
+                spawnWave(250);
+                spawnWave(500);
+
+                spawnWave(2000);
+                spawnWave(2250);
+                spawnWave(2500);
+            }
+        }, 4500);
+    }
+
+    stop_phone_ringing() {
+        if (this.phone_ring_interval) {
+            clearInterval(this.phone_ring_interval);
+            this.phone_ring_interval = null;
+        }
+
+        // 1. Turn off the emergency lights
+        let light = document.getElementById("phone_booth_light");
+        let tip = document.getElementById("phone_booth_dish_antenna_tip");
+        if (light) light.classList.remove("ringing_police_light");
+        if (tip) tip.classList.remove("ringing_antenna_tip");
+
+        // 2. Restart the Scanning Animation
+        let assembly = document.getElementById("phone_booth_antenna_assembly");
+        if (assembly) {
+            // Remove the class first
+            assembly.classList.remove("scanning_antenna");
+
+            // THE FIX: Request the offsetWidth to force a "DOM Reflow".
+            // This guarantees the browser registers that the class was removed before adding it back!
+            void assembly.offsetWidth;
+
+            // Add it back, triggering a fresh animation start
+            assembly.classList.add("scanning_antenna");
+        }
+    }
+
+    remove_phone_booth() {
+        let boothBase = document.getElementById("phone_booth");
+        let boothTop = document.getElementById("phone_booth_top");
+
+        if (boothBase) boothBase.remove();
+        if (boothTop) boothTop.remove();
+    }
+
+    // ----------------------------------------------------
+    // SCENE TRANSITIONS
+    // ----------------------------------------------------
+    hide_all_locations() {
+        Array.from(document.getElementsByClassName("location")).forEach(l => l.style.display = "none");
+        Array.from(document.getElementsByClassName("location_sky")).forEach(s => s.style.display = "none");
+        this.Location_Layer.style.display = "none";
+        this.Sky_layer.style.display = "none";
+    }
+
+    enter_location(location, optional_switched_region) {
+        this.currently_in_location = true;
+        this.hide_all_locations();
+        this.flash_location_transition_mask(this.current_region);
+
+        if(this.RequestInstructionsButton) this.RequestInstructionsButton.style.display = "none";
+        Interface.FenneFinder.hide();
+
+        setTimeout(() => {
+            this.Map_Layer.style.display = "none";
+            this.Location_Layer.style.display = "inherit";
+            document.getElementById("location_" + location).style.display = "inherit";
+
+            this.Sky_layer.style.display = "inherit";
+            let sky_id = "sky_" + (optional_switched_region || this.current_region);
+            document.getElementById(sky_id).style.display = "inherit";
+
+            // FIX: CAMEL CASED CALL
+            this.ExpCont.enteringLocation(location);
+        }, 0.5 * GenParam.map_to_location_transition_speed);
+    }
+
+    jump_player_to_location(location, region) {
+        this.current_region = region;
+        this.enter_location(location, region);
+        Interface.player_moved_to_new_region(region);
+        this.SVGShield.style.fill = GenParam.RegionData[region].surrounding_color;
+        this.SVGShield.style.stroke = GenParam.RegionData[region].color;
+        this.PageContainer.style.background = GenParam.RegionData[region].surrounding_color;
+    }
+
+    allow_participant_to_leave_location(add_keyboard_shortcut) {
+        if (this.currently_in_location) {
+            this.show_action_button("return_arrow", "center", add_keyboard_shortcut ? ["Escape", "Enter", " "] : false, false);
+            this.current_action_key_status = "return_to_map";
+        }
+    }
+
+    return_to_map() {
+        if (this.currently_in_location) {
+            this.flash_location_transition_mask(this.current_region);
+            setTimeout(() => {
+                this.Map_Layer.style.display = "inherit";
+                this.hide_all_locations();
+                this.ExpCont.checkIfFennefinderShouldBeShown();
+
+            }, 0.5 * GenParam.map_to_location_transition_speed);
+            if(this.RequestInstructionsButton) this.RequestInstructionsButton.style.display = "inherit";
+        } else {
+            this.Map_Layer.style.display = "inherit";
+            this.hide_all_locations();
+            this.ExpCont.checkIfFennefinderShouldBeShown();
+        }
+
+        this.currently_in_location = false;
+
+        // FIX: CAMEL CASED CALL
+        this.ExpCont.leavingLocation();
+
+        this.Partner.update_behavior();
+
+    }
+
+    reset_map_to_player_in_center() {
+        this.return_to_map();
+        this.Player.jump_to_map_center();
+
+        if (GenParam.DisplayFoundFennimalIconsOnMap.show && GenParam.DisplayFoundFennimalIconsOnMap.display_only_in_current_region) {
+            this.display_all_Fennimal_icon_on_map_for_region("Home");
+        }
+
+        this.Partner.jump_to_map_center();
+        this.Partner.update_behavior();
+    }
+
+    flash_location_transition_mask(optional_region) {
+        let color = "black";
+        if (optional_region && optional_region !== "All" && GenParam.RegionData[optional_region]) {
+            color = GenParam.RegionData[optional_region].lighter_color;
+        }
+        document.getElementById("transition_mask_rect").style.fill = color;
+
+        this.Transition_Mask.style.animation = `map_transition_animation ${GenParam.map_to_location_transition_speed}ms ease-in-out forwards`;
+        setTimeout(() => this.Transition_Mask.style.animation = "", GenParam.map_to_location_transition_speed);
+    }
+
+    // ----------------------------------------------------
+    // GLOBAL STATE HOOKS
+    // ----------------------------------------------------
+    disable_map_interactions() {
+        this.Player.disable_movement();
+        AudioCont.stop_all_region_sounds();
+    }
+
+    enable_map_interactions() {
+        this.Player.allow_movement();
+        AudioCont.play_region_sound(this.current_region);
+        this.Partner.update_behavior();
+    }
+
+    create_request_instructions_button() {
+        this.RequestInstructionsButton = create_SVG_buttonElement(GenParam.RequestInstructionButtonSettings.center_x, GenParam.RequestInstructionButtonSettings.center_y, GenParam.RequestInstructionButtonSettings.width, GenParam.RequestInstructionButtonSettings.height, GenParam.RequestInstructionButtonSettings.text, GenParam.RequestInstructionButtonSettings.textsize);
+        this.Interface_Layer.appendChild(this.RequestInstructionsButton);
+        this.RequestInstructionsButton.style.display = "none";
+        this.RequestInstructionsButton.style.fontWeight = GenParam.RequestInstructionButtonSettings.fontWeight;
+        this.RequestInstructionsButton.classList.add("do_not_move_on_click");
+
+        this.RequestInstructionsButton.onpointerdown = () => {
+            AudioCont.play_sound_effect("button_click");
+
+            // FIX: CAMEL CASED CALL
+            this.ExpCont.instructionsRequested();
+        };
+    }
+
+    show_request_instructions_button() {
+        if(this.RequestInstructionsButton) this.RequestInstructionsButton.style.display = "inherit";
+    }
+
+    // ----------------------------------------------------
+    // FENNIMAL ICONS ON MAP
+    // ----------------------------------------------------
+    add_Fennimal_icon_on_map(FenObj) {
+        if (!this.Arr_IDs_of_Fennimals_currently_on_map.includes(FenObj.id)) {
+            this.CurrentFennimalIconsOnMap.push(new this.FennimalIconOnMap(FenObj, this.Map_Layer));
+            this.Arr_IDs_of_Fennimals_currently_on_map.push(FenObj.id);
+        }
+    }
+
+    clear_all_Fennimal_icons_from_map() {
+        this.CurrentFennimalIconsOnMap.forEach(icon => icon.remove());
+        this.CurrentFennimalIconsOnMap = [];
+        this.Arr_IDs_of_Fennimals_currently_on_map = [];
+    }
+
+    display_all_Fennimal_icon_on_map_for_region(region) {
+        this.CurrentFennimalIconsOnMap.forEach(icon => icon.display_only_if_in_region(region));
+    }
+
+    update_player_settings() {
+        this.Partner.update_settings();
+        this.Player.update_settings();
+    }
+
+    enforce_dome_until_tower_climbed() {
+        Interface.Prompt.show_message("First climb the watchtower to get an overview of Fenneland");
+        this.DomeCont.raise_dome_with_arrow();
+        this.DomeCont.dome_visible_until_tower_climbed = true;
+        this.DomeCont.dome_message_interval = setInterval(() => {
+            Interface.Prompt.show_message("First climb the watchtower to get an overview of Fenneland");
+        }, 1000);
+    }
+
+    // ====================================================
+    // SUB-CLASSES (Tightly coupled logic)
+    // ====================================================
+
+    DomeController = class {
+        constructor() {
+            this.Dome = document.getElementById("centerdome");
+            this.DomeBlock = document.getElementById("dome_block_element");
+            this.DomeArrow = document.getElementById("dome_arrow");
+
+            this.Dome.style.opacity = 0;
+            this.DomeBlock.style.opacity = 0;
+            this.Dome.style.display = "none";
+            this.DomeBlock.classList.remove("map_block");
+            this.DomeArrow.style.display = "none";
+            this.DomeArrow.style.opacity = 0;
+            this.Dome.style.transition = "all 500ms ease-in-out";
+            this.DomeArrow.style.transition = "all 500ms ease-in-out";
+            this.dome_visible_until_tower_climbed = false;
+        }
+        raise_dome_with_arrow() {
+            this.Dome.style.display = "inherit";
+            this.DomeBlock.classList.add("map_block");
+            this.DomeArrow.style.display = "inherit";
+
+            // Force reflow
+            window.getComputedStyle(this.Dome).opacity;
+            this.Dome.style.opacity = 1;
+            setTimeout(() => this.DomeArrow.style.opacity = 1, 500);
+        }
+        collapse_dome() {
+            this.DomeArrow.style.opacity = 0;
+            setTimeout(() => {
+                this.Dome.style.opacity = 0;
+                this.DomeBlock.classList.remove("map_block");
+            }, 500);
+            setTimeout(() => {
+                this.Dome.style.display = "none";
+                this.DomeArrow.style.display = "none";
+            }, 1000);
+        }
+    };
+
+    FennimalIconOnMap = class {
+        constructor(FenObj, MapLayer) {
+            this.FenObj = FenObj;
+            this.BoxSettings = { width: 60, height: 60, offset_x: -5, offset_y: -50, inner_size_factor: 0.9, max_opacity: 0.8 };
+
+            // Manual tweaks per location
+            switch (FenObj.location) {
+                case "Lake": this.BoxSettings.offset_x = -30; this.BoxSettings.offset_y = 10; break;
+                case "Statue": this.BoxSettings.offset_x = 20; break;
+                case "Fountain": this.BoxSettings.offset_y = 0; this.BoxSettings.offset_x = -30; break;
+                case "Farm": this.BoxSettings.offset_y = 0; this.BoxSettings.offset_x = 30; break;
+                case "Dam": this.BoxSettings.offset_y = -60; this.BoxSettings.offset_x = 10; break;
+                case "Waterfall": this.BoxSettings.offset_x = -20; break;
+                case "Cliff": this.BoxSettings.offset_x = 30; this.BoxSettings.offset_y = 30; break;
+                case "Rainforest": this.BoxSettings.offset_x = -20; break;
+                case "Bush": this.BoxSettings.offset_y = 0; this.BoxSettings.offset_x = -20; break;
+                case "Port": this.BoxSettings.offset_y = 0; break;
+                case "Iceberg": this.BoxSettings.offset_y = -10; this.BoxSettings.offset_x = -25; break;
+                case "Igloo": this.BoxSettings.offset_y = 0; this.BoxSettings.offset_x = -25; break;
+                case "Pineforest": this.BoxSettings.offset_y = -10; break;
             }
 
-            //Update the previous status
-            previous_action_key_status = current_action_key_status
-        }
-    }
+            let TargetLocationMaker = document.getElementById("location_marker_" + FenObj.location);
+            let MapCoords = { x: TargetLocationMaker.getBBox().x, y: TargetLocationMaker.getBBox().y };
 
-    function action_key_pressed() {
-        remove_all_action_buttons()
-        switch (current_action_key_status) {
-            case("watchtower"):
-                Player.climb_watchtower();
-                break
-            case("watchtower_down"):
-                Player.leave_watchtower();
-                break
-            case("search"):
-                perform_search_at_current_location();
-                break
-            case("empty_location"):
-                if (GenParam.can_enter_empty_locations) {
-                    enter_location(current_nearest_location)
-                    //TODO: REMOVE, NEEDS TO BE ROUTED VIA EXP CONTROLLER
-                    that.allow_participant_to_leave_location()
+            this.FennimalIconGroup = create_SVG_group(0, 0);
+            let Outer = create_SVG_rect(0, 0, this.BoxSettings.width + "px", this.BoxSettings.height + "px");
+            Outer.style.fill = GenParam.RegionData[FenObj.region].color; Outer.style.rx = "5px";
+
+            let Inner = create_SVG_rect((0.5 * (1 - this.BoxSettings.inner_size_factor) * this.BoxSettings.width) + "px",
+                (0.5 * (1 - this.BoxSettings.inner_size_factor) * this.BoxSettings.height) + "px",
+                (this.BoxSettings.inner_size_factor * this.BoxSettings.width) + "px",
+                (this.BoxSettings.inner_size_factor * this.BoxSettings.height) + "px");
+            Inner.style.fill = GenParam.RegionData[FenObj.region].lighter_color; Inner.style.rx = "3px";
+
+            let Icon = GenParam.DisplayFoundFennimalIconsOnMap.icon_type === "full" ?
+                create_Fennimal_SVG_object(FenObj, GenParam.Fennimal_head_size, false) :
+                create_Fennimal_SVG_object_head_only(FenObj, false);
+
+
+            this.FennimalIconGroup.appendChild(Outer);
+            this.FennimalIconGroup.appendChild(Inner);
+            this.FennimalIconGroup.appendChild(Icon);
+            MapLayer.appendChild(this.FennimalIconGroup);
+
+            let scale_factor_w = 1 / (Icon.getBBox().width / (this.BoxSettings.inner_size_factor * this.BoxSettings.width));
+            let scale_factor_h = 1 / (Icon.getBBox().height / (this.BoxSettings.inner_size_factor * this.BoxSettings.height));
+            let min_scale_factor = Math.floor(Math.min(scale_factor_w, scale_factor_h) * 100) / 100;
+
+            let ScaleGroup = Icon.getElementsByClassName("Fennimal_scale_group")[0];
+            ScaleGroup.style.transform = `scale(${min_scale_factor})`;
+
+            let NewBox = Icon.getBBox();
+            let TargetCenter = { x: Math.round(0.5 * this.BoxSettings.width), y: Math.round(0.5 * this.BoxSettings.height) };
+            Icon.style.transform = `translate(${TargetCenter.x - (NewBox.x + 0.5 * NewBox.width)}px, ${TargetCenter.y - (NewBox.y + 0.5 * NewBox.height)}px)`;
+
+            this.FennimalIconGroup.style.transform = `translate(${Math.round(MapCoords.x + this.BoxSettings.offset_x)}px, ${Math.round(MapCoords.y + this.BoxSettings.offset_y)}px)`;
+            this.FennimalIconGroup.style.opacity = this.BoxSettings.max_opacity;
+            this.FennimalIconGroup.style.transition = "all 1000ms ease-in-out";
+        }
+        remove() { this.FennimalIconGroup.remove(); }
+        display_only_if_in_region(region) {
+            let should_display = (this.FenObj.region === region) || (GenParam.DisplayFoundFennimalIconsOnMap.display_all_icons_on_watchtower && region === "All");
+            this.FennimalIconGroup.style.opacity = should_display ? this.BoxSettings.max_opacity : 0;
+        }
+    };
+
+    PlayerIconController = class {
+        constructor(MapCont) {
+            this.MapCont = MapCont;
+            this.player_speed = GenParam.Speedlimits.default;
+            this.CurrentPlayerPos = { x: 0, y: 0 };
+            this.player_current_direction = null;
+
+            this.is_dragging = false;
+            this.MouseTargetCoords = { x: 0, y: 0 };
+
+            this.PlayerIconData = {};
+            this.populate_player_icon_data();
+
+            this.PlayerIcon = create_SVG_group(false, false, false, "PlayerIconGroup");
+            this.PlayerIcon.style.pointerEvents = "none";
+            this.PlayerIcon.style.transition = "none";
+            document.getElementById("Map_player_level").appendChild(this.PlayerIcon);
+
+            this.animationFrameId = null;
+
+            // FIX: Use DOM Level 0 events to guarantee nothing blocks the clicks!
+            document.onpointerdown = (e) => {
+                if (!this.MapCont.currently_in_location && this.MapCont.player_allowed_to_move) {
+                    if (!e.target.classList.contains("do_not_move_on_click")) {
+                        this.is_dragging = true;
+                        this.setMouseTargetCoords(e);
+                    }
+                    if (this.MapCont.current_player_status === "in_watchtower") {
+                        this.leave_watchtower();
+                    }
                 }
-                break
-            case("enter_location_with_unvisited_Fennimal"):
-                enter_location(current_nearest_location)
-                break
-            case("enter_location_with_visited_Fennimal"):
-                enter_location(current_nearest_location)
-                that.allow_participant_to_leave_location(true)
-                break
+            };
 
-            case("return_to_map"):
-                that.return_to_map()
-                break
-        }
-    }
+            document.onpointerup = () => { this.is_dragging = false; };
+            document.onpointerleave = () => { this.is_dragging = false; };
 
-    function remove_all_action_buttons() {
-        for (let i = 0; i < ActiveActionButtonArr.length; i++) {
-            ActiveActionButtonArr[i].delete()
-        }
-        ActiveActionButtonArr = []
-    }
-
-    function show_action_button(button_icon, TargetObject, keyboard_shortcuts_arr, warmup_time,) {
-        //Remove all buttons
-        remove_all_action_buttons()
-
-        //Create a new button
-        ActiveActionButtonArr.push(new ActionButton(Interface_Layer, button_icon, TargetObject, warmup_time, keyboard_shortcuts_arr, action_key_pressed))
-        AudioCont.play_sound_effect("alert_minimal")
-
-
-        //If button icon is false, then we're done
-        if (button_icon === false) {
-            return true
+            document.onpointermove = (e) => {
+                if (this.is_dragging && this.MapCont.player_allowed_to_move) {
+                    this.setMouseTargetCoords(e);
+                }
+            };
         }
 
+        populate_player_icon_data() {
+            this.PlayerIconData.FrontElem = this.MapCont.WorldState.get_person_icon("player", "front");
+            this.PlayerIconData.BackElem = this.MapCont.WorldState.get_person_icon("player", "back");
+            this.PlayerIconData.LeftElem = this.MapCont.WorldState.get_person_icon("player", "left");
+            this.PlayerIconData.RightElem = this.MapCont.WorldState.get_person_icon("player", "right");
 
-    }
-
-    //Shows the action button on the map level. Assumes that there can be only a single button at the same time. If called with false will remove all buttons.
-    let ActiveActionButtonArr = []
-
-    //SEARCH AND TRANSITION FUNCTIONS
-    function perform_search_at_current_location() {
-        let Closest_Marker = get_closest_object(CurrentPlayerPos, document.getElementsByClassName("location_marker_" + current_region))
-        let location_name = Closest_Marker.Object.getAttribute("id").split("_")[2]
-
-        //Create a ripple to provide feedback on search competed
-        let Coords = get_center_coords_of_SVG_object(Closest_Marker.Object)
-        setTimeout(function () {
-            create_ripple(Map_Layer, Coords.x, Coords.y, false)
-        }, 100)
-
-        //Performing search at location
-        let Search_outcome = WorldState.perform_search_at_location(location_name)
-        if (Search_outcome === "empty_unsearched") {
-            //let Location_Outline = document.getElementById("location_outline_" + location_name)
-            //Location_Outline.classList.add("map_location_outline_searched")
-            //Location_Outline.classList.remove("map_location_outline")
-
-            update_nearest_location_highlights()
-            //test_player_proximity_to_map_elements()
-        } else {
-            //If an object is returned, then this is a Fennimal
-            current_action_key_status = "Fennimal_present"
-
+            let scale = this.MapCont.WorldState.get_player_icon_settings().scale_factor;
+            if (typeof scale === "number") {
+                ["FrontElem", "BackElem", "LeftElem", "RightElem"].forEach(el => this.PlayerIconData[el].style.transform = `scale(${scale})`);
+            }
         }
 
-        //current_action_key_status = false
-        update_action_button()
-
-
-    }
-
-    // LOCATION FUNCTIONS
-    //////////////////////////////
-    function hide_all_locations() {
-        let All_Location_Backgrounds = document.getElementsByClassName("location")
-        for (let i = 0; i < All_Location_Backgrounds.length; i++) {
-            All_Location_Backgrounds[i].style.display = "none"
+        update_settings() {
+            this.populate_player_icon_data();
+            this.update_player_icon_direction("up", true);
+            this.update_player_icon_direction("down", true);
         }
 
-        let All_Sky_Layers = document.getElementsByClassName("location_sky")
-        for (let i = 0; i < All_Sky_Layers.length; i++) {
-            All_Sky_Layers[i].style.display = "none"
+        update_player_icon_direction(new_direction, force = false) {
+            if (this.player_current_direction !== new_direction || force) {
+                this.PlayerIcon.innerHTML = "";
+                switch(new_direction) {
+                    case "up": this.PlayerIcon.appendChild(this.PlayerIconData.BackElem.cloneNode(true)); break;
+                    case "down": this.PlayerIcon.appendChild(this.PlayerIconData.FrontElem.cloneNode(true)); break;
+                    case "left": this.PlayerIcon.appendChild(this.PlayerIconData.LeftElem.cloneNode(true)); break;
+                    case "right": this.PlayerIcon.appendChild(this.PlayerIconData.RightElem.cloneNode(true)); break;
+                }
+                this.player_current_direction = new_direction;
+            }
         }
-        Location_Layer.style.display = "none"
-        Sky_layer.style.display = "none"
 
-    }
+        allow_movement() {
+            this.MapCont.player_allowed_to_move = true;
+            this.Check_Proximity_Interval = setInterval(() => this.MapCont.test_player_proximity_to_map_elements(), 250);
+            this.start_render_loop();
+        }
 
-    function enter_location(location, optional_switched_region) {
-        currently_in_location = true
-        hide_all_locations()
-        flash_location_transition_mask(current_region)
+        disable_movement() {
+            this.MapCont.player_allowed_to_move = false;
+            this.is_dragging = false;
+            clearInterval(this.Check_Proximity_Interval);
 
-        RequestInstructionsButton.style.display = "none"
+            // Kill the loop to save memory
+            if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
 
-        Interface.FenneFinder.hide()
+        update_icon_position() {
+            this.PlayerIcon.style.transform = `translate(${this.CurrentPlayerPos.x}px, ${this.CurrentPlayerPos.y}px)`;
+        }
 
-        setTimeout(function () {
-            //Hide the map
-            Map_Layer.style.display = "none"
+        jump_to_map_center() {
+            this.MapCont.current_region = "Home";
+            this.MapCont.zoom_map_to_region("Home");
+            this.CurrentPlayerPos = { x: 0.5 * GenParam.SVG_width, y: 0.5 * GenParam.SVG_height };
+            this.update_icon_position();
+            this.update_player_icon_direction("down");
+        }
 
-            //Show the location layer and the correct background
-            Location_Layer.style.display = "inherit"
-            document.getElementById("location_" + location).style.display = "inherit"
+        check_if_coords_valid(x, y) {
+            if (x < 0 || y < 0 || x > GenParam.SVG_width || y > GenParam.SVG_height) return false;
 
-            //Show the sky layer and sky
-            Sky_layer.style.display = "inherit"
-            if (optional_switched_region !== undefined) {
-                document.getElementById("sky_" + optional_switched_region).style.display = "inherit"
+            let PointObj = GenParam.SVGObject.createSVGPoint();
+            PointObj.x = x; PointObj.y = y;
+
+            let blocks = GenParam.SVGObject.getElementsByClassName("map_block");
+            for (let i = 0; i < blocks.length; i++) if (blocks[i].isPointInFill(PointObj)) return false;
+
+            let region_blocks = GenParam.SVGObject.getElementsByClassName("map_block_" + this.MapCont.current_region);
+            for (let i = 0; i < region_blocks.length; i++) if (region_blocks[i].isPointInFill(PointObj)) return false;
+
+            return true;
+        }
+
+        attempt_to_move_to_coords(x, y) {
+            if (x !== this.CurrentPlayerPos.x || y !== this.CurrentPlayerPos.y) {
+                if (this.check_if_coords_valid(x, y)) {
+                    let delta_x = x - this.CurrentPlayerPos.x;
+                    let delta_y = y - this.CurrentPlayerPos.y;
+
+                    this.CurrentPlayerPos = { x: parseFloat(x), y: parseFloat(y) };
+                    this.update_icon_position();
+
+                    if (Math.abs(delta_x) > Math.abs(delta_y)) {
+                        this.update_player_icon_direction(delta_x > 0 ? "right" : "left");
+                    } else {
+                        this.update_player_icon_direction(delta_y > 0 ? "down" : "up");
+                    }
+
+                    if (this.MapCont.Partner) this.MapCont.Partner.player_moved_to_location(x, y);
+                    Interface.FenneFinder.update_player_location(this.CurrentPlayerPos);
+
+                    this.check_for_region_shift();
+                }
+            }
+        }
+
+        check_for_region_shift() {
+            let PointObj = GenParam.SVGObject.createSVGPoint();
+            PointObj.x = this.CurrentPlayerPos.x; PointObj.y = this.CurrentPlayerPos.y;
+
+            if (this.MapCont.current_region === "Home") {
+                let enters = GenParam.SVGObject.getElementsByClassName("map_region_enter");
+                for (let i = 0; i < enters.length; i++) {
+                    if (enters[i].isPointInFill(PointObj)) {
+                        let new_region = enters[i].id.replace("map_region_enter_", "");
+                        this.MapCont.current_region = new_region;
+                        this.MapCont.zoom_map_to_region(new_region);
+                        Interface.player_moved_to_new_region(new_region);
+                        break;
+                    }
+                }
             } else {
-                document.getElementById("sky_" + current_region).style.display = "inherit"
-            }
-            ExpCont.entering_location(location)
-
-        }, 0.5 * GenParam.map_to_location_transition_speed)
-    }
-
-    this.jump_player_to_location = function(location, region){
-        current_region = region
-        enter_location(location, region)
-        Interface.player_moved_to_new_region(region)
-        SVGShield.style.fill = GenParam.RegionData[region].surrounding_color
-        SVGShield.style.stroke = GenParam.RegionData[region].color
-        PageContainer.style.background = GenParam.RegionData[region].surrounding_color
-    }
-
-    function flash_location_transition_mask(optional_region) {
-        if (optional_region !== undefined) {
-            if (optional_region !== false) {
-                //Find the region colors
-                document.getElementById("transition_mask_rect").style.fill = GenParam.RegionData[optional_region].lighter_color
-
-            } else {
-                //Set to default black
-                document.getElementById("transition_mask_rect").style.fill = "black"
-            }
-        } else {
-            //Set to default black
-            document.getElementById("transition_mask_rect").style.fill = "black"
-        }
-
-        //Show the transition mask animation
-        Transition_Mask.style.animation = "map_transition_animation " + GenParam.map_to_location_transition_speed + "ms ease-in-out forwards"
-
-        setTimeout(function () {
-            Transition_Mask.style.animation = ""
-        }, GenParam.map_to_location_transition_speed)
-
-
-    }
-
-    //Call to allow the participant to leave a location
-    this.allow_participant_to_leave_location = function (add_keyboard_shortcut) {
-        if (currently_in_location) {
-            show_action_button("return_arrow", "center", ["Escape", "Enter", " "], false);
-            current_action_key_status = "return_to_map"
-        }
-
-        if (add_keyboard_shortcut) {
-
-        }
-    }
-
-    //Call to leave a location and return to the map
-    this.return_to_map = function () {
-        if (currently_in_location) {
-            flash_location_transition_mask(current_region)
-            setTimeout(function () {
-                Map_Layer.style.display = "inherit"
-                hide_all_locations()
-            }, 0.5 * GenParam.map_to_location_transition_speed)
-            RequestInstructionsButton.style.display = "inherit"
-        } else {
-            Map_Layer.style.display = "inherit"
-            hide_all_locations()
-        }
-
-        currently_in_location = false
-        ExpCont.leaving_location()
-        Partner.update_behavior()
-
-        Interface.FenneFinder.show()
-    }
-
-    //Call to return the participant to the center of the map. Also updates the partner behavior
-    this.reset_map_to_player_in_center = function () {
-        this.return_to_map()
-        Player.jump_to_map_center()
-        if (GenParam.DisplayFoundFennimalIconsOnMap.show) {
-            if (GenParam.DisplayFoundFennimalIconsOnMap.display_only_in_current_region) {
-                display_all_Fennimal_icon_on_map_for_region("Home")
-            }
-        }
-
-        Partner.jump_to_map_center()
-        Partner.update_behavior()
-
-    }
-
-    //Call to disable or enable map interations
-    this.disable_map_interactions = function () {
-        player_allowed_to_move = false
-        AudioCont.stop_all_region_sounds()
-
-    }
-    this.enable_map_interactions = function () {
-        player_allowed_to_move = true
-        AudioCont.play_region_sound(current_region)
-        Partner.update_behavior()
-    }
-
-    //Call to show the request-instructions button on the top of the page
-    this.show_request_instructions_button = function () {
-        RequestInstructionsButton.style.display = "inherit"
-
-    }
-
-    function create_request_instructions_button() {
-        RequestInstructionsButton = create_SVG_buttonElement(GenParam.RequestInstructionButtonSettings.center_x, GenParam.RequestInstructionButtonSettings.center_y, GenParam.RequestInstructionButtonSettings.width, GenParam.RequestInstructionButtonSettings.height, GenParam.RequestInstructionButtonSettings.text, GenParam.RequestInstructionButtonSettings.textsize)
-        Interface_Layer.appendChild(RequestInstructionsButton)
-        RequestInstructionsButton.style.display = "none"
-        RequestInstructionsButton.onpointerdown = function () {
-            request_instructions_button_clicked();
-            AudioCont.play_sound_effect("button_click")
-        }
-        RequestInstructionsButton.style.fontWeight = GenParam.RequestInstructionButtonSettings.fontWeight
-        RequestInstructionsButton.classList.add("do_not_move_on_click")
-
-    }
-
-    function request_instructions_button_clicked() {
-        ExpCont.instructions_requested()
-    }
-
-    //HINTS
-    ///////////
-    function flash_hints_from_watchtower() {
-        //Find out which locations have a Fennimal and have not been searched
-        let TargetLocations = []
-        let CurrentStates = WorldState.get_location_states_as_object()
-        for (let key in CurrentStates) {
-            if (CurrentStates[key].search_status === 'unsearched') {
-                if (typeof CurrentStates[key].id !== "undefined") {
-                    TargetLocations.push(key)
+                let leaves = GenParam.SVGObject.getElementsByClassName("map_region_leave");
+                for (let i = 0; i < leaves.length; i++) {
+                    if (leaves[i].isPointInFill(PointObj)) {
+                        this.MapCont.current_region = "Home";
+                        this.MapCont.zoom_map_to_region("Home");
+                        Interface.player_moved_to_new_region("Home");
+                        if (this.MapCont.ExpCont.playerReturnedHome) this.MapCont.ExpCont.playerReturnedHome();
+                        break;
+                    }
                 }
             }
         }
 
-        for (let i = 0; i < TargetLocations.length; i++) {
-            flash_hint_at_location(TargetLocations[i])
+        setMouseTargetCoords(event) {
+            let mousepos = getMousePosition_with_transforms(this.MapCont.Map_Layer, event);
+            this.MouseTargetCoords = { x: mousepos.x, y: mousepos.y };
         }
 
-    }
+        start_render_loop() {
+            if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
 
-    function flash_hint_at_location(location_name) {
-        let Marker = document.getElementById("location_marker_" + location_name)
-        create_ripple(Map_Layer, Marker.getBBox().x, Marker.getBBox().y, true)
-    }
-
-    //DOME
-    ////////////
-    let dome_visible_until_tower_climbed = false, dome_message_interval
-    this.enforce_dome_until_tower_climbed = function(){
-        Interface.Prompt.show_message("First climb the watchtower to get an overview of Fenneland")
-        DomeCont.raise_dome_with_arrow()
-        dome_visible_until_tower_climbed = true
-        dome_message_interval = setInterval(function () {
-            Interface.Prompt.show_message("First climb the watchtower to get an overview of Fenneland")
-        }, 1000)
-    }
-
-
-    //On start
-    ///////////////////
-    reset_all_region_opacity_masks()
-
-    //Subcontroller for the player icon movement
-    PlayerIconController = function () {
-        let playerthat = this
-        let player_speed = GenParam.Speedlimits.default
-        let default_transition = "all 100ms linear"
-        let IndicatorPoint, MousePoint, show_marker_points = false
-
-        //This function populates SVG objects of the player used during the experiment
-        let PlayerIconData = {}
-        function populate_player_icon_data(){
-            PlayerIconData.FrontElem =WorldState.get_person_icon("player", "front")
-            PlayerIconData.BackElem =WorldState.get_person_icon("player", "back")
-            PlayerIconData.LeftElem =WorldState.get_person_icon("player", "left")
-            PlayerIconData.RightElem =WorldState.get_person_icon("player", "right")
-
-            //Setting optional scale
-            if(typeof WorldState.get_player_icon_settings().scale_factor !== "undefined"){
-
-                if(typeof WorldState.get_player_icon_settings().scale_factor === "number"){
-                    PlayerIconData.FrontElem.style.transform = "scale(" + WorldState.get_player_icon_settings().scale_factor+ ")"
-                    PlayerIconData.BackElem.style.transform = "scale(" + WorldState.get_player_icon_settings().scale_factor + ")"
-                    PlayerIconData.LeftElem.style.transform = "scale(" + WorldState.get_player_icon_settings().scale_factor + ")"
-                    PlayerIconData.RightElem.style.transform = "scale(" + WorldState.get_player_icon_settings().scale_factor + ")"
+            const loop = () => {
+                if (this.is_dragging && this.MapCont.player_allowed_to_move) {
+                    this.move_icon_towards_mouse_target_coords();
                 }
-
-            }
-
-
-        }
-        populate_player_icon_data()
-        this.update_settings = function(){
-            populate_player_icon_data()
-            update_player_icon_direction("up")
-            update_player_icon_direction("down")
+                this.animationFrameId = requestAnimationFrame(loop);
+            };
+            this.animationFrameId = requestAnimationFrame(loop);
         }
 
-        //Creating a container to hold the currently visible player icon
-        let PlayerIcon = create_SVG_group(false,false,false,"PlayerIconGroup")
-        PlayerIcon.style.pointerEvents = "none"
-        document.getElementById("Map_player_level").appendChild(PlayerIcon)
-        let player_current_direction
+        move_icon_towards_mouse_target_coords() {
+            this.player_speed = GenParam.Speedlimits.default;
+            let PointObj = GenParam.SVGObject.createSVGPoint();
+            PointObj.x = this.CurrentPlayerPos.x; PointObj.y = this.CurrentPlayerPos.y;
 
-        //Changes the SVG for the player icon to face it in the new direction. Here directions are: "up", "down", "left" and "right"
-        function update_player_icon_direction(new_direction) {
-            //Only update if the player icon has changed direction
-            if(player_current_direction !== new_direction) {
-                //Clear the SVG
-                PlayerIcon.innerHTML = ""
+            let roads = GenParam.SVGObject.getElementsByClassName("map_road_" + this.MapCont.current_region);
+            for (let i = 0; i < roads.length; i++) if (roads[i].isPointInFill(PointObj)) this.player_speed = GenParam.Speedlimits.road;
 
-                //Clear the SVG and add a copy of the correct direction
-                switch(new_direction){
-                    case("up"): PlayerIcon.appendChild(PlayerIconData.BackElem.cloneNode(true)); break
-                    case("down"): PlayerIcon.appendChild(PlayerIconData.FrontElem.cloneNode(true)); break
-                    case("left"): PlayerIcon.appendChild(PlayerIconData.LeftElem.cloneNode(true)); break
-                    case("right"): PlayerIcon.appendChild(PlayerIconData.RightElem.cloneNode(true)); break
-                }
+            // FIX: Apply a 60% speed reduction multiplier to the final speed!
+            let active_speed = this.player_speed * 0.6;
 
-                //Update the direction state
-                player_current_direction = new_direction
-            }
-        }
-
-        PlayerIcon.style.transition = default_transition
-
-        this.allow_movement = function () {
-            player_allowed_to_move = true
-            Check_Proximity_Interval = setInterval(test_player_proximity_to_map_elements, 250)
-        }
-        this.disable_movement = function () {
-            player_allowed_to_move = false
-            clearInterval(Check_Proximity_Interval)
-        }
-
-        //Updates the player icon to its current location
-        function update_icon_position() {
-            PlayerIcon.style.transform = "translate(" + (CurrentPlayerPos.x) + "px, " + (CurrentPlayerPos.y) + "px)"
-        }
-
-        //Resets the player icon to the center of the map
-        this.jump_to_map_center = function () {
-            move_to_region("Home")
-            CurrentPlayerPos = {x: 0.5 * GenParam.SVG_width, y: 0.5 * GenParam.SVG_height}
-            update_icon_position()
-            update_player_icon_direction("down")
-        }
-
-        //General movement functions
-        //Checks if a given coordinate is valid to move to
-        function check_if_coords_valid(x, y) {
-            if (x < 0 || y < 0 || x > GenParam.SVG_width || y > GenParam.SVG_height) {
-                return (false)
-            }
-
-            let PointObj = GenParam.SVGObject.createSVGPoint()
-            PointObj.x = x
-            PointObj.y = y
-
-            //These objects are always checked
-            let General_Blocking_objects = GenParam.SVGObject.getElementsByClassName("map_block")
-            for (let i = 0; i < General_Blocking_objects.length; i++) {
-                if (General_Blocking_objects[i].isPointInFill(PointObj) === true) {
-                    return (false)
-                }
-            }
-
-            //Depending on the region, we want to check some more blocking elements
-            let Region_Blocking_objects = GenParam.SVGObject.getElementsByClassName("map_block_" + current_region)
-            for (let i = 0; i < Region_Blocking_objects.length; i++) {
-                if (Region_Blocking_objects[i].isPointInFill(PointObj) === true) {
-                    return (false)
-                }
-            }
-            return (true)
-
-        }
-
-        function check_if_pressing_on_do_not_move_area(Target) {
-            return (!Target.classList.contains("do_not_move_on_click"))
-        }
-
-        //Attempts to move to a given coordinate (if the location is not valid, or the mouse is pressing a do-not-move area, then nothing happens)
-        function attempt_to_move_to_coords(x, y) {
-            if (!(x === CurrentPlayerPos.x && y === CurrentPlayerPos.y)) {
-                if (check_if_coords_valid(x, y)) {
-                    move_to_coords(x, y)
-                }
-            }
-        }
-
-        function move_to_coords(x, y) {
-            let delta_x =x - CurrentPlayerPos.x
-            let delta_y = y - CurrentPlayerPos.y
-            CurrentPlayerPos = {x: parseFloat(x), y: parseFloat(y)}
-            update_icon_position()
-            check_for_region_shift()
-            update_action_button()
-            check_for_auto_events()
-
-            //Changing the direction of the icon
-            if(Math.abs(delta_x) > Math.abs( delta_y) ){
-                if(delta_x > 0){
-                    update_player_icon_direction("right")
-                }else{
-                    update_player_icon_direction("left")
-                }
-            }else{
-                if(delta_y > 0){
-                    update_player_icon_direction("down")
-                }else{
-                    update_player_icon_direction("up")
-                }
-            }
-
-            //If there is a Partner Icon, tell it that the player icon has moved
-            if(typeof Partner !== "undefined"){
-                if(Partner !== false){
-                    Partner.player_moved_to_location(x,y)
-                }
-            }
-
-            if(show_marker_points){
-                if(typeof IndicatorPoint === "undefined"){
-                    IndicatorPoint = create_SVG_circle(CurrentPlayerPos.x,CurrentPlayerPos.y,10, undefined,undefined)
-                    IndicatorPoint.style.fill = "red"
-                    Map_Layer.appendChild(IndicatorPoint)
-                }else{
-                    IndicatorPoint.style.cx = CurrentPlayerPos.x
-                    IndicatorPoint.style.cy = CurrentPlayerPos.y
-                }
-            }
-
-            Interface.FenneFinder.update_player_location(CurrentPlayerPos)
-
-        }
-
-        //Triggers any events that occur when the player touches some specific areas. Note that this only fires if the player is not currently in the middle of something...
-        function check_for_auto_events() {
-            if (current_player_status === false) {
-                let PointObj = GenParam.SVGObject.createSVGPoint()
-                PointObj.x = CurrentPlayerPos.x
-                PointObj.y = CurrentPlayerPos.y
-
-                //For computational efficiency, we perform checks only for the relevant region.
-                if (current_region === "Home") {
-                    //Check if the player touched the auto-move region
-                    //if(document.getElementById("map_watchtower_forced_region").isPointInFill(PointObj) === true){
-                    //    playerthat.climb_watchtower()
-                    // }
-                }
-            }
-
-        }
-
-        function move_to_region(new_region) {
-            current_region = new_region
-            zoom_map_to_region(new_region)
-
-            //Inform the Interface that we have moved to a new region
-            Interface.player_moved_to_new_region(new_region)
-
-        }
-
-        //Detects the current speed (depends on the substrate the player is standing on)
-        function update_player_speed() {
-            //Reset to default
-            player_speed = GenParam.Speedlimits.default
-
-            //Create a point at the current location
-            let PointObj = GenParam.SVGObject.createSVGPoint()
-            PointObj.x = CurrentPlayerPos.x
-            PointObj.y = CurrentPlayerPos.y
-
-            //Checks are done by region
-
-            //Detect whether the player is standing on a road
-            let Road_objects = GenParam.SVGObject.getElementsByClassName("map_road_" + current_region)
-            for (let i = 0; i < Road_objects.length; i++) {
-                if (Road_objects[i].isPointInFill(PointObj) === true) {
-                    player_speed = GenParam.Speedlimits.road
-                }
-            }
-
-            //Detect whether the player is standing on a path
-            let Path_objects = GenParam.SVGObject.getElementsByClassName("map_road" + +current_region)
-            for (let i = 0; i < Path_objects.length; i++) {
-                if (Path_objects[i].isPointInFill(PointObj) === true) {
-                    player_speed = GenParam.Speedlimits.road
-                }
-            }
-
-        }
-
-        //Mouse movement function
-        let MouseMoveInterval, moving_to_mouse = false, MouseTargetCoords
-
-        function setMouseTargetCoords(event) {
-            let mousepos = getMousePosition_with_transforms(Map_Layer, event)
-            MouseTargetCoords = {x: mousepos.x, y: mousepos.y}
-            if(show_marker_points){
-                if(typeof MousePoint === "undefined"){
-                    MousePoint = create_SVG_circle(mousepos.x,mousepos.y,10, undefined,undefined)
-                    MousePoint.style.fill = "blue"
-                    Map_Layer.appendChild(MousePoint)
-
-                }else{
-                    MousePoint.style.cx = mousepos.x
-                    MousePoint.style.cy = mousepos.y
-                }
-            }
-        }
-
-        function start_mouse_moving_interval() {
-            MouseMoveInterval = setInterval(function () {
-                if (moving_to_mouse) {
-                    move_icon_towards_mouse_target_coords()
-                }
-            }, 30)
-        }
-
-        function move_icon_towards_mouse_target_coords() {
-            //Update the player speed depending on the current substrate
-            update_player_speed()
-
-            //Find own location ON SCREEN (not in SVG coordinates)
-            //let Bounds = PlayerIcon.getBoundingClientRect()
-            //let Own_location = {x: Bounds.x, y: Bounds.y}
-
-            //Find the distance to the mouse. Only move if theres a minimum distance (prevents wiggling)
-            let dist_to_mouse = EUDistPoints(CurrentPlayerPos, MouseTargetCoords)
-
+            let dist_to_mouse = EUDistPoints(this.CurrentPlayerPos, this.MouseTargetCoords);
             if (dist_to_mouse > GenParam.player_minimum_move_distance) {
-                // Finding the angle to move in
-                //let angleDeg = Math.atan2(MouseTargetCoords.y - Own_location.y, MouseTargetCoords.x - Own_location.x) * 180 / Math.PI;
-                let angleRad = Math.atan2(MouseTargetCoords.y - CurrentPlayerPos.y , MouseTargetCoords.x - CurrentPlayerPos.x);
-
-                //Calculate the point that we want to move towards
-                let x_delta = player_speed * Math.cos(angleRad)
-                let y_delta = player_speed * Math.sin(angleRad)
-
-                attempt_to_move_to_coords(Math.round(CurrentPlayerPos.x + x_delta), Math.round(CurrentPlayerPos.y + y_delta))
-
-            }
-
-
-        }
-
-        document.onpointerup = function (event) {
-            moving_to_mouse = false
-            clearInterval(MouseMoveInterval)
-        }
-        document.onpointerleave = function (event) {
-            moving_to_mouse = false
-            clearInterval(MouseMoveInterval)
-        }
-
-        document.onpointerdown = function (event) {
-            //First check if we are clicking on a do-not-move area. If not, then try moving.
-            if (!currently_in_location) {
-                moving_to_mouse = false
-                clearInterval(MouseMoveInterval)
-
-                if (player_allowed_to_move) {
-                    moving_to_mouse = true
-                    setMouseTargetCoords(event)
-                    start_mouse_moving_interval()
-
-                } else {
-
-                }
-
-                //Clicking anywhere on the map while in the watchtower will move the player down
-                if (current_player_status === "in_watchtower") {
-                    playerthat.leave_watchtower()
-                }
-
-                if (check_if_pressing_on_do_not_move_area(event.target)) {
-
-                }
-            }
-
-
-        }
-
-        document.onpointermove = function (event) {
-            if (player_allowed_to_move) {
-                moving_to_mouse = true
-                setMouseTargetCoords(event)
+                let angleRad = Math.atan2(this.MouseTargetCoords.y - this.CurrentPlayerPos.y, this.MouseTargetCoords.x - this.CurrentPlayerPos.x);
+                let x_delta = active_speed * Math.cos(angleRad);
+                let y_delta = active_speed * Math.sin(angleRad);
+                this.attempt_to_move_to_coords(Math.round(this.CurrentPlayerPos.x + x_delta), Math.round(this.CurrentPlayerPos.y + y_delta));
             }
         }
 
-        //Region transition functions
-        function check_for_region_shift() {
-            //Create a point at the current location
-            let PointObj = GenParam.SVGObject.createSVGPoint()
-            PointObj.x = CurrentPlayerPos.x
-            PointObj.y = CurrentPlayerPos.y
+        climb_watchtower() {
+            this.MapCont.current_action_key_status = false;
+            this.MapCont.current_player_status = "transition";
+            this.MapCont.current_region = "All";
+            this.disable_movement();
 
-            //If we are in the "Home" region, then we need to check if the player is touching any of the available region entering zones
-            if (current_region === "Home") {
-                let Region_enter_objects = GenParam.SVGObject.getElementsByClassName("map_region_enter")
-                for (let i = 0; i < Region_enter_objects.length; i++) {
-                    if (Region_enter_objects[i].isPointInFill(PointObj) === true) {
-                        //Entering a new region! Get the name from the id
-                        let new_region_name = Region_enter_objects[i].id.replace("map_region_enter_", "")
-                        move_to_region(new_region_name)
-                    }
-                }
+            this.PlayerIcon.style.transition = "all 500ms ease-out";
+            setTimeout(() => {
+                let Base_marker = document.getElementById("map_watchtower_start");
+                this.attempt_to_move_to_coords(Base_marker.getAttribute("cx"), Base_marker.getAttribute("cy"));
 
+                setTimeout(() => {
+                    this.PlayerIcon.style.transition = "all 2s ease-out";
+                    let Top_marker = document.getElementById("map_watchtower_end");
+                    this.attempt_to_move_to_coords(Top_marker.getAttribute("cx"), Top_marker.getAttribute("cy"));
 
-            } else {
-                //If we are in a non-Home region, then we need to check if the player is touching a Home-transition area
-                let Region_leave_objects = GenParam.SVGObject.getElementsByClassName("map_region_leave")
-                for (let i = 0; i < Region_leave_objects.length; i++) {
-                    if (Region_leave_objects[i].isPointInFill(PointObj) === true) {
-                        //Going back to the center
-                        move_to_region("Home")
-                    }
-                }
+                    setTimeout(() => {
+                        this.MapCont.zoom_map_to_region("All");
+                        this.MapCont.current_player_status = "in_watchtower";
+                        this.MapCont.current_action_key_status = "watchtower_down";
+                        this.MapCont.update_action_button();
+                        this.MapCont.start_watchtower_ripples();
 
+                    }, 2000);
+                }, 500);
+            }, 10);
+
+            if (this.MapCont.DomeCont.dome_visible_until_tower_climbed) {
+                setTimeout(() => {
+                    clearInterval(this.MapCont.DomeCont.dome_message_interval);
+                    this.MapCont.DomeCont.dome_visible_until_tower_climbed = false;
+                    this.MapCont.DomeCont.collapse_dome();
+                }, 1000);
+            }
+        }
+
+        leave_watchtower() {
+            this.MapCont.current_action_key_status = false;
+            this.MapCont.current_region = "Home";
+            this.MapCont.zoom_map_to_region("Home");
+            this.MapCont.stop_watchtower_ripples();
+
+            this.PlayerIcon.style.transition = "all 2s ease-in";
+            Interface.Prompt.hide();
+            this.MapCont.current_player_status = "transition";
+
+            setTimeout(() => {
+                let Base_marker = document.getElementById("map_watchtower_start");
+                this.attempt_to_move_to_coords(Base_marker.getAttribute("cx"), Base_marker.getAttribute("cy"));
+
+                setTimeout(() => {
+                    this.MapCont.current_action_key_status = "watchtower";
+                    this.MapCont.current_player_status = false;
+                    this.PlayerIcon.style.transition = "none";
+                    this.allow_movement();
+                }, 2200);
+            }, 100);
+        }
+    };
+
+    PartnerIconController = class {
+        constructor(MapCont) {
+            this.MapCont = MapCont;
+            this.PartnerIconPos = { x: 0, y: 0 };
+            this.TargetPos = false;
+            this.currently_following_player = false;
+            this.currently_on_the_move = false;
+            this.animationFrameId = null;
+
+            this.PartnerIcon = create_SVG_group(false, false, false, "PartnerIconGroup");
+            this.PartnerIcon.style.pointerEvents = "none";
+            this.PartnerIcon.style.transition = "none";
+            document.getElementById("Map_player_level").appendChild(this.PartnerIcon);
+
+            this.PartnerIconData = {};
+            this.populate_partner_icon_data();
+            this.icon_current_direction = null;
+        }
+
+        populate_partner_icon_data() {
+            this.PartnerIconData.FrontElem = this.MapCont.WorldState.get_person_icon("partner", "front");
+            this.PartnerIconData.BackElem = this.MapCont.WorldState.get_person_icon("partner", "back");
+            this.PartnerIconData.LeftElem = this.MapCont.WorldState.get_person_icon("partner", "left");
+            this.PartnerIconData.RightElem = this.MapCont.WorldState.get_person_icon("partner", "right");
+
+            // FIX: Fetch the partner's scale factor.
+            // We use the player's scale as a fallback just in case it wasn't explicitly defined!
+            let scale = this.MapCont.WorldState.get_partner_icon_settings().scale_factor;
+            if (typeof scale !== "number") {
+                scale = this.MapCont.WorldState.get_player_icon_settings().scale_factor;
             }
 
-
-        }
-
-        //Interval to show hints on top of the watchtower
-        let Watchtower_hint_interval, watchtower_hint_speed = 3000
-
-        this.climb_watchtower = function () {
-            //Remove the action key status
-            current_action_key_status = false
-            current_player_status = "transition"
-            current_region = "All"
-
-            //Disable player movement while in the watchtower
-            player_allowed_to_move = false
-            clearInterval(MouseMoveInterval)
-
-            //Move the player to the starting point
-            PlayerIcon.style.transition = "all 500ms ease-out"
-            setTimeout(function () {
-                //Find starting location coords
-                let Base_marker = document.getElementById("map_watchtower_start")
-                let Base_coords = {x: Base_marker.getAttribute("cx"), y: Base_marker.getAttribute("cy")}
-                move_to_coords(Base_coords.x, Base_coords.y)
-                update_icon_position()
-
-
-                setTimeout(function () {
-                    PlayerIcon.style.transition = "all 2s ease-out"
-
-                    let Top_marker = document.getElementById("map_watchtower_end")
-                    let Top_coords = {x: Top_marker.getAttribute("cx"), y: Top_marker.getAttribute("cy")}
-                    move_to_coords(Top_coords.x, Top_coords.y)
-                    update_icon_position()
-
-                    setTimeout(function () {
-                        zoom_map_to_region("All")
-                        current_player_status = "in_watchtower"
-                        current_action_key_status = "watchtower_down"
-                        update_action_button()
-
-                    }, 2000)
-
-                }, 500)
-            }, 10)
-
-            if (GenParam.get_hint_on_top_of_watchtower) {
-                Watchtower_hint_interval = setInterval(function () {
-                    flash_hints_from_watchtower()
-                }, watchtower_hint_speed)
+            // Apply the scale to all 4 directional views
+            if (typeof scale === "number") {
+                ["FrontElem", "BackElem", "LeftElem", "RightElem"].forEach(el => {
+                    this.PartnerIconData[el].style.transform = `scale(${scale})`;
+                });
             }
-
-
-            //Check if a dome is raised. If so, lower it
-            if(dome_visible_until_tower_climbed){
-                setTimeout(function () {
-                    clearInterval(dome_message_interval)
-                    dome_visible_until_tower_climbed = false
-                    DomeCont.collapse_dome()
-                }, 1000)
-            }
-
         }
 
-        this.leave_watchtower = function () {
-            current_action_key_status = false
-            current_region = "Home"
-            //Return to normal zoom levels
-            zoom_map_to_region("Home")
-            PlayerIcon.style.transition = "all 2s ease-in"
-            Interface.Prompt.hide()
-            current_player_status = "transition"
-
-            clearInterval(Watchtower_hint_interval)
-
-            setTimeout(function () {
-                //Move down the ladder
-                let Base_marker = document.getElementById("map_watchtower_start")
-                let Base_coords = {x: Base_marker.getAttribute("cx"), y: Base_marker.getAttribute("cy")}
-                move_to_coords(Base_coords.x, Base_coords.y)
-                update_icon_position()
-
-                setTimeout(function () {
-                    //Re-allow movement
-                    current_action_key_status = "watchtower"
-                    current_player_status = false
-                    player_allowed_to_move = true
-                    PlayerIcon.style.transition = default_transition
-                    current_player_status = false
-
-                }, 2200)
-
-            }, 100)
-
-
-            //Enable movement
-            //
+        update_settings() {
+            this.populate_partner_icon_data();
+            this.update_icon_direction("up", true);
+            this.update_icon_direction("down", true);
         }
 
-    }
-
-    PartnerIconController = function(){
-        let max_distance_before_moving = 70
-        let min_distance_stop_moving = 40
-        let step_max_speed = 30
-        let step_max_speed_distance = 200
-
-        let step_time = 100
-        let PartnerIconPos = {}
-        let TargetPos = false
-        let currently_following_player = false
-        let WalkingInterval
-        let currently_on_the_move = false
-
-        //On creation, add an icon to the SVG
-        let default_transition = "all 100ms ease-in-out"
-
-        //Creating a container to hold the currently visible player icon
-        let PartnerIcon = create_SVG_group(false,false,false,"PartnerIconGroup")
-        PartnerIcon.style.pointerEvents = "none"
-        document.getElementById("Map_player_level").appendChild(PartnerIcon)
-        PartnerIcon.style.display = "inherit"
-
-        //This function populates SVG objects of the player used during the experiment
-        let PartnerIconData = {}
-        function populate_partner_icon_data(){
-            PartnerIconData.FrontElem = WorldState.get_person_icon("partner", "front")
-            PartnerIconData.BackElem = WorldState.get_person_icon("partner", "back")
-            PartnerIconData.LeftElem = WorldState.get_person_icon("partner", "left")
-            PartnerIconData.RightElem = WorldState.get_person_icon("partner", "right")
-
-        }
-        populate_partner_icon_data()
-
-        this.update_settings = function(){
-            populate_partner_icon_data()
-            update_icon_direction("up")
-            update_icon_direction("down")
-        }
-
-        let icon_current_direction
-
-        //Changes the SVG for the player icon to face it in the new direction. Here directions are: "up", "down", "left" and "right"
-        function update_icon_direction(new_direction) {
-            //Only update if the player icon has changed direction
-            if(icon_current_direction !== new_direction) {
-                //Clear the SVG
-                PartnerIcon.innerHTML = ""
-
-                //Clear the SVG and add a copy of the correct direction
+        update_icon_direction(new_direction, force = false) {
+            if (this.icon_current_direction !== new_direction || force) {
+                this.PartnerIcon.innerHTML = "";
                 switch(new_direction){
-                    case("up"): PartnerIcon.appendChild(PartnerIconData.BackElem.cloneNode(true)); break
-                    case("down"): PartnerIcon.appendChild(PartnerIconData.FrontElem.cloneNode(true)); break
-                    case("left"): PartnerIcon.appendChild(PartnerIconData.LeftElem.cloneNode(true)); break
-                    case("right"): PartnerIcon.appendChild(PartnerIconData.RightElem.cloneNode(true)); break
+                    case "up": this.PartnerIcon.appendChild(this.PartnerIconData.BackElem.cloneNode(true)); break;
+                    case "down": this.PartnerIcon.appendChild(this.PartnerIconData.FrontElem.cloneNode(true)); break;
+                    case "left": this.PartnerIcon.appendChild(this.PartnerIconData.LeftElem.cloneNode(true)); break;
+                    case "right": this.PartnerIcon.appendChild(this.PartnerIconData.RightElem.cloneNode(true)); break;
                 }
-
-                //Update the direction state
-                icon_current_direction = new_direction
+                this.icon_current_direction = new_direction;
             }
         }
 
-        PartnerIcon.style.transition = default_transition
+        start_render_loop() {
+            if(this.animationFrameId) return;
+            const loop = () => {
+                this.step_logic();
+                this.animationFrameId = requestAnimationFrame(loop);
+            };
+            this.animationFrameId = requestAnimationFrame(loop);
+        }
 
-        //Checks if the partner icon needs to move.
-        function step_interval(){
-            if(currently_following_player) {
-                if(TargetPos !== false){
+        step_logic() {
+            if (this.currently_following_player && this.TargetPos) {
+                let dist_to_player = EUDistPoints(this.PartnerIconPos, this.TargetPos);
+                let critical_movement_distance = this.currently_on_the_move ? 40 : 70;
 
-                    //Find the distance to the player icon.
-                    let dist_to_player = EUDistPoints(PartnerIconPos, TargetPos)
+                if (this.MapCont.WorldState.get_current_partner_role() === "active") {
+                    if (dist_to_player > critical_movement_distance) {
+                        this.currently_on_the_move = true;
 
-                    //If we are already moving, then we move if the distance exceeds the minimum threshold.
-                    let critical_movement_distance = max_distance_before_moving
-                    if(currently_on_the_move){ critical_movement_distance = min_distance_stop_moving }
+                        let x_delta = this.TargetPos.x - this.PartnerIconPos.x;
+                        let y_delta = this.TargetPos.y - this.PartnerIconPos.y;
 
-                    let x_delta =  TargetPos.x - PartnerIconPos.x
-                    let y_delta = TargetPos.y - PartnerIconPos.y
-
-                    if(Math.abs(x_delta) > Math.abs( y_delta) ){
-                        if(x_delta > 0){
-                            update_icon_direction("right")
-                        }else{
-                            update_icon_direction("left")
+                        // 1. Visual direction updating
+                        if (Math.abs(x_delta) > Math.abs(y_delta)) {
+                            this.update_icon_direction(x_delta > 0 ? "right" : "left");
+                        } else {
+                            this.update_icon_direction(y_delta > 0 ? "down" : "up");
                         }
-                    }else{
-                        if(y_delta > 0){
-                            update_icon_direction("down")
-                        }else{
-                            update_icon_direction("up")
-                        }
-                    }
 
-                    if(WorldState.get_current_partner_role() === "active"){
-                        if(dist_to_player > critical_movement_distance){
-                            //Now we need to start moving
-                            currently_on_the_move = true
+                        // 2. Trigonometric trajectory (Matches the Player's math!)
+                        let angleRad = Math.atan2(y_delta, x_delta);
 
-                            let speed_x, speed_y
-                            if(dist_to_player > step_max_speed_distance){
-                                speed_x = Math.min(Math.abs(x_delta),step_max_speed)
-                                speed_y = Math.min(Math.abs(y_delta),step_max_speed)
-                            }else{
-                                speed_x = Math.min((dist_to_player / step_max_speed_distance) * step_max_speed, Math.abs(x_delta) )
-                                speed_y = Math.min((dist_to_player / step_max_speed_distance) * step_max_speed, Math.abs(y_delta) )
-                            }
+                        // 3. Speed Calculation
+                        let base_speed = 3.5; // Solid starting speed, no crawling
 
-                            if(x_delta > 0){
-                                PartnerIconPos.x = PartnerIconPos.x + speed_x
-                            }else{
-                                PartnerIconPos.x = PartnerIconPos.x - speed_x
-                            }
-                            if(y_delta > 0){
-                                PartnerIconPos.y = PartnerIconPos.y + speed_y
-                            }else{
-                                PartnerIconPos.y = PartnerIconPos.y - speed_y
-                            }
-                            //PartnerIconPos.x = PartnerIconPos.x + Math.min(0.5*x_delta, speed)
-                            //PartnerIconPos.y = PartnerIconPos.y + Math.min(0.5*y_delta, speed)
+                        // Rubber-banding: speed increases slightly if they fall far behind
+                        let dynamic_speed = base_speed + (dist_to_player * 0.000);
 
-                            update_icon_position()
+                        // HARD CAP: Never exceed 6.5 (fast enough to catch up to the player's 4.8, but never teleporting)
+                        let active_speed = Math.min(4, dynamic_speed);
 
+                        // Ensure we don't mathematically overshoot the target in the final frame
+                        active_speed = Math.min(active_speed, dist_to_player);
 
+                        // 4. Apply vector velocity
+                        this.PartnerIconPos.x += active_speed * Math.cos(angleRad);
+                        this.PartnerIconPos.y += active_speed * Math.sin(angleRad);
 
-                        }else{
-                            //Now we stop moving
-                            currently_on_the_move = false
-                        }
+                        this.PartnerIcon.style.transform = `translate(${this.PartnerIconPos.x}px, ${this.PartnerIconPos.y}px)`;
+                    } else {
+                        this.currently_on_the_move = false;
                     }
                 }
-
             }
-
         }
 
-        //Updates the player icon to its current location
-        function update_icon_position() {
-            PartnerIcon.style.transform = "translate(" + (PartnerIconPos.x) + "px, " + (PartnerIconPos.y) + "px)"
+        player_moved_to_location(new_location_x, new_location_y) {
+            this.TargetPos = { x: new_location_x, y: new_location_y };
         }
 
-        this.player_moved_to_location = function(new_location_x, new_location_y) {
-            TargetPos = {x: new_location_x, y: new_location_y}
+        jump_to_position(x, y) {
+            this.PartnerIconPos = { x: x, y: y };
+            this.TargetPos = false;
+            this.PartnerIcon.style.transform = `translate(${x}px, ${y}px)`;
+            this.update_icon_direction("down");
         }
 
-        // Must be called on construction to correctly set the coordinates
-        this.jump_to_position = function(x, y){
-
-            PartnerIconPos = {x: x, y:y}
-            TargetPos = false
-            update_icon_position()
-            update_icon_direction("down")
+        jump_to_map_center() {
+            this.jump_to_position(0.5 * GenParam.SVG_width, 0.5 * GenParam.SVG_height);
+            if(this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
         }
 
-        //Resets the player icon to the center of the map
-        this.jump_to_map_center = function () {
-
-            PartnerIconPos = {x: 0.5 * GenParam.SVG_width, y: 0.5 * GenParam.SVG_height}
-            TargetPos= false
-            update_icon_position()
-            update_icon_direction("down")
-            clearInterval(WalkingInterval)
-        }
-
-        // Can be "active" (following player), "passive" (confined to center) or null (invisible).
-        //Reads its value from the worldstate
-        this.update_behavior = function(){
-            switch(WorldState.get_current_partner_role()){
-                case("active"):
-                    PartnerIcon.style.display = "inherit"
-                    currently_following_player = true
-                    clearInterval(WalkingInterval)
-                    WalkingInterval = setInterval(step_interval, 100)
-                    break
-                case("passive"):
-                    PartnerIcon.style.display = "inherit"
-                    currently_following_player = false
-                    clearInterval(WalkingInterval)
-                    WalkingInterval = setInterval(step_interval, 100)
-                    break
-                default:
-                    PartnerIcon.style.display = "none"
-                    currently_following_player = false
-
-                    clearInterval(WalkingInterval)
-                    break
+        update_behavior() {
+            let role = this.MapCont.WorldState.get_current_partner_role();
+            if (role === "active" || role === "passive") {
+                this.PartnerIcon.style.display = "inherit";
+                this.currently_following_player = (role === "active");
+                this.start_render_loop();
+            } else {
+                this.PartnerIcon.style.display = "none";
+                this.currently_following_player = false;
+                if(this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
+                this.animationFrameId = null;
             }
-
         }
-
-        //TODO: temporary
-
-    }
-
-    DomeController = function(){
-        //Get the dome elements
-        const Dome = document.getElementById("centerdome")
-        const DomeBlock = document.getElementById("dome_block_element")
-        const DomeArrow = document.getElementById("dome_arrow")
-
-        //On creation, disable the dome
-        Dome.style.opacity = 0
-        DomeBlock.style.opacity = 0
-        Dome.style.display = "none"
-        DomeBlock.classList.remove("map_block")
-        DomeArrow.style.display = "none"
-        DomeArrow.style.opacity = 0
-        Dome.style.transition = "all 500ms ease-in-out"
-        DomeArrow.style.transition = "all 500ms ease-in-out"
-
-        //Enables the dome
-        this.raise_dome_with_arrow = function(){
-            Dome.style.opacity = 0
-            Dome.style.display = "inherit"
-            DomeBlock.classList.add("map_block")
-            DomeArrow.style.display = "inherit"
-
-            Dome.style.opacity = 1
-            setTimeout(function(){DomeArrow.style.opacity = 1},500)
-        }
-
-        //Shows the dome fade out and then disables
-        this.collapse_dome = function(){
-            DomeArrow.style.opacity = 0
-
-            setTimeout(function(){
-                Dome.style.opacity = 0
-                DomeBlock.classList.remove("map_block")
-            },500)
-
-            setTimeout(function(){
-                Dome.style.display = "none"
-                DomeArrow.style.display = "none"
-            },1000)
-
-        }
-
-
-
-
-    }
-
-    this.update_player_settings = function(){
-        Partner.update_settings()
-        Player.update_settings()
-    }
-
-    assign_outline_IDs()
-    set_all_map_regions_to_visible()
-
-    //TODO: SET VARIABLE
-    let Partner = new PartnerIconController()
-    Partner.jump_to_position(  0.5 * GenParam.SVG_width,0.48 * GenParam.SVG_height)
-    Partner.update_behavior()
-
-    let Player = new PlayerIconController()
-    let DomeCont = new DomeController()
-
-    //On start
-    Player.jump_to_map_center()
-    Player.allow_movement()
-    create_request_instructions_button()
-    Map_Layer.style.display = "inherit"
-
-
+    };
 }
 
 console.log("%c SCRIPTS - LOADED MAP CONTROLLER", "color:darkgreen")

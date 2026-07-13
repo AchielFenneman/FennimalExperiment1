@@ -28,12 +28,6 @@ function delete_elements_by_class_name(class_name) {
     }
 }
 
-function EUDist(x1, y1, x2, y2) {
-    let a = x1 - x2
-    let b = y1 - y2
-    return (Math.sqrt(a * a + b * b))
-}
-
 function EUDistPoints(p1, p2) {
     let a = p1.x - p2.x
     let b = p1.y - p2.y
@@ -60,24 +54,6 @@ const LevenshteinDistance = (s, t) => {
     }
     return arr[t.length][s.length];
 };
-
-//Returns all unique combinations of two elements from the array (excludes combinations with the same element twice)
-function get_all_pairs_of_array_elements(Arr) {
-
-    let Out = Arr.flatMap(
-        (v, i) => Arr.slice(i + 1).map(w => [v, w])
-    );
-
-    return (Out)
-}
-
-function mean_of_array(Arr) {
-    let sum = 0
-    for (let i = 0; i < Arr.length; i++) {
-        sum = sum + Arr[i]
-    }
-    return (sum / Arr.length)
-}
 
 function set_property_to_all_elem_in_arr(property, value, Arr){
     let NewArr =[]
@@ -174,7 +150,6 @@ function get_cursor_pos_in_svg(SVG, event) {
 
 }
 
-
 //When assigned to a button press, enables the fullscreen
 function toggleFullscreen(event) {
     var element = document.body;
@@ -222,7 +197,6 @@ function getBrowser() {
 
     return browser;
 }
-
 
 function create_SVG_rect(x, y, width, height, class_name, id_name) {
     let Rect = document.createElementNS("http://www.w3.org/2000/svg", 'rect')
@@ -622,16 +596,8 @@ function moveSVGCenterTo(element, targetX, targetY) {
     element.setAttribute("transform", `translate(${dx}, ${dy})`);
 }
 
-function moveElementRelative(Elem, dx, dy){
-    const currentTrans = Elem.style.transform || Elem.getAttribute("transform") ||"";
-    let matrix = new DOMMatrix(currentTrans);
-    matrix = matrix.translate(dx,dy)
-    Elem.style.transform = matrix.toString()
-}
-
-
 //Given a reference to an SVG object, sets the color classes for the Fennimal
-function set_Fennimal_color_classes(Obj) {
+/*function set_Fennimal_color_classes(Obj) {
     //The Fennimal's colors are defined by their placeholder fills (as just in the inkscape format). Here we take these fill colors and append the correct classes
     //Get all children, grandchildren etc.
     let List_All = Obj.getElementsByTagName("*")
@@ -680,6 +646,96 @@ function set_Fennimal_color_classes(Obj) {
     }
 }
 
+ */
+
+// Given a reference to an SVG object, sets the color classes for the Fennimal
+function set_Fennimal_color_classes(Obj) {
+    let List_All = Obj.querySelectorAll("*");
+
+    List_All.forEach(el => {
+        // Grab the color, force lowercase, and STRIP ALL SPACES so "rgb(234, 98, 8)" becomes "rgb(234,98,8)"
+        let fill_color = (el.getAttribute("fill") || el.style.fill || "").toLowerCase().replace(/\s/g, "");
+        let stroke_color = (el.getAttribute("stroke") || el.style.stroke || "").toLowerCase().replace(/\s/g, "");
+
+        let matchedFill = false;
+        let matchedStroke = false;
+
+        // --- Handle Fill Colors ---
+        if (fill_color) {
+            switch (fill_color) {
+                // Primary Color
+                case "#ea6208":
+                case "rgb(234,98,8)":
+                    el.classList.add("Fennimal_primary_color");
+                    matchedFill = true;
+                    break;
+                // Secondary Color
+                case "#eed671":
+                case "rgb(238,214,113)":
+                case "#efd771":
+                case "rgb(239,215,113)":
+                    el.classList.add("Fennimal_secondary_color");
+                    matchedFill = true;
+                    break;
+                // Tertiary Color
+                case "#812c2c":
+                case "rgb(129,44,44)":
+                case "#812c2f":
+                case "rgb(129,44,47)":
+                    el.classList.add("Fennimal_tertiary_color");
+                    matchedFill = true;
+                    break;
+                // Eye Color
+                case "#a7cdfe":
+                case "rgb(167,205,254)":
+                    el.classList.add("Fennimal_eye_color");
+                    matchedFill = true;
+                    break;
+            }
+
+            if (matchedFill) {
+                el.removeAttribute("fill");
+                el.style.fill = "";
+            }
+        }
+
+        // --- Handle Stroke Colors ---
+        if (stroke_color) {
+            switch (stroke_color) {
+                case "#ea6208":
+                case "rgb(234,98,8)":
+                    el.classList.add("Fennimal_primary_color_stroke");
+                    matchedStroke = true;
+                    break;
+                case "#eed671":
+                case "rgb(238,214,113)":
+                case "#efd771":
+                case "rgb(239,215,113)":
+                    el.classList.add("Fennimal_secondary_color_stroke");
+                    matchedStroke = true;
+                    break;
+                case "#812c2c":
+                case "rgb(129,44,44)":
+                case "#812c2f":
+                case "rgb(129,44,47)":
+                    el.classList.add("Fennimal_tertiary_color_stroke");
+                    matchedStroke = true;
+                    break;
+                case "#a7cdfe":
+                case "rgb(167,205,254)":
+                    el.classList.add("Fennimal_eye_color_stroke");
+                    matchedStroke = true;
+                    break;
+            }
+
+            if (matchedStroke) {
+                el.removeAttribute("stroke");
+                el.style.stroke = "";
+            }
+        }
+    });
+}
+
 function set_fill_for_all_elements_in_array(Arr, fill_color) {
     for (let i = 0; i < Arr.length; i++) {
         Arr[i].style.fill = fill_color
@@ -692,131 +748,224 @@ function set_stroke_color_for_all_elements_in_array(Arr, stroke_color) {
     }
 }
 
+// A global utility to firmly lock animated SVG parts to their pivot points
+function apply_Fennimal_animation_pivots(FennimalSVG) {
+    if (!FennimalSVG) return;
+
+    let animatedParts = FennimalSVG.querySelectorAll('.animated_part');
+    animatedParts.forEach(part => {
+        let pivot = part.querySelector('.pivot_point');
+        if (pivot) {
+            let px = parseFloat(pivot.getAttribute("cx"));
+            let py = parseFloat(pivot.getAttribute("cy"));
+
+            // Apply the absolute SVG coordinates
+            part.style.transformOrigin = `${px}px ${py}px`;
+
+            // WE DELETED THE transformBox = "fill-box" HERE!
+        }
+    });
+
+    let eyes = FennimalSVG.querySelectorAll(".eye_gaze");
+    eyes.forEach(eye => {
+        // The eyes use "center" instead of absolute coordinates,
+        // so they STILL NEED fill-box to know where their own center is.
+        eye.style.transformOrigin = "center";
+        eye.style.transformBox = "fill-box";
+    });
+}
+
 function create_Fennimal_SVG_object(FenObj, head_scale_factor, outline_only) {
-    //Create the Fennimal SVG container. There are two layers here, one for transform (top), one for scale (second)
-    let TranslationGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g')
-    let ScaleGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g')
-    TranslationGroup.appendChild(ScaleGroup)
+    let TranslationGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
+    let ScaleGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
+    TranslationGroup.appendChild(ScaleGroup);
 
-    //Creating subcontainers for head, body and hat. As above, these should have two layers of subgroups: top for translate, bottom for scale
-    let BodyGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g')
-    let BodyScaleGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g')
-    BodyGroup.appendChild(BodyScaleGroup)
-    ScaleGroup.appendChild(BodyGroup)
+    // ----------------------------------------------------
+    // 1. BODY SETUP
+    // ----------------------------------------------------
+    let BodyGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
+    let BodyScaleGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
 
-    let HeadGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g')
-    let HeadScaleGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g')
-    HeadGroup.appendChild(HeadScaleGroup)
-    ScaleGroup.appendChild(HeadGroup)
+    BodyGroup.classList.add("Fennimal_body");
+    BodyGroup.appendChild(BodyScaleGroup);
+    ScaleGroup.appendChild(BodyGroup);
 
-    let HatGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g')
-    let HatScaleGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g')
-    HatGroup.appendChild(HatScaleGroup)
-    ScaleGroup.appendChild(HatGroup)
+    let BodySVG = document.getElementById("Fennimal_body_" + FenObj.body).cloneNode(true);
+    //set_Fennimal_color_classes(BodySVG);
+    BodySVG.style.display = "inherit";
+    BodyScaleGroup.appendChild(BodySVG);
 
-    //Now we can find and copy the SVG code for the head and body
-    let BodySVG = document.getElementById("Fennimal_body_" + FenObj.body).cloneNode(true)
-    BodySVG.style.display = "inherit"
-    BodyScaleGroup.appendChild(BodySVG)
+    // ----------------------------------------------------
+    // 2. HEAD SETUP (The "Wrapper Group" Fix)
+    // ----------------------------------------------------
+    // HeadGroup: Holds the structural neck connection (immune to render loop)
+    /*let HeadGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
 
-    let HeadSVG = document.getElementById("Fennimal_head_" + FenObj.head).cloneNode(true)
-    HeadSVG.style.display = "inherit"
-    HeadScaleGroup.appendChild(HeadSVG)
+    // HeadAnimationGroup: The target for the breathing/gaze tracking render loop
+    let HeadAnimationGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
+    HeadAnimationGroup.classList.add("Fennimal_head");
 
-    //Translating the body the line up the two neck points
+    // Casts a soft, dark shadow straight down (18px) onto the collar!
+    HeadAnimationGroup.style.filter = "drop-shadow(0px 18px 4px rgba(0, 0, 0, 0.35))";
+
+    // HeadScaleGroup: Holds the scale factor
+    let HeadScaleGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
+
+    HeadGroup.appendChild(HeadAnimationGroup);
+    HeadAnimationGroup.appendChild(HeadScaleGroup);
+    ScaleGroup.appendChild(HeadGroup);
+
+    let HeadSVG = document.getElementById("Fennimal_head_" + FenObj.head).cloneNode(true);
+    HeadSVG.style.display = "inherit";
+    //set_Fennimal_color_classes(HeadSVG);
+    HeadScaleGroup.appendChild(HeadSVG);
+
+    // --- Head Math ---
     let BodyCenterPoint = {
         x: parseFloat(BodySVG.getElementsByClassName("Fennimal_body_center_point")[0].getAttribute("cx")),
         y: parseFloat(BodySVG.getElementsByClassName("Fennimal_body_center_point")[0].getAttribute("cy"))
-    }
+    };
     let BodyNeckPoint = {
         x: parseFloat(BodySVG.getElementsByClassName("Fennimal_body_neck_point")[0].getAttribute("cx")),
         y: parseFloat(BodySVG.getElementsByClassName("Fennimal_body_neck_point")[0].getAttribute("cy"))
-    }
+    };
     let HeadNeckPoint = {
         x: parseFloat(HeadSVG.getElementsByClassName("Fennimal_head_neck_point")[0].getAttribute("cx")),
         y: parseFloat(HeadSVG.getElementsByClassName("Fennimal_head_neck_point")[0].getAttribute("cy"))
-    }
+    };
 
-    //Figuring out how much we need to translate the HEAD
-    let translate_x_delta = BodyNeckPoint.x - HeadNeckPoint.x
-    let translate_y_delta = BodyNeckPoint.y - HeadNeckPoint.y
-    HeadGroup.style.transform = "translate(" + translate_x_delta + "px, " + translate_y_delta + "px)"
+    // Apply structural position strictly to HeadGroup so the animation loop doesn't delete it!
+    let translate_x_delta = BodyNeckPoint.x - HeadNeckPoint.x;
+    let translate_y_delta = BodyNeckPoint.y - HeadNeckPoint.y;
+    HeadGroup.style.transform = `translate(${translate_x_delta}px, ${translate_y_delta}px)`;
 
-    //Scaling the head
-    HeadScaleGroup.style.transformOrigin = HeadNeckPoint.x + "px " + HeadNeckPoint.y + "px"
-    HeadScaleGroup.style.transform = "scale(" + head_scale_factor + ")"
+    // Make sure the Animation loop rotates the head pivoting exactly at the neck joint!
+    HeadAnimationGroup.style.transformOrigin = `${HeadNeckPoint.x}px ${HeadNeckPoint.y}px`;
 
-    //Adding the hat on top of the head
-    let HatSVG
-    if(typeof FenObj.hat !== "undefined") {
-        //Some Fennimal heads to NOT allow a head. If so, print a warning.
+    HeadScaleGroup.style.transformOrigin = `${HeadNeckPoint.x}px ${HeadNeckPoint.y}px`;
+    HeadScaleGroup.style.transform = `scale(${head_scale_factor})`;
 
-        if(HeadSVG.getElementsByClassName("Fennimal_head_hat_point").length > 0) {
-            let HatSVG = document.getElementById("hat_" + FenObj.hat).cloneNode(true)
-            HatSVG.style.display = "inherit"
-            HatScaleGroup.appendChild(HatSVG)
+     */
 
-            //Positioning the hat
+    // ----------------------------------------------------
+    // 2. HEAD SETUP (The "Wrapper Group" Fix)
+    // ----------------------------------------------------
+    let HeadGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
+
+    // 1. JS CONTROLS THIS: The target for the breathing/gaze tracking render loop
+    let HeadAnimationGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
+    HeadAnimationGroup.classList.add("Fennimal_head"); // Keeps your hover effects working!
+
+    // 2. CSS CONTROLS THIS: The target for the Curious Tilt and Drop Shadow
+    let HeadTiltGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
+    HeadTiltGroup.classList.add("Fennimal_head_tilt");
+    HeadTiltGroup.style.filter = "drop-shadow(0px 10px 4px rgba(0, 0, 0, 0.45))";
+
+    // 3. SCALE CONTROLS THIS: Holds the scale factor
+    let HeadScaleGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
+
+    // The New Assembly Order
+    HeadGroup.appendChild(HeadAnimationGroup);
+    HeadAnimationGroup.appendChild(HeadTiltGroup); // Tucked inside!
+    HeadTiltGroup.appendChild(HeadScaleGroup);
+    ScaleGroup.appendChild(HeadGroup);
+
+    let HeadSVG = document.getElementById("Fennimal_head_" + FenObj.head).cloneNode(true);
+    HeadSVG.style.display = "inherit";
+    set_Fennimal_color_classes(HeadSVG); // Your dynamic color fix
+    HeadScaleGroup.appendChild(HeadSVG);
+
+    // --- Head Math ---
+    let BodyCenterPoint = {
+        x: parseFloat(BodySVG.getElementsByClassName("Fennimal_body_center_point")[0].getAttribute("cx")),
+        y: parseFloat(BodySVG.getElementsByClassName("Fennimal_body_center_point")[0].getAttribute("cy"))
+    };
+    let BodyNeckPoint = {
+        x: parseFloat(BodySVG.getElementsByClassName("Fennimal_body_neck_point")[0].getAttribute("cx")),
+        y: parseFloat(BodySVG.getElementsByClassName("Fennimal_body_neck_point")[0].getAttribute("cy"))
+    };
+    let HeadNeckPoint = {
+        x: parseFloat(HeadSVG.getElementsByClassName("Fennimal_head_neck_point")[0].getAttribute("cx")),
+        y: parseFloat(HeadSVG.getElementsByClassName("Fennimal_head_neck_point")[0].getAttribute("cy"))
+    };
+
+    let translate_x_delta = BodyNeckPoint.x - HeadNeckPoint.x;
+    let translate_y_delta = BodyNeckPoint.y - HeadNeckPoint.y;
+    HeadGroup.style.transform = `translate(${translate_x_delta}px, ${translate_y_delta}px)`;
+
+    // Apply the exact same pivot point to BOTH the JS group and the new CSS group!
+    HeadAnimationGroup.style.transformOrigin = `${HeadNeckPoint.x}px ${HeadNeckPoint.y}px`;
+    HeadTiltGroup.style.transformOrigin = `${HeadNeckPoint.x}px ${HeadNeckPoint.y}px`;
+
+    HeadScaleGroup.style.transformOrigin = `${HeadNeckPoint.x}px ${HeadNeckPoint.y}px`;
+    HeadScaleGroup.style.transform = `scale(${head_scale_factor})`;
+
+    // ----------------------------------------------------
+    // 3. HAT SETUP
+    // ----------------------------------------------------
+    if (typeof FenObj.hat !== "undefined") {
+        if (HeadSVG.getElementsByClassName("Fennimal_head_hat_point").length > 0) {
+            let HatGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
+            let HatScaleGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
+
+            HatGroup.classList.add("hat");
+            HatGroup.appendChild(HatScaleGroup);
+            HeadScaleGroup.appendChild(HatGroup);
+
+            let HatSVG = document.getElementById("hat_" + FenObj.hat).cloneNode(true);
+            HatSVG.style.display = "inherit";
+            HatScaleGroup.appendChild(HatSVG);
+
             let HeadHatPoint = {
                 x: parseFloat(HeadSVG.getElementsByClassName("Fennimal_head_hat_point")[0].getAttribute("cx")),
                 y: parseFloat(HeadSVG.getElementsByClassName("Fennimal_head_hat_point")[0].getAttribute("cy"))
-            }
+            };
             let HatConnectionPoint = {
                 x: parseFloat(HatSVG.getElementsByClassName("hat_attachment_point")[0].getAttribute("cx")),
                 y: parseFloat(HatSVG.getElementsByClassName("hat_attachment_point")[0].getAttribute("cy"))
-            }
+            };
 
-            let hat_translate_x_delta = (HeadHatPoint.x - HatConnectionPoint.x) + translate_x_delta
-            let hat_translate_y_delta = (HeadHatPoint.y - HatConnectionPoint.y) + 0.5*translate_y_delta
+            let hat_translate_x_delta = HeadHatPoint.x - HatConnectionPoint.x;
+            let hat_translate_y_delta = HeadHatPoint.y - HatConnectionPoint.y;
+            HatGroup.style.transform = `translate(${hat_translate_x_delta}px, ${hat_translate_y_delta}px)`;
 
-            HatGroup.style.transform = "translate(" + hat_translate_x_delta + "px, " + hat_translate_y_delta + "px)"
+            HatScaleGroup.style.transformOrigin = `${HatConnectionPoint.x}px ${HatConnectionPoint.y}px`;
 
-            //Setting scale for the hat
-            HatScaleGroup.style.transformOrigin = HatConnectionPoint.x + "px " + HatConnectionPoint.y + "px"
-            HatScaleGroup.style.transform = "scale(2)"
-        }else{
-            console.warn("Attempting to place a hat on an invalid Fennimal. Check stimulus setup")
+            // THE HAT SCALE FIX: Because it inherits the head's scale, we divide the original target
+            // scale (2) by the head's scale to guarantee it stays the exact size you intended!
+            HatScaleGroup.style.transform = `scale(${2 / head_scale_factor})`;
+        } else {
+            console.warn("Attempting to place a hat on an invalid Fennimal.");
         }
-
-
     }
 
-
-
-
-    //Adding colors
+    // ----------------------------------------------------
+    // 4. COLORING & FINISHING
+    // ----------------------------------------------------
     if (outline_only) {
-        TranslationGroup.style.fill = "black"
-        set_fill_for_all_elements_in_array(TranslationGroup.querySelectorAll("*"), "black")
-        set_stroke_color_for_all_elements_in_array(TranslationGroup.querySelectorAll("*"), "black")
+        TranslationGroup.style.fill = "black";
+        set_fill_for_all_elements_in_array(TranslationGroup.querySelectorAll("*"), "black");
+        set_stroke_color_for_all_elements_in_array(TranslationGroup.querySelectorAll("*"), "black");
     } else {
-        set_fill_for_all_elements_in_array(HeadGroup.getElementsByClassName("Fennimal_primary_color"), FenObj.ColorScheme.Head.primary_color)
+        // [Your existing color assignment logic...]
+        set_fill_for_all_elements_in_array(HeadGroup.getElementsByClassName("Fennimal_primary_color"), FenObj.ColorScheme.Head.primary_color);
         set_fill_for_all_elements_in_array(HeadGroup.getElementsByClassName("Fennimal_secondary_color"), FenObj.ColorScheme.Head.secondary_color)
         set_fill_for_all_elements_in_array(HeadGroup.getElementsByClassName("Fennimal_tertiary_color"), FenObj.ColorScheme.Head.tertiary_color)
+
+        set_fill_for_all_elements_in_array(BodyGroup.getElementsByClassName("Fennimal_primary_color"), FenObj.ColorScheme.Head.primary_color);
+        set_fill_for_all_elements_in_array(BodyGroup.getElementsByClassName("Fennimal_secondary_color"), FenObj.ColorScheme.Head.secondary_color)
+        set_fill_for_all_elements_in_array(BodyGroup.getElementsByClassName("Fennimal_tertiary_color"), FenObj.ColorScheme.Head.tertiary_color)
+
         set_fill_for_all_elements_in_array(HeadGroup.getElementsByClassName("Fennimal_eye_color"), FenObj.ColorScheme.Head.eye_color)
-
-        set_stroke_color_for_all_elements_in_array(HeadGroup.getElementsByClassName("Fennimal_primary_color_stroke"), FenObj.ColorScheme.Head.primary_color)
-        set_stroke_color_for_all_elements_in_array(HeadGroup.getElementsByClassName("Fennimal_secondary_color_stroke"), FenObj.ColorScheme.Head.secondary_color)
-        set_stroke_color_for_all_elements_in_array(HeadGroup.getElementsByClassName("Fennimal_tertiary_color_stroke"), FenObj.ColorScheme.Head.tertiary_color)
-
-        set_fill_for_all_elements_in_array(BodyGroup.getElementsByClassName("Fennimal_primary_color"), FenObj.ColorScheme.Body.primary_color)
-        set_fill_for_all_elements_in_array(BodyGroup.getElementsByClassName("Fennimal_secondary_color"), FenObj.ColorScheme.Body.secondary_color)
-        set_fill_for_all_elements_in_array(BodyGroup.getElementsByClassName("Fennimal_tertiary_color"), FenObj.ColorScheme.Body.tertiary_color)
-
     }
 
+    ScaleGroup.style.transformOrigin = `${BodyCenterPoint.x}px ${BodyCenterPoint.y}px`;
+    ScaleGroup.classList.add("Fennimal_scale_group");
+    TranslationGroup.classList.add("Fennimal_translation_group");
 
-    //Adding global scale. This will be based on the center of the Fennimal body.
-    ScaleGroup.style.transformOrigin = BodyCenterPoint.x + "px " + BodyCenterPoint.y + "px"
-    //ScaleGroup.style.transform = "scale(" + scale_factor + ")"
+    apply_Fennimal_animation_pivots(TranslationGroup);
 
-    //Labelling some key groups for easy access
-    ScaleGroup.classList.add("Fennimal_scale_group")
-    TranslationGroup.classList.add("Fennimal_translation_group")
-
-
-    //Returning
-    return (TranslationGroup)
+    return TranslationGroup;
 }
 
 function create_Fennimal_SVG_object_head_only(FenObj, outline_only) {
@@ -849,6 +998,8 @@ function create_Fennimal_SVG_object_head_only(FenObj, outline_only) {
     //Labelling some key groups for easy access
     ScaleGroup.classList.add("Fennimal_scale_group")
     TranslationGroup.classList.add("Fennimal_translation_group")
+
+    apply_Fennimal_animation_pivots(TranslationGroup);
 
     //Returning
     return (TranslationGroup)
@@ -1005,8 +1156,6 @@ function set_toy_color_scheme(ToySVG, toy_type, use_alternate_color){
     }
 }
 
-
-
 //Randomization functions
 function pseudo_randomize_order_of_ids_no_back_to_back(Arr_ids, num_samples){
     //The first element can be any ordering
@@ -1048,3 +1197,263 @@ function get_object_from_array_based_on_value(key,value, Arr, copy, remove_from_
 function wait(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+MakeObjectDraggableObject = function(ElemParentLayer,MaskLayer, DraggableElem, Target, required_minimum_distance, returnfunc){
+    let Mask, dragging_is_enabled = false, currentlydragging = false
+    let maximum_allowed_distance_to_target = required_minimum_distance
+    let OriginalParent = DraggableElem.parentNode
+
+    // NEW: Track the last known valid positions
+    let current_delta_x = 0;
+    let current_delta_y = 0;
+
+    let DragGroup = create_SVG_group(0,0)
+    DragGroup.appendChild(DraggableElem)
+    ElemParentLayer.appendChild(DragGroup)
+
+    if(typeof DraggableElem.id === "undefined" ){
+        DraggableElem.id = "DragControllerTargetID1112"
+    }
+    let Outline = create_SVG_outline_of_group_ID(DraggableElem)
+
+    //Stripping existing strokes from the outline
+    Outline.removeAttribute("stroke");
+    let allClonedChildren = Outline.querySelectorAll('*');
+    allClonedChildren.forEach(child => child.removeAttribute("stroke"));
+
+    DraggableElem.parentNode.insertBefore(Outline, DraggableElem);
+
+    let OriginalPos = getSVGInternalCenter(DraggableElem)
+
+    //For the object, create an event that triggers dragging mode
+    function enable_object_draggable(){
+        DraggableElem.style.cursor = "pointer"
+        Outline.classList.add("focus_on_SVG_outline")
+        DraggableElem.onpointerdown = start_dragging
+        dragging_is_enabled = true
+    }
+    function disable_object_draggable(){
+        DraggableElem.style.cursor = "auto"
+        Outline.classList.remove("focus_on_SVG_outline")
+        dragging_is_enabled = false
+    }
+
+    function is_colliding_with_unpassable() {
+        // 1. Define your "core" leeway radius (Adjust X here)
+        const core_radius = 30; // The radius in pixels that cannot cross the boundary
+
+        // 2. Calculate the exact center of the dragged element's bounding box
+        let dragRect = DraggableElem.getBoundingClientRect();
+        let center_x = dragRect.left + (dragRect.width / 2);
+        let center_y = dragRect.top + (dragRect.height / 2);
+
+        let barriers = document.querySelectorAll('.drag_boundary');
+
+        for (let i = 0; i < barriers.length; i++) {
+            let barrierRect = barriers[i].getBoundingClientRect();
+
+            // 3. Find the closest point on the barrier's rectangle to the toy's center
+            let closest_x = Math.max(barrierRect.left, Math.min(center_x, barrierRect.right));
+            let closest_y = Math.max(barrierRect.top, Math.min(center_y, barrierRect.bottom));
+
+            // 4. Calculate the distance between the toy's center and that closest point
+            let distance_x = center_x - closest_x;
+            let distance_y = center_y - closest_y;
+
+            // We use squared distance (a^2 + b^2 = c^2) to save the CPU from doing heavy square root math!
+            let distance_squared = (distance_x * distance_x) + (distance_y * distance_y);
+
+            // 5. If the distance is smaller than the radius, the core has hit the wall
+            if (distance_squared < (core_radius * core_radius)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function start_dragging(){
+        if(dragging_is_enabled){
+
+            currentlydragging = true
+            Outline.classList.remove("focus_on_SVG_outline")
+            Mask = create_SVG_rect(0,0,GenParam.SVG_width,GenParam.SVG_height)
+            Mask.style.opacity = 0
+            MaskLayer.appendChild(Mask)
+            Mask.onpointermove = function(event){ pointer_moved(event)}
+            Mask.onpointerup = function(event){ release_dragging(event)}
+            Mask.onpointerdown = function(event){ release_dragging(event)}
+
+            Mask.onpointercancel = function(event){ drag_cancelled()}
+            Mask.onpointerleave = function(event){ drag_cancelled()}
+
+        }
+    }
+
+    function pointer_moved(event){
+        move_elem_to_location(getMousePosition(event))
+    }
+
+    function drag_cancelled(){
+        AudioCont.play_sound_effect("rejected")
+        current_delta_x = 0;
+        current_delta_y = 0;
+        //Return the element to its original position. While doing so, no new drags are allowed
+        Mask.remove()
+        disable_object_draggable()
+        DragGroup.style.transition = "all 300ms ease-in-out"
+        DragGroup.style.transform = ""
+        setTimeout(function(){
+            DragGroup.style.transition = ""
+            enable_object_draggable()
+        },350)
+
+    }
+
+    function release_dragging(event){
+        let dist_to_target = EUDistPoints(getMousePosition(event), getSVGInternalCenter(Target));
+
+        if(dist_to_target < maximum_allowed_distance_to_target){
+            // 1. Clean up the mask
+            if (Mask) Mask.remove();
+
+            // 2. Move the toy back to its original home in the DOM
+            OriginalParent.appendChild(DraggableElem);
+
+            // 3. Apply the total distance dragged directly to the toy itself
+            DraggableElem.style.transform += "translate(" + current_delta_x + "px ," + current_delta_y + "px)";
+
+            // 4. Clean up the temporary drag group
+            DragGroup.remove();
+
+            // 5. Reset states
+            disable_object_draggable();
+            current_delta_x = 0;
+            current_delta_y = 0;
+
+            // 6. Execute the callback
+            returnfunc();
+
+        } else {
+            // Failed to reach target
+            drag_cancelled();
+        }
+    }
+
+    function move_elem_to_location(NewPos){
+        let intended_delta_x = NewPos.x - OriginalPos.x;
+        let intended_delta_y = NewPos.y - OriginalPos.y;
+
+        // 1. Try moving ONLY on the X axis
+        DragGroup.style.transform = "translate(" + intended_delta_x + "px ," + current_delta_y + "px)";
+        if (is_colliding_with_unpassable()) {
+            // Hitting a wall on X! Revert intended X to our last safe X.
+            intended_delta_x = current_delta_x;
+        } else {
+            // Safe to move on X. Update our safe state.
+            current_delta_x = intended_delta_x;
+        }
+
+        // 2. Try moving ONLY on the Y axis (using the updated X)
+        DragGroup.style.transform = "translate(" + current_delta_x + "px ," + intended_delta_y + "px)";
+        if (is_colliding_with_unpassable()) {
+            // Hitting a wall on Y! Revert intended Y to our last safe Y.
+            intended_delta_y = current_delta_y;
+        } else {
+            // Safe to move on Y. Update our safe state.
+            current_delta_y = intended_delta_y;
+        }
+
+        // 3. Apply the final, validated transform
+        DragGroup.style.transform = "translate(" + current_delta_x + "px ," + current_delta_y + "px)";
+    }
+
+    //When dragging, create a mask to catch all pointer events
+
+
+    //The exact interaction depends on the type of draging objective.
+    // Drag_to_Fennimal: assumes that the Target is the Fennimal SVG object. If released sufficiently close, then triggers a success.
+    // Clean_Fennimal: assumes that the Target is a list of elements of class "dirt". Each element is deleted when sufficiently close. Triggers a success if all dirt has been removed.
+    // Movable object: Can be released anywhere on the screen
+
+    //On creation
+    enable_object_draggable()
+
+
+}
+
+function create_SVG_outline_of_group_ID(Group){
+    // 2. Create the <use> element (must use the SVG namespace!)
+    // 1. Physically clone the group and all its children
+    const outlineGroup = Group.cloneNode(true);
+
+    // 2. Change the ID so you don't have duplicates in the DOM
+    outlineGroup.id = Group.id + '-outline';
+
+    // 3. Find EVERY element inside the clone and strip its original styling
+    const allChildren = outlineGroup.querySelectorAll('*');
+    allChildren.forEach(child => {
+        // Strip the hardcoded colors
+        child.removeAttribute('stroke');
+        child.style.stroke = '';
+
+        // NEW: Strip the hardcoded thicknesses so they can inherit!
+        child.removeAttribute('stroke-width');
+        child.style.strokeWidth = '';
+    });
+
+// 4. (Optional but recommended) Remove the inline JS attributes completely
+// and let your CSS class handle everything.
+
+    outlineGroup.setAttribute('stroke-linejoin', 'round'); // Keep this, it makes thick corners look nice
+    outlineGroup.setAttribute('class', 'dynamic-outline');
+
+    return(outlineGroup)
+}
+
+// Using the rest parameter (...groups) allows you to pass in as many groups as you want
+// Example usage: create_SVG_outline_of_multiple_groups(group1, group2, group3)
+function create_SVG_outline_of_multiple_groups(...groups) {
+
+    // 1. Create a master wrapper group using the proper SVG namespace
+    const combinedOutlineWrapper = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+    // 2. Set the styling attributes on the master wrapper
+    combinedOutlineWrapper.setAttribute('class', 'dynamic-outline');
+    combinedOutlineWrapper.setAttribute('stroke-linejoin', 'round');
+
+    // Optional: Give the master wrapper a unique ID
+    combinedOutlineWrapper.id = 'combined-outline-' + Date.now();
+
+    // 3. Loop through every group passed into the function
+    groups.forEach((group, index) => {
+        // Clone the group and all its children
+        const clonedGroup = group.cloneNode(true);
+
+        // Update the ID to prevent duplicates in the DOM
+        clonedGroup.id = (group.id || 'unnamed-group') + '-outline-part-' + index;
+
+        // Find EVERY element inside the clone and strip its original styling
+        const allChildren = clonedGroup.querySelectorAll('*');
+        allChildren.forEach(child => {
+            // Strip the hardcoded colors
+            child.removeAttribute('stroke');
+            child.style.stroke = '';
+
+            // Strip the hardcoded thicknesses
+            child.removeAttribute('stroke-width');
+            child.style.strokeWidth = '';
+
+            // Depending on your CSS, you may also want to strip fills here
+            // so the inner shapes don't obscure each other.
+            // child.removeAttribute('fill');
+            // child.style.fill = '';
+        });
+
+        // 4. Append the cleaned clone into our master wrapper
+        combinedOutlineWrapper.appendChild(clonedGroup);
+    });
+
+    // Return the single master wrapper containing all the cloned outlines
+    return combinedOutlineWrapper;
+}
+

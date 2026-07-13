@@ -41,6 +41,10 @@ SVGREDUCER = function (Stimuli) {
             LeaveItem.classList.remove("map_region_leave")
             LeaveItem.classList.add("map_block")
 
+            let iconGroup = document.getElementById("Map_locations_" + region);
+            if (iconGroup) iconGroup.remove();
+
+
         }
     }
 

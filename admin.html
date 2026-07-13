@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Experiment Data Exporter</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 40px; background: #f4f4f9; }
+        .container { max-width: 500px; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        input, button { padding: 10px; margin-top: 10px; width: 100%; box-sizing: border-box; font-size: 16px;}
+        button { background: #007AFF; color: white; border: none; cursor: pointer; border-radius: 5px; font-weight: bold;}
+        button:hover { background: #005bb5; }
+        #status { margin-top: 15px; font-weight: bold; color: #333; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Firebase CSV Exporter</h2>
+    <p>Type the name of the Collection (Experiment Code) you want to download:</p>
+
+    <input type="text" id="collectionName" value="mentalizing" placeholder="Enter collection name (e.g., mentalizing)">
+
+    <button id="downloadBtn">Download Data as CSV</button>
+    <div id="status"></div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+    // 1. PASTE YOUR EXACT FIREBASE CONFIG HERE
+    const firebaseConfig = {
+        apiKey: "AIzaSyBLYsCJDNs9JO3bNi3RSCBZFHegtH1OI_I",
+        authDomain: "fennimals.firebaseapp.com",
+        projectId: "fennimals",
+        storageBucket: "fennimals.firebasestorage.app",
+        messagingSenderId: "416848310750",
+        appId: "1:416848310750:web:1fd80297bf7b6389472d4f"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    document.getElementById("downloadBtn").addEventListener("click", async () => {
+        const colName = document.getElementById("collectionName").value.trim();
+        const statusEl = document.getElementById("status");
+
+        if (!colName) return alert("Please enter a collection name.");
+
+        statusEl.innerText = "Fetching data from Firebase... Please wait.";
+        statusEl.style.color = "blue";
+
+        try {
+            const querySnapshot = await getDocs(collection(db, colName));
+
+            if (querySnapshot.empty) {
+                statusEl.innerText = `No data found in collection: '${colName}'`;
+                statusEl.style.color = "red";
+                return;
+            }
+
+            // 2. Collect the raw JSON objects
+            let allParticipants = [];
+            querySnapshot.forEach((doc) => {
+                let rawData = doc.data();
+                rawData["Document_ID"] = doc.id; // Inject the Prolific ID into the object
+                allParticipants.push(rawData);
+            });
+
+            // 3. Convert directly to a JSON string
+            const jsonString = JSON.stringify(allParticipants, null, 2);
+
+            // 4. Create a downloadable .json file
+            const blob = new Blob([jsonString], { type: "application/json" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `${colName}_data.json`;
+            link.style.display = "none";
+
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            statusEl.innerText = `Success! Downloaded ${allParticipants.length} participants as JSON.`;
+            statusEl.style.color = "green";
+
+        } catch (error) {
+            console.error(error);
+            statusEl.innerText = "Error: " + error.message;
+            statusEl.style.color = "red";
+        }
+    });
+</script>
+</body>
+</html>

@@ -12,7 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=PT+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
 
-    <link rel="stylesheet" href="cardsortingtaskcss.css">
+
     <link rel="stylesheet" href="maincss.css">
 
 </head>
@@ -24,22 +24,43 @@
         </svg>
     </div>
 
-    <div id="formcontainer" style="display: none">
-        <form action="https://usebasin.com/f/f3b73e7bc281" method="POST">
-            <textarea name="data" id='data_form_field' label="data"></textarea>
-            <input id="submitbutton" type="submit" value="Submit">
-
-        </form>
-
-    </div>
-
 </div>
 
 </body>
+<script type="module">
+    // 1. Import the Firebase tools directly from Google's servers
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+    // 2. PASTE YOUR CONFIG OBJECT HERE (From the Firebase Console)
+    const firebaseConfig = {
+        apiKey: "AIzaSyBLYsCJDNs9JO3bNi3RSCBZFHegtH1OI_I",
+        authDomain: "fennimals.firebaseapp.com",
+        projectId: "fennimals",
+        storageBucket: "fennimals.firebasestorage.app",
+        messagingSenderId: "416848310750",
+        appId: "1:416848310750:web:1fd80297bf7b6389472d4f"
+    };
+
+    // 3. Initialize Firebase and create a global save function!
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // We attach this to the 'window' so your Top_controller.js can easily call it
+    window.saveToFirebase = async function(experiment_name, prolific_id, experiment_data) {
+        try {
+            // It creates a unique folder for the experiment, and puts the participant inside it!
+            const docRef = doc(db, experiment_name, prolific_id);
+            await setDoc(docRef, experiment_data, { merge: true });
+        } catch (e) {
+            console.error("Error saving to Firebase: ", e);
+        }
+    };
+</script>
+
 <script type="text/javascript" src="1_General_functions.js"></script>
-<script type="text/javascript" src="3_FennimalController.js"></script>
+<script type="text/javascript" src="3_InteractiveFennimalController.js"></script>
 <script type="text/javascript" src="1_Worldstate.js"></script>
-<script type="text/javascript" src="0_SVG_cardsortingtask.js"></script>
 <script type="text/javascript" src="0_Loader.js"></script>
 <script type="text/javascript" src="1_General_Parameters.js"></script>
 <script type="text/javascript" src="2_Stimulus_data.js"></script>
@@ -47,7 +68,6 @@
 <script type="text/javascript" src="3_Map_controller.js"></script>
 <script type="text/javascript" src="4_SortingTasks.js"></script>
 <script type="text/javascript" src="1_SVGReducer.js"></script>
-<script type="text/javascript" src="4_CardSortingTask.js"></script>
 <script type="text/javascript" src="AudioController.js"></script>
 <script type="text/javascript" src="4_AttentionCheckController.js"></script>
 <script type="text/javascript" src="3_Interface.js"></script>

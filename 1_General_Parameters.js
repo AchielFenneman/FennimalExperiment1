@@ -349,10 +349,10 @@ GENERALPARAM = function () {
                 dark_color: "#006680"
             },
         },
-        ball: {
+        jack: {
             ColorScheme: {
-                light_color: "#c87137",
-                dark_color: "#808080"
+                light_color: "#ed4845",
+                dark_color: "#c87137"
             },
             AlternateColorScheme: {
                 light_color: "#0000ff",
@@ -369,7 +369,7 @@ GENERALPARAM = function () {
                 dark_color: "#d400aa"
             }
         },
-        shovel: {
+        bubblewand: {
             ColorScheme: {
                 light_color: "#b5bbe3",
                 dark_color: "#7581d0"
@@ -379,7 +379,7 @@ GENERALPARAM = function () {
                 dark_color: "#554400"
             }
         },
-        boomerang: {
+        globe: {
             ColorScheme: {
                 light_color: "#e99598",
                 dark_color: "#602ead"
@@ -427,6 +427,17 @@ GENERALPARAM = function () {
             AlternateColorScheme: {
                 light_color: "#d4aa00",
                 dark_color: "#00aad4"
+            }
+        },
+        robot: {
+            ColorScheme: {
+                light_color: "#eeda22",
+                dark_color: "#bd5555"
+
+            },
+            AlternateColorScheme: {
+                light_color: "#d7a4d4",
+                dark_color: "#a03da5"
             }
         },
     }
