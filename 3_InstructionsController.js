@@ -1521,12 +1521,12 @@ class InstructionsController {
         document.getElementById("Instructions_Title").innerHTML = "Do <u>NOT</u> close this page yet...";
 
         // FIX: Changed this.expPaymentData.completion_code to this.expPaymentData.completionCode
-        let text = "Do NOT close or refresh this window before submitting your code to Prolific. <br>" +
-            " Your completion code is: <tspan style='user-select:all'><b> " + this.expPaymentData.completionCode + " </b></tspan>. <br>" +
+        let text = "Do NOT close or refresh this window yet! <br>" +
+            " As a safety backup, your completion code is: <tspan style='user-select:all'><b> " + this.expPaymentData.completionCode + " </b></tspan>. <br>" +
             "<br> " +
-            "Please go to Prolific now to submit this code. After you have submitted this code to Prolific, then press the button below <br>" +
+            "Pressing the button below should automatically submit your code to Prolific. However, please copy this code first. <br>" +
             "<br>" +
-            "<u>Do not close or refresh this window before clicking the button! </u> We can only approve your work if you submitted the code to Prolific and have clicked the button below! <br>" +
+            "<u>Do not close or refresh this window before clicking the button! </u> We can only approve your work if you submitted the code to Prolific by clicking the button below! <br>" +
             "<br>" +
             "Thank you for participating! :)";
 
