@@ -55,6 +55,15 @@ let StimulusSettings = function () {
     let All_Experiment_Structures = {
         test: [
             {
+                type: "jump_to_trial",
+                interaction_type: "basic_intro",
+                Fennimals_encountered: ["A1", "A2"],
+                partner_behavior: "absent",
+                hint_type: ["icon"],
+                include_Fennefinder: true
+            },
+
+            {
                 type: "Fennimal_attribute_sorting_task",
                 Fennimals_encountered: ["A1", "A2"],
                 attribute_order: ["location", "head", "toy", "toybox"],
@@ -170,20 +179,14 @@ let StimulusSettings = function () {
 
             {
                 type: "on_call",
-                interaction_type: ["dirty_and_broken_toy"],
+                interaction_type: ["dirty_toy", "broken_toy"],
                 Fennimals_encountered: ["S1" , "S2", "S3"],
                 partner_behavior: "active",
                 include_Fennefinder: true,
                 included_orthogonal_tasks: ["find_box_extended", "reach_hat", "fly_swat_extended"],
                 orthogonal_tasks_possible_after_trial: 3
             },
-            {
-                type: "Fennimal_attribute_sorting_task",
-                Fennimals_encountered: ["S1", "S2", "S3"],
-                attribute_order: ["location", "head", "toy", "toybox"],
-                maximum_earnable_stars: 5
 
-            },
 
 
             {
@@ -207,20 +210,14 @@ let StimulusSettings = function () {
             },
             {
                 type: "on_call",
-                interaction_type: ["dirty_and_broken_toy"],
+                interaction_type: ["dirty_toy", "broken_toy"],
                 Fennimals_encountered: ["P1" , "P2", "P3"],
                 partner_behavior: "absent",
                 include_Fennefinder: true,
                 included_orthogonal_tasks: ["find_box_extended", "reach_hat", "fly_swat_extended"],
                 orthogonal_tasks_possible_after_trial: 3
             },
-            {
-                type: "Fennimal_attribute_sorting_task",
-                Fennimals_encountered: ["P1", "P2", "P3"],
-                attribute_order: ["location", "head", "toy", "toybox"],
-                maximum_earnable_stars: 5
 
-            },
             {
                 type: "pseudoday",
                 information: "partner_returns"

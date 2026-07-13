@@ -1324,22 +1324,32 @@ class BaseToyModule {
             }
 
             // --- Hitbox Fix 2.0 (UPDATED) ---
-            // 1. Bruteforce turn off hitboxes for all physical pieces
             let all_pieces = Array.from(this.ToyElement.querySelectorAll(".toy_part, .toy_frame, .tube_backside"));
             all_pieces.forEach(piece => {
                 piece.style.pointerEvents = "none";
             });
 
-            // 2. Override the parent's pointer-events, and FORCE the ghost masks to catch clicks!
             if (bottle_cap) bottle_cap.style.pointerEvents = "all";
 
             if (wand_assembly) {
                 wand_assembly.style.pointerEvents = "all";
-                // This targets the invisible shapes you drew inside the group
                 let wand_children = Array.from(wand_assembly.children);
                 wand_children.forEach(child => {
                     child.style.pointerEvents = "all";
                 });
+
+                // NEW: Inject a massive invisible hitbox so the thin stick is always grabbable!
+                let wBox = wand_assembly.getBBox();
+                if (wBox.width > 0 && wBox.height > 0) {
+                    let hitRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    hitRect.setAttribute('x', wBox.x - 30);
+                    hitRect.setAttribute('y', wBox.y - 30);
+                    hitRect.setAttribute('width', wBox.width + 60);
+                    hitRect.setAttribute('height', wBox.height + 60);
+                    hitRect.setAttribute('fill', 'transparent'); // Invisible but clickable!
+                    hitRect.setAttribute('stroke', 'none');
+                    wand_assembly.appendChild(hitRect);
+                }
             }
             // ---------------------------
 
@@ -1358,18 +1368,17 @@ class BaseToyModule {
                 wand_assembly.style.transformOrigin = "center";
             }
 
-            // 2. The Waypoint Curve (Adjust these X/Y values to match your specific SVG spacing)
+            // 2. The Waypoint Curve
             const get_waypoint_transform = (p) => {
                 const wp = [
                     { p: 0,   x: 0,   y: 0,    rot: 0 },    // Resting
-                    { p: 30,  x: -20,  y: -50, rot: 45 },   // Lifted up
-                    { p: 70,  x: 32, y: -50, rot: 180 },  // Hovering flipped over the bottle
-                    { p: 100, x: 32, y: -20,   rot: 180 }   // Dipped inside
+                    { p: 30,  x: -20, y: -50,  rot: 45 },   // Lifted up
+                    { p: 70,  x: 32,  y: -50,  rot: 180 },  // Hovering flipped over the bottle
+                    { p: 100, x: 32,  y: -20,  rot: 180 }   // Dipped inside
                 ];
 
                 p = Math.max(0, Math.min(100, p)); // Clamp 0-100
 
-                // Find which two waypoints we are currently between
                 let start = wp[0], end = wp[wp.length - 1];
                 for (let i = 0; i < wp.length - 1; i++) {
                     if (p >= wp[i].p && p <= wp[i + 1].p) {
@@ -1377,7 +1386,6 @@ class BaseToyModule {
                     }
                 }
 
-                // Lerp (Smoothly blend) the values
                 let t = (end.p === start.p) ? 0 : (p - start.p) / (end.p - start.p);
                 let x = start.x + (end.x - start.x) * t;
                 let y = start.y + (end.y - start.y) * t;
@@ -1389,12 +1397,12 @@ class BaseToyModule {
             // 3. Step One: Click the Cap
             bottle_cap.style.cursor = "pointer";
             bottle_cap.onpointerdown = () => {
-                AudioCont.play_sound_effect("plastic_cap_open"); // Or a pop sound!
+                AudioCont.play_sound_effect("plastic_cap_open");
                 bottle_cap.onpointerdown = null;
+                bottle_cap.style.pointerEvents = "none";
                 bottle_cap.style.transition = "opacity 200ms ease-out";
                 bottle_cap.style.opacity = 0;
 
-                // Fade in the back wall of the jar instantly!
                 if (tube_backside) {
                     tube_backside.style.transition = "opacity 200ms ease-in";
                     tube_backside.style.opacity = 1;
@@ -1409,7 +1417,7 @@ class BaseToyModule {
                 let scrub_at_drag_start = 0;
 
                 let dip_count = 0;
-                let can_dip = true; // Prevents spamming the bottom
+                let can_dip = true;
 
                 wand_assembly.onpointerdown = (e) => {
                     wand_assembly.setPointerCapture(e.pointerId);
@@ -1424,11 +1432,19 @@ class BaseToyModule {
                         let deltaX = ev.clientX - drag_start_x;
                         let deltaY = ev.clientY - drag_start_y;
 
-                        // Dragging RIGHT (+X) or Dragging UP (-Y) pushes the progress forward!
-                        // This perfectly matches a natural, diagonal lifting motion.
-                        let drag_distance = deltaX - deltaY;
+                        // NEW: Contextual Drag Mapping!
+                        // Dragging Right (+X) always drives progress forward.
+                        let drag_distance = deltaX * 0.8;
 
-                        // Sensitivity (You can tweak the 0.3 if it feels too fast or slow)
+                        if (scrub_at_drag_start > 50) {
+                            // Phase 2 (Over the soap): Dragging DOWN (+Y) dips it in.
+                            drag_distance += deltaY * 1.2;
+                        } else {
+                            // Phase 1 (In the bottle): Dragging UP (-Y) pulls it out.
+                            drag_distance -= deltaY * 1.2;
+                        }
+
+                        // Apply the new, highly intuitive mapping
                         scrub_value = scrub_at_drag_start + (drag_distance * 0.5);
                         scrub_value = Math.max(0, Math.min(100, scrub_value));
 
@@ -1436,25 +1452,21 @@ class BaseToyModule {
                         wand_assembly.style.transform = get_waypoint_transform(scrub_value);
 
                         // Dip Registration Logic
-                        if (scrub_value <= 90) {
-                            can_dip = true; // User pulled back enough to reset the trigger
-                        }
+                        if (scrub_value <= 90) can_dip = true;
 
                         if (scrub_value >= 100 && can_dip) {
                             can_dip = false;
                             dip_count++;
-                            AudioCont.play_sound_effect("water_splash"); // Or a splash/liquid sound!
+                            AudioCont.play_sound_effect("water_splash");
 
-                            // 5. Success Condition
                             // 5. Success Condition
                             if (dip_count >= 3) {
                                 wand_assembly.onpointermove = null;
                                 wand_assembly.onpointerup = null;
-                                wand_assembly.onpointerdown = null; // <-- FIX 1: Kills the zombie drag!
+                                wand_assembly.onpointerdown = null;
                                 wand_assembly.releasePointerCapture(e.pointerId);
                                 wand_assembly.style.cursor = "auto";
 
-                                // Show the soap film!
                                 if (wand_soap) {
                                     wand_soap.style.transition = "opacity 300ms ease-in";
                                     wand_soap.style.opacity = 1;
@@ -1462,53 +1474,40 @@ class BaseToyModule {
 
                                 AudioCont.play_sound_effect("success");
 
-                                // --- NEW: Programmatic Reverse Scrub ---
-                                // Grabs wherever the user currently is (usually 100)
                                 let start_scrub = scrub_value;
                                 let start_time = performance.now();
-                                let duration = 700; // Milliseconds for the return trip
+                                let duration = 700;
 
                                 const animate_reverse = (time) => {
                                     let elapsed = time - start_time;
-                                    let progress = Math.min(elapsed / duration, 1); // Goes from 0.0 to 1.0
-
-                                    // An "Ease-In-Out" formula so it doesn't look like a stiff robot
+                                    let progress = Math.min(elapsed / duration, 1);
                                     let easeProgress = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 
-                                    // Math: Start at 100, smoothly multiply down to 0
                                     let current_scrub = start_scrub * (1 - easeProgress);
-
-                                    // Force the wand onto the waypoint path!
                                     wand_assembly.style.transform = get_waypoint_transform(current_scrub);
 
-                                    // If we haven't reached 1.0 (100%), request the next frame
                                     if (progress < 1) {
                                         requestAnimationFrame(animate_reverse);
                                     } else {
-                                        // --- Put the cap back on! ---
                                         if (bottle_cap) {
                                             bottle_cap.style.transition = "opacity 300ms ease-in";
                                             bottle_cap.style.opacity = 1;
+                                            bottle_cap.style.pointerEvents = "";
                                         }
                                         if (tube_backside) {
                                             tube_backside.style.transition = "opacity 300ms ease-out";
                                             tube_backside.style.opacity = 0;
                                         }
 
-                                        // Restore all hitboxes for the final toy box drag! ---
                                         let all_pieces = Array.from(this.ToyElement.querySelectorAll(".toy_part, .toy_frame, .tube_backside"));
                                         all_pieces.forEach(piece => {
-                                            piece.style.pointerEvents = ""; // Setting to empty string removes the inline style, returning it to normal!
+                                            piece.style.pointerEvents = "";
                                         });
 
-                                        // Animation completely finished, resolve the Promise!
                                         setTimeout(() => resolve(), 200);
                                     }
                                 };
-
-                                // Kick off the animation loop
                                 requestAnimationFrame(animate_reverse);
-                                // ----------------------------------------
                             }
                         }
                     };
@@ -2644,10 +2643,23 @@ class PartnerModule {
         });
     }
 
-    return_to_start() {
+    return_to_start(avoid_x = null) {
         return new Promise(resolve => {
             this.PartnerTranslateGroup.style.transition = "all 500ms ease-in-out";
-            this.PartnerTranslateGroup.style.transform = "";
+
+            let dx = 0;
+            // NEW: If an avoid_x is provided, check if the partner's home base is too close
+            if (avoid_x !== null) {
+                let partner_base_x = 0.9 * GenParam.SVG_width; // 0.9 is the multiplier used for its home position
+
+                // If the hidden object is within 400px of the resting spot, shift the partner to the left!
+                if (Math.abs(partner_base_x - avoid_x) < 400) {
+                    dx = -500;
+                }
+            }
+
+            // Setting it to a single translateX (or empty string) safely clears any messy appended transforms from walking
+            this.PartnerTranslateGroup.style.transform = dx ? `translateX(${dx}px)` : "";
             setTimeout(() => resolve(), 500);
         });
     }
@@ -3502,23 +3514,23 @@ class FoliageModule {
         this.clear_all();
     }
 
-    start_partner_cutting(PartnerObj) {
+    start_partner_cutting(PartnerObj, avoid_x = null) {
         this.partner_is_cutting = true;
-        this.partner_cutting_loop(PartnerObj);
+        this.partner_cutting_loop(PartnerObj, avoid_x);
     }
 
     stop_partner_cutting() {
         this.partner_is_cutting = false;
     }
 
-    async partner_cutting_loop(PartnerObj) {
+    async partner_cutting_loop(PartnerObj, avoid_x = null) {
         if (!this.partner_is_cutting) return;
 
         let target = this.get_target_tree();
 
         if (!target) {
-            // FIX: Out of targets! Return to the starting corner to completely clear the play area.
-            PartnerObj.return_to_start();
+            // FIX: Out of targets! Return to the starting corner, but safely avoid the hidden object if specified.
+            PartnerObj.return_to_start(avoid_x);
             return;
         }
 
@@ -3542,7 +3554,7 @@ class FoliageModule {
 
         // 3. Recurse
         if (this.partner_is_cutting) {
-            this.partner_cutting_loop(PartnerObj);
+            this.partner_cutting_loop(PartnerObj, avoid_x);
         }
     }
 
@@ -4481,7 +4493,8 @@ class FindBoxTrialController {
         this.foliageLogic.make_foliage_cuttable();
 
         if (this.partner.is_present) {
-            this.foliageLogic.start_partner_cutting(this.partner);
+            // FIX: Pass the X coordinate of the hidden box so the partner knows not to stand on it!
+            this.foliageLogic.start_partner_cutting(this.partner, this.box_start_x);
         }
     }
 
@@ -5054,7 +5067,7 @@ class DirtyAndBrokenToyTrialController {
     reset_failsafe_timer() {
         if (this.failsafe_timeout) clearTimeout(this.failsafe_timeout);
         if (!this.trial_is_active || this.partner.is_present) return;
-        this.failsafe_timeout = setTimeout(() => this.trigger_auto_solve(), 30000);
+        this.failsafe_timeout = setTimeout(() => this.trigger_auto_solve(), 10000);
     }
 
     trigger_auto_solve() {

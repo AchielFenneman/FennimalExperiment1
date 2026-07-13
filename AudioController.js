@@ -2,23 +2,29 @@ class AudioControllerObject {
     constructor() {
         this.pathname = ""; // "https://achielfenneman.github.io/FennimalExperiment1//"
 
-        // 1. CORE AMBIENCE: We still preload regions because they play immediately and constantly
-        this.RegionSoundScapes = {
-            North: new Audio(this.pathname + "./Audio/North.wav"),
-            Jungle: new Audio(this.pathname + "./Audio/Jungle.mp3"),
-            Desert: new Audio(this.pathname + "./Audio/Desert.mp3"),
-            Mountains: new Audio(this.pathname + "./Audio/Mountains.wav"),
-            Beach: new Audio(this.pathname + "./Audio/Beach.wav"),
-            Flowerfields: new Audio(this.pathname + "./Audio/Flowerfields.mp3"),
-            Village: new Audio(this.pathname + "./Audio/Village.mp3"),
-            Swamp: new Audio(this.pathname + "./Audio/Swamp.wav"),
-            Home: new Audio(this.pathname + "./Audio/Home.mp3")
+        this.RegionSoundScapes = {};
+
+        const regionFiles = {
+            North: "North.mp3",
+            Jungle: "Jungle.mp3",
+            Desert: "Desert.mp3",
+            Mountains: "Mountains.mp3",
+            Beach: "Beach.mp3",
+            Flowerfields: "Flowerfields.mp3",
+            Village: "Village.mp3",
+            Swamp: "Swamp.mp3",
+            Home: "Home.mp3"
         };
 
-        // Ensure all region tracks loop
-        for (let region in this.RegionSoundScapes) {
-            this.RegionSoundScapes[region].loop = true;
-            this.RegionSoundScapes[region].volume = 0.15;
+        for (const [region, filename] of Object.entries(regionFiles)) {
+            let audio = new Audio(this.pathname + "./Audio/" + filename);
+
+            // THE MAGIC BULLET: Tells the browser "Do not download this until I hit play"
+            audio.preload = "none";
+
+            audio.loop = true;
+            audio.volume = 0.15;
+            this.RegionSoundScapes[region] = audio;
         }
 
         // 2. THE MANIFEST: Just the filenames! No memory is used here.
