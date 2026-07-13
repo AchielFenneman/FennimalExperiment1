@@ -19,8 +19,7 @@ class DataController {
             fennimals: [],
             avatar: null,
             attentionData: null,
-            totalDuration: 0,
-            experimentCompleted: false
+            totalDuration: 0
         };
 
         this.paymentInfo = [];
@@ -52,33 +51,6 @@ class DataController {
     storePhaseData(cleanDataObj) {
         this.experimentData.storedData.push(JSON.parse(JSON.stringify(cleanDataObj)));
         this.recordTimestamp(cleanDataObj.type);
-        this.storeAllData(false)
-    }
-
-    storeAllData(bool_experiment_completed) {
-        console.log("Storing data...");
-
-        if (bool_experiment_completed === true) {
-            this.experimentData.experimentCompleted = true;
-        }
-
-        // FIX 4: Actively sync duration and attention checks on every partial save!
-        this.experimentData.totalDuration = Math.round((Date.now() - this.startTime) / 1000);
-        if (this.attentionCheckController) {
-            this.experimentData.attentionData = this.attentionCheckController.get_attention_rep();
-        }
-
-        // FIX 1: Safely handle expCode whether it is an array ["mentalizing"] or a string "mentalizing"
-        let expString = Array.isArray(this.experimentData.expCode) ? this.experimentData.expCode[0] : this.experimentData.expCode;
-        let folder_name = expString || "Default_Experiment";
-
-        let doc_name = this.experimentData.pid ? this.experimentData.pid : "NO_PID_" + this.startTime;
-
-        if (window.saveToFirebase) {
-            return window.saveToFirebase(folder_name, doc_name, this.experimentData);
-        } else {
-            return Promise.resolve(true);
-        }
     }
 
     storeCardDataWhenIncludedInGeneralInstructions(cardData) {
@@ -147,9 +119,6 @@ class DataController {
 // ----------------------------------------------------
 // 2. TRIAL GENERATOR (Decoupled Phase Logic)
 // ----------------------------------------------------
-// ----------------------------------------------------
-// 2. TRIAL GENERATOR (Decoupled Phase Logic)
-// ----------------------------------------------------
 class TrialGenerator {
     constructor(stimuli) {
         this.stimuli = stimuli;
@@ -178,8 +147,11 @@ class TrialGenerator {
             orthogonalTrials = this.getOrthogonalTaskTrials(phaseData);
         }
 
-        // 3. Run the Smart Shuffle (Grace period removed for maximum randomization!)
-        return this.smartShuffleTrials(mainTrials, orthogonalTrials);
+        // 3. Determine the grace period (0 means no grace period)
+        let protectedCount = phaseData.orthogonal_tasks_possible_after_trial || 0;
+
+        // 4. Run the Smart Shuffle
+        return this.smartShuffleTrials(mainTrials, orthogonalTrials, protectedCount);
     }
 
     getOrthogonalTaskTrials(phaseData) {
@@ -198,35 +170,52 @@ class TrialGenerator {
         return oTrials;
     }
 
-    smartShuffleTrials(mainTrials, orthogonalTrials) {
-        // 1. Dump EVERYTHING into one single pool right away and shuffle it completely
-        let combinedPool = [...mainTrials, ...orthogonalTrials];
-        let remainingPool = shuffleArray(combinedPool);
+    smartShuffleTrials(mainTrials, orthogonalTrials, gracePeriod) {
+        // Randomize the initial pools
+        let shuffledMain = shuffleArray([...mainTrials]);
+        let shuffledOrthogonal = shuffleArray([...orthogonalTrials]);
 
+        // Enforce grace period: Pull the first N trials exclusively from the main pool
         let sequence = [];
+        let actualGracePeriod = Math.min(gracePeriod, shuffledMain.length);
 
-        // 2. Smart Shuffle Loop
+        for (let i = 0; i < actualGracePeriod; i++) {
+            // Try to avoid back-to-backs even within the grace period if possible
+            let lastId = sequence.length > 0 ? sequence[sequence.length - 1].id : null;
+            let nextIndex = shuffledMain.findIndex(item => item.id !== lastId);
+
+            if (nextIndex !== -1) {
+                sequence.push(shuffledMain.splice(nextIndex, 1)[0]);
+            } else {
+                sequence.push(shuffledMain.shift()); // Unavoidable
+            }
+        }
+
+        // Combine remaining main trials and orthogonal trials into one big pool
+        let remainingPool = shuffleArray([...shuffledMain, ...shuffledOrthogonal]);
+
+        // Smart sequencing loop
         while (remainingPool.length > 0) {
             let lastId = sequence.length > 0 ? sequence[sequence.length - 1].id : null;
             let nextIndex = remainingPool.findIndex(item => item.id !== lastId);
 
             if (nextIndex !== -1) {
-                // Perfect fit: We found a trial with a different Fennimal ID
+                // Perfect fit: We found a trial with a different Fennimal
                 sequence.push(remainingPool.splice(nextIndex, 1)[0]);
             } else {
-                // Collision! All remaining items in the pool belong to the exact same Fennimal.
+                // Collision: All remaining trials belong to the same Fennimal!
                 let problematicItem = remainingPool.shift();
                 let swapped = false;
 
-                // Look backwards through our already built sequence to find a safe place to swap it into
-                for (let j = 0; j < sequence.length - 1; j++) {
+                // Look backwards to see if we can sneak this item in earlier
+                for (let j = actualGracePeriod; j < sequence.length - 1; j++) {
                     let prevId = j > 0 ? sequence[j - 1].id : null;
                     let nextId = sequence[j + 1].id;
                     let candidateToMoveToEnd = sequence[j];
 
-                    // Can we safely wedge the problematic item between index j-1 and j+1?
+                    // Can we safely put the problematic item at index j?
                     if (problematicItem.id !== prevId && problematicItem.id !== nextId) {
-                        // If we move the item currently sitting at j to the very end, will it collide?
+                        // Can the displaced item safely sit at the end?
                         if (candidateToMoveToEnd.id !== lastId) {
                             // Swap successful!
                             sequence.splice(j, 1, problematicItem);
@@ -238,7 +227,7 @@ class TrialGenerator {
                 }
 
                 if (!swapped) {
-                    // Give up: It is mathematically impossible to separate them (e.g. four S1s in a 6-item list)
+                    // Give up: No valid swap found, just append it
                     sequence.push(problematicItem);
                 }
             }
@@ -247,6 +236,7 @@ class TrialGenerator {
         return sequence;
     }
 }
+
 
 // ----------------------------------------------------
 // 3. TASK EVALUATOR (Decoupled Data Cleaning)
@@ -433,7 +423,6 @@ class ExperimentController {
 
     setupTrialBasedPhase() {
         this.currentPhaseData.Fennimals_in_phase = this.trialGenerator.generateTrialsForPhase(this.currentPhaseData);
-        console.log(this.currentPhaseData.Fennimals_in_phase )
         this.currentPhaseData.number_interactions_in_phase = this.currentPhaseData.Fennimals_in_phase.length;
         this.currentPhaseData.Data = [];
         this.currentTrialNumInDay = 0;
@@ -443,6 +432,7 @@ class ExperimentController {
         this.mapCont.disable_map_interactions();
         document.getElementById("Map").style.display = "none";
 
+        // TRANSLATION FIX: Convert the config codes (A, B, C) into the actual assigned SVG names!
         this.currentPhaseData.toyboxes_asked = this.stimuli.get_assigned_names_of_code_array("toybox", this.currentPhaseData.toyboxes_asked);
         this.currentPhaseData.toys_asked = this.stimuli.get_assigned_names_of_code_array("toy", this.currentPhaseData.toys_asked);
 
@@ -450,20 +440,18 @@ class ExperimentController {
         let pbPartnerPresent = WorldState.get_current_partner_role() === "active";
 
         let currentTask = new PartnerBeliefTaskController(pLayer, this.currentPhaseData, pbPartnerPresent, () => {
-
-            // FIX 3: Attach the answers directly to the rich phase data object, preserving the configurations
-            this.currentPhaseData.answers = this.currentPhaseData.PartnerBeliefAnswers;
+            this.dataCont.storePhaseData({
+                type: "partner_belief",
+                day: this.currentDayNum,
+                answers: this.currentPhaseData.PartnerBeliefAnswers
+            });
 
             let earned = this.currentPhaseData.PartnerBeliefAnswers.reduce((sum, ans) => sum + (ans.stars_earned || 0), 0);
             let maxPossible = this.currentPhaseData.bonus_stars_per_correct_answer * this.currentPhaseData.toyboxes_asked.length;
-
-            this.currentPhaseData.bonus_stars_earned = earned; // Tag it locally for easy access in R
             this.dataCont.recordStarsEarned(this.currentDayNum, "partner_belief", earned, maxPossible);
 
             currentTask.clean_up();
             document.getElementById("Map").style.display = "inherit";
-
-            // This naturally calls phaseCompleted(), which will now properly store this rich object!
             this.phaseCompleted();
         });
         currentTask.start_sequence();
@@ -586,6 +574,7 @@ class ExperimentController {
     }
 
     phaseCompleted() {
+        this.dataCont.storePhaseData(this.currentPhaseData);
         if (this.currentFennimal) this.currentFennimal.clean_up();
 
         // Legacy star logic for trial-based phases
@@ -599,13 +588,11 @@ class ExperimentController {
                     maxBonusStars += this.currentPhaseData.Data[trialNum].bonus_stars_earnable || 0;
                 }
 
+                // FIX: Moved these two lines INSIDE the if-statement so they don't overwrite custom phases like partner_belief!
                 this.currentPhaseData.bonus_stars_earned = totalBonusStarsEarned;
                 this.dataCont.recordStarsEarned(this.currentDayNum, this.currentPhaseType, totalBonusStarsEarned, maxBonusStars);
             }
         }
-
-        // FIX 2: Store the phase data NOW, after all stars and variables have been attached!
-        this.dataCont.storePhaseData(this.currentPhaseData);
 
         this.mapCont.reset_map_to_player_in_center();
         this.startNextExperimentPhase();
@@ -858,15 +845,12 @@ class ExperimentController {
 
     sortingTaskCompleted(data) {
         this.currentPhaseData.Errors = JSON.parse(JSON.stringify(data));
+        this.dataCont.storePhaseData(this.currentPhaseData);
 
         if (this.currentPhaseData.maximum_earnable_stars > 0) {
             let starsEarned = Math.max(0, this.currentPhaseData.maximum_earnable_stars - data.length);
             this.dataCont.recordStarsEarned(this.currentDayNum, "Sorting Task", starsEarned, this.currentPhaseData.maximum_earnable_stars);
-            this.currentPhaseData.bonus_stars_earned = starsEarned; // Good practice to attach it here too
         }
-
-        // Store AFTER calculating stars
-        this.dataCont.storePhaseData(this.currentPhaseData);
         this.startNextExperimentPhase();
     }
 
@@ -876,20 +860,8 @@ class ExperimentController {
     }
 
     submitExperiment() {
-        let completionCode = this.dataCont.getCompletionCode();
-        let prolificURL = `https://app.prolific.com/submissions/complete?cc=${completionCode}`;
-
-        // Call your new DRY function, passing true for the final save
-        this.dataCont.storeAllData(true)
-            .then(() => {
-                // SUCCESS: Redirect instantly
-                window.location.href = prolificURL;
-            })
-            .catch((error) => {
-                // FAILSAFE: If the internet drops at the exact moment they finish
-                console.error("Final save failed:", error);
-                alert("Your data is safe, but we had a connection hiccup. Your Prolific completion code is: " + completionCode + ". Click OK to return to Prolific.");
-                window.location.href = prolificURL;
-            });
+        alert("In case you pressed the button before submitting the completion code to prolific, your code is: " + this.dataCont.getCompletionCode() + ". Press OK to finalize your submission.");
+        let submitBtn = document.getElementById("submitbutton");
+        if(submitBtn) submitBtn.click();
     }
 }

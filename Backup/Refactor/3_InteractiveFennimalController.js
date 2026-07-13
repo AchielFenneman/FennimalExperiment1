@@ -313,32 +313,26 @@ class BasicElementsModule {
         }
 
         // ----------------------------------------------------
-        // FIX: Bulletproof SVG Matrix Math for Object Tracking
+        // Override math if we are tracking a specific object
         // ----------------------------------------------------
         if (this.gaze_target_element && !this.is_slumped) {
-            try {
-                let pt = GenParam.SVGObject.createSVGPoint();
+            let headRect = this.FennimalHead.getBoundingClientRect();
+            let headCenterX = headRect.x + (headRect.width / 2);
+            let headCenterY = headRect.y + (headRect.height / 2);
 
-                // Get perfect screen coordinates of the Head
-                let headBBox = this.FennimalHead.getBBox();
-                pt.x = headBBox.x + (headBBox.width / 2);
-                pt.y = headBBox.y + (headBBox.height / 2);
-                let screenHead = pt.matrixTransform(this.FennimalHead.getScreenCTM());
+            let targetRect = this.gaze_target_element.getBoundingClientRect();
 
-                // Get perfect screen coordinates of the Target Box/Object
-                let targetBBox = this.gaze_target_element.getBBox();
-                pt.x = targetBBox.x + (targetBBox.width / 2);
-                pt.y = targetBBox.y + (targetBBox.height / 2);
-                let screenTarget = pt.matrixTransform(this.gaze_target_element.getScreenCTM());
+            // Safety check in case the object is hidden/removed
+            if (targetRect.width > 0) {
+                let targetCenterX = targetRect.x + (targetRect.width / 2);
+                let targetCenterY = targetRect.y + (targetRect.height / 2);
 
-                let dx = screenTarget.x - screenHead.x;
-                let dy = screenTarget.y - screenHead.y;
+                let dx = targetCenterX - headCenterX;
+                let dy = targetCenterY - headCenterY;
 
                 // Same exact parallax constraints so the eyes don't pop out
                 this.targetGazeX = Math.max(-6, Math.min(6, dx * 0.015));
                 this.targetGazeY = Math.max(-4, Math.min(4, dy * 0.015));
-            } catch(e) {
-                // Failsafe in case the object is mid-transition or detached
             }
         }
 
@@ -561,68 +555,6 @@ class BasicElementsModule {
         });
     }
 
-    async perform_success_celebration(TargetBoxElement) {
-        // 1. Calculate the distance to move to the EXACT center of the target object
-        let boxCenter = getSVGInternalCenter(TargetBoxElement);
-        let fenCenter = getSVGInternalCenter(this.Fennimal);
-
-        // Removed the offset so the Fennimal stands directly in front of the box
-        let targetX = boxCenter.x;
-        let dx = targetX - fenCenter.x;
-
-        // 2. Walk over to the object smoothly
-        await this.Fennimal_move_relative(dx, 0, 600);
-        await wait(200);
-
-        // Lock gaze on the box
-        this.set_gaze_target(TargetBoxElement);
-        AudioCont.play_sound_effect("positive");
-
-        // 3. Helper function to create a burst of particles EXACTLY where the Fennimal currently is
-        const jump_with_particle_burst = async (jump_height) => {
-            // Grab the real-time position of the Fennimal right before it jumps
-            let currentFenCenter = getSVGInternalCenter(this.Fennimal);
-
-            if (typeof SmallFeedbackSymbol !== "undefined") {
-                // Generate a burst of 5 particles simultaneously
-                for(let p = 0; p < 5; p++) {
-                    let randomOffsetX = (Math.random() - 0.5) * 160;
-                    let randomOffsetY = (Math.random() - 0.5) * 80;
-                    let symbol = Math.random() > 0.5 ? "heart" : "star";
-
-                    new SmallFeedbackSymbol(
-                        this.ItemLayers.Plus2,
-                        symbol,
-                        900, // Slightly faster burst speed
-                        (currentFenCenter.x + randomOffsetX), (currentFenCenter.y - 150 + randomOffsetY),
-                        (currentFenCenter.x + randomOffsetX), (currentFenCenter.y - 350 + randomOffsetY)
-                    );
-                }
-            }
-            // Execute the actual jump
-            await this.Fennimal_jump(jump_height);
-        };
-
-        // 4. The Centered Dance Routine
-        // Jumps at the center, slides right, jumps, slides left across the box, jumps, returns to center!
-        await jump_with_particle_burst(100);
-
-        await this.Fennimal_move_relative(300, 0, 400); // Slide Right
-        await jump_with_particle_burst(150);
-
-        await this.Fennimal_move_relative(-600, 0, 600); // Slide Left (across the box)
-        await jump_with_particle_burst(150);
-
-        await this.Fennimal_move_relative(300, 0, 400); // Return to Center
-        await jump_with_particle_burst(100);
-
-        // Cleanly release the gaze
-        this.clear_gaze_target();
-
-        // Linger for a half-second so the participant can enjoy the visual reward
-        await wait(500);
-    }
-
     clean_up() {
         if (this.BackgroundMask) this.BackgroundMask.remove();
         if (this.Fennimal) this.Fennimal.remove();
@@ -835,9 +767,6 @@ class BaseToyModule {
                 this.ToyElement.style.transition = "none";
                 this.ToyElement.style.cursor = "grabbing";
 
-                // FIX: Start the wind-up sound as soon as they grab the car!
-                AudioCont.start_looping_sound_effect("toy_car_windup");
-
                 let pt = GenParam.SVGObject.createSVGPoint();
                 pt.x = e.clientX;
                 pt.y = e.clientY;
@@ -860,23 +789,16 @@ class BaseToyModule {
                 this.ToyElement.onpointerup = (ev) => {
                     this.ToyElement.onpointermove = null;
                     this.ToyElement.onpointerup = null;
+                    this.ToyElement.onpointerdown = null;
                     this.ToyElement.releasePointerCapture(ev.pointerId);
                     this.ToyElement.style.cursor = "auto";
 
-                    // FIX: Stop the wind-up sound immediately when they let go!
-                    AudioCont.stop_looping_sound_effect("toy_car_windup");
-
                     if (Math.abs(currentTx) >= pull_target) {
-                        // FIX: Only lock the toy (prevent re-grabbing) if they actually pulled it far enough!
-                        this.ToyElement.onpointerdown = null;
-
                         AudioCont.play_sound_effect("success");
                         this.ToyElement.style.transition = "all 600ms cubic-bezier(0.25, 1, 0.5, 1)";
                         this.ToyElement.style.transform = `translate(${this.centered_x}px, ${this.centered_y}px) scale(${this.zoomFactor})`;
                         setTimeout(() => resolve(), 600);
                     } else {
-                        // If they didn't pull far enough, it just snaps back, and the cursor resets so they know they can try again!
-                        this.ToyElement.style.cursor = "grab";
                         this.ToyElement.style.transition = "all 300ms ease-out";
                         this.ToyElement.style.transform = `translate(${this.centered_x}px, ${this.centered_y}px) scale(${this.zoomFactor})`;
                     }
@@ -910,7 +832,7 @@ class BaseToyModule {
 
             const handle_click = () => {
                 clicks++;
-                AudioCont.play_sound_effect("wind_up_plane");
+                AudioCont.play_sound_effect("click");
 
                 if (clicks % 2 !== 0) {
                     prop_base.style.opacity = 0;
@@ -1009,7 +931,7 @@ class BaseToyModule {
 
             // Part 1: Flip the Switch
             toggle_off.onpointerdown = () => {
-                AudioCont.play_sound_effect("switch_flicked");
+                AudioCont.play_sound_effect("click");
                 toggle_off.onpointerdown = null;
                 toggle_off.style.cursor = "auto";
 
@@ -1115,7 +1037,7 @@ class BaseToyModule {
                         let random_arc = arcs[Math.floor(Math.random() * arcs.length)];
                         random_arc.style.opacity = 1;
                         random_arc.style.transform = `rotate(${Math.floor(Math.random() * 360)}deg)`;
-                        AudioCont.play_sound_effect("electric_zap_single");
+                        AudioCont.play_sound_effect("click");
                         setTimeout(() => { random_arc.style.opacity = 0; }, 50);
                     }
 
@@ -1210,7 +1132,7 @@ class BaseToyModule {
                 is_cranking = true;
                 cranks++;
 
-                AudioCont.play_sound_effect("wind_up_spring");
+                AudioCont.play_sound_effect("click");
                 crank_up.style.opacity = 0;
                 if (crank_down) crank_down.style.opacity = 1;
 
@@ -1389,7 +1311,7 @@ class BaseToyModule {
             // 3. Step One: Click the Cap
             bottle_cap.style.cursor = "pointer";
             bottle_cap.onpointerdown = () => {
-                AudioCont.play_sound_effect("plastic_cap_open"); // Or a pop sound!
+                AudioCont.play_sound_effect("click"); // Or a pop sound!
                 bottle_cap.onpointerdown = null;
                 bottle_cap.style.transition = "opacity 200ms ease-out";
                 bottle_cap.style.opacity = 0;
@@ -1443,7 +1365,7 @@ class BaseToyModule {
                         if (scrub_value >= 100 && can_dip) {
                             can_dip = false;
                             dip_count++;
-                            AudioCont.play_sound_effect("water_splash"); // Or a splash/liquid sound!
+                            AudioCont.play_sound_effect("click"); // Or a splash/liquid sound!
 
                             // 5. Success Condition
                             // 5. Success Condition
@@ -1694,9 +1616,6 @@ class BaseToyModule {
             el.style.transition = "transform 300ms ease-in-out";
         });
 
-        // FIX: Start the looping audio right as the robot starts its routine!
-        AudioCont.start_looping_sound_effect("robot_play");
-
         let isAntennaOn = true;
         let blinkInterval = setInterval(() => {
             isAntennaOn = !isAntennaOn;
@@ -1722,9 +1641,6 @@ class BaseToyModule {
             clearInterval(blinkInterval);
             this.set_robot_state("off");
             [...arms, ...wrists, ...clamps].forEach(el => el.style.transform = "rotate(0deg)");
-
-            // FIX: Stop the audio loop perfectly in sync with the robot powering down!
-            AudioCont.stop_looping_sound_effect("robot_play");
         }, 3500);
     }
 
@@ -1788,9 +1704,6 @@ class BaseToyModule {
             transGroup.classList.add("translation_" + this.FenObj.toy);
         }
 
-        // FIX: Start the looping audio right as the storm starts!
-        AudioCont.start_looping_sound_effect("electric_zap_discharge");
-
         // 3. The Chaotic Storm Interval
         let stormInterval = setInterval(() => {
             arcs.forEach(a => a.style.opacity = 0);
@@ -1808,9 +1721,6 @@ class BaseToyModule {
             arcs.forEach(a => a.style.opacity = 0);
             let lights = Array.from(this.ToyElement.querySelectorAll(".light_1, .light_2, .light_3, .light_4"));
             lights.forEach(l => l.style.fill = "#555555");
-
-            // FIX: Stop the audio loop perfectly in sync with the visual power down!
-            AudioCont.stop_looping_sound_effect("electric_zap_discharge");
         }, 3500);
     }
 
@@ -1925,8 +1835,7 @@ class BaseToyModule {
                         bubble.style.transition = "all 100ms ease-in";
                         bubble.style.transform += " scale(1.8)";
                         bubble.style.opacity = 0;
-                        setTimeout(() => {bubble.remove(); AudioCont.play_sound_effect("bubble_pop_small")}, 100);
-
+                        setTimeout(() => bubble.remove(), 100);
                     }, 1800 + Math.random() * 700);
                 }
 
@@ -2018,7 +1927,7 @@ class BaseToyModule {
         const playSequence = async () => {
             await wait(800);
 
-            AudioCont.play_sound_effect("spring_release");
+            AudioCont.play_sound_effect("pop");
             if (box_lid_closed) box_lid_closed.style.opacity = 0;
             if (box_lid_open) box_lid_open.style.opacity = 1;
 
@@ -2069,9 +1978,14 @@ class BaseToyModule {
 
                 await wait(400);
 
-                // The Happy Jumps (now using the centralized function to trigger sounds!)
+                // The Happy Jumps
                 for (let i = 0; i < 3; i++) {
-                    await basics.Fennimal_jump(100);
+                    activeFennimal.style.transition = "transform 150ms ease-out";
+                    activeFennimal.style.transform = `translate(${startX}px, ${startY - 40}px)`;
+                    await wait(150);
+                    activeFennimal.style.transition = "transform 150ms ease-in";
+                    activeFennimal.style.transform = `translate(${startX}px, ${startY}px)`;
+                    await wait(150);
                 }
             }
 
@@ -2102,22 +2016,6 @@ class BaseToyModule {
             if (prop_base) prop_base.style.opacity = 0;
             if (prop_alt) prop_alt.style.opacity = 0;
             if (prop_spinning) prop_spinning.style.opacity = 1;
-
-            // FIX: Start the looping airplane sound
-            AudioCont.start_looping_sound_effect("plane_buzz");
-
-            // Power down the sound when the universal return-trip triggers at 3.5s
-            setTimeout(() => {
-                AudioCont.stop_looping_sound_effect("plane_buzz");
-            }, 3500);
-        }
-
-        // FIX: Hardcoded timing sequence for the CSS-driven Car
-        if (this.FenObj.toy === "car") {
-            // Tweak these millisecond delays to match your CSS keyframes perfectly!
-            setTimeout(() => AudioCont.play_sound_effect("toy_car_move"), 200);
-            setTimeout(() => AudioCont.play_sound_effect("toy_car_move"), 1400);
-            setTimeout(() => AudioCont.play_sound_effect("toy_car_move"), 2600);
         }
 
         // Generic CSS Animations
@@ -2236,10 +2134,6 @@ class BaseToyModule {
 
     clean_up() {
         if (this.ToyElement) this.ToyElement.remove();
-        AudioCont.stop_looping_sound_effect("electric_zap_discharge");
-        AudioCont.stop_looping_sound_effect("robot_play");
-        AudioCont.stop_looping_sound_effect("plane_buzz");
-        AudioCont.stop_looping_sound_effect("toy_car_windup");
     }
 }
 
@@ -2673,12 +2567,12 @@ class GeneralTrialController {
         if (this.partner.is_present) {
             Interface.Prompt.show_message(this.partner.partnername + " opens the " + this.box.boxname);
             await this.partner.move_to_element_and_act(this.box.BoxBase, () => this.box.open_box());
-            await wait(750);
+            await wait(500);
         } else {
             await new Promise(resolve => {
                 this.box.wait_for_user_click("open", () => resolve());
             });
-            await wait(750);
+            await wait(500);
         }
     }
 
@@ -2686,12 +2580,10 @@ class GeneralTrialController {
         await this.basics.create_and_appear_Fennimal(this.basics.ItemLayers.Main, 0.4 * this.basics.W, 0.8 * this.basics.H, 1.75, 250);
         AudioCont.play_sound_effect("alert");
         Interface.Prompt.show_message("This Fennimal is called " + this.FenObj.name);
-        await wait(1000);
+        await wait(500);
 
         let bodyCenter = getSVGInternalCenter(this.basics.TargetPoints.Fennimal_body_center);
         await this.toy.create_and_appear_toy(this.basics.ItemLayers.Plus1, "main", bodyCenter.x, bodyCenter.y, 4, 200);
-        Interface.Prompt.show_message(this.FenObj.name + " would like to play with the " + this.FenObj.toy);
-        await wait (1000)
     }
 
     async run_correct_toy_intro() {
@@ -2747,14 +2639,10 @@ class GeneralTrialController {
         // Fire our newly updated 2-step sequence!
         Interface.Prompt.show_message(this.FenObj.name + " throws the " +  this.current_contents + " away");
         await this.wrong_toy.discard_to_right();
-        await wait(750)
 
         // Correct toy magically appears in hands
         let bodyCenter = getSVGInternalCenter(this.basics.TargetPoints.Fennimal_body_center);
         await this.toy.create_and_appear_toy(this.basics.ItemLayers.Plus2, "main", bodyCenter.x, bodyCenter.y, 4, 200);
-
-        Interface.Prompt.show_message(this.FenObj.name + " would like to play with the " +  this.FenObj.toy + " instead");
-        await wait(750)
 
         // Fennimal AND the new correct toy move back to start position together
         this.toy.move_relative(-dx, 0, 500);
@@ -2839,12 +2727,8 @@ class GeneralTrialController {
         let boxTarget = getSVGInternalCenter(this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0]);
         await this.toy.shimmy_to_target(boxTarget);
 
-        // --- FIXED: UPDATE THE GLOBAL WORLD STATE ---
+        // UPDATE THE GLOBAL WORLD STATE
         WorldState.change_toybox_contents(this.FenObj.toybox, this.FenObj.toy);
-        if (this.partner.is_present) {
-            WorldState.change_partner_belief_in_box_contents(this.FenObj.toybox, this.FenObj.toy);
-        }
-        // --------------------------------------------
 
         if (this.partner.is_present) {
             Interface.Prompt.show_message(this.partner.partnername + " closes the " + this.box.boxname);
@@ -2857,7 +2741,9 @@ class GeneralTrialController {
 
     async finish_trial() {
         Interface.Prompt.show_message(this.FenObj.name + " is happy that you're keeping the " + this.FenObj.toy + " safe!");
-        await this.basics.perform_success_celebration(this.box.BoxBase);
+        await this.basics.Fennimal_jump(50);
+        await this.basics.Fennimal_jump(100);
+        await this.basics.Fennimal_jump(50);
         this.returnfunc();
     }
 
@@ -2876,8 +2762,8 @@ class FlyModule {
 
     constructor(FenObj) {
         this.FenObj = FenObj;
-        // FIX: Removed the manual AudioCont.load_audio calls!
-        // Our new lazy-loading system handles this automatically.
+        AudioCont.load_audio("splat", "splat.wav", false);
+        AudioCont.load_audio("fly_buzzing", "fly_buzzing.wav", true);
     }
 
     spawn_flies(ParentLayer, TargetBoxElement, number_of_flies, on_fly_swatted_callback) {
@@ -2895,15 +2781,7 @@ class FlyModule {
                 }
             );
         }
-
-        // FIX: Updated to use our new looping function!
-        AudioCont.start_looping_sound_effect("fly_buzzing");
-    }
-
-    make_flies_swattable() {
-        for (let key in this.RemainingFlyControllers) {
-            this.RemainingFlyControllers[key].make_swattable();
-        }
+        AudioCont.play_sound_effect("fly_buzzing");
     }
 
     get_random_living_fly() {
@@ -2915,13 +2793,12 @@ class FlyModule {
     }
 
     clean_up() {
-        // FIX: Updated to use our new looping stop function!
-        AudioCont.stop_looping_sound_effect("fly_buzzing");
-
+        AudioCont.stop_audio("fly_buzzing");
         for (let key in this.RemainingFlyControllers) {
             this.RemainingFlyControllers[key].swat(); // Force kill remaining
         }
     }
+
     // Your exact fly logic, now bound as a subclass to the module
     SwattableFly = class {
         constructor(Parent, TargetObject, index_num, returnfunc) {
@@ -2930,10 +2807,6 @@ class FlyModule {
             this.FlyElement.classList.add("swattable_fly");
             this.FlyElement.style.display = "inherit";
             Parent.appendChild(this.FlyElement);
-
-            // FIX: Start locked and without a pointer cursor
-            this.is_swattable = false;
-            this.FlyElement.style.cursor = "auto";
 
             const TargetCoords = getSVGInternalCenter(TargetObject);
             const targetX = TargetCoords.x + (Math.random() - 0.5) * 200;
@@ -2964,16 +2837,7 @@ class FlyModule {
                 requestAnimationFrame(animate_fly);
             };
 
-            // FIX: Only allow the swat function to fire if unlocked
-            this.FlyElement.onpointerdown = () => {
-                if (this.is_swattable) this.swat();
-            };
-
-            // FIX: Internal method to unlock this specific fly
-            this.make_swattable = () => {
-                this.is_swattable = true;
-                this.FlyElement.style.cursor = "pointer";
-            };
+            this.FlyElement.onpointerdown = () => this.swat();
 
             this.get_position = () => getSVGInternalCenter(this.FlyElement);
 
@@ -3517,8 +3381,10 @@ class FoliageModule {
         let target = this.get_target_tree();
 
         if (!target) {
-            // FIX: Out of targets! Return to the starting corner to completely clear the play area.
-            PartnerObj.return_to_start();
+            // Out of targets, step back out of the user's way!
+            let dx = 300;
+            PartnerObj.PartnerTranslateGroup.style.transition = "all 500ms ease-in-out";
+            PartnerObj.PartnerTranslateGroup.style.transform += `translateX(${dx}px)`;
             return;
         }
 
@@ -3634,252 +3500,6 @@ class FoliageModule {
     }
 }
 
-class DustModule {
-    constructor() {
-        // Preload sounds
-        AudioCont.load_audio("air_puff", "air_puff.wav", false); // Add a puffy air sound to your Audio folder!
-        AudioCont.load_audio("success", "success.wav", false);
-    }
-
-    apply_dust_filter(BoxBase, BoxTop) {
-        if (!BoxBase || !BoxTop) return; // Safety guard!
-
-        this.BoxBase = BoxBase;
-        this.BoxTop = BoxTop;
-
-        this.dust_level = 100;
-
-        // Apply a heavy grayscale/sepia filter to make it look like thick dust
-        let filter_string = `sepia(0.4) grayscale(0.6) brightness(0.7) contrast(0.8) blur(1px)`;
-        this.BoxBase.style.filter = filter_string;
-        this.BoxTop.style.filter = filter_string;
-
-        this.BoxBase.style.transition = "filter 400ms ease-out";
-        this.BoxTop.style.transition = "filter 400ms ease-out";
-    }
-
-    spawn_and_enable_bellows(ParentLayer, box_center_x, box_center_y, on_clean_callback) {
-        let rawBellows = document.getElementById("bellows").cloneNode(true);
-        rawBellows.id = "active_bellows";
-        rawBellows.style.display = "inherit";
-
-        let bellowsOutline = create_SVG_outline_of_group_ID(rawBellows);
-        bellowsOutline.classList.add("focus_on_SVG_outline");
-
-        this.BellowsScaleGroup = create_SVG_group(0, 0);
-        this.BellowsScaleGroup.style.transform = `scale(3.5)`;
-        this.BellowsScaleGroup.appendChild(bellowsOutline);
-        this.BellowsScaleGroup.appendChild(rawBellows);
-
-        this.BellowsTranslateGroup = create_SVG_group(0, 0);
-        this.BellowsTranslateGroup.appendChild(this.BellowsScaleGroup);
-        ParentLayer.appendChild(this.BellowsTranslateGroup);
-
-        let start_x = box_center_x + 180;
-        let start_y = box_center_y - 800;
-        this.BellowsTranslateGroup.style.transform = `translate(${start_x}px, ${start_y}px)`;
-
-        let bellows_top = rawBellows.querySelector(".bellows_top");
-        let bellows_gasket = rawBellows.querySelector(".bellows_gasket");
-        let nozzle_point = rawBellows.querySelector(".nozzle_point");
-
-        let pivot = bellows_top ? bellows_top.querySelector(".bellows_pivot_point") : null;
-
-        if (bellows_top && pivot) {
-            bellows_top.style.transformBox = "fill-box";
-            let pBox = pivot.getBBox();
-            let bBox = bellows_top.getBBox();
-            let px = ((pBox.x + pBox.width / 2 - bBox.x) / bBox.width) * 100;
-            let py = ((pBox.y + pBox.height / 2 - bBox.y) / bBox.height) * 100;
-            bellows_top.style.transformOrigin = `${px}% ${py}%`;
-        }
-
-        if (bellows_gasket && pivot) {
-            bellows_gasket.style.transformBox = "fill-box";
-            let pBox = pivot.getBBox();
-            let gBox = bellows_gasket.getBBox();
-            let px = ((pBox.x + pBox.width / 2 - gBox.x) / gBox.width) * 100;
-            let py = ((pBox.y + pBox.height / 2 - gBox.y) / gBox.height) * 100;
-            bellows_gasket.style.transformOrigin = `${px}% ${py}%`;
-        }
-
-        this.BellowsTranslateGroup.style.opacity = 0;
-        window.getComputedStyle(this.BellowsTranslateGroup).opacity;
-        this.BellowsTranslateGroup.style.transition = "all 600ms cubic-bezier(0.34, 1.56, 0.64, 1)";
-        this.BellowsTranslateGroup.style.opacity = 1;
-        this.BellowsTranslateGroup.style.cursor = "pointer";
-
-        let baseBoxBaseTransform = this.BoxBase.style.transform;
-        let baseBoxTopTransform = this.BoxTop.style.transform;
-
-        let is_animating = false;
-
-        this.BellowsTranslateGroup.onpointerdown = () => {
-            if (is_animating || this.dust_level <= 0) return;
-            is_animating = true;
-
-            if (bellowsOutline) {
-                bellowsOutline.remove();
-                bellowsOutline = null;
-            }
-
-            AudioCont.play_sound_effect("air_puff");
-
-            // A. Snappy Bellows Animation (Fast Down!)
-            if (bellows_top) {
-                bellows_top.style.transition = "transform 50ms ease-in";
-                bellows_top.style.transform = "rotate(32deg)";
-            }
-            if (bellows_gasket) {
-                bellows_gasket.style.transition = "transform 50ms ease-in";
-                // TWEAK 1: Reduced rotation and squished much flatter (0.5) to keep it tucked inside the wood panels!
-                bellows_gasket.style.transform = "rotate(12deg) scale(0.9, 0.5)";
-            }
-
-            // B. Box Jiggle Effect (Impact!)
-            this.BoxBase.style.transition = "transform 50ms ease-in-out";
-            this.BoxTop.style.transition = "transform 50ms ease-in-out";
-            this.BoxBase.style.transform = baseBoxBaseTransform + " translate(-8px, 8px)";
-            this.BoxTop.style.transform = baseBoxTopTransform + " translate(-8px, 8px)";
-
-            // C. Spawn Wind and Dust Effects
-            if (nozzle_point) {
-                let pt = GenParam.SVGObject.createSVGPoint();
-                let nBox = nozzle_point.getBBox();
-                pt.x = nBox.x + nBox.width / 2;
-                pt.y = nBox.y + nBox.height / 2;
-
-                let screenNozzle = pt.matrixTransform(nozzle_point.getScreenCTM());
-                let localNozzle = screenNozzle.matrixTransform(ParentLayer.getScreenCTM().inverse());
-
-                this.spawn_wind_streaks(ParentLayer, localNozzle.x, localNozzle.y, box_center_x, box_center_y);
-                this.spawn_dislodged_dust(ParentLayer, box_center_x, box_center_y);
-            }
-
-            // D. Update the CSS Filter
-            this.dust_level -= 10;
-            let p = this.dust_level / 100;
-
-            let filter_string = `sepia(${0.4 * p}) grayscale(${0.6 * p}) brightness(${1 - (0.3 * p)}) contrast(${1 - (0.2 * p)}) blur(${1 * p}px)`;
-            this.BoxBase.style.filter = filter_string;
-            this.BoxTop.style.filter = filter_string;
-
-            // E. Snap Back (Slow refill & box resets)
-            setTimeout(() => {
-                this.BoxBase.style.transform = baseBoxBaseTransform;
-                this.BoxTop.style.transform = baseBoxTopTransform;
-
-                if (bellows_top) {
-                    // TWEAK 2: Lengthened the refill time to 700ms for a massive, slow draw
-                    bellows_top.style.transition = "transform 700ms cubic-bezier(0.25, 1.5, 0.5, 1)";
-                    bellows_top.style.transform = "rotate(0deg)";
-                }
-                if (bellows_gasket) {
-                    bellows_gasket.style.transition = "transform 700ms cubic-bezier(0.25, 1.5, 0.5, 1)";
-                    bellows_gasket.style.transform = "rotate(0deg) scale(1, 1)";
-                }
-
-                if (this.dust_level <= 0) {
-                    this.BellowsTranslateGroup.onpointerdown = null;
-                    this.BellowsTranslateGroup.style.cursor = "auto";
-
-                    // Wait for the final slow refill to complete before playing success sound and flying away
-                    setTimeout(() => {
-                        AudioCont.play_sound_effect("success");
-                        this.BellowsTranslateGroup.style.transition = "all 500ms ease-in";
-                        this.BellowsTranslateGroup.style.transform += " translate(200px, -200px) scale(0)";
-                        this.BellowsTranslateGroup.style.opacity = 0;
-                        setTimeout(() => on_clean_callback(), 600);
-                    }, 700);
-                } else {
-                    // TWEAK 3: Only locks the animation for 50ms! This lets them rapid-pump the bellows mid-refill.
-                    setTimeout(() => {
-                        is_animating = false;
-                    }, 50);
-                }
-            }, 50); // Box un-jiggles immediately after 50ms impact
-        };
-    }
-
-    spawn_wind_streaks(ParentLayer, startX, startY, targetX, targetY) {
-        // Doubled the wind streaks for more power!
-        for (let i = 0; i < 10; i++) {
-            let streak = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            streak.setAttribute('width', 80 + Math.random() * 60); // Longer streaks
-            streak.setAttribute('height', 5 + Math.random() * 5);  // Thicker streaks
-            streak.setAttribute('rx', 4);
-            streak.setAttribute('fill', 'rgba(255, 255, 255, 0.85)');
-            streak.setAttribute('x', 0);
-            streak.setAttribute('y', 0);
-
-            let dx = targetX - startX;
-            let dy = targetY - startY;
-            let angle = Math.atan2(dy, dx) * (180 / Math.PI);
-
-            // Wider spread from the nozzle
-            let ox = startX + (Math.random() - 0.5) * 60;
-            let oy = startY + (Math.random() - 0.5) * 60;
-
-            streak.style.transformOrigin = "left center";
-            streak.style.transformBox = "fill-box";
-            streak.style.transform = `translate(${ox}px, ${oy}px) rotate(${angle + (Math.random()-0.5)*10}deg) scale(0)`;
-            ParentLayer.appendChild(streak);
-
-            setTimeout(() => {
-                // Faster wind!
-                streak.style.transition = "transform 150ms ease-in, opacity 150ms ease-in";
-                let endX = ox + (dx * 0.9);
-                let endY = oy + (dy * 0.9);
-                streak.style.transform = `translate(${endX}px, ${endY}px) rotate(${angle}deg) scale(1)`;
-                streak.style.opacity = 0;
-
-                setTimeout(() => streak.remove(), 150);
-            }, 10);
-        }
-    }
-
-    spawn_dislodged_dust(ParentLayer, boxX, boxY) {
-        let colors = ['#A9A9A9', '#808080', '#696969', '#8B7355'];
-
-        // Doubled dust clouds!
-        for (let i = 0; i < 12; i++) {
-            let dust = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-            dust.setAttribute('r', 25 + Math.random() * 40); // Bigger dust
-            dust.setAttribute('cx', 0);
-            dust.setAttribute('cy', 0);
-            dust.setAttribute('fill', colors[Math.floor(Math.random() * colors.length)]);
-            dust.setAttribute('opacity', 0.7);
-
-            // Start around the box, covering a wider area
-            let startX = boxX + (Math.random() - 0.5) * 200;
-            let startY = boxY + (Math.random() - 0.5) * 200;
-
-            dust.style.transformOrigin = "center";
-            dust.style.transformBox = "fill-box";
-            dust.style.transform = `translate(${startX}px, ${startY}px) scale(0.2)`;
-            ParentLayer.appendChild(dust);
-
-            // Blow further and faster!
-            setTimeout(() => {
-                dust.style.transition = "all 500ms cubic-bezier(0.25, 1, 0.5, 1)";
-                let endX = startX - 300 - (Math.random() * 300);
-                let endY = startY + (Math.random() - 0.5) * 300;
-
-                dust.style.transform = `translate(${endX}px, ${endY}px) scale(1.8)`;
-                dust.style.opacity = 0;
-
-                setTimeout(() => dust.remove(), 500);
-            }, 50);
-        }
-    }
-
-    clean_up() {
-        if (this.BellowsTranslateGroup) this.BellowsTranslateGroup.remove();
-        if (this.BoxBase) this.BoxBase.style.filter = "none";
-        if (this.BoxTop) this.BoxTop.style.filter = "none";
-    }
-}
-
 class FlySwatTrialController {
 
     constructor(FenObj, partner_is_present, returnfunc) {
@@ -3898,65 +3518,51 @@ class FlySwatTrialController {
         this.partner_kill_count = 0;
     }
 
-    async trigger_initial_spawns_and_prompts() {
-        Interface.Prompt.show_message("Ew! There's a bunch of flies around the " + this.box.boxname + "! Gross!");
-        AudioCont.play_sound_effect("sad");
-        await wait(100);
-
-        let numFlies = this.partner.is_present ? 10 : 7;
-        this.flyLogic.spawn_flies(
-            this.basics.ItemLayers.Plus2,
-            this.box.BoxBase,
-            numFlies,
-            (remaining) => this.handle_fly_swatted(remaining)
-        );
-    }
-
-    async start_interaction_phase() {
-        Interface.Prompt.show_message("Help " + this.FenObj.name + " by swatting all the flies!");
-        this.flyLogic.make_flies_swattable();
-
-        if (this.partner.is_present) {
-            this.partner_swatting_loop();
-        }
-    }
-
     async handle_fly_swatted(remaining_count) {
         if (remaining_count <= 0) {
             AudioCont.play_sound_effect("success");
-            AudioCont.stop_looping_sound_effect("fly_buzzing");
+            AudioCont.stop_audio("fly_buzzing");
             Interface.Prompt.show_message("All the flies are gone!");
-            await this.on_flies_cleared();
+            this.finish_trial();
         }
-    }
-
-    async on_flies_cleared() {
-        // Base behavior uses the new standard celebration!
-        await this.basics.perform_success_celebration(this.box.BoxBase);
-        this.finish_trial();
     }
 
     async partner_swatting_loop() {
         let targetFly = this.flyLogic.get_random_living_fly();
 
         if (targetFly && this.partner_kill_count < this.max_partner_kills) {
+            // Manager bridges the Partner and the Fly
             await this.partner.move_to_element_and_act(
                 targetFly.FlyElement,
                 () => targetFly.swat()
             );
 
             this.partner_kill_count++;
+
+            // Move back to start
             this.partner.PartnerTranslateGroup.style.transition = "all 500ms ease-in-out";
             this.partner.PartnerTranslateGroup.style.transform = "";
-            await wait(500);
-            await wait(1500);
+            await wait(500); // Wait for return trip
+            await wait(1500); // Pause before next target
+
+            // Recurse until done
             this.partner_swatting_loop();
         }
     }
 
     async finish_trial() {
+        await wait(1000);
+        await this.basics.Fennimal_move_relative(0.2 * this.basics.W, 0, 500);
+        await wait(500);
+
+        AudioCont.play_sound_effect("positive");
         Interface.Prompt.show_message(this.FenObj.name + " really appreciates your help!");
-        await wait(1500);
+
+        await this.basics.Fennimal_jump(100);
+        await this.basics.Fennimal_jump(100);
+        await this.basics.Fennimal_jump(100);
+        await wait(2000);
+
         this.returnfunc();
     }
 
@@ -3970,14 +3576,26 @@ class FlySwatTrialController {
 
         // Setup Scene
         await this.basics.create_background_mask(true, 500);
+
+        // Slightly customized placement for this specific task
         await this.basics.create_and_appear_Fennimal(this.basics.ItemLayers.Neg1, 0.35 * this.basics.W, 0.85 * this.basics.H, 1.8, 250);
         await this.box.create_and_appear_box(this.basics.ItemLayers.Main, this.basics.ItemLayers.Plus2, 0.5 * this.basics.W, 0.7 * this.basics.H, 4, 100);
 
+        // Intro Sequence
         Interface.Prompt.hide();
         await wait(1000);
+        Interface.Prompt.show_message("Ew! There's a bunch of flies around the " + this.box.boxname + "! Gross!");
+        AudioCont.play_sound_effect("sad");
+        await wait(100);
 
-        // Extension Point 1
-        await this.trigger_initial_spawns_and_prompts();
+        // Bridge: Manager tells FlyModule where the box is to spawn flies around it
+        let numFlies = this.partner.is_present ? 10 : 5;
+        this.flyLogic.spawn_flies(
+            this.basics.ItemLayers.Plus2,
+            this.box.BoxBase,
+            numFlies,
+            (remaining) => this.handle_fly_swatted(remaining)
+        );
 
         await wait(500);
         await this.basics.Fennimal_move_relative(-0.2 * this.basics.W, 0, 250);
@@ -3987,8 +3605,12 @@ class FlySwatTrialController {
         await this.basics.trigger_comfort_checkin();
         await wait(500);
 
-        // Extension Point 2
-        await this.start_interaction_phase();
+        Interface.Prompt.show_message("Help " + this.FenObj.name + " by swatting all the flies!");
+
+        // Trigger Partner AI if present
+        if (this.partner.is_present) {
+            this.partner_swatting_loop();
+        }
     }
 
     clean_up() {
@@ -3996,64 +3618,6 @@ class FlySwatTrialController {
         this.box.clean_up();
         this.flyLogic.clean_up();
         if (this.partner.PartnerTranslateGroup) this.partner.PartnerTranslateGroup.remove();
-    }
-}
-
-class FlySwatExtendedTrialController extends FlySwatTrialController {
-
-    constructor(FenObj, partner_is_present, returnfunc) {
-        super(FenObj, partner_is_present, returnfunc);
-        // Add the extra dirt module
-        this.dirtLogic = new DirtModule();
-    }
-
-    async trigger_initial_spawns_and_prompts() {
-        Interface.Prompt.show_message("Ew! The " + this.box.boxname + " is covered in flies and dirt! Gross!");
-        AudioCont.play_sound_effect("sad");
-        await wait(100);
-
-        // 1. Spawn Flies
-        let numFlies = this.partner.is_present ? 10 : 7;
-        this.flyLogic.spawn_flies(
-            this.basics.ItemLayers.Plus2,
-            this.box.BoxBase,
-            numFlies,
-            (remaining) => this.handle_fly_swatted(remaining)
-        );
-
-        // 2. Spawn Dirt directly on the BoxTop
-        let num_dirt = 5 + Math.floor(Math.random() * 5);
-        this.dirtLogic.spawn_dirt_on_element(this.box.BoxTop, this.basics.ItemLayers.Plus1, num_dirt);
-    }
-
-    async on_flies_cleared() {
-        // Intercept the celebration! Make them clean the dirt first.
-        Interface.Prompt.hide();
-        await wait(1000);
-
-        Interface.Prompt.show_message("Great! Now grab the sponge to clean off the dirt!");
-        let sponge_x = 0.65 * this.basics.W;
-        let sponge_y = 0.5 * this.basics.H;
-
-        this.dirtLogic.spawn_and_enable_sponge(
-            this.basics.ItemLayers.Plus2,
-            sponge_x,
-            sponge_y,
-            () => this.on_dirt_cleared()
-        );
-    }
-
-    async on_dirt_cleared() {
-        Interface.Prompt.hide();
-        await wait(1000);
-        // NOW we trigger the standard celebration and finish
-        await this.basics.perform_success_celebration(this.box.BoxBase);
-        this.finish_trial();
-    }
-
-    clean_up() {
-        super.clean_up();
-        this.dirtLogic.clean_up();
     }
 }
 
@@ -4313,15 +3877,27 @@ class ReachHatTrialController {
         await wait(200);
 
         // Move to center
-        //let center_dx = (0.5 * this.basics.W) - getSVGInternalCenter(this.basics.Fennimal).x;
-        //await this.basics.Fennimal_move_relative(center_dx, 0, 500);
+        let center_dx = (0.5 * this.basics.W) - getSVGInternalCenter(this.basics.Fennimal).x;
+        await this.basics.Fennimal_move_relative(center_dx, 0, 500);
 
+        AudioCont.play_sound_effect("positive");
         Interface.Prompt.show_message(`${this.FenObj.name} really appreciates your help!`);
 
-        // Standardized celebration! (The box is now at the pole, so we celebrate next to it)
-        await this.basics.perform_success_celebration(this.box.BoxBase);
+        let HGenerator = setInterval(() => {
+            let x_delta = randomIntFromInterval(-1000, 200);
+            let y_delta = randomIntFromInterval(-950, -500);
+            let heart_start_coords = getSVGInternalCenter(this.basics.Fennimal.getElementsByClassName("Fennimal_head_mouth_point")[0]);
+            heart_start_coords.x += randomIntFromInterval(-200, 200);
+            heart_start_coords.y += randomIntFromInterval(-200, 200);
+            new SmallFeedbackSymbol(this.basics.ItemLayers.Plus2, "heart", 2000, heart_start_coords.x, heart_start_coords.y, heart_start_coords.x + x_delta, heart_start_coords.y + y_delta);
+        }, 250);
 
+        await this.basics.Fennimal_jump(100);
+        await this.basics.Fennimal_jump(100);
+        await this.basics.Fennimal_jump(100);
+        await wait(2000);
 
+        clearInterval(HGenerator);
         this.returnfunc();
     }
 
@@ -4380,26 +3956,32 @@ class FindBoxTrialController {
         this.returnfunc = returnfunc;
         this.is_task_active = true;
 
+        // 1. Instantiate Generic Workers
         this.basics = new BasicElementsModule(FenObj);
         this.box = new BoxModule(FenObj);
         this.partner = new PartnerModule(partner_is_present);
+
+        // 2. Instantiate Task-Specific Worker
         this.foliageLogic = new FoliageModule(FenObj, partner_is_present);
 
+        // 3. Task Layout Data
         this.Spots = {
             Main: [.25, .35, .45, .55, .65, .75, .85, .95],
             Plus1: [.2, .4, .6, .8, .9],
             Plus2: [.10, .40, .70, .90],
         };
-
-
         this.layer_y_pos = { Main: .6, Plus1: .7, Plus2: .75 };
         this.BoxSizes = { Main: 1.25, Plus1: 1.75, Plus2: 2.25 };
         this.FoliageSizes = { Main: 2.25, Plus1: 2.75, Plus2: 3.25 };
     }
 
+    // --- LOGIC METHODS ---
+
     async handle_box_found() {
         if (!this.is_task_active) return;
-        this.is_task_active = false;
+        this.is_task_active = false; // Stops partner loops
+
+        //Tell the module to stop the partner loop!
         this.foliageLogic.stop_partner_cutting();
 
         this.box.BoxBase.onpointerdown = null;
@@ -4425,42 +4007,61 @@ class FindBoxTrialController {
         this.box.BoxBase.style.transition = "all 500ms ease-in-out";
         this.box.BoxTop.style.transition = "all 500ms ease-in-out";
         let Boxcenter = getSVGInternalCenter(this.box.BoxBase);
-        this.box_dx = (0.6 * this.basics.W) - Boxcenter.x;
-        this.box_dy = (0.7 * this.basics.H) - Boxcenter.y;
-        this.box.BoxBase.style.transform += ` translate(${this.box_dx}px, ${this.box_dy}px) scale(3)`;
-        this.box.BoxTop.style.transform += ` translate(${this.box_dx}px, ${this.box_dy}px) scale(3)`;
+        let box_dx = (0.6 * this.basics.W) - Boxcenter.x;
+        let box_dy = (0.7 * this.basics.H) - Boxcenter.y;
+        this.box.BoxBase.style.transform += ` translate(${box_dx}px, ${box_dy}px) scale(3)`;
+        this.box.BoxTop.style.transform += ` translate(${box_dx}px, ${box_dy}px) scale(3)`;
 
         await wait(750);
-
-        // This is where we break out the behavior for the Extended class to intercept!
-        await this.trigger_post_discovery_phase();
-    }
-
-    async trigger_post_discovery_phase() {
         AudioCont.play_sound_effect("positive");
         Interface.Prompt.show_message(`${this.FenObj.name} is very grateful that you found the ${this.box.boxname}!`);
 
-        await this.basics.perform_success_celebration(this.box.BoxBase);
+        // DOM BUMP: Bring Fennimal to front layer
+        this.basics.ItemLayers.Plus2.appendChild(this.basics.Fennimal);
 
+        // Move Fennimal Front and Center
+        this.basics.Fennimal.style.transition = "all 500ms ease-in-out";
+        let Fencenter = getSVGInternalCenter(this.basics.Fennimal);
+        let fen_dx = (0.35 * this.basics.W) - Fencenter.x;
+        let fen_dy = (0.4 * this.basics.H) - Fencenter.y;
+        this.basics.Fennimal.style.transform += ` translate(${fen_dx}px, ${fen_dy}px) scale(1.5)`;
+
+        await wait(500);
+
+        let HGenerator = setInterval(() => {
+            let x_delta = randomIntFromInterval(-1000, 200);
+            let y_delta = randomIntFromInterval(-950, -500);
+            let heart_start_coords = getSVGInternalCenter(this.basics.Fennimal.getElementsByClassName("Fennimal_head_mouth_point")[0]);
+            heart_start_coords.x += randomIntFromInterval(-200, 200);
+            heart_start_coords.y += randomIntFromInterval(-200, 200);
+            new SmallFeedbackSymbol(this.basics.ItemLayers.Plus2, "heart", 2000, heart_start_coords.x, heart_start_coords.y, heart_start_coords.x + x_delta, heart_start_coords.y + y_delta);
+        }, 250);
+
+        await this.basics.Fennimal_jump(50);
+        await this.basics.Fennimal_jump(75);
+        await this.basics.Fennimal_jump(50);
+
+        await wait(3000);
+        clearInterval(HGenerator);
         this.returnfunc();
     }
 
+    // --- ORCHESTRATOR METHODS ---
+
     async start_sequence() {
         this.basics.create_svg_sublayers();
-        await this.basics.create_background_mask(false, 500);
 
-        if (this.partner.is_present) this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        if (this.partner.is_present) {
+            this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        }
 
+        // Setup Scene
         await this.basics.create_and_appear_Fennimal(this.basics.ItemLayers.Neg1, 0.10 * this.basics.W, 0.75 * this.basics.H, 1.25, 250);
 
+        // Setup Hidden Box
         let box_layer = "Main";
         let box_x_pos = shuffleArray(this.Spots[box_layer])[0];
-
-        // Expose coordinates for the extended class
-        this.box_start_x = box_x_pos * this.basics.W;
-        this.box_start_y = (this.layer_y_pos[box_layer] + 0.05) * this.basics.H;
-
-        await this.box.create_and_appear_box(this.basics.ItemLayers[box_layer], this.basics.ItemLayers[box_layer], this.box_start_x, this.box_start_y, this.BoxSizes[box_layer], 0);
+        await this.box.create_and_appear_box(this.basics.ItemLayers[box_layer], this.basics.ItemLayers[box_layer], box_x_pos * this.basics.W, (this.layer_y_pos[box_layer] + 0.05) * this.basics.H, this.BoxSizes[box_layer], 0);
 
         const box_clicked = () => this.handle_box_found();
         this.box.BoxBase.style.cursor = "pointer";
@@ -4468,14 +4069,17 @@ class FindBoxTrialController {
         this.box.BoxBase.onpointerdown = box_clicked;
         this.box.BoxTop.onpointerdown = box_clicked;
 
+        // Setup Foliage (Created AFTER the box, naturally covering it in DOM order)
         this.foliageLogic.spawn_foliage(this.basics.ItemLayers, this.Spots, this.layer_y_pos, this.FoliageSizes);
 
+        // Start Interaction
         Interface.Prompt.show_message(`Uh oh! ${this.FenObj.name} has lost the ${this.box.boxname}!`);
         AudioCont.play_sound_effect("sad");
         await wait(1000);
         Interface.Prompt.show_message(`${this.FenObj.name} looks so sad! Click to cheer ${this.FenObj.name}  up.`);
         await this.basics.trigger_comfort_checkin();
         await wait(500);
+
 
         Interface.Prompt.show_message(`Please cut down the plants until you find the ${this.box.boxname}`);
         this.foliageLogic.make_foliage_cuttable();
@@ -4490,80 +4094,6 @@ class FindBoxTrialController {
         this.box.clean_up();
         this.foliageLogic.clean_up();
         if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
-    }
-}
-
-class FindBoxExtendedTrialController extends FindBoxTrialController {
-
-    constructor(FenObj, partner_is_present, returnfunc) {
-        super(FenObj, partner_is_present, returnfunc);
-        this.dustLogic = new DustModule();
-    }
-
-    async start_sequence() {
-        // Start the parent sequence
-        let p = super.start_sequence();
-
-        // Defensively wait until the asynchronous parent function actually creates the box DOM elements
-        let checkCount = 0;
-        let checkInterval = setInterval(() => {
-            if (this.box && this.box.BoxBase) {
-                this.dustLogic.apply_dust_filter(this.box.BoxBase, this.box.BoxTop);
-                clearInterval(checkInterval);
-            }
-            checkCount++;
-            if (checkCount > 100) clearInterval(checkInterval); // Failsafe: stop checking after 5 seconds
-        }, 50);
-
-        await p;
-    }
-
-    async trigger_post_discovery_phase() {
-        // TWEAK: Dramatically wash out the background mask to pull all focus to the dusty box!
-        if (this.basics.BackgroundMask) {
-            this.basics.BackgroundMask.style.transition = "opacity 1000ms ease-in-out";
-            this.basics.BackgroundMask.style.opacity = "0.8";
-        }
-
-        Interface.Prompt.show_message("Oh no! The " + this.box.boxname + " is covered in thick dust!");
-        AudioCont.play_sound_effect("sad");
-        await wait(1500);
-
-        Interface.Prompt.show_message("Click the bellows repeatedly to blow the dust away!");
-
-        let centered_box_x = 0.6 * this.basics.W;
-        let centered_box_y = 0.7 * this.basics.H;
-
-        this.dustLogic.spawn_and_enable_bellows(
-            this.basics.ItemLayers.Plus2,
-            centered_box_x,
-            centered_box_y,
-            () => this.on_dust_cleared()
-        );
-    }
-
-    async on_dust_cleared() {
-        Interface.Prompt.hide();
-        await wait(1000);
-
-        // TWEAK: Restore the background mask to normal for the vibrant celebration!
-        if (this.basics.BackgroundMask) {
-            this.basics.BackgroundMask.style.transition = "opacity 1000ms ease-in-out";
-            this.basics.BackgroundMask.style.opacity = "0.8";
-        }
-
-        // Trigger the standard celebration now that it's clean!
-        AudioCont.play_sound_effect("positive");
-        Interface.Prompt.show_message(`${this.FenObj.name} is very grateful that you found the clean ${this.box.boxname}!`);
-
-        await this.basics.perform_success_celebration(this.box.BoxBase);
-
-        this.returnfunc();
-    }
-
-    clean_up() {
-        super.clean_up();
-        this.dustLogic.clean_up();
     }
 }
 
@@ -4674,13 +4204,6 @@ class BrokenToyTrialController {
         this.brokenToyLogic.ToyElement.style.transform += `translate(${target.x - curr.x}px, ${target.y - curr.y}px)`;
         await wait(150);
 
-        // --- FIXED: UPDATE THE GLOBAL WORLD STATE ---
-        WorldState.change_toybox_contents(this.FenObj.toybox, this.FenObj.toy);
-        if (this.partner.is_present) {
-            WorldState.change_partner_belief_in_box_contents(this.FenObj.toybox, this.FenObj.toy);
-        }
-        // --------------------------------------------
-
         if (this.partner.is_present) {
             Interface.Prompt.show_message(this.partner.partnername + " closes the " + this.box.boxname);
             await this.partner.move_to_element_and_act(this.box.BoxBase, () => this.box.close_box());
@@ -4729,7 +4252,9 @@ class BrokenToyTrialController {
 
     async finish_trial() {
         Interface.Prompt.show_message(this.FenObj.name + " is happy that you're keeping the " + this.FenObj.toy + " safe!");
-        await this.basics.perform_success_celebration(this.box.BoxBase);
+        await this.basics.Fennimal_jump(50);
+        await this.basics.Fennimal_jump(100);
+        await this.basics.Fennimal_jump(50);
         this.returnfunc();
     }
 
@@ -4902,13 +4427,6 @@ class DirtyToyTrialController {
         let boxTarget = getSVGInternalCenter(this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0]);
         await this.toyLogic.shimmy_to_target(boxTarget);
 
-        // --- FIXED: UPDATE THE GLOBAL WORLD STATE ---
-        WorldState.change_toybox_contents(this.FenObj.toybox, this.FenObj.toy);
-        if (this.partner.is_present) {
-            WorldState.change_partner_belief_in_box_contents(this.FenObj.toybox, this.FenObj.toy);
-        }
-        // --------------------------------------------
-
         if (this.partner.is_present) {
             Interface.Prompt.show_message(this.partner.partnername + " closes the " + this.box.boxname);
             await this.partner.move_to_element_and_act(this.box.BoxBase, () => this.box.close_box());
@@ -4920,7 +4438,9 @@ class DirtyToyTrialController {
 
     async finish_trial() {
         Interface.Prompt.show_message(this.FenObj.name + " is happy that you're keeping the " + this.FenObj.toy + " safe!");
-        await this.basics.perform_success_celebration(this.box.BoxBase);
+        await this.basics.Fennimal_jump(50);
+        await this.basics.Fennimal_jump(100);
+        await this.basics.Fennimal_jump(50);
         this.returnfunc();
     }
 
@@ -5182,13 +4702,6 @@ class DirtyAndBrokenToyTrialController {
         let boxTarget = getSVGInternalCenter(this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0]);
         await this.brokenToyLogic.shimmy_to_target(boxTarget);
 
-        // --- FIXED: UPDATE THE GLOBAL WORLD STATE ---
-        WorldState.change_toybox_contents(this.FenObj.toybox, this.FenObj.toy);
-        if (this.partner.is_present) {
-            WorldState.change_partner_belief_in_box_contents(this.FenObj.toybox, this.FenObj.toy);
-        }
-        // --------------------------------------------
-
         if (this.partner.is_present) {
             Interface.Prompt.show_message(this.partner.partnername + " closes the " + this.box.boxname);
             await this.partner.move_to_element_and_act(this.box.BoxBase, () => this.box.close_box());
@@ -5197,9 +4710,12 @@ class DirtyAndBrokenToyTrialController {
             this.box.wait_for_user_click("close", () => this.finish_trial());
         }
     }
+
     async finish_trial() {
         Interface.Prompt.show_message(this.FenObj.name + " is happy that you're keeping the " + this.FenObj.toy + " safe!");
-        await this.basics.perform_success_celebration(this.box.BoxBase);
+        await this.basics.Fennimal_jump(50);
+        await this.basics.Fennimal_jump(100);
+        await this.basics.Fennimal_jump(50);
         this.returnfunc();
     }
 
@@ -5258,17 +4774,11 @@ class TrialFactory {
             case "fly_swat":
                 return new FlySwatTrialController(FenObj, partner_is_present, returnfunc);
 
-            case "fly_swat_extended":
-                return new FlySwatExtendedTrialController(FenObj, partner_is_present, returnfunc);
-
             case "reach_hat":
                 return new ReachHatTrialController(FenObj, partner_is_present, returnfunc);
 
             case "find_box":
                 return new FindBoxTrialController(FenObj, partner_is_present, returnfunc);
-
-            case "find_box_extended": // <--- ADD THIS
-                return new FindBoxExtendedTrialController(FenObj, partner_is_present, returnfunc);
 
             case "basic_intro":
                 // Your standard box interaction from earlier
@@ -5849,34 +5359,9 @@ class PartnerBeliefTaskController {
     async finish_task() {
         this.TaskObj.PartnerBeliefAnswers = this.ParticipantAnswers;
 
-        // STEP 1: The partner leaves the scene first
-        if (this.is_partner_present) {
-            // Make sure they are facing the direction they are walking!
-            this.set_partner_direction("right");
-
-            // Smooth 1.5-second walk off the screen
-            this.PartnerTranslateGroup.style.transition = "transform 1500ms ease-in, opacity 500ms ease-in 1000ms";
-
-            // Safely append a massive horizontal shift
-            let currentTransform = this.PartnerTranslateGroup.style.transform;
-            this.PartnerTranslateGroup.style.transform = currentTransform + " translateX(1500px)";
-            this.PartnerTranslateGroup.style.opacity = 0;
-
-            // Wait for the partner to completely leave the screen before fading the warehouse
-            await wait(1500);
-        }
-
-        // STEP 2: Fade out the warehouse, table, and boxes
-        this.OpaqueBackdrop.style.transition = "opacity 400ms ease-in";
         this.OpaqueBackdrop.style.opacity = 0;
-
-        this.Background.style.transition = "opacity 400ms ease-in";
         this.Background.style.opacity = 0;
-
-        if (this.BackgroundMask) {
-            this.BackgroundMask.style.transition = "opacity 400ms ease-in";
-            this.BackgroundMask.style.opacity = 0;
-        }
+        if (this.BackgroundMask) this.BackgroundMask.style.opacity = 0;
 
         this.TableGroup.style.transition = "opacity 400ms ease-in";
         this.TableGroup.style.opacity = 0;
@@ -5886,10 +5371,12 @@ class PartnerBeliefTaskController {
             b.element.style.opacity = 0;
         });
 
-        // Wait for the environmental fade-out to finish
-        await wait(500);
+        if (this.is_partner_present) {
+            this.PartnerTranslateGroup.style.transition = "opacity 400ms ease-in";
+            this.PartnerTranslateGroup.style.opacity = 0;
+        }
 
-        // Return control to the top controller
+        await wait(500);
         this.returnfunc();
     }
 

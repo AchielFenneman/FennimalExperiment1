@@ -38,7 +38,7 @@
     max-height: 99dvh;
     background: white;
     touch-action: none;
-    max-width: 2560px;
+    max-width: 1920px;
 
 }
 
@@ -1679,69 +1679,4 @@
     28%  { transform: rotate(3deg); }
     35%  { transform: rotate(0deg); }
     100% { transform: rotate(0deg); }
-}
-
-
-
-/* --- PHONE BOOTH ANTENNA SCANNING --- */
-/* --- PHONE BOOTH ANTENNA SCANNING --- */
-.scanning_antenna {
-    /* 6 seconds makes for a nice, slow, radar-like sweep */
-    animation: lazy-antenna-scan 6s ease-in-out infinite;
-}
-
-@keyframes lazy-antenna-scan {
-    /* Using modern 'rotate' prevents overwriting Inkscape's 'transform' attribute! */
-    0%   { rotate: -30deg; }
-    50%  { rotate: 30deg; }
-    100% { rotate: -30deg; }
-}
-
-/* --- PHONE BOOTH EMERGENCY ANIMATIONS --- */
-/* --- PHONE BOOTH EMERGENCY ANIMATIONS (SPEC-COMPLIANT & MASSIVE) --- */
-
-/* The '*' ensures we animate the paths INSIDE the Inkscape groups! */
-.ringing_police_light, .ringing_police_light * {
-    /* We can keep !important here on the assignment, just not in the frames */
-    animation: police-siren 0.6s infinite !important;
-}
-
-/* NO !IMPORTANT TAGS ALLOWED INSIDE THESE BRACKETS: */
-@keyframes police-siren {
-    0%, 49% {
-        fill: #80e5ff;
-        stroke: #80e5ff;
-        stroke-width: 5px;
-        filter: drop-shadow(0px 0px 50px #80e5ff) drop-shadow(0px 0px 150px #80e5ff) drop-shadow(0px 0px 300px #80e5ff);
-    }
-    50%, 100% {
-        fill: #fdf305;
-        stroke: #fdf305;
-        stroke-width: 5px;
-        filter: drop-shadow(0px 0px 50px #fdf305) drop-shadow(0px 0px 150px #fdf305) drop-shadow(0px 0px 300px #fdf305);
-    }
-}
-
-
-.ringing_antenna_tip, .ringing_antenna_tip * {
-    animation: antenna-pulse 0.5s infinite alternate !important;
-}
-
-@keyframes antenna-pulse {
-    0% {
-        fill: #ffffff;
-        stroke: #80e5ff;
-        stroke-width: 2px;
-        filter: drop-shadow(0px 0px 10px #80e5ff);
-    }
-    100% {
-        fill: #ffffff;
-        stroke: #80e5ff;
-
-        /* A much more reasonable bulge so we can actually see the tip! */
-        stroke-width: 8px;
-
-        /* Huge cyan bloom */
-        filter: drop-shadow(0px 0px 30px #80e5ff) drop-shadow(0px 0px 80px #80e5ff) drop-shadow(0px 0px 150px #80e5ff);
-    }
 }

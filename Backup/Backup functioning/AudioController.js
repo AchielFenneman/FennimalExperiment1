@@ -18,7 +18,6 @@ class AudioControllerObject {
         // Ensure all region tracks loop
         for (let region in this.RegionSoundScapes) {
             this.RegionSoundScapes[region].loop = true;
-            this.RegionSoundScapes[region].volume = 0.15;
         }
 
         // 2. THE MANIFEST: Just the filenames! No memory is used here.
@@ -29,15 +28,13 @@ class AudioControllerObject {
             button_click: "button_click.wav",
             close_menu: "close_menu.mp3",
             alert_minimal: "alert_minimal.wav",
-            stars_earned: "star_earned.mp3",
-            star_earned: "star_earned.mp3",
             success: "success.wav",
             photo: "photo.mp3",
             click: "click.wav",
             notification: "notification.wav",
             alert: "alert.wav",
             alert_minor: "alert_minor.wav",
-            phone_ring: "phone_ring.wav",
+            phone_ring: "phone_ringing.wav",
 
             search_loop: "search.wav",
             beep: "beep.wav",
@@ -58,10 +55,11 @@ class AudioControllerObject {
             fly_buzzing: "fly_buzzing.wav",
             splat: "splat.wav",
             water_splash: "water_splash.wav",
-
+            scrub: "scrub.wav",
             pop: "pop.wav",
             jump: "jump.wav",
             thud: "thud.wav",
+            star_earned: "star_earned.wav",
             drag_wood: "drag_wood.wav",
             sad: "sad.wav",
             toy_car_windup: "toy_car_windup.wav",
@@ -90,9 +88,6 @@ class AudioControllerObject {
 
             wind_up_spring: "wind_up_spring.wav",
             spring_release: "spring_release.wav",
-
-            scrub: "scrub.wav",
-
         };
 
         // 3. MEMORY MANAGEMENT

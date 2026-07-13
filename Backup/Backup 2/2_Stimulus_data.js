@@ -1,11 +1,13 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["mentalizing"];
+    this.Experiment_Code = ["test"];
 
     const All_Instructions_At_Start = {
         test: [],
-        mentalizing_network: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
-        mentalizing: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
+        mentalizing_1: [],
+        mentalizing_1B : [],
+        mentalizing_2: [],
+        mentalizing_network: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"]
     };
 
     // ----------------------------------------------------
@@ -37,16 +39,7 @@ let StimulusSettings = function () {
             "P1": { head: "D", region: "D", toy: "D", toybox: "A" },
             "P2": { head: "E", region: "E", toy: "E", toybox: "B", hat: "B"},
             "P3": { head: "F", region: "F", toy: "F", toybox: "C" }
-        },
-
-        mentalizing: {
-            "S1": { head: "A", region: "A", toy: "A", toybox: "A", hat: "A", play_orthogonal_tasks: true},
-            "S2": { head: "B", region: "B", toy: "B", toybox: "B" },
-            "S3": { head: "C", region: "C", toy: "C", toybox: "C" },
-            "P1": { head: "D", region: "D", toy: "D", toybox: "A" },
-            "P2": { head: "E", region: "E", toy: "E", toybox: "B", hat: "B", play_orthogonal_tasks: true},
-            "P3": { head: "F", region: "F", toy: "F", toybox: "C" }
-        },
+        }
     };
 
     // ----------------------------------------------------
@@ -54,22 +47,7 @@ let StimulusSettings = function () {
     // ----------------------------------------------------
     let All_Experiment_Structures = {
         test: [
-            {
-                type: "Fennimal_attribute_sorting_task",
-                Fennimals_encountered: ["A1", "A2"],
-                attribute_order: ["location", "head", "toy", "toybox"],
-                maximum_earnable_stars: 5
 
-            },
-
-            {
-                type: "jump_to_trial",
-                interaction_type: "dirty_and_broken_toy",
-                Fennimals_encountered: ["A1", "A2"],
-                partner_behavior: "absent",
-                hint_type: ["icon"],
-                include_Fennefinder: true
-            },
             {
                 type: "free_exploration",
                 interaction_type: ["basic_intro"],
@@ -79,7 +57,14 @@ let StimulusSettings = function () {
                 include_Fennefinder: true, //"low_power_mode"
                 force_climbing_tower_first: false
             },
-
+            {
+                type: "jump_to_trial",
+                interaction_type: "basic_intro",
+                Fennimals_encountered: ["A1", "A2"],
+                partner_behavior: "active",
+                hint_type: ["icon"],
+                include_Fennefinder: true
+            },
             {
                 type: "pseudoday",
                 information: "new_Fennimals_spotted",
@@ -88,6 +73,8 @@ let StimulusSettings = function () {
                 display_text: "There are some Fennimals on the island who seem a bit down..."
             },
         ],
+
+
 
         mentalizing_network: [
             {
@@ -155,92 +142,6 @@ let StimulusSettings = function () {
                 toys_asked: ["A", "B", "C", "D", "E", "F"],
                 bonus_stars_per_correct_answer: 4
             }
-        ],
-
-        mentalizing: [
-
-            {
-                type: "free_exploration",
-                interaction_type: ["basic_intro"],
-                Fennimals_encountered: ["S1" , "S2", "S3"],
-                partner_behavior: "active",
-                include_Fennefinder: true,
-                force_climbing_tower_first: true
-            },
-
-            {
-                type: "on_call",
-                interaction_type: ["dirty_and_broken_toy"],
-                Fennimals_encountered: ["S1" , "S2", "S3"],
-                partner_behavior: "active",
-                include_Fennefinder: true,
-                included_orthogonal_tasks: ["find_box_extended", "reach_hat", "fly_swat_extended"],
-                orthogonal_tasks_possible_after_trial: 3
-            },
-            {
-                type: "Fennimal_attribute_sorting_task",
-                Fennimals_encountered: ["S1", "S2", "S3"],
-                attribute_order: ["location", "head", "toy", "toybox"],
-                maximum_earnable_stars: 5
-
-            },
-
-
-            {
-                type: "pseudoday",
-                information: "partner_leaves"
-            },
-            {
-                type: "pseudoday",
-                information: "new_Fennimals_spotted",
-                displayed_icons: ["P1", "P2", "P3"],
-                title: "Get to know some more Fennimals on the island",
-                display_text: "While %PARTNERNAME% is away, there are some Fennimals on the island who would love to get to know you! Unfortunately, we ran out of boxes to store the toys in, so we will have to reuse some of the boxes."
-            },
-            {
-                type: "free_exploration",
-                interaction_type: ["basic_intro"],
-                Fennimals_encountered: ["P1", "P2", "P3"],
-                partner_behavior: "absent",
-                include_Fennefinder: true,
-                force_climbing_tower_first: true
-            },
-            {
-                type: "on_call",
-                interaction_type: ["dirty_and_broken_toy"],
-                Fennimals_encountered: ["P1" , "P2", "P3"],
-                partner_behavior: "absent",
-                include_Fennefinder: true,
-                included_orthogonal_tasks: ["find_box_extended", "reach_hat", "fly_swat_extended"],
-                orthogonal_tasks_possible_after_trial: 3
-            },
-            {
-                type: "Fennimal_attribute_sorting_task",
-                Fennimals_encountered: ["P1", "P2", "P3"],
-                attribute_order: ["location", "head", "toy", "toybox"],
-                maximum_earnable_stars: 5
-
-            },
-            {
-                type: "pseudoday",
-                information: "partner_returns"
-            },
-            {
-
-                type: "partner_belief",
-                toyboxes_asked: ["A", "B", "C"],
-                toys_asked: ["A", "B", "C", "D", "E", "F"],
-                bonus_stars_per_correct_answer: 4
-            },
-            {
-                type: "Fennimal_attribute_sorting_task",
-                Fennimals_encountered: ["S1", "S2", "S3", "P1", "P2", "P3"],
-                attribute_order: ["location", "head", "toy", "toybox"],
-                maximum_earnable_stars: 5
-
-            },
-
-
         ]
     };
 
@@ -256,8 +157,10 @@ let StimulusSettings = function () {
     const All_Banned_Head_Lists = { test: false, mentalizing_1: false };
     const All_Forced_Head_Lists = {
         test: ["roller", "brush", "tube", "palette"],
+        mentalizing_1: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant", "fly", "shark", "blockhead"],
+        mentalizing_1B: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant", "fly", "shark", "blockhead"],
+        mentalizing_2: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant", "fly", "shark", "blockhead"],
         mentalizing_network: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant",  "shark", "blockhead", "parrot", "stocking"],
-        mentalizing: ["astro", "cupcake", "tube", "tv", "skull", "elephant", "shark", "blockhead", "parrot"],
     };
 
     const All_Allowed_Head_Groups_List = { test: false, mentalizing_1: false };
@@ -286,7 +189,7 @@ let StimulusSettings = function () {
     this.banned_head_groups = All_Banned_Head_Groups_List[this.Experiment_Code] || false;
 
     this.use_region_preferred_body_types = true;
-    this.preferred_region_sample_order = [["Jungle", "Village", "North", "Desert","Beach", "Mountains", "Flowerfields", "Swamp"]] // [["Jungle", "Village", "North", "Desert"], ["Beach", "Mountains", "Flowerfields", "Swamp"]];
+    this.preferred_region_sample_order = [["Jungle", "Village", "North", "Desert"], ["Beach", "Mountains", "Flowerfields", "Swamp"]];
     this.use_constract_color_for_head = false;
     this.name_is_determined_as = "head";
 
@@ -770,15 +673,6 @@ let StimulusTransformer = function (StimTemplate) {
             if (block.type === "partner_belief" && typeof block.bonus_stars_per_correct_answer === "number") {
                 max_stars += block.bonus_stars_per_correct_answer * block.toyboxes_asked.length;
             }
-
-            // FIX: Ensure the sorting task's stars are included in the global estimate
-            if (block.type === "Fennimal_attribute_sorting_task") {
-                if (typeof block.maximum_earnable_stars === "number") {
-                    max_stars += block.maximum_earnable_stars;
-                } else if (typeof block.maximum_bonus_stars_earned === "number") {
-                    max_stars += block.maximum_bonus_stars_earned;
-                }
-            }
         });
         return max_stars;
     };
@@ -791,14 +685,5 @@ let StimulusTransformer = function (StimTemplate) {
     this.get_unused_items_of_type = function(type, number) {
         let Available = JSON.parse(JSON.stringify(shuffleArray(Maps.Free[type] || [])));
         return Available.length >= number ? Available.slice(0, number) : Available;
-    };
-
-    this.get_clean_Fennimal_templates = function () {
-        let rawArr = this.get_all_Fennimals_objects_in_array();
-        return rawArr.map(fen => {
-            let cleanFen = JSON.parse(JSON.stringify(fen));
-            if (cleanFen.color_scheme_origin !== "custom") delete cleanFen.ColorScheme;
-            return cleanFen;
-        });
     };
 };
