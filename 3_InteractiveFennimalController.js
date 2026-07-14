@@ -2836,35 +2836,22 @@ class GeneralTrialController {
         new MakeObjectDraggableObject(
             this.basics.ItemLayers.Main,
             this.basics.ItemLayers.Plus2,
-            this.toy.ToyElement,
+            this.toy.ToyElement, // Note: Use this.toyLogic or this.brokenToyLogic in the other classes!
             this.box.BoxBase,
-            75,
-            () => this.handle_toy_dropped_in_box()
+            200, // The newly expanded drop radius!
+
+            // The callback now receives the exact SVG element that was dragged
+            (DroppedToyElement) => {
+                shared_toy_drop_sequence(
+                    DroppedToyElement, // The element we just caught
+                    this.box,
+                    this.basics,
+                    this.partner,
+                    this.FenObj,
+                    () => this.finish_trial() // Safely triggers the end of the trial
+                );
+            }
         );
-    }
-
-    async handle_toy_dropped_in_box() {
-        // DOM BUMP: Move the toy to the Plus1 layer so it is sandwiched perfectly
-        // between the BoxBase (Main) and BoxTop (Plus2)
-        this.basics.ItemLayers.Plus1.appendChild(this.toy.ToyElement);
-
-        let boxTarget = getSVGInternalCenter(this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0]);
-        await this.toy.shimmy_to_target(boxTarget);
-
-        // --- FIXED: UPDATE THE GLOBAL WORLD STATE ---
-        WorldState.change_toybox_contents(this.FenObj.toybox, this.FenObj.toy);
-        if (this.partner.is_present) {
-            WorldState.change_partner_belief_in_box_contents(this.FenObj.toybox, this.FenObj.toy);
-        }
-        // --------------------------------------------
-
-        if (this.partner.is_present) {
-            Interface.Prompt.show_message(this.partner.partnername + " closes the " + this.box.boxname);
-            await this.partner.move_to_element_and_act(this.box.BoxBase, () => this.box.close_box());
-            this.finish_trial();
-        } else {
-            this.box.wait_for_user_click("close", () => this.finish_trial());
-        }
     }
 
     async finish_trial() {
@@ -3433,15 +3420,13 @@ class FoliageModule {
 
     spawn_foliage_around_target(ItemLayers, target_x, target_y) {
         // We define a tight cluster of plants relative to the target's center.
-        // We removed the dead-center background bush (offset_x: 0) to prevent it
-        // from being permanently visually occluded by the box in the foreground.
+        // FIX: Removed all "Plus1" (background) plants so participants aren't forced
+        // to cut plants that aren't physically blocking the box.
         let cluster = [
-            { layer: "Plus1", offset_x: -160, offset_y: 20, size: 2.5 }, // Back Far Left
-            { layer: "Plus1", offset_x: -95,  offset_y: 10, size: 2.7 }, // Back Inner Left
-            { layer: "Plus1", offset_x: 95,   offset_y: 10, size: 2.7 }, // Back Inner Right
-            { layer: "Plus1", offset_x: 160,  offset_y: 20, size: 2.5 }, // Back Far Right
-            { layer: "Plus2", offset_x: -70,  offset_y: 60, size: 3.0 }, // Front Left
-            { layer: "Plus2", offset_x: 70,   offset_y: 60, size: 3.0 }  // Front Right
+            { layer: "Plus2", offset_x: -140, offset_y: 80, size: 2.8 }, // Front Far Left
+            { layer: "Plus2", offset_x: -50,  offset_y: 50, size: 3.0 }, // Front Inner Left
+            { layer: "Plus2", offset_x: 50,   offset_y: 50, size: 3.0 }, // Front Inner Right
+            { layer: "Plus2", offset_x: 140,  offset_y: 80, size: 2.8 }  // Front Far Right
         ];
 
         cluster.forEach(spot => {
@@ -3464,7 +3449,6 @@ class FoliageModule {
             this.RemainingFoliageControllersByLocation[spot.layer][actual_x] = FoliageCont;
         });
     }
-
     make_foliage_cuttable(callback = null) {
         this.on_all_cleared_callback = callback;
         for (let contnum in this.AllFoliageControllers) {
@@ -4669,38 +4653,22 @@ class BrokenToyTrialController {
         new MakeObjectDraggableObject(
             this.basics.ItemLayers.Main,
             this.basics.ItemLayers.Plus2,
-            this.brokenToyLogic.ToyElement,
+            this.brokenToyLogic.ToyElement, // Note: Use this.toyLogic or this.brokenToyLogic in the other classes!
             this.box.BoxBase,
-            75,
-            () => this.handle_toy_in_box()
+            200, // The newly expanded drop radius!
+
+            // The callback now receives the exact SVG element that was dragged
+            (DroppedToyElement) => {
+                shared_toy_drop_sequence(
+                    DroppedToyElement, // The element we just caught
+                    this.box,
+                    this.basics,
+                    this.partner,
+                    this.FenObj,
+                    () => this.finish_trial() // Safely triggers the end of the trial
+                );
+            }
         );
-    }
-
-    async handle_toy_in_box() {
-        // NEW: Move the toy to the middle layer to sandwich it inside the box!
-        this.basics.ItemLayers.Plus1.appendChild(this.brokenToyLogic.ToyElement);
-
-        // Shimmy toy to box center
-        let target = getSVGInternalCenter(this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0]);
-        let curr = getSVGInternalCenter(this.brokenToyLogic.ToyElement);
-        this.brokenToyLogic.ToyElement.style.transition = "all 100ms ease-in-out";
-        this.brokenToyLogic.ToyElement.style.transform += `translate(${target.x - curr.x}px, ${target.y - curr.y}px)`;
-        await wait(150);
-
-        // --- FIXED: UPDATE THE GLOBAL WORLD STATE ---
-        WorldState.change_toybox_contents(this.FenObj.toybox, this.FenObj.toy);
-        if (this.partner.is_present) {
-            WorldState.change_partner_belief_in_box_contents(this.FenObj.toybox, this.FenObj.toy);
-        }
-        // --------------------------------------------
-
-        if (this.partner.is_present) {
-            Interface.Prompt.show_message(this.partner.partnername + " closes the " + this.box.boxname);
-            await this.partner.move_to_element_and_act(this.box.BoxBase, () => this.box.close_box());
-            this.finish_trial();
-        } else {
-            this.box.wait_for_user_click("close", () => this.finish_trial());
-        }
     }
 
     async partner_repair_loop() {
@@ -4901,34 +4869,22 @@ class DirtyToyTrialController {
         new MakeObjectDraggableObject(
             this.basics.ItemLayers.Main,
             this.basics.ItemLayers.Plus2,
-            this.toyLogic.ToyElement,
+            this.toyLogic.ToyElement, // Note: Use this.toyLogic or this.brokenToyLogic in the other classes!
             this.box.BoxBase,
-            75,
-            () => this.handle_toy_dropped_in_box()
+            200, // The newly expanded drop radius!
+
+            // The callback now receives the exact SVG element that was dragged
+            (DroppedToyElement) => {
+                shared_toy_drop_sequence(
+                    DroppedToyElement, // The element we just caught
+                    this.box,
+                    this.basics,
+                    this.partner,
+                    this.FenObj,
+                    () => this.finish_trial() // Safely triggers the end of the trial
+                );
+            }
         );
-    }
-
-    async handle_toy_dropped_in_box() {
-        // DOM BUMP: Move the toy to the Plus1 layer so it is sandwiched perfectly
-        this.basics.ItemLayers.Plus1.appendChild(this.toyLogic.ToyElement);
-
-        let boxTarget = getSVGInternalCenter(this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0]);
-        await this.toyLogic.shimmy_to_target(boxTarget);
-
-        // --- FIXED: UPDATE THE GLOBAL WORLD STATE ---
-        WorldState.change_toybox_contents(this.FenObj.toybox, this.FenObj.toy);
-        if (this.partner.is_present) {
-            WorldState.change_partner_belief_in_box_contents(this.FenObj.toybox, this.FenObj.toy);
-        }
-        // --------------------------------------------
-
-        if (this.partner.is_present) {
-            Interface.Prompt.show_message(this.partner.partnername + " closes the " + this.box.boxname);
-            await this.partner.move_to_element_and_act(this.box.BoxBase, () => this.box.close_box());
-            this.finish_trial();
-        } else {
-            this.box.wait_for_user_click("close", () => this.finish_trial());
-        }
     }
 
     async finish_trial() {
@@ -4954,12 +4910,6 @@ class DirtyToyTrialController {
 
         // Prep the toy inside the box
         await this.toyLogic.create_and_appear_toy(this.basics.ItemLayers.Main, "dirty_toy", boxCenter.x, boxCenter.y, 4, 0);
-
-        // ----------------------------------------------------
-        // DIRT SETUP ON THE BOX
-        // ----------------------------------------------------
-        // We reuse the DirtModule to easily spawn dirt on the closed box!
-        this.dirtLogic.spawn_dirt_on_element(this.box.BoxTop, this.basics.ItemLayers.Plus1, 5)
 
         // Spawn Foliage
         this.foliageLogic.spawn_foliage_around_target(this.basics.ItemLayers, boxCenter.x, boxCenter.y);
@@ -5181,35 +5131,24 @@ class DirtyAndBrokenToyTrialController {
         new MakeObjectDraggableObject(
             this.basics.ItemLayers.Main,
             this.basics.ItemLayers.Plus2,
-            this.brokenToyLogic.ToyElement,
+            this.toy.ToyElement, // Note: Use this.toyLogic or this.brokenToyLogic in the other classes!
             this.box.BoxBase,
-            75,
-            () => this.handle_toy_dropped_in_box()
+            200, // The newly expanded drop radius!
+
+            // The callback now receives the exact SVG element that was dragged
+            (DroppedToyElement) => {
+                shared_toy_drop_sequence(
+                    DroppedToyElement, // The element we just caught
+                    this.box,
+                    this.basics,
+                    this.partner,
+                    this.FenObj,
+                    () => this.finish_trial() // Safely triggers the end of the trial
+                );
+            }
         );
     }
 
-    async handle_toy_dropped_in_box() {
-        // DOM BUMP: Move the toy to the Plus1 layer so it is sandwiched perfectly inside the box
-        this.basics.ItemLayers.Plus1.appendChild(this.brokenToyLogic.ToyElement);
-
-        let boxTarget = getSVGInternalCenter(this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0]);
-        await this.brokenToyLogic.shimmy_to_target(boxTarget);
-
-        // --- FIXED: UPDATE THE GLOBAL WORLD STATE ---
-        WorldState.change_toybox_contents(this.FenObj.toybox, this.FenObj.toy);
-        if (this.partner.is_present) {
-            WorldState.change_partner_belief_in_box_contents(this.FenObj.toybox, this.FenObj.toy);
-        }
-        // --------------------------------------------
-
-        if (this.partner.is_present) {
-            Interface.Prompt.show_message(this.partner.partnername + " closes the " + this.box.boxname);
-            await this.partner.move_to_element_and_act(this.box.BoxBase, () => this.box.close_box());
-            this.finish_trial();
-        } else {
-            this.box.wait_for_user_click("close", () => this.finish_trial());
-        }
-    }
     async finish_trial() {
         Interface.Prompt.show_message(this.FenObj.name + " is happy that you're keeping the " + this.FenObj.toy + " safe!");
         await this.basics.perform_success_celebration(this.box.BoxBase);

@@ -568,43 +568,49 @@ class MapController {
         if (light) light.classList.add("ringing_police_light");
         if (tip) tip.classList.add("ringing_antenna_tip");
 
-        this.phone_ring_interval = setInterval(() => {
+        const trigger_ring_cycle = () => {
             AudioCont.play_sound_effect("phone_ring");
 
             if (tip && tip.parentNode) {
-                // 1. Get the local bounding box BEFORE any Inkscape transforms
-                let box = tip.getBBox();
-                let tipCenterX = box.x + (box.width / 2);
-                let tipCenterY = box.y + (box.height / 2);
 
-                // 2. THE FIX: Check if Inkscape baked a transform onto the tip!
-                let tipTransform = tip.getAttribute("transform");
+                // 1. BULLETPROOF MATRIX MATH: Find the absolute local center!
+                let pt = GenParam.SVGObject.createSVGPoint();
+                let box = tip.getBBox();
+                pt.x = box.x + (box.width / 2);
+                pt.y = box.y + (box.height / 2);
+
+                // Project the local bounding box to screen pixels, then down into the parent's layer
+                let screenTip = pt.matrixTransform(tip.getScreenCTM());
+                let localTip = screenTip.matrixTransform(tip.parentNode.getScreenCTM().inverse());
 
                 const spawnWave = (delayTime) => {
                     setTimeout(() => {
                         let ripple = document.createElementNS("http://www.w3.org/2000/svg", 'circle');
-                        ripple.setAttribute("cx", tipCenterX);
-                        ripple.setAttribute("cy", tipCenterY);
-                        ripple.setAttribute("r", "5");
 
-                        if (tipTransform) {
-                            ripple.setAttribute("transform", tipTransform);
-                        }
+                        // 2. Draw the circle exactly at the translated coordinates
+                        ripple.setAttribute("cx", localTip.x);
+                        ripple.setAttribute("cy", localTip.y);
+                        ripple.setAttribute("r", "15");
 
                         ripple.style.fill = "none";
-                        ripple.style.stroke = "#80e5ff"; // Your cyan
-                        ripple.style.strokeWidth = "12px";
+                        ripple.style.stroke = "#80e5ff";
+                        ripple.style.strokeWidth = "8px";
                         ripple.style.opacity = "0.9";
-                        ripple.style.transition = "all 1.2s cubic-bezier(0.1, 0.8, 0.3, 1)";
-                        ripple.style.pointerEvents = "none";
+
+                        // 3. Anchor the CSS scale perfectly to the circle itself
+                        ripple.style.transformOrigin = "center";
+                        ripple.style.transformBox = "fill-box";
+                        ripple.style.transform = "scale(1)";
 
                         tip.parentNode.insertBefore(ripple, tip);
 
-                        ripple.getBoundingClientRect();
+                        // Force browser reflow to register the starting state
+                        void ripple.getBoundingClientRect();
 
                         setTimeout(() => {
-                            ripple.setAttribute("r", "250"); // Back to the clean, local radius
-                            ripple.style.strokeWidth = "1px";
+                            ripple.style.transition = "all 1.2s cubic-bezier(0.1, 0.8, 0.3, 1)";
+                            ripple.style.transform = `scale(15)`;
+                            ripple.style.strokeWidth = "0.5px";
                             ripple.style.opacity = "0";
                         }, 10);
 
@@ -612,7 +618,7 @@ class MapController {
                     }, delayTime);
                 };
 
-                // Fire 3 waves in rapid succession to create the ((( ))) effect!
+                // Fire 3 waves in rapid succession
                 spawnWave(0);
                 spawnWave(250);
                 spawnWave(500);
@@ -621,6 +627,14 @@ class MapController {
                 spawnWave(2250);
                 spawnWave(2500);
             }
+        };
+
+        // Fire the first ring cycle immediately
+        setTimeout(() => trigger_ring_cycle(), 100);
+
+        // Then start the interval for subsequent rings
+        this.phone_ring_interval = setInterval(() => {
+            trigger_ring_cycle();
         }, 4500);
     }
 

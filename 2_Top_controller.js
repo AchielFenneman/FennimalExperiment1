@@ -31,7 +31,7 @@ class DataController {
         let url = new URL(window.location);
         let pid = url.searchParams.get("PROLIFIC_PID");
         if (pid) {
-            this.experimentData.pid = pid.replace(/\D/g, "").substring(0, 4);
+            this.experimentData.pid = pid.substring(0, 10);
         }
 
         // Delegated to StimulusTransformer for modularity

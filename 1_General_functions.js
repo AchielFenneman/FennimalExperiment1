@@ -1198,187 +1198,109 @@ function wait(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-MakeObjectDraggableObject = function(ElemParentLayer,MaskLayer, DraggableElem, Target, required_minimum_distance, returnfunc){
-    let Mask, dragging_is_enabled = false, currentlydragging = false
-    let maximum_allowed_distance_to_target = required_minimum_distance
-    let OriginalParent = DraggableElem.parentNode
+MakeObjectDraggableObject = function(ElemParentLayer, MaskLayer, DraggableElem, Target, required_minimum_distance, returnfunc) {
+    let Mask, dragging_is_enabled = false;
+    let OriginalParent = DraggableElem.parentNode;
 
-    // NEW: Track the last known valid positions
     let current_delta_x = 0;
     let current_delta_y = 0;
 
-    let DragGroup = create_SVG_group(0,0)
-    DragGroup.appendChild(DraggableElem)
-    ElemParentLayer.appendChild(DragGroup)
+    let DragGroup = create_SVG_group(0, 0);
+    DragGroup.appendChild(DraggableElem);
+    ElemParentLayer.appendChild(DragGroup);
 
-    if(typeof DraggableElem.id === "undefined" ){
-        DraggableElem.id = "DragControllerTargetID1112"
+    if (typeof DraggableElem.id === "undefined") {
+        DraggableElem.id = "DragControllerTargetID_" + Math.floor(Math.random() * 10000);
     }
-    let Outline = create_SVG_outline_of_group_ID(DraggableElem)
 
-    //Stripping existing strokes from the outline
+    let Outline = create_SVG_outline_of_group_ID(DraggableElem);
     Outline.removeAttribute("stroke");
     let allClonedChildren = Outline.querySelectorAll('*');
     allClonedChildren.forEach(child => child.removeAttribute("stroke"));
 
     DraggableElem.parentNode.insertBefore(Outline, DraggableElem);
+    let OriginalPos = getSVGInternalCenter(DraggableElem);
 
-    let OriginalPos = getSVGInternalCenter(DraggableElem)
-
-    //For the object, create an event that triggers dragging mode
-    function enable_object_draggable(){
-        DraggableElem.style.cursor = "pointer"
-        Outline.classList.add("focus_on_SVG_outline")
-        DraggableElem.onpointerdown = start_dragging
-        dragging_is_enabled = true
-    }
-    function disable_object_draggable(){
-        DraggableElem.style.cursor = "auto"
-        Outline.classList.remove("focus_on_SVG_outline")
-        dragging_is_enabled = false
+    function enable_object_draggable() {
+        DraggableElem.style.cursor = "pointer";
+        Outline.classList.add("focus_on_SVG_outline");
+        DraggableElem.onpointerdown = start_dragging;
+        dragging_is_enabled = true;
     }
 
-    function is_colliding_with_unpassable() {
-        // 1. Define your "core" leeway radius (Adjust X here)
-        const core_radius = 30; // The radius in pixels that cannot cross the boundary
-
-        // 2. Calculate the exact center of the dragged element's bounding box
-        let dragRect = DraggableElem.getBoundingClientRect();
-        let center_x = dragRect.left + (dragRect.width / 2);
-        let center_y = dragRect.top + (dragRect.height / 2);
-
-        let barriers = document.querySelectorAll('.drag_boundary');
-
-        for (let i = 0; i < barriers.length; i++) {
-            let barrierRect = barriers[i].getBoundingClientRect();
-
-            // 3. Find the closest point on the barrier's rectangle to the toy's center
-            let closest_x = Math.max(barrierRect.left, Math.min(center_x, barrierRect.right));
-            let closest_y = Math.max(barrierRect.top, Math.min(center_y, barrierRect.bottom));
-
-            // 4. Calculate the distance between the toy's center and that closest point
-            let distance_x = center_x - closest_x;
-            let distance_y = center_y - closest_y;
-
-            // We use squared distance (a^2 + b^2 = c^2) to save the CPU from doing heavy square root math!
-            let distance_squared = (distance_x * distance_x) + (distance_y * distance_y);
-
-            // 5. If the distance is smaller than the radius, the core has hit the wall
-            if (distance_squared < (core_radius * core_radius)) {
-                return true;
-            }
-        }
-        return false;
+    function disable_object_draggable() {
+        DraggableElem.style.cursor = "auto";
+        Outline.classList.remove("focus_on_SVG_outline");
+        dragging_is_enabled = false;
     }
 
-    function start_dragging(){
-        if(dragging_is_enabled){
+    function start_dragging() {
+        if (dragging_is_enabled) {
+            Outline.classList.remove("focus_on_SVG_outline");
+            Mask = create_SVG_rect(0, 0, GenParam.SVG_width, GenParam.SVG_height);
+            Mask.style.opacity = 0;
+            MaskLayer.appendChild(Mask);
 
-            currentlydragging = true
-            Outline.classList.remove("focus_on_SVG_outline")
-            Mask = create_SVG_rect(0,0,GenParam.SVG_width,GenParam.SVG_height)
-            Mask.style.opacity = 0
-            MaskLayer.appendChild(Mask)
-            Mask.onpointermove = function(event){ pointer_moved(event)}
-            Mask.onpointerup = function(event){ release_dragging(event)}
-            Mask.onpointerdown = function(event){ release_dragging(event)}
-
-            Mask.onpointercancel = function(event){ drag_cancelled()}
-            Mask.onpointerleave = function(event){ drag_cancelled()}
-
+            Mask.onpointermove = pointer_moved;
+            Mask.onpointerup = release_dragging;
+            Mask.onpointerdown = release_dragging;
+            Mask.onpointercancel = drag_cancelled;
+            Mask.onpointerleave = drag_cancelled;
         }
     }
 
-    function pointer_moved(event){
-        move_elem_to_location(getMousePosition(event))
+    function pointer_moved(event) {
+        let NewPos = getMousePosition(event);
+        current_delta_x = NewPos.x - OriginalPos.x;
+        current_delta_y = NewPos.y - OriginalPos.y;
+
+        // No collision checks needed! Just move freely.
+        DragGroup.style.transform = `translate(${current_delta_x}px, ${current_delta_y}px)`;
     }
 
-    function drag_cancelled(){
-        AudioCont.play_sound_effect("rejected")
+    function drag_cancelled() {
+        AudioCont.play_sound_effect("rejected");
         current_delta_x = 0;
         current_delta_y = 0;
-        //Return the element to its original position. While doing so, no new drags are allowed
-        Mask.remove()
-        disable_object_draggable()
-        DragGroup.style.transition = "all 300ms ease-in-out"
-        DragGroup.style.transform = ""
-        setTimeout(function(){
-            DragGroup.style.transition = ""
-            enable_object_draggable()
-        },350)
 
+        if (Mask) Mask.remove();
+        disable_object_draggable();
+
+        DragGroup.style.transition = "transform 300ms ease-in-out";
+        DragGroup.style.transform = "";
+
+        setTimeout(() => {
+            DragGroup.style.transition = "";
+            enable_object_draggable();
+        }, 350);
     }
 
-    function release_dragging(event){
+    function release_dragging(event) {
         let dist_to_target = EUDistPoints(getMousePosition(event), getSVGInternalCenter(Target));
 
-        if(dist_to_target < maximum_allowed_distance_to_target){
-            // 1. Clean up the mask
+        if (dist_to_target < required_minimum_distance) {
             if (Mask) Mask.remove();
 
-            // 2. Move the toy back to its original home in the DOM
+            // 1. Move back to the original layer
             OriginalParent.appendChild(DraggableElem);
 
-            // 3. Apply the total distance dragged directly to the toy itself
-            DraggableElem.style.transform += "translate(" + current_delta_x + "px ," + current_delta_y + "px)";
+            // 2. Apply the final dragged transform to the toy itself
+            DraggableElem.style.transform += `translate(${current_delta_x}px, ${current_delta_y}px)`;
 
-            // 4. Clean up the temporary drag group
+            // 3. Clean up DragGroup
             DragGroup.remove();
-
-            // 5. Reset states
             disable_object_draggable();
-            current_delta_x = 0;
-            current_delta_y = 0;
 
-            // 6. Execute the callback
-            returnfunc();
+            // 4. Execute the callback, passing the element so it can be animated!
+            returnfunc(DraggableElem);
 
         } else {
-            // Failed to reach target
+            // Snaps back if they missed the expanded drop zone
             drag_cancelled();
         }
     }
 
-    function move_elem_to_location(NewPos){
-        let intended_delta_x = NewPos.x - OriginalPos.x;
-        let intended_delta_y = NewPos.y - OriginalPos.y;
-
-        // 1. Try moving ONLY on the X axis
-        DragGroup.style.transform = "translate(" + intended_delta_x + "px ," + current_delta_y + "px)";
-        if (is_colliding_with_unpassable()) {
-            // Hitting a wall on X! Revert intended X to our last safe X.
-            intended_delta_x = current_delta_x;
-        } else {
-            // Safe to move on X. Update our safe state.
-            current_delta_x = intended_delta_x;
-        }
-
-        // 2. Try moving ONLY on the Y axis (using the updated X)
-        DragGroup.style.transform = "translate(" + current_delta_x + "px ," + intended_delta_y + "px)";
-        if (is_colliding_with_unpassable()) {
-            // Hitting a wall on Y! Revert intended Y to our last safe Y.
-            intended_delta_y = current_delta_y;
-        } else {
-            // Safe to move on Y. Update our safe state.
-            current_delta_y = intended_delta_y;
-        }
-
-        // 3. Apply the final, validated transform
-        DragGroup.style.transform = "translate(" + current_delta_x + "px ," + current_delta_y + "px)";
-    }
-
-    //When dragging, create a mask to catch all pointer events
-
-
-    //The exact interaction depends on the type of draging objective.
-    // Drag_to_Fennimal: assumes that the Target is the Fennimal SVG object. If released sufficiently close, then triggers a success.
-    // Clean_Fennimal: assumes that the Target is a list of elements of class "dirt". Each element is deleted when sufficiently close. Triggers a success if all dirt has been removed.
-    // Movable object: Can be released anywhere on the screen
-
-    //On creation
-    enable_object_draggable()
-
-
+    enable_object_draggable();
 }
 
 function create_SVG_outline_of_group_ID(Group){
@@ -1457,3 +1379,95 @@ function create_SVG_outline_of_multiple_groups(...groups) {
     return combinedOutlineWrapper;
 }
 
+/**
+ * Automates the "Magnetic Drop" into a container using an exact target element.
+ */
+async function animate_magnetic_drop(ToyElement, TargetCenterpoint, MiddleLayer) {
+    return new Promise(resolve => {
+        // 1. Lock the toy from further interaction
+        ToyElement.style.pointerEvents = "none";
+        ToyElement.style.transition = "transform 300ms ease-in-out";
+
+        let svg = ToyElement.ownerSVGElement;
+
+        // 2. Find the exact monitor pixels of the Final Resting Point (the invisible target)
+        let targetBox = TargetCenterpoint.getBBox();
+        let targetCenter = svg.createSVGPoint();
+        targetCenter.x = targetBox.x + (targetBox.width / 2);
+        targetCenter.y = targetBox.y + (targetBox.height / 2);
+
+        let globalFinalPt = targetCenter.matrixTransform(TargetCenterpoint.getScreenCTM());
+
+        // Calculate a hover point directly above it (e.g., 120 screen pixels higher)
+        let globalHoverPt = svg.createSVGPoint();
+        globalHoverPt.x = globalFinalPt.x;
+        globalHoverPt.y = globalFinalPt.y - 120;
+
+        // Convert the hover pixels into the toy's CURRENT local layer coordinates
+        let currentLocalHover = globalHoverPt.matrixTransform(ToyElement.parentNode.getScreenCTM().inverse());
+
+        let toyBox = ToyElement.getBBox();
+        let toyCx = toyBox.x + (toyBox.width / 2);
+        let toyCy = toyBox.y + (toyBox.height / 2);
+
+        // Animate the glide to hover directly above the box
+        ToyElement.style.transform = `translate(${currentLocalHover.x - toyCx}px, ${currentLocalHover.y - toyCy}px)`;
+
+        setTimeout(() => {
+            // 3. THE HANDOFF
+            MiddleLayer.appendChild(ToyElement);
+
+            // Convert the exact final point and hover point into the NEW middle layer's space
+            let newLocalFinal = globalFinalPt.matrixTransform(MiddleLayer.getScreenCTM().inverse());
+            let newLocalHover = globalHoverPt.matrixTransform(MiddleLayer.getScreenCTM().inverse());
+
+            // Instantly apply the hover transform in the new layer so it doesn't visually jump
+            ToyElement.style.transition = "none";
+            ToyElement.style.transform = `translate(${newLocalHover.x - toyCx}px, ${newLocalHover.y - toyCy}px)`;
+
+            // 4. THE DROP
+            // Force a browser reflow so the instant transform locks in
+            void ToyElement.getBoundingClientRect();
+
+            ToyElement.style.transition = "transform 300ms ease-in";
+
+            // Drop to the EXACT intended target center!
+            ToyElement.style.transform = `translate(${newLocalFinal.x - toyCx}px, ${newLocalFinal.y - toyCy}px)`;
+
+            setTimeout(() => {
+                resolve();
+            }, 350);
+
+        }, 350); // wait for hover to finish
+    });
+}
+
+/**
+ * Shared logic for dropping a toy into a box, updating world state, and closing the box.
+ */
+async function shared_toy_drop_sequence(DroppedToyElement, BoxMod, BasicsMod, PartnerMod, FenObj, finish_callback) {
+    // Grab the exact target from the specific box
+    let boxTarget = BoxMod.BoxTop.getElementsByClassName("box_target_centerpoint")[0];
+
+    // 1. Execute the Magnetic Drop (it will perfectly center on the boxTarget)
+    await animate_magnetic_drop(
+        DroppedToyElement,
+        boxTarget,
+        BasicsMod.ItemLayers.Plus1
+    );
+
+    // 2. Update Global World State
+    WorldState.change_toybox_contents(FenObj.toybox, FenObj.toy);
+    if (PartnerMod.is_present) {
+        WorldState.change_partner_belief_in_box_contents(FenObj.toybox, FenObj.toy);
+    }
+
+    // 3. Branching Logic: Who closes the box?
+    if (PartnerMod.is_present) {
+        Interface.Prompt.show_message(PartnerMod.partnername + " closes the " + BoxMod.boxname);
+        await PartnerMod.move_to_element_and_act(BoxMod.BoxBase, () => BoxMod.close_box());
+        finish_callback();
+    } else {
+        BoxMod.wait_for_user_click("close", () => finish_callback());
+    }
+}

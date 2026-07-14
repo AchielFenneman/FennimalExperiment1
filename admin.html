@@ -92,24 +92,41 @@
                 allParticipants.push(rawData);
             });
 
-            // 6. Convert directly to a JSON string and download
-            const jsonString = JSON.stringify(allParticipants, null, 2);
-            const blob = new Blob([jsonString], { type: "application/json" });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = `${colName}_data.json`;
-            link.style.display = "none";
+            // NEW: Filter for only completed experiments
+            // We check both the root and nested levels defensively, depending on how the data was merged into Firebase
+            let completedParticipants = allParticipants.filter(p =>
+                p.experimentCompleted === true ||
+                (p.experimentData && p.experimentData.experimentCompleted === true)
+            );
 
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            // NEW: Helper function to trigger downloads
+            const downloadJSON = (dataObj, filename) => {
+                const jsonString = JSON.stringify(dataObj, null, 2);
+                const blob = new Blob([jsonString], { type: "application/json" });
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = filename;
+                link.style.display = "none";
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
 
-            statusEl.innerText = `Success! Downloaded ${allParticipants.length} participants.`;
+            // 6. Download the full dataset immediately
+            downloadJSON(allParticipants, `${colName}_all_data.json`);
+
+            // Download the completed dataset after a tiny 500ms delay
+            // (This prevents the browser from blocking multiple simultaneous downloads!)
+            setTimeout(() => {
+                downloadJSON(completedParticipants, `${colName}_completed_data.json`);
+            }, 500);
+
+            // Update the UI with both counts!
+            statusEl.innerText = `Success! Downloaded ${allParticipants.length} total participants (${completedParticipants.length} completed).`;
             statusEl.style.color = "green";
 
             // 7. Log out immediately after downloading to maintain security
             auth.signOut();
-
         } catch (error) {
             console.error(error);
             statusEl.innerText = "Error: Invalid password or connection issue.";

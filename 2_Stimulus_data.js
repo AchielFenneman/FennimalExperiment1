@@ -1,6 +1,6 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["mentalizing"];
+    this.Experiment_Code = ["test"];
 
     const All_Instructions_At_Start = {
         test: [],
@@ -55,8 +55,8 @@ let StimulusSettings = function () {
     let All_Experiment_Structures = {
         test: [
             {
-                type: "jump_to_trial",
-                interaction_type: "basic_intro",
+                type: "on_call",
+                interaction_type: "dirty_toy",
                 Fennimals_encountered: ["A1", "A2"],
                 partner_behavior: "absent",
                 hint_type: ["icon"],
