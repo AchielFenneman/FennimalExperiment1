@@ -259,7 +259,7 @@ let StimulusSettings = function () {
         mentalizing_1: ["demographics_questionnaire"],
         mentalizing_1B: ["demographics_questionnaire"],
         mentalizing_2: ["demographics_questionnaire"],
-        mentalizing_network: ["demographics_questionnaire"],
+        mentalizing: ["demographics_questionnaire"],
     };
 
     const All_Allowed_Head_Lists = { test: false, mentalizing_1: false };
@@ -267,7 +267,7 @@ let StimulusSettings = function () {
     const All_Forced_Head_Lists = {
         test: ["roller", "brush", "tube", "palette"],
         mentalizing_network: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant",  "shark", "blockhead", "parrot", "stocking"],
-        mentalizing: ["astro", "cupcake", "tube", "tv", "skull", "elephant", "shark", "blockhead", "parrot"],
+        mentalizing: ["astro", "cupcake", "tube", "tv", "skull", "elephant", "blockhead", "parrot"],
     };
 
     const All_Allowed_Head_Groups_List = { test: false, mentalizing_1: false };
