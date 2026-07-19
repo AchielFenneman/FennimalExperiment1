@@ -288,6 +288,9 @@ WorldStateObject = function () {
     // Changes only go into effect after the map is reset!
     let current_partner_role = null
     this.change_partner_role_behavior = function(new_role){
+        // Accept common aliases so stimulus typos don't silently hide the partner.
+        if (new_role === "present" || new_role === true) new_role = "active";
+        if (new_role === "absent" || new_role === false) new_role = null;
         current_partner_role = new_role
     }
     this.get_current_partner_role = function(){
@@ -351,6 +354,8 @@ WorldStateObject = function () {
     //BOX FUNCTIONS
     ////////////////
     let ToyBoxes = {}
+    // Chronological contents history per box: [{ toy, changed_at_ms }]
+    let ToyBoxHistory = {}
 
     //Checks the contents of a box. If this box has not been encountered yet, returns false.
     this.get_toybox_contents = function(boxtype){
@@ -363,7 +368,42 @@ WorldStateObject = function () {
     //Changes the contents of a box. If this box has not been encountered, it will create a new entry
     this.change_toybox_contents = function(boxtype, toy){
         ToyBoxes[boxtype] = toy
+        if (typeof ToyBoxHistory[boxtype] === "undefined") {
+            ToyBoxHistory[boxtype] = []
+        }
+        ToyBoxHistory[boxtype].push({
+            toy: toy,
+            changed_at_ms: Date.now()
+        })
+    }
 
+    // Clears current contents (box becomes empty). Records the clear in history.
+    this.clear_toybox_contents = function(boxtype){
+        delete ToyBoxes[boxtype]
+        if (typeof ToyBoxHistory[boxtype] === "undefined") {
+            ToyBoxHistory[boxtype] = []
+        }
+        ToyBoxHistory[boxtype].push({
+            toy: null,
+            changed_at_ms: Date.now()
+        })
+    }
+
+    // Full chronological history for a box (empty array if never filled).
+    this.get_toybox_contents_history = function(boxtype){
+        if (typeof ToyBoxHistory[boxtype] === "undefined") {
+            return []
+        }
+        return JSON.parse(JSON.stringify(ToyBoxHistory[boxtype]))
+    }
+
+    // Previous contents before the current one (false if fewer than 2 entries).
+    this.get_previous_toybox_contents = function(boxtype){
+        let history = ToyBoxHistory[boxtype]
+        if (!history || history.length < 2) {
+            return false
+        }
+        return history[history.length - 2].toy
     }
 
     // LOST AND FOUND

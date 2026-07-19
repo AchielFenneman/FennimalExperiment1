@@ -48,8 +48,8 @@ function cleanSVGElements(element) {
 }
 
 
-// --- MAIN CONTROLLER ---
-class FennimalAttributeSortingTask {
+// --- MAIN CONTROLLERS ---
+class FennimalAttributeSortingTaskBase {
     constructor(parentElem, titleElem, fennimalObjectArray, attributesArr, maxEarnableStars, instructionsCont, returnFunc) {
         this.parentElem = parentElem;
         this.titleElem = titleElem;
@@ -71,12 +71,13 @@ class FennimalAttributeSortingTask {
         this.targetBoxes = [];
         this.cardsInReservoir = [];
         this.activeCard = null;
+        this.cardsLocked = false;
 
-        this.init();
+        this.totalProgressUnits = this.fennimalObjectArray.length * this.attributesArr.length;
+        this.completedProgressUnits = 0;
     }
 
-    init() {
-        // 1. Setup a SINGLE Full-Screen Foreign Object to prevent all clipping
+    initShell() {
         this.mainForeign = create_SVG_foreignElement(0, 0, GenParam.SVG_width, GenParam.SVG_height);
         this.parentElem.appendChild(this.mainForeign);
 
@@ -86,7 +87,6 @@ class FennimalAttributeSortingTask {
         this.mainDiv.style.position = "relative";
         this.mainForeign.appendChild(this.mainDiv);
 
-        // 2. Setup the Reservoir (Flexbox guarantees perfect alignment and snap-backs)
         this.reservoirDiv = document.createElement("div");
         this.reservoirDiv.style.position = "absolute";
         this.reservoirDiv.style.top = "12%";
@@ -99,7 +99,6 @@ class FennimalAttributeSortingTask {
         this.reservoirDiv.style.gap = "30px";
         this.mainDiv.appendChild(this.reservoirDiv);
 
-        // 3. Setup the Targets (Multi-Row Support Added)
         this.targetDiv = document.createElement("div");
         this.targetDiv.style.position = "absolute";
         this.targetDiv.style.top = "32%";
@@ -113,66 +112,240 @@ class FennimalAttributeSortingTask {
         this.targetDiv.style.gap = "20px";
         this.mainDiv.appendChild(this.targetDiv);
 
-        // Build the Scene Boxes
-        this.fennimalObjectArray.forEach((fenObj) => {
-            this.targetBoxes.push(new FennimalSortingTargetSceneBox(this.targetDiv, fenObj, this.attributesArr, this.fennimalObjectArray.length));
-        });
-
-        // 4. UI: Star Counter
         if (this.maxEarnableStars > 0) {
-            this.starDiv = document.createElement("div");
-            this.starDiv.style.position = "absolute";
-            this.starDiv.style.top = "3%";
-            this.starDiv.style.right = "5%";
-            this.starDiv.style.fontSize = "80px";
-            this.starDiv.style.fontWeight = "bold";
-            this.starDiv.style.color = "darkgoldenrod";
-            this.mainDiv.appendChild(this.starDiv);
-            this.updateStarUI();
+            this.buildStarCounter();
         }
 
-        // 5. Bind Global Drag Handlers safely
+        this.updateTaskProgress();
+
         this.pointerMoveHandler = (e) => this.onPointerMove(e);
         this.pointerUpHandler = (e) => this.onPointerUp(e);
         document.addEventListener("pointermove", this.pointerMoveHandler);
         document.addEventListener("pointerup", this.pointerUpHandler);
+    }
 
-        this.startNextAttribute();
+    buildStarCounter() {
+        this.starDiv = document.createElement("div");
+        this.starDiv.style.position = "absolute";
+        this.starDiv.style.top = "calc(2% + 10px)";
+        this.starDiv.style.right = "4%";
+        this.starDiv.style.display = "flex";
+        this.starDiv.style.alignItems = "center";
+        this.starDiv.style.gap = "10px";
+        this.starDiv.style.transition = "transform 160ms ease, filter 160ms ease";
+        this.starDiv.style.transformOrigin = "center center";
+        this.mainDiv.appendChild(this.starDiv);
+
+        let starSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        starSvg.setAttribute("width", "72");
+        starSvg.setAttribute("height", "72");
+        starSvg.style.overflow = "visible";
+        starSvg.style.flexShrink = "0";
+        this.starDiv.appendChild(starSvg);
+
+        let alignGroup = create_SVG_group(0, 0);
+        starSvg.appendChild(alignGroup);
+
+        let starSource = document.getElementById("icon_bonus_star");
+        if (starSource) {
+            let starClone = starSource.cloneNode(true);
+            starClone.style.display = "inherit";
+            starClone.removeAttribute("id");
+            starClone.classList.remove("interface_element");
+            alignGroup.appendChild(starClone);
+            this.starIconGroup = alignGroup;
+
+            setTimeout(() => {
+                try {
+                    let box = alignGroup.getBBox();
+                    if (box.width > 0 && box.height > 0) {
+                        let scale = Math.min(64 / box.width, 64 / box.height);
+                        let cx = box.x + box.width / 2;
+                        let cy = box.y + box.height / 2;
+                        alignGroup.setAttribute("transform", `translate(36, 36) scale(${scale}) translate(${-cx}, ${-cy})`);
+                    }
+                } catch (e) { /* bbox unavailable */ }
+            }, 0);
+        }
+
+        this.starCountLabel = document.createElement("span");
+        this.starCountLabel.style.fontSize = "56px";
+        this.starCountLabel.style.fontWeight = "bold";
+        this.starCountLabel.style.color = "darkgoldenrod";
+        this.starCountLabel.style.lineHeight = "1";
+        this.starCountLabel.style.transition = "color 160ms ease, transform 160ms ease";
+        this.starDiv.appendChild(this.starCountLabel);
+
+        this.updateStarUI();
     }
 
     updateStarUI() {
-        if (this.starDiv) this.starDiv.innerHTML = `⭐ x ${this.currentStars}`;
+        if (this.starCountLabel) {
+            this.starCountLabel.textContent = `× ${this.currentStars}`;
+        }
     }
 
-    startNextAttribute() {
-        if (this.currentAttributeIndex >= this.attributesArr.length) {
-            return this.triggerCompletionSequence();
+    flashStarLoss() {
+        if (!this.starDiv) return;
+
+        this.starDiv.style.transform = "scale(1.28)";
+        this.starDiv.style.filter = "brightness(1.35) saturate(1.4)";
+        if (this.starCountLabel) {
+            this.starCountLabel.style.color = "#c62828";
+            this.starCountLabel.style.transform = "scale(1.12)";
         }
 
-        let attr = this.attributesArr[this.currentAttributeIndex];
-        let printedAttr = attr === "Fennimal" ? "Fennimal face" : attr;
-        this.titleElem.innerHTML = `Match the ${printedAttr} to the correct Fennimal!`;
+        setTimeout(() => {
+            this.starDiv.style.transform = "scale(1)";
+            this.starDiv.style.filter = "none";
+            if (this.starCountLabel) {
+                this.starCountLabel.style.color = "darkgoldenrod";
+                this.starCountLabel.style.transform = "scale(1)";
+            }
+        }, 280);
 
-        this.correctlyPlacedCardsThisStep = 0;
+        setTimeout(() => {
+            if (!this.starDiv) return;
+            this.starDiv.style.transform = "scale(1.12)";
+            setTimeout(() => {
+                if (this.starDiv) this.starDiv.style.transform = "scale(1)";
+            }, 140);
+        }, 320);
+    }
+
+    updateTaskProgress() {
+        if (!this.instructionsCont || typeof this.instructionsCont.updateProgressWithinDay !== "function") return;
+        let pct = this.totalProgressUnits > 0
+            ? (this.completedProgressUnits / this.totalProgressUnits) * 100
+            : 100;
+        this.instructionsCont.updateProgressWithinDay(pct);
+    }
+
+    registerCorrectPlacement() {
+        this.completedProgressUnits++;
+        this.updateTaskProgress();
+    }
+
+    clearReservoirCards() {
+        this.cardsInReservoir.forEach(card => {
+            if (card && card.cardDiv && card.cardDiv.parentNode) card.cardDiv.remove();
+        });
         this.cardsInReservoir = [];
+        this.reservoirDiv.innerHTML = "";
+    }
 
-        // Unlock all boxes for this new step
-        this.targetBoxes.forEach(box => box.satisfiedThisStep = false);
+    getAttributeKey(attribute) {
+        return attribute === "Fennimal" ? "head" : attribute;
+    }
 
-        let fensToSpawn = shuffleArray([...this.fennimalObjectArray]);
-        fensToSpawn.forEach((fenObj, index) => {
-            let card = new FennimalSortingCard(this.reservoirDiv, this.mainDiv, fenObj, attr, index, (c, e) => this.onGrab(c, e));
+    setCardsLocked(locked) {
+        this.cardsLocked = locked;
+        if (locked && this.activeCard) {
+            this.activeCard.returnToReservoir();
+            this.activeCard = null;
+        }
+        this.cardsInReservoir.forEach(card => {
+            if (!card || !card.cardDiv) return;
+            card.cardDiv.style.pointerEvents = locked ? "none" : "auto";
+            card.cardDiv.style.cursor = locked ? "default" : "grab";
+        });
+    }
+
+    spawnCardsFromFenList(fenList, attribute) {
+        this.clearReservoirCards();
+        this.setCardsLocked(false);
+        let shuffled = shuffleArray([...fenList]);
+        shuffled.forEach((fenObj, index) => {
+            let card = new FennimalSortingCard(this.reservoirDiv, this.mainDiv, fenObj, attribute, index, (c, e) => this.onGrab(c, e));
             this.cardsInReservoir.push(card);
         });
     }
 
-    triggerCompletionSequence() {
-        // 1. Update Title and Play Sound
-        this.titleElem.innerHTML = "Well done! You have completed the sorting task.";
-        AudioCont.play_sound_effect("positive");
+    /**
+     * Unique card sources for an attribute value (no duplicate feature values).
+     */
+    getUniqueFenSourcesForAttribute(attribute) {
+        let attrKey = this.getAttributeKey(attribute);
+        let seen = new Set();
+        let unique = [];
+        this.fennimalObjectArray.forEach(fen => {
+            let value = fen[attrKey];
+            let dedupeKey = (value === undefined || value === null) ? `__missing_${fen.id}` : String(value);
+            if (seen.has(dedupeKey)) return;
+            seen.add(dedupeKey);
+            unique.push(fen);
+        });
+        return unique;
+    }
 
-        // 2. Play a staggered "Wave" animation on all completed boxes
-        this.targetBoxes.forEach((box, index) => {
+    onGrab(card, e) {
+        if (this.cardsLocked) return;
+        AudioCont.play_sound_effect("button_click");
+        this.activeCard = card;
+        this.mainDiv.appendChild(this.activeCard.cardDiv);
+        this.onPointerMove(e);
+    }
+
+    onPointerMove(e) {
+        if (this.activeCard) {
+            let svgPos = getMousePosition(e);
+            this.activeCard.moveTo(svgPos.x, svgPos.y);
+        }
+    }
+
+    onPointerUp(e) {
+        if (!this.activeCard) return;
+
+        let droppedOnBox = null;
+        for (let box of this.targetBoxes) {
+            if (box.checkCollision(e.clientX, e.clientY)) {
+                droppedOnBox = box;
+                break;
+            }
+        }
+
+        if (droppedOnBox) {
+            let attrKey = this.getAttributeKey(this.activeCard.attribute);
+            let isMatch = droppedOnBox.fenObj[attrKey] === this.activeCard.fenObj[attrKey];
+
+            if (isMatch && !droppedOnBox.satisfiedThisStep) {
+                droppedOnBox.satisfiedThisStep = true;
+                AudioCont.play_sound_effect("success");
+                droppedOnBox.acceptAttribute(this.activeCard.attribute);
+                this.activeCard.destroy();
+                this.activeCard = null;
+                this.correctlyPlacedCardsThisStep++;
+                this.registerCorrectPlacement();
+                this.onCorrectDrop(droppedOnBox);
+            } else {
+                AudioCont.play_sound_effect("rejected");
+                this.errorsMade.push({
+                    expected: droppedOnBox.fenObj.id,
+                    dropped: this.activeCard.fenObj.id,
+                    attribute: this.activeCard.attribute
+                });
+
+                if (this.currentStars > 0) {
+                    this.currentStars--;
+                    this.updateStarUI();
+                    this.flashStarLoss();
+                }
+
+                this.activeCard.returnToReservoir();
+                this.activeCard = null;
+            }
+        } else {
+            this.activeCard.returnToReservoir();
+            this.activeCard = null;
+        }
+    }
+
+    onCorrectDrop(_droppedOnBox) {
+        // Subclasses implement advancement.
+    }
+
+    celebrateBoxes(boxes, thenContinue) {
+        boxes.forEach((box, index) => {
             setTimeout(() => {
                 box.boxDiv.style.transition = "all 300ms cubic-bezier(0.34, 1.56, 0.64, 1)";
                 box.boxDiv.style.transform = "translateY(-20px) scale(1.05)";
@@ -189,10 +362,19 @@ class FennimalAttributeSortingTask {
             }, index * 150);
         });
 
-        // 3. Repurpose the empty reservoir space for the native SVG Continue Button!
-        this.reservoirDiv.innerHTML = "";
+        let waitMs = 100 + (boxes.length * 150) + 500;
+        setTimeout(() => {
+            if (thenContinue) thenContinue();
+        }, waitMs);
+    }
 
-        let btnWrapper = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    showContinueButtonAndFinish() {
+        this.titleElem.innerHTML = "Well done! You have completed the sorting task.";
+        AudioCont.play_sound_effect("positive");
+
+        this.clearReservoirCards();
+
+        let btnWrapper = document.createElementNS("http://www.w3.org/2000/svg", "svg");
         btnWrapper.style.width = "400px";
         btnWrapper.style.height = "100px";
         btnWrapper.style.overflow = "visible";
@@ -210,7 +392,7 @@ class FennimalAttributeSortingTask {
         setTimeout(() => {
             btnWrapper.style.opacity = "1";
             btnWrapper.style.transform = "scale(1)";
-        }, 100 + (this.targetBoxes.length * 150));
+        }, 100);
 
         continueBtn.onpointerdown = () => {
             AudioCont.play_sound_effect("button_click");
@@ -218,96 +400,175 @@ class FennimalAttributeSortingTask {
         };
     }
 
-    onGrab(card, e) {
-        AudioCont.play_sound_effect("button_click");
-        this.activeCard = card;
-
-        this.mainDiv.appendChild(this.activeCard.cardDiv);
-        this.onPointerMove(e);
-    }
-
-    onPointerMove(e) {
-        if (this.activeCard) {
-            let svgPos = getMousePosition(e);
-            this.activeCard.moveTo(svgPos.x, svgPos.y);
-        }
-    }
-
-    onPointerUp(e) {
-        if (this.activeCard) {
-            let droppedOnBox = null;
-
-            for (let box of this.targetBoxes) {
-                if (box.checkCollision(e.clientX, e.clientY)) {
-                    droppedOnBox = box;
-                    break;
-                }
-            }
-
-            if (droppedOnBox) {
-                // THE LOGIC FIX: Check feature parity, not instance parity!
-                // We map "Fennimal" to "head" since the object property is .head
-                let attrKey = this.activeCard.attribute === "Fennimal" ? "head" : this.activeCard.attribute;
-
-                let isMatch = droppedOnBox.fenObj[attrKey] === this.activeCard.fenObj[attrKey];
-
-                // Check if it's a match AND the box hasn't already received a correct card this round
-                if (isMatch && !droppedOnBox.satisfiedThisStep) {
-
-                    // Lock the box so it can't eat duplicate cards
-                    droppedOnBox.satisfiedThisStep = true;
-
-                    AudioCont.play_sound_effect("success");
-                    droppedOnBox.acceptAttribute(this.activeCard.attribute);
-                    this.activeCard.destroy();
-                    this.activeCard = null;
-                    this.correctlyPlacedCardsThisStep++;
-
-                    if (this.correctlyPlacedCardsThisStep === this.fennimalObjectArray.length) {
-                        setTimeout(() => {
-                            this.currentAttributeIndex++;
-                            this.startNextAttribute();
-                        }, 1000);
-                    }
-                } else {
-                    // INCORRECT (or trying to double-dip an already full box)
-                    AudioCont.play_sound_effect("rejected");
-                    this.errorsMade.push({ expected: droppedOnBox.fenObj.id, dropped: this.activeCard.fenObj.id, attribute: this.activeCard.attribute });
-
-                    if (this.currentStars > 0) {
-                        this.currentStars--;
-                        this.updateStarUI();
-                    }
-
-                    this.activeCard.returnToReservoir();
-                    this.activeCard = null;
-                }
-            } else {
-                // DROPPED IN EMPTY SPACE
-                this.activeCard.returnToReservoir();
-                this.activeCard = null;
-            }
-        }
-    }
-
     finishTask() {
         document.removeEventListener("pointermove", this.pointerMoveHandler);
         document.removeEventListener("pointerup", this.pointerUpHandler);
         this.mainForeign.remove();
-        console.log(this.errorsMade)
+        console.log(this.errorsMade);
         this.returnFunc(this.errorsMade);
     }
 }
 
 
+class FennimalAttributeSortingMultipleTask extends FennimalAttributeSortingTaskBase {
+    constructor(parentElem, titleElem, fennimalObjectArray, attributesArr, maxEarnableStars, instructionsCont, returnFunc) {
+        super(parentElem, titleElem, fennimalObjectArray, attributesArr, maxEarnableStars, instructionsCont, returnFunc);
+        this.init();
+    }
+
+    init() {
+        this.initShell();
+
+        this.fennimalObjectArray.forEach((fenObj) => {
+            this.targetBoxes.push(new FennimalSortingTargetSceneBox(
+                this.targetDiv,
+                fenObj,
+                this.attributesArr,
+                this.fennimalObjectArray.length,
+                "multiple"
+            ));
+        });
+
+        this.startNextAttribute();
+    }
+
+    startNextAttribute() {
+        if (this.currentAttributeIndex >= this.attributesArr.length) {
+            this.triggerCompletionSequence();
+            return;
+        }
+
+        let attr = this.attributesArr[this.currentAttributeIndex];
+        let printedAttr = attr === "Fennimal" ? "Fennimal face" : attr;
+        this.titleElem.innerHTML = `Match the ${printedAttr} to the correct Fennimal!`;
+
+        this.correctlyPlacedCardsThisStep = 0;
+        this.targetBoxes.forEach(box => { box.satisfiedThisStep = false; });
+
+        // Multiple mode keeps one card per Fennimal (duplicates allowed when values are shared).
+        this.spawnCardsFromFenList(this.fennimalObjectArray, attr);
+    }
+
+    onCorrectDrop() {
+        if (this.correctlyPlacedCardsThisStep === this.fennimalObjectArray.length) {
+            this.setCardsLocked(true);
+            setTimeout(() => {
+                this.currentAttributeIndex++;
+                this.startNextAttribute();
+            }, 1000);
+        }
+    }
+
+    triggerCompletionSequence() {
+        this.setCardsLocked(true);
+        this.celebrateBoxes(this.targetBoxes, () => this.showContinueButtonAndFinish());
+    }
+}
+
+
+class FennimalAttributeSortingSingleTask extends FennimalAttributeSortingTaskBase {
+    constructor(parentElem, titleElem, fennimalObjectArray, attributesArr, maxEarnableStars, instructionsCont, returnFunc) {
+        super(parentElem, titleElem, fennimalObjectArray, attributesArr, maxEarnableStars, instructionsCont, returnFunc);
+        this.pageOrder = shuffleArray([...this.fennimalObjectArray]);
+        this.currentFennimalIndex = 0;
+        this.init();
+    }
+
+    init() {
+        this.initShell();
+        this.targetDiv.style.alignContent = "center";
+        this.buildCurrentFennimalPage();
+        this.startNextAttribute();
+    }
+
+    get currentFenObj() {
+        return this.pageOrder[this.currentFennimalIndex];
+    }
+
+    buildCurrentFennimalPage() {
+        this.targetDiv.innerHTML = "";
+        this.targetBoxes = [];
+        this.targetBoxes.push(new FennimalSortingTargetSceneBox(
+            this.targetDiv,
+            this.currentFenObj,
+            this.attributesArr,
+            1,
+            "single"
+        ));
+    }
+
+    startNextAttribute() {
+        if (this.currentAttributeIndex >= this.attributesArr.length) {
+            this.completeCurrentFennimalPage();
+            return;
+        }
+
+        let attr = this.attributesArr[this.currentAttributeIndex];
+        let printedAttr = attr === "Fennimal" ? "Fennimal face" : attr;
+        this.titleElem.innerHTML = `Match the ${printedAttr} to ${this.currentFenObj.name}!`;
+
+        this.correctlyPlacedCardsThisStep = 0;
+        this.targetBoxes.forEach(box => { box.satisfiedThisStep = false; });
+
+        // Single mode: at most one card per distinct attribute value.
+        this.spawnCardsFromFenList(this.getUniqueFenSourcesForAttribute(attr), attr);
+    }
+
+    onCorrectDrop() {
+        // One target box → one correct placement completes the attribute step.
+        // Lock immediately so leftover cards can't be grabbed during the delay.
+        this.setCardsLocked(true);
+        setTimeout(() => {
+            this.currentAttributeIndex++;
+            this.startNextAttribute();
+        }, 800);
+    }
+
+    completeCurrentFennimalPage() {
+        this.setCardsLocked(true);
+        this.clearReservoirCards();
+        this.celebrateBoxes(this.targetBoxes, () => {
+            this.currentFennimalIndex++;
+            if (this.currentFennimalIndex >= this.pageOrder.length) {
+                this.showContinueButtonAndFinish();
+                return;
+            }
+            // Extra beat after celebration so participants can reflect before the next Fennimal.
+            setTimeout(() => {
+                this.currentAttributeIndex = 0;
+                this.buildCurrentFennimalPage();
+                this.startNextAttribute();
+            }, 2000);
+        });
+    }
+}
+
+
+/**
+ * Factory + backwards-compatible alias.
+ * presentation: "multiple" (default) | "single"
+ */
+function createFennimalAttributeSortingTask(parentElem, titleElem, fennimalObjectArray, attributesArr, maxEarnableStars, instructionsCont, returnFunc, presentation) {
+    let mode = (presentation === "single") ? "single" : "multiple";
+    if (mode === "single") {
+        return new FennimalAttributeSortingSingleTask(parentElem, titleElem, fennimalObjectArray, attributesArr, maxEarnableStars, instructionsCont, returnFunc);
+    }
+    return new FennimalAttributeSortingMultipleTask(parentElem, titleElem, fennimalObjectArray, attributesArr, maxEarnableStars, instructionsCont, returnFunc);
+}
+
+// Deprecated alias for older callers — defaults to multiple presentation.
+class FennimalAttributeSortingTask extends FennimalAttributeSortingMultipleTask {}
+
+
 // --- SCENE BOX CONTROLLER ---
 class FennimalSortingTargetSceneBox {
-    constructor(parentDiv, fenObj, attributesToAsk, totalBoxes) {
+    constructor(parentDiv, fenObj, attributesToAsk, totalBoxes, layoutMode = "multiple") {
         this.fenObj = fenObj;
         this.attributesToAsk = attributesToAsk;
+        this.layoutMode = layoutMode === "single" ? "single" : "multiple";
 
         // Multi-Row Math
-        this.isTwoRows = totalBoxes > 3;
+        this.isTwoRows = this.layoutMode === "multiple" && totalBoxes > 3;
         let columnsPerRow = this.isTwoRows ? Math.ceil(totalBoxes / 2) : totalBoxes;
 
         // Anti-Double-Dip Lock
@@ -323,8 +584,13 @@ class FennimalSortingTargetSceneBox {
         this.regionDarkColor = GenParam.RegionData[this.fenObj.region] ? GenParam.RegionData[this.fenObj.region].darker_color : "#4CAF50";
 
         this.boxDiv = document.createElement("div");
-        this.boxDiv.style.width = `calc(${100 / columnsPerRow}% - 20px)`;
-        this.boxDiv.style.height = this.isTwoRows ? "48%" : "100%";
+        if (this.layoutMode === "single") {
+            this.boxDiv.style.width = "min(700px, 70%)";
+            this.boxDiv.style.height = "100%";
+        } else {
+            this.boxDiv.style.width = `calc(${100 / columnsPerRow}% - 20px)`;
+            this.boxDiv.style.height = this.isTwoRows ? "48%" : "100%";
+        }
 
         this.boxDiv.style.border = "6px solid #B0BEC5";
         this.boxDiv.style.borderRadius = "20px";

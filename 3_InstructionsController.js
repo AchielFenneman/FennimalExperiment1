@@ -27,9 +27,12 @@ class InstructionsController {
         this.overviewPageSearchContinueText = null;
 
         // Exploration Phase State
-        this.fennimalBox = null;
+        this.explorationRoster = null;
         this.textElemMainInstructions = null;
         this.fennimalsInPhase = [];
+        this.explorationDayNum = 1;
+        this.explorationFennefinderStatus = false;
+        this.explorationForcedTower = false;
 
         // Questionnaire State
         this.questionnaireForeign = null;
@@ -50,6 +53,11 @@ class InstructionsController {
         }
         this.currentInstructionsSVG = null;
         this.closingButton = null;
+        this.textElemMainInstructions = null;
+        if (this.explorationRoster) {
+            this.explorationRoster.destroy();
+            this.explorationRoster = null;
+        }
     }
 
     createBasicInstructionElements() {
@@ -132,6 +140,10 @@ class InstructionsController {
     }
 
     updateProgressWithinDay(percentageComplete) {
+        if (!this.progressWithinDayBar || !this.progressWithinDayBar.parentElement) {
+            return;
+        }
+
         if (percentageComplete === false) {
             this.progressWithinDayBar.parentElement.style.display = "none";
         } else {
@@ -589,81 +601,205 @@ class InstructionsController {
     }
 
     initializeFreeExplorationInstructions(interactionType, currentBlockNum, canEarnStars, fennefinderStatus, forcedTowerClimbAtStart, fennimalsInPhaseArray) {
-        this.fennimalsInPhase = fennimalsInPhaseArray.filter(f => f.name !== undefined);
+        // Trial queues can contain duplicate Fennimal ids (cartesian interaction types) — roster must be unique.
+        this.fennimalsInPhase = this.uniqueFennimalsById(
+            (fennimalsInPhaseArray || []).filter((f) => f && f.name !== undefined)
+        );
         this.currentInstructionType = "exploration";
+        this.explorationDayNum = currentBlockNum;
+        this.explorationFennefinderStatus = fennefinderStatus;
+        this.explorationForcedTower = forcedTowerClimbAtStart === true;
 
         this.clearInstructions();
         this.currentInstructionsSVG = this.createBasicInstructionElements();
         this.parentElem.appendChild(this.currentInstructionsSVG);
         this.parentElem.style.display = "inherit";
-        this.addClosingButtonToParent("top-right", false, undefined);
 
-        let fennefinderText = fennefinderStatus === true ? "The Fennefinder on the bottom-right of the screen will help guide you to the different Fennimals. " :
-            fennefinderStatus === "low_power_mode" ? "Unfortunately, the Fennefinder has run out of battery - so you'll have to find all Fennimals by memory! " : "";
+        document.getElementById("Instructions_Title").innerHTML =
+            "Day " + currentBlockNum + ": find all the Fennimals on the island";
 
-        let domeText = forcedTowerClimbAtStart ? "At the start of the day, you should first climb the watchtower to see the locations of all Fennimals. " : "";
+        let fennefinderText = fennefinderStatus === true
+            ? " The Fennefinder (bottom-right) will help guide you."
+            : fennefinderStatus === "low_power_mode"
+                ? " The Fennefinder is out of battery — you'll need to search by memory."
+                : "";
+        let domeText = this.explorationForcedTower
+            ? " Start by climbing the watchtower to spot their locations."
+            : "";
 
-        document.getElementById("Instructions_Title").innerHTML = "Day " + currentBlockNum + ": find all the Fennimals on the island";
+        let n = this.fennimalsInPhase.length;
+        let instructionText =
+            "Explore the island and find all " + n + " Fennimals." +
+            fennefinderText + domeText +
+            "<br>These are the Fennimals you are looking for:";
 
-        let instructionText = "Your task today is to explore the island and find all Fennimals on the island. There are currently " + this.fennimalsInPhase.length + " Fennimals spread across the different regions of Fenneland.  <br>" +
-            "You can search different locations. If there is a Fennimal present, then please enter the location and follow the instructions. " +
-            fennefinderText + domeText + "<br>Press the X to close this page and travel the island.";
-
-        this.textElemMainInstructions = create_SVG_text_in_foreign_element(instructionText, 100, 100, (GenParam.SVG_width - 2 * 100), 500, "instruction_element_text");
-        this.textElemMainInstructions.classList.add("instruction_element_nonbackground");
-        this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0].style.fontSize = "40px";
-        this.currentInstructionsSVG.appendChild(this.textElemMainInstructions);
-
-        this.fennimalBox = new VerticalScrollableBox(this.parentElem, (0.5 * 1920 - 0.5 * 1800), 450, 1800, 500);
-        this.fennimalBox.changeOpacity(0);
-        this.fennimalBox.addArrayOfFennimalIcons(this.fennimalsInPhase, 200, 200, true, true);
-
-        setTimeout(() => this.fennimalBox.changeOpacity(1), 5);
+        this.setExplorationInstructionText(instructionText);
+        this.buildExplorationRoster("intro", this.fennimalsInPhase);
         this.updateProgressNewDay(currentBlockNum);
+        this.updateProgressWithinDay(false);
+        this.addClosingButtonToParent("bottom-center", true, undefined, 400);
+    }
+
+    uniqueFennimalsById(fenList) {
+        let seen = new Set();
+        let unique = [];
+        (fenList || []).forEach((fen) => {
+            if (!fen || fen.id === undefined || fen.id === null) return;
+            let key = String(fen.id);
+            if (seen.has(key)) return;
+            seen.add(key);
+            unique.push(fen);
+        });
+        return unique;
+    }
+
+    setExplorationInstructionText(html) {
+        if (this.textElemMainInstructions) {
+            this.textElemMainInstructions.remove();
+            this.textElemMainInstructions = null;
+        }
+        this.textElemMainInstructions = create_SVG_text_in_foreign_element(
+            html,
+            0.1 * GenParam.SVG_width,
+            0.12 * GenParam.SVG_height,
+            0.8 * GenParam.SVG_width,
+            0.18 * GenParam.SVG_height,
+            "instruction_element_text"
+        );
+        this.textElemMainInstructions.classList.add("instruction_element_nonbackground");
+        let textNode = this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0];
+        textNode.style.fontSize = "36px";
+        textNode.style.textAlign = "center";
+        this.currentInstructionsSVG.appendChild(this.textElemMainInstructions);
+    }
+
+    buildExplorationRoster(mode, fenList) {
+        if (this.explorationRoster) {
+            this.explorationRoster.destroy();
+            this.explorationRoster = null;
+        }
+        let bandX = 0.08 * GenParam.SVG_width;
+        let bandY = 0.30 * GenParam.SVG_height;
+        let bandW = 0.84 * GenParam.SVG_width;
+        let bandH = 0.48 * GenParam.SVG_height;
+        this.explorationRoster = new ExplorationFennimalRoster(
+            this.parentElem,
+            bandX,
+            bandY,
+            bandW,
+            bandH
+        );
+        this.explorationRoster.render(this.uniqueFennimalsById(fenList), mode);
+    }
+
+    getExplorationRosterFennimalsFromWorld() {
+        let visited = [];
+        let unvisited = [];
+        this.worldState.get_array_of_Fennimals_on_map().forEach((f) => {
+            if (f.name === undefined) return;
+            if (f.visited) visited.push(f);
+            else unvisited.push(f);
+        });
+        visited = this.uniqueFennimalsById(visited);
+        unvisited = this.uniqueFennimalsById(unvisited);
+        visited.sort((a, b) => (a.num_in_phase || 0) - (b.num_in_phase || 0));
+        unvisited.sort((a, b) => (a.num_in_phase || 0) - (b.num_in_phase || 0));
+        return { visited, unvisited, all: [...visited, ...unvisited] };
     }
 
     updateExplorationPhaseInstructionsToShowCompletion() {
-        AudioCont.play_sound_effect("alert");
-        this.textElemMainInstructions.remove();
-        this.textElemMainInstructions = create_SVG_text_in_foreign_element("Well done! You have photographed all the Fennimals! You will continue to the next phase of the experiment after closing these instructions!", 100, 150, (1920 - 2 * 100), 500, "instruction_element_text");
-        this.textElemMainInstructions.classList.add("instruction_element_nonbackground");
-        this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0].style.fontSize = "40px";
-        this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0].style.fontWeight = 700;
-        this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0].style.color = "darkgreen";
-        this.currentInstructionsSVG.appendChild(this.textElemMainInstructions);
+        this.showFreeExplorationCompletionScreen();
+    }
 
-        this.closingButton.style.opacity = 0;
-        setTimeout(() => { this.closingButton.style.opacity = 1; }, 2500);
+    showFreeExplorationCompletionScreen() {
+        AudioCont.play_sound_effect("positive");
+
+        // Ensure the instruction shell is visible (may already be open from a help reopen).
+        if (!this.currentInstructionsSVG || !this.currentInstructionsSVG.parentNode) {
+            this.clearInstructions();
+            this.currentInstructionType = "exploration";
+            this.currentInstructionsSVG = this.createBasicInstructionElements();
+            this.parentElem.appendChild(this.currentInstructionsSVG);
+            this.updateProgressNewDay(this.explorationDayNum);
+        }
+
+        this.parentElem.style.display = "inherit";
+        let background = this.parentElem.getElementsByClassName("instructions_element_background")[0];
+        if (background) {
+            background.style.display = "inherit";
+            background.setAttribute("x", this.boundarySize);
+            background.setAttribute("y", this.boundarySize);
+            background.setAttribute("width", GenParam.SVG_width - 2 * this.boundarySize);
+            background.setAttribute("height", GenParam.SVG_height - 2 * this.boundarySize);
+        }
+
+        if (this.closingButton) {
+            this.closingButton.remove();
+            this.closingButton = null;
+        }
+
+        document.getElementById("Instructions_Title").innerHTML = "Well done!";
+        let n = this.fennimalsInPhase.length;
+        this.setExplorationInstructionText(
+            "You found all " + n + " Fennimals on the island.<br>Continue when you are ready for the next part of the day."
+        );
+
+        let rosterFens = this.getExplorationRosterFennimalsFromWorld().all;
+        if (rosterFens.length === 0) rosterFens = this.fennimalsInPhase;
+        this.buildExplorationRoster("complete", rosterFens);
+
+        // Reveal non-background elements (in case the page was mid-collapse).
+        Array.from(this.parentElem.getElementsByClassName("instruction_element_nonbackground")).forEach((el) => {
+            el.style.display = "inherit";
+        });
+
+        this.addClosingButtonToParent("bottom-center", true, undefined, 600);
     }
 
     updateAndShowFreeExplorationInstructions() {
+        // If the phase is already complete, show the finish screen instead of the checklist.
+        if (this.expCont && this.expCont.flagExplorationPhaseCompleted) {
+            this.showFreeExplorationCompletionScreen();
+            return;
+        }
+
+        let background = this.parentElem.getElementsByClassName("instructions_element_background")[0];
+        if (background) {
+            background.style.display = "inherit";
+            background.style.transition = "all 200ms ease-in-out";
+            setTimeout(() => {
+                background.setAttribute("x", this.boundarySize);
+                background.setAttribute("y", this.boundarySize);
+                background.setAttribute("width", GenParam.SVG_width - 2 * this.boundarySize);
+                background.setAttribute("height", GenParam.SVG_height - 2 * this.boundarySize);
+            }, 0);
+        }
         this.parentElem.style.display = "inherit";
-        this.fennimalBox.changeOpacity(0);
-        this.openInstructionsPage();
+
+        if (this.closingButton) {
+            this.closingButton.remove();
+            this.closingButton = null;
+        }
 
         setTimeout(() => {
-            this.fennimalBox.clearAllIcons();
-
-            let visitedFennimals = [];
-            let unvisitedFennimals = [];
-            this.worldState.get_array_of_Fennimals_on_map().forEach(f => {
-                if (f.visited) visitedFennimals.push(f);
-                else unvisitedFennimals.push(f);
+            Array.from(this.parentElem.getElementsByClassName("instruction_element_nonbackground")).forEach((el) => {
+                el.style.display = "inherit";
             });
 
-            visitedFennimals.sort((a, b) => a.num_in_phase - b.num_in_phase);
+            let { visited, unvisited, all } = this.getExplorationRosterFennimalsFromWorld();
+            let foundCount = visited.length;
+            let total = all.length || this.fennimalsInPhase.length;
 
-            this.fennimalBox.addArrayOfFennimalIcons([...visitedFennimals, ...unvisitedFennimals], 200, 200, true);
-            setTimeout(() => this.fennimalBox.changeOpacity(1), 5);
+            document.getElementById("Instructions_Title").innerHTML =
+                "Day " + this.explorationDayNum + ": find all the Fennimals on the island";
 
-            if (visitedFennimals.length > 0) {
-                this.textElemMainInstructions.remove();
-                this.textElemMainInstructions = create_SVG_text_in_foreign_element("Your task today is to explore the island and find all Fennimals on the island. You have already found these Fennimals:", 100, 150, (1920 - 2 * 100), 500, "instruction_element_text");
-                this.textElemMainInstructions.classList.add("instruction_element_nonbackground");
-                this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0].style.fontSize = "40px";
-                this.currentInstructionsSVG.appendChild(this.textElemMainInstructions);
-                this.fennimalBox.changePosition("y", 0.3 * GenParam.SVG_height);
-            }
+            let statusText = foundCount === 0
+                ? "Explore the island and find all " + total + " Fennimals.<br>These are the Fennimals you are looking for:"
+                : "You've found <b>" + foundCount + " of " + total + "</b> Fennimals so far.<br>Color portraits are found — grayscale ones are still out there:";
+
+            this.setExplorationInstructionText(statusText);
+            this.buildExplorationRoster("progress", all.length ? all : this.fennimalsInPhase);
+            this.addClosingButtonToParent("bottom-center", true, undefined, 200);
         }, 210);
     }
 
@@ -730,6 +866,9 @@ class InstructionsController {
     }
 
     initializeHintAndSearchPhaseTrialInstructions(fenObj, hintType, percentageComplete) {
+        // TODO: When hint_and_search supports Fennimal_toy / toy_to_box (and other new
+        // interaction types), branch trial hint visuals/copy by fenObj.interaction_type
+        // similar to getPhoneRoomHintConfig() / createPhoneRoomHintVisual().
         this.updateProgressWithinDay(percentageComplete);
         let continueButtonTime = 500;
 
@@ -870,6 +1009,71 @@ class InstructionsController {
         this.addClosingButtonToParent("bottom-center", false, undefined, 500);
     }
 
+    initializePhoneRoomPhaseGeneralInstructions(currentBlockNum) {
+        this.currentInstructionType = "phone_room";
+
+        this.clearInstructions();
+        this.currentInstructionsSVG = this.createBasicInstructionElements();
+        this.parentElem.appendChild(this.currentInstructionsSVG);
+        this.parentElem.style.display = "inherit";
+
+        document.getElementById("Instructions_Title").innerHTML = `Day ${currentBlockNum}: staffing the phone room`;
+        this.updateProgressNewDay(currentBlockNum);
+        this.updateProgressWithinDay(false);
+
+        let partnerRole = this.worldState.get_current_partner_role();
+        let partnerPresent = partnerRole && partnerRole !== "absent";
+        let partnerName = this.worldState.get_partner_icon_settings().name;
+
+        let instructionText;
+        if (partnerPresent) {
+            instructionText =
+                `You and ${partnerName} will be staffing the island’s phone room today!<br><br>` +
+                `Whenever someone on the island needs assistance, the phone will ring. Click the phone to answer it and receive instructions about the task and where you need to go.<br><br>` +
+                `During this part of your stay on the island, your route will be arranged for you. You and ${partnerName} will travel automatically to each destination, so you do not need to navigate the map yourself.<br><br>` +
+                `After each task, you will automatically return to the phone room. Wait there until the phone rings again.`;
+        } else {
+            instructionText =
+                `Today, you will be staffing the island’s phone room.<br><br>` +
+                `Whenever someone on the island needs assistance, the phone will ring. Click the phone to answer it and receive instructions about the task and where you need to go.<br><br>` +
+                `During this part of your stay on the island, your route will be arranged for you. You will travel automatically to each destination, so you do not need to navigate the map yourself.<br><br>` +
+                `After each task, you will automatically return to the phone room. Wait there until the phone rings again.`;
+        }
+
+        let iconBox = create_SVG_rect(0.08 * GenParam.SVG_width, 0.25 * GenParam.SVG_height, 400, 475, undefined, undefined);
+        iconBox.style.rx = "30";
+        iconBox.style.fill = "transparent";
+        this.currentInstructionsSVG.appendChild(iconBox);
+
+        let phoneTemplate = document.getElementById("phone");
+        if (phoneTemplate) {
+            let phoneCenterX = iconBox.getBBox().x + 0.5 * iconBox.getBBox().width;
+            let phoneCenterY = iconBox.getBBox().y + 0.5 * iconBox.getBBox().height;
+            let phoneVisual = copy_scale_and_move_object_to_position(
+                phoneTemplate,
+                this.currentInstructionsSVG,
+                phoneCenterX,
+                phoneCenterY,
+                3.5
+            );
+            phoneVisual.classList.add("instruction_element_nonbackground");
+            phoneVisual.style.pointerEvents = "none";
+        }
+
+        this.textElemMainInstructions = create_SVG_text_in_foreign_element(
+            instructionText,
+            0.35 * GenParam.SVG_width, 230,
+            0.55 * GenParam.SVG_width,
+            600,
+            "instruction_element_text"
+        );
+        this.textElemMainInstructions.classList.add("instruction_element_nonbackground");
+        this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0].style.fontSize = "38px";
+        this.currentInstructionsSVG.appendChild(this.textElemMainInstructions);
+
+        this.addClosingButtonToParent("bottom-center", false, undefined, 500);
+    }
+
     initializePartnerBeliefInstructions(partnerName, partnerPresent, bonusStarsPerCorrectAnswer, numQuestions, currentBlockNum) {
         this.currentInstructionType = "partner_belief";
         let canEarnStars = bonusStarsPerCorrectAnswer > 0;
@@ -958,7 +1162,105 @@ class InstructionsController {
         this.addClosingButtonToParent("bottom-center", false, deleteBonusStarIcons, continueButtonTime);
     }
 
+    initializePartnerBeliefIndividualBoxesInstructions(partnerName, bonusStarsPerCorrectAnswer, numQuestions, numBeliefBlocks, includePracticeTrial, includeRealityBlockAtEnd, currentBlockNum) {
+        this.currentInstructionType = "partner_belief_individual_boxes";
+        let canEarnStars = bonusStarsPerCorrectAnswer > 0;
+        let continueButtonTime = 500;
+
+        this.clearInstructions();
+        this.currentInstructionsSVG = this.createBasicInstructionElements();
+        this.parentElem.appendChild(this.currentInstructionsSVG);
+        this.parentElem.style.display = "inherit";
+
+        document.getElementById("Instructions_Title").innerHTML = `Day ${currentBlockNum}: What does ${partnerName} think?`;
+
+        // Partner icon on the left, raised to leave room for bonus stars underneath.
+        let iconBox = create_SVG_rect(0.08 * GenParam.SVG_width, 0.12 * GenParam.SVG_height, 400, 400, undefined, undefined);
+        iconBox.style.rx = "30";
+        iconBox.style.fill = "transparent";
+        this.currentInstructionsSVG.appendChild(iconBox);
+
+        let iconSVG = this.worldState.get_person_icon("partner", "front");
+        iconSVG.style.transform = "scale(15)";
+        let iconTranslateGroup = create_SVG_group(0, 0, undefined, undefined);
+        iconTranslateGroup.appendChild(iconSVG);
+        this.currentInstructionsSVG.appendChild(iconTranslateGroup);
+        moveSVGCenterTo(iconTranslateGroup, iconBox.getBBox().x + 0.5 * iconBox.getBBox().width, iconBox.getBBox().y + 0.5 * iconBox.getBBox().height);
+
+        let practiceLine = includePracticeTrial
+            ? `First, you will complete a short practice with simple shapes and colors so you can learn the controls.<br><br>`
+            : "";
+
+        let realityLine = includeRealityBlockAtEnd
+            ? `<br><br>Later, you will also be asked which toy is <i>currently</i> inside each box.`
+            : "";
+
+        let instructionText =
+            `${partnerName} has returned to the warehouse! We will now test what you think ${partnerName} believes is inside each box.<br><br>` +
+            practiceLine +
+            `On each question, click the highlighted circle to reveal the answer choices. Between box questions, you will also answer a few simple shape or color questions.<br><br>` +
+            `<div style='text-align:center; font-size:42px; font-weight:bold; color:navy;'>Please answer as quickly and accurately as you can.</div><br>` +
+            `Remember: when asked about ${partnerName}, tell us what <i>${partnerName}</i> believes is inside — not necessarily what is actually inside.` +
+            realityLine;
+
+        if (canEarnStars) {
+            continueButtonTime += bonusStarsPerCorrectAnswer * 500;
+            document.getElementsByClassName("instructions_element_background")[0].style.fill = GenParam.background_fill_for_instructions_where_stars_can_be_earned;
+
+            let leftCenterX = iconBox.getBBox().x + 0.5 * iconBox.getBBox().width;
+            let starY = iconBox.getBBox().y + iconBox.getBBox().height + 140;
+            let starSpacing = 70;
+            let starStartX = leftCenterX - 0.5 * (bonusStarsPerCorrectAnswer - 1) * starSpacing;
+
+            for (let i = 0; i < bonusStarsPerCorrectAnswer; i++) {
+                let starX = starStartX + i * starSpacing;
+                setTimeout(() => {
+                    showBonusStarOnScreen(this.parentElem, starX, starY, true, "deletable_bonus_star", 1, undefined);
+                }, (i + 1) * 300);
+            }
+
+            let perAnswerLabel = create_SVG_text_elem(
+                leftCenterX,
+                starY + 95,
+                "(per answer!)",
+                "pb_indiv_star_caption",
+                undefined
+            );
+            perAnswerLabel.style.textAnchor = "middle";
+            perAnswerLabel.style.fontSize = "32px";
+            perAnswerLabel.style.fontWeight = 700;
+            perAnswerLabel.style.fill = "navy";
+            perAnswerLabel.classList.add("instruction_element_nonbackground");
+            this.currentInstructionsSVG.appendChild(perAnswerLabel);
+
+            let numText = bonusStarsPerCorrectAnswer > 1 ? bonusStarsPerCorrectAnswer + " bonus stars" : "a bonus star";
+            instructionText += `<br><br><b>You can earn ${numText} for each correct answer.</b> You will only learn how many you earned at the end of the experiment.`;
+        }
+
+        this.textElemMainInstructions = create_SVG_text_in_foreign_element(
+            instructionText,
+            0.35 * GenParam.SVG_width, 140,
+            0.55 * GenParam.SVG_width,
+            720,
+            "instruction_element_text"
+        );
+        this.textElemMainInstructions.classList.add("instruction_element_nonbackground");
+        this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0].style.fontSize = "34px";
+        this.currentInstructionsSVG.appendChild(this.textElemMainInstructions);
+
+        this.updateProgressNewDay(currentBlockNum);
+        this.updateProgressWithinDay(false);
+
+        const deleteBonusStarIcons = () => {
+            Array.from(document.getElementsByClassName("deletable_bonus_star")).forEach(s => s.remove());
+        };
+        this.addClosingButtonToParent("bottom-center", false, deleteBonusStarIcons, continueButtonTime);
+    }
+
     setup_on_call_trial_elements(fenObj) {
+        // TODO: When on_call supports Fennimal_toy / toy_to_box (and other new
+        // interaction types), branch trial hint visuals/copy by fenObj.interaction_type
+        // similar to getPhoneRoomHintConfig() / createPhoneRoomHintVisual().
         this.clearInstructions();
 
         // 1. Initialize AND append the native background and containers
@@ -1107,6 +1409,436 @@ class InstructionsController {
         this.openInstructionsPage();
     }
 
+    setupPhoneRoomHintElements(trialObj) {
+        this.clearInstructions();
+
+        this.currentInstructionType = "phone_room";
+        this.currentInstructionsSVG = this.createBasicInstructionElements();
+        this.parentElem.appendChild(this.currentInstructionsSVG);
+
+        this.parentElem.style.display = "inherit";
+
+        this.updateProgressNewDay(this.expCont.currentDayNum);
+        this.updateProgressWithinDay(
+            ((this.expCont.currentTrialNumInDay - 1) / this.expCont.currentPhaseData.number_interactions_in_phase) * 100
+        );
+
+        let hintConfig = this.getPhoneRoomHintConfig(trialObj);
+
+        document.getElementById("Instructions_Title").innerHTML = hintConfig.title;
+
+        this.phoneRoomHintSequentialElements = [];
+        this.createPhoneRoomHintVisual(hintConfig);
+        this.createPhoneRoomHintText(hintConfig);
+
+        this.parentElem.style.display = "none";
+    }
+
+    getPhoneRoomHintConfig(trialObj) {
+        let displayName = trialObj.name || trialObj.id || "this Fennimal";
+        let locationName = GenParam.get_display_name_of_location(trialObj.location);
+        let regionName = GenParam.RegionData[trialObj.region]
+            ? GenParam.RegionData[trialObj.region].display_name
+            : trialObj.region;
+
+        let baseConfig = {
+            title: "Incoming call!",
+            locationText: `Go to ${locationName}`,
+            regionText: `in ${regionName}.`,
+            instructionText: "Close this message to travel there.",
+            trialObj: trialObj
+        };
+
+        // Phone-room hints are interaction-type aware.
+        // TODO: Mirror this interaction-type branching in on_call and hint_and_search
+        // trial instruction setup when those block types gain support for
+        // Fennimal_toy / toy_to_box / photo_box / feed_Fennimal.
+        switch (trialObj.interaction_type) {
+            case "Fennimal_toy":
+            case "basic_intro":
+                return {
+                    ...baseConfig,
+                    type: "fennimal",
+                    slumped: false,
+                    mainText: `${displayName} is bored and wants to play.`
+                };
+
+            case "toy_to_box":
+                return {
+                    ...baseConfig,
+                    type: "toy",
+                    mainText: `Oops! The ${trialObj.toy} has been left behind`
+                };
+
+            case "photo_box":
+                return {
+                    ...baseConfig,
+                    type: "box",
+                    mainText: "Go take a photo of the box to check if its still in good shape"
+                };
+
+            case "feed_Fennimal":
+                return {
+                    ...baseConfig,
+                    type: "fennimal",
+                    slumped: true,
+                    mainText: `${displayName} is hungry.`
+                };
+
+            case "joint_box_cleaning":
+                return {
+                    ...baseConfig,
+                    type: "box",
+                    mainText: `${displayName}'s box needs a good clean!`
+                };
+
+            default:
+                // Placeholder for other interaction types (broken_toy, dirty_toy, fly_swat, etc.).
+                // Keep the slumped Fennimal until type-specific copy/visuals are written.
+                return {
+                    ...baseConfig,
+                    type: "fennimal",
+                    slumped: true,
+                    mainText: `${displayName} needs your help!`
+                };
+        }
+    }
+
+    createPhoneRoomHintVisual(hintConfig) {
+        switch (hintConfig.type) {
+            case "fennimal":
+                this.createPhoneRoomFennimalHintVisual(hintConfig.trialObj, hintConfig.slumped === true);
+                break;
+            case "toy":
+                this.createPhoneRoomToyHintVisual(hintConfig.trialObj);
+                break;
+            case "box":
+                this.createPhoneRoomBoxHintVisual(hintConfig.trialObj);
+                break;
+            default:
+                this.createPhoneRoomPlaceholderHintVisual(hintConfig);
+                break;
+        }
+    }
+
+    createPhoneRoomFennimalHintVisual(trialObj, slumped = false) {
+        let icon = create_Fennimal_SVG_object(trialObj, GenParam.Fennimal_head_size, false);
+        this.currentInstructionsSVG.appendChild(icon);
+
+        moveSVGCenterTo(icon, GenParam.SVG_width / 2, GenParam.SVG_height / 2 - 170);
+
+        let head = icon.getElementsByClassName("Fennimal_head")[0];
+        let body = icon.getElementsByClassName("Fennimal_body")[0];
+
+        if (head) {
+            head.style.transformBox = "fill-box";
+            head.style.transformOrigin = "center";
+        }
+
+        if (body) {
+            body.style.transformBox = "fill-box";
+            body.style.transformOrigin = "50% 100%";
+        }
+
+        if (slumped) {
+            icon.classList.add("is-slumped");
+        }
+
+        icon.classList.add("instruction_element_nonbackground");
+        icon.classList.add("phone_room_hint_sequential");
+        icon.style.display = "none";
+        icon.style.opacity = 0;
+
+        this.phoneRoomHintSequentialElements.push(icon);
+
+        if (slumped && GenParam.PhoneRoomFlair.showHintRainclouds) {
+            this.createPhoneRoomHintRainclouds();
+        }
+    }
+
+    createPhoneRoomToyHintVisual(trialObj) {
+        let toyTemplate = document.getElementById("toy_" + trialObj.toy);
+        if (!toyTemplate) {
+            this.createPhoneRoomPlaceholderHintVisual({ type: "toy" });
+            return;
+        }
+
+        let toyIcon = copy_scale_and_move_object_to_position(
+            toyTemplate,
+            this.currentInstructionsSVG,
+            GenParam.SVG_width / 2,
+            GenParam.SVG_height / 2 - 170,
+            4
+        );
+        set_toy_color_scheme(toyIcon, trialObj.toy, false);
+        this.makePhoneRoomToyStatic(toyIcon, trialObj.toy);
+        toyIcon.classList.add("instruction_element_nonbackground");
+        toyIcon.classList.add("phone_room_hint_sequential");
+        toyIcon.style.display = "none";
+        toyIcon.style.opacity = 0;
+
+        this.phoneRoomHintSequentialElements.push(toyIcon);
+    }
+
+    createPhoneRoomBoxHintVisual(trialObj) {
+        let boxTemplate = document.getElementById("toybox_" + trialObj.toybox);
+        if (!boxTemplate) {
+            this.createPhoneRoomPlaceholderHintVisual({ type: "box" });
+            return;
+        }
+
+        let boxIcon = copy_scale_and_move_object_to_position(
+            boxTemplate,
+            this.currentInstructionsSVG,
+            GenParam.SVG_width / 2,
+            GenParam.SVG_height / 2 - 170,
+            3
+        );
+
+        // Closed box: keep back + front + lid (front is the visible body).
+        boxIcon.classList.add("instruction_element_nonbackground");
+        boxIcon.classList.add("phone_room_hint_sequential");
+        boxIcon.style.display = "none";
+        boxIcon.style.opacity = 0;
+
+        this.phoneRoomHintSequentialElements.push(boxIcon);
+    }
+
+    makePhoneRoomToyStatic(toyIcon, toyId) {
+        // Mirrors ToyChoiceBar.make_toy_static() / PartnerBeliefMultipleController so this hint
+        // shows the same inert, display-only version of each toy.
+        toyIcon.querySelectorAll(".prep_element_hidden, .invisible_element").forEach((element) => {
+            element.style.display = "none";
+        });
+
+        switch (toyId) {
+            case "plane": {
+                let propBase = toyIcon.querySelector(".prop_base");
+                let propAlt = toyIcon.querySelector(".prop_alt");
+                let propSpinning = toyIcon.querySelector(".prop_spinning");
+                if (propBase) {
+                    propBase.style.display = "inherit";
+                    propBase.style.opacity = 1;
+                }
+                if (propAlt) propAlt.style.display = "none";
+                if (propSpinning) propSpinning.style.display = "none";
+                break;
+            }
+
+            case "globe":
+                toyIcon.querySelectorAll(".arc").forEach((arc) => {
+                    arc.style.display = "none";
+                });
+                toyIcon.querySelectorAll(".light_1, .light_2, .light_3, .light_4").forEach((light) => {
+                    light.style.fill = "#555555";
+                });
+                break;
+
+            case "robot": {
+                toyIcon.querySelectorAll(".eye_light, .antenna").forEach((element) => {
+                    element.style.fill = "#444444";
+                });
+                let switchOn = toyIcon.querySelector(".switch_toggle_on");
+                let switchOff = toyIcon.querySelector(".switch_toggle_off");
+                if (switchOn) switchOn.style.display = "none";
+                if (switchOff) switchOff.style.opacity = 1;
+                break;
+            }
+
+            case "bubblewand": {
+                let soap = toyIcon.querySelector(".wand_soap");
+                if (soap) soap.style.display = "none";
+                break;
+            }
+
+            case "jack": {
+                let crankDown = toyIcon.querySelector(".crank_down");
+                let lidClosed = toyIcon.querySelector(".box_lid_closed");
+                if (crankDown) crankDown.style.display = "none";
+                if (lidClosed) lidClosed.style.display = "none";
+                break;
+            }
+        }
+
+        toyIcon.getAnimations({ subtree: true }).forEach((animation) => animation.cancel());
+    }
+
+    createPhoneRoomHintRainclouds() {
+        let cloudTemplate = document.getElementsByClassName("raincloud")[0];
+        if (!cloudTemplate) return;
+
+        let cloudGroup = create_SVG_group(0, 0, "instruction_element_nonbackground", undefined);
+        cloudGroup.classList.add("phone_room_hint_sequential");
+        cloudGroup.style.display = "none";
+        cloudGroup.style.opacity = 0;
+        cloudGroup.style.transform = `translate(${GenParam.SVG_width / 2}px, ${GenParam.SVG_height / 2 - 410}px)`;
+        this.currentInstructionsSVG.appendChild(cloudGroup);
+
+        const cloudConfigs = [
+            { dx: -90, dy: -20, scale: 1.7, delay: 0 },
+            { dx: -180, dy: -5, scale: 1.3, delay: -350 },
+            { dx: 0, dy: 10, scale: 1.4, delay: -700 }
+        ];
+
+        cloudConfigs.forEach(config => {
+            let cloud = cloudTemplate.cloneNode(true);
+            cloud.style.display = "inherit";
+            cloud.style.opacity = "0.72";
+            cloud.style.transformOrigin = "center";
+            cloud.style.transformBox = "fill-box";
+
+            cloudGroup.appendChild(cloud);
+
+            let box = cloud.getBBox();
+            let nativeCX = box.x + (box.width / 2);
+            let nativeCY = box.y + (box.height / 2);
+
+            let trueDx = config.dx - nativeCX;
+            let trueDy = config.dy - nativeCY;
+
+            cloud.style.transform = `translate(${trueDx}px, ${trueDy}px) scale(${config.scale})`;
+
+            cloud.animate([
+                { transform: `translate(${trueDx}px, ${trueDy}px) scale(${config.scale})` },
+                { transform: `translate(${trueDx}px, ${trueDy - 10}px) scale(${config.scale})` }
+            ], {
+                duration: 1200 + Math.random() * 250,
+                iterations: Infinity,
+                direction: "alternate",
+                easing: "ease-in-out",
+                delay: config.delay
+            });
+        });
+
+        this.phoneRoomHintSequentialElements.push(cloudGroup);
+    }
+
+    createPhoneRoomPlaceholderHintVisual(hintConfig) {
+        let placeholder = create_SVG_circle(
+            GenParam.SVG_width / 2,
+            GenParam.SVG_height / 2 - 170,
+            120,
+            undefined,
+            undefined
+        );
+        placeholder.style.fill = "#DDDDDD";
+        placeholder.style.stroke = "#555555";
+        placeholder.style.strokeWidth = "8px";
+        placeholder.classList.add("instruction_element_nonbackground");
+        placeholder.style.display = "none";
+        this.currentInstructionsSVG.appendChild(placeholder);
+
+        let questionMark = create_SVG_text_elem(
+            GenParam.SVG_width / 2,
+            GenParam.SVG_height / 2 - 135,
+            "?",
+            undefined,
+            undefined
+        );
+        questionMark.style.textAnchor = "middle";
+        questionMark.style.fontSize = "150px";
+        questionMark.style.fontWeight = 900;
+        questionMark.style.fill = "#555555";
+        questionMark.classList.add("instruction_element_nonbackground");
+        questionMark.style.display = "none";
+        this.currentInstructionsSVG.appendChild(questionMark);
+    }
+
+    createPhoneRoomHintText(hintConfig) {
+        let titleText = create_SVG_text_elem(
+            GenParam.SVG_width / 2,
+            GenParam.SVG_height / 2 + 200,
+            hintConfig.mainText,
+            undefined,
+            undefined
+        );
+        titleText.style.fill = "#2c3e50";
+        titleText.style.fontWeight = "bold";
+        titleText.style.fontSize = "55px";
+        titleText.style.textAnchor = "middle";
+        titleText.classList.add("instruction_element_nonbackground");
+        titleText.classList.add("phone_room_hint_sequential");
+        titleText.style.display = "none";
+        titleText.style.opacity = 0;
+
+        let locationText = create_SVG_text_elem(
+            GenParam.SVG_width / 2,
+            GenParam.SVG_height / 2 + 280,
+            hintConfig.locationText,
+            undefined,
+            undefined
+        );
+        locationText.style.fill = "#555555";
+        locationText.style.fontSize = "40px";
+        locationText.style.textAnchor = "middle";
+        locationText.classList.add("instruction_element_nonbackground");
+        locationText.classList.add("phone_room_hint_sequential");
+        locationText.style.display = "none";
+        locationText.style.opacity = 0;
+
+        let regionText = create_SVG_text_elem(
+            GenParam.SVG_width / 2,
+            GenParam.SVG_height / 2 + 335,
+            hintConfig.regionText,
+            undefined,
+            undefined
+        );
+        regionText.style.fill = "#555555";
+        regionText.style.fontSize = "40px";
+        regionText.style.textAnchor = "middle";
+        regionText.classList.add("instruction_element_nonbackground");
+        regionText.classList.add("phone_room_hint_sequential");
+        regionText.style.display = "none";
+        regionText.style.opacity = 0;
+
+        let instructionText = create_SVG_text_elem(
+            GenParam.SVG_width / 2,
+            GenParam.SVG_height / 2 + 410,
+            hintConfig.instructionText,
+            undefined,
+            undefined
+        );
+        instructionText.style.fill = "#555555";
+        instructionText.style.fontSize = "34px";
+        instructionText.style.fontStyle = "italic";
+        instructionText.style.textAnchor = "middle";
+        instructionText.classList.add("instruction_element_nonbackground");
+        instructionText.classList.add("phone_room_hint_sequential");
+        instructionText.style.display = "none";
+        instructionText.style.opacity = 0;
+
+        this.currentInstructionsSVG.appendChild(titleText);
+        this.currentInstructionsSVG.appendChild(locationText);
+        this.currentInstructionsSVG.appendChild(regionText);
+        this.currentInstructionsSVG.appendChild(instructionText);
+
+        this.phoneRoomHintSequentialElements.push(titleText, locationText, regionText, instructionText);
+    }
+
+    showPhoneRoomHint() {
+        this.currentInstructionType = "phone_room";
+        AudioCont.play_sound_effect("alert_minimal");
+        this.openInstructionsPage();
+
+        if (GenParam.PhoneRoomFlair.sequentialHintText) {
+            setTimeout(() => this.animatePhoneRoomHintSequentialElements(), 320);
+        }
+    }
+
+    animatePhoneRoomHintSequentialElements() {
+        if (!this.phoneRoomHintSequentialElements) return;
+
+        this.phoneRoomHintSequentialElements.forEach((element, index) => {
+            setTimeout(() => {
+                if (!element || !element.parentNode) return;
+
+                element.style.display = "inherit";
+                element.style.transition = "opacity 300ms ease-in-out";
+                element.style.opacity = 1;
+            }, index * 160);
+        });
+    }
+
     startNameRecallTask(currentBlockNum, bonusStarsPerCorrectAnswer) {
         this.currentInstructionType = "name_recall_task";
         let canEarnStars = bonusStarsPerCorrectAnswer > 0;
@@ -1187,8 +1919,9 @@ class InstructionsController {
         this.addClosingButtonToParent(closeButtonPos, false, undefined, continueButtonTime);
     }
 
-    startFennimalAttributeSortingTask(phaseNum, taskData, attributesArr, maxEarnableStars) {
+    startFennimalAttributeSortingTask(phaseNum, taskData, attributesArr, maxEarnableStars, presentation) {
         this.currentInstructionType = "match_head_to_region";
+        let presentationMode = (presentation === "single") ? "single" : "multiple";
 
         this.clearInstructions();
         this.currentInstructionsSVG = this.createBasicInstructionElements();
@@ -1196,15 +1929,21 @@ class InstructionsController {
         this.parentElem.style.display = "inherit";
         document.getElementById("Instructions_Title").innerHTML = "Day " + phaseNum + " : do you remember the Fennimals you just encountered?";
 
-        let taskInstruction = "On the next page you will see " + taskData.length + " different boxes, each for a different Fennimal. " +
-            "On the top of the page you will see a set of smaller boxes, each containing a different piece of information. " +
-            "Your task is to match each of these smaller boxes with the correct Fennimal by dragging the smaller boxes to the correct larger box. " +
-            "Once you have placed all smaller boxes they will be replaced with a different set of information until you have completed all questions. ";
-
+        let taskInstruction;
         if (attributesArr.includes("name")) {
             taskInstruction = "First, you will be asked to write down the names of all " + taskData.length + " Fennimals you encountered yesterday. " +
                 "Then a set of smaller boxes will appear on the top of the page, each containing a different piece of information. " +
                 "Your task is to match each of these smaller boxes with the correct Fennimal.";
+        } else if (presentationMode === "single") {
+            taskInstruction = "On the next pages you will see a box labelled with the name of a Fennimal, one Fennimal at a time. " +
+                "On the top of the page you will see smaller boxes, each containing a different piece of information. " +
+                "Drag the correct piece of information onto that Fennimal's box. " +
+                "When you have finished all questions for that Fennimal, you will move on to the next Fennimal until you have completed all of them.";
+        } else {
+            taskInstruction = "On the next page you will see " + taskData.length + " different boxes, each for a different Fennimal. " +
+                "On the top of the page you will see a set of smaller boxes, each containing a different piece of information. " +
+                "Your task is to match each of these smaller boxes with the correct Fennimal by dragging the smaller boxes to the correct larger box. " +
+                "Once you have placed all smaller boxes they will be replaced with a different set of information until you have completed all questions. ";
         }
 
         // FIX: Reduced the number of <br> tags so the text doesn't push down into the stars
@@ -1262,12 +2001,12 @@ class InstructionsController {
         continueButton.onpointerdown = () => {
             // Clean up the stars when we leave
             Array.from(document.getElementsByClassName("deletable_bonus_star")).forEach(s => s.remove());
-            this.executeFennimalAttributeSortingTask(phaseNum, taskData, attributesArr, maxEarnableStars);
+            this.executeFennimalAttributeSortingTask(phaseNum, taskData, attributesArr, maxEarnableStars, presentationMode);
             AudioCont.play_sound_effect("button_click");
         };
     }
 
-    executeFennimalAttributeSortingTask(phaseNum, taskData, attributesArr, maxEarnableStars) {
+    executeFennimalAttributeSortingTask(phaseNum, taskData, attributesArr, maxEarnableStars, presentation) {
         this.clearInstructions();
         this.currentInstructionsSVG = this.createBasicInstructionElements();
         this.parentElem.appendChild(this.currentInstructionsSVG);
@@ -1279,7 +2018,16 @@ class InstructionsController {
             document.getElementsByClassName("instructions_element_background")[0].style.fill = GenParam.background_fill_for_instructions_where_stars_can_be_earned;
         }
 
-        new FennimalAttributeSortingTask(this.currentInstructionsSVG, document.getElementById("Instructions_Title"), taskData, attributesArr, maxEarnableStars, this, (data) => this.completedSortingTask(data));
+        createFennimalAttributeSortingTask(
+            this.currentInstructionsSVG,
+            document.getElementById("Instructions_Title"),
+            taskData,
+            attributesArr,
+            maxEarnableStars,
+            this,
+            (data) => this.completedSortingTask(data),
+            presentation
+        );
     }
 
     completedSortingTask(data) {
@@ -1569,6 +2317,176 @@ class InstructionsController {
 // ----------------------------------------------------------------------
 // EXPORTED COMPONENT CLASSES
 // ----------------------------------------------------------------------
+
+/**
+ * Adaptive Fennimal-head roster for free-exploration intro / progress / complete screens.
+ * mode: "intro" (all grayscale) | "progress" (found color, else gray) | "complete" (all color)
+ */
+class ExplorationFennimalRoster {
+    constructor(parentElem, x, y, width, height) {
+        this.parentElem = parentElem;
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.foreign = null;
+        this.rootDiv = null;
+    }
+
+    destroy() {
+        if (this.foreign && this.foreign.parentNode) this.foreign.remove();
+        this.foreign = null;
+        this.rootDiv = null;
+    }
+
+    getLayout(n) {
+        let cols;
+        let rows;
+        let maxCell;
+
+        if (n <= 3) {
+            cols = Math.max(n, 1);
+            rows = 1;
+            maxCell = 280;
+        } else if (n <= 6) {
+            cols = n;
+            rows = 1;
+            maxCell = 200;
+        } else if (n <= 12) {
+            cols = Math.ceil(n / 2);
+            rows = 2;
+            maxCell = 160;
+        } else {
+            cols = 6;
+            rows = Math.ceil(n / 6);
+            maxCell = 140;
+        }
+
+        let gap = n <= 3 ? 36 : 22;
+        let cellW = (this.width - gap * (cols + 1)) / cols;
+        let cellH = (this.height - gap * (rows + 1)) / Math.min(rows, n <= 12 ? rows : 3);
+        let size = Math.max(90, Math.min(cellW, cellH, maxCell));
+
+        return { cols, rows, gap, size, needsScroll: n > 12 };
+    }
+
+    render(fenList, mode) {
+        this.destroy();
+
+        let fens = (fenList || []).filter((f) => f && f.name !== undefined);
+        this.foreign = create_SVG_foreignElement(this.x, this.y, this.width, this.height, undefined, undefined);
+        this.foreign.classList.add("instruction_element_nonbackground");
+        this.parentElem.appendChild(this.foreign);
+
+        this.rootDiv = document.createElement("div");
+        this.rootDiv.style.width = "100%";
+        this.rootDiv.style.height = "100%";
+        this.rootDiv.style.display = "flex";
+        this.rootDiv.style.flexWrap = "wrap";
+        this.rootDiv.style.justifyContent = "center";
+        this.rootDiv.style.alignContent = "center";
+        this.rootDiv.style.alignItems = "center";
+        this.rootDiv.style.boxSizing = "border-box";
+        this.rootDiv.style.padding = "8px";
+        this.foreign.appendChild(this.rootDiv);
+
+        if (fens.length === 0) return;
+
+        let layout = this.getLayout(fens.length);
+        if (layout.needsScroll) {
+            this.rootDiv.style.overflowY = "auto";
+            this.rootDiv.style.alignContent = "flex-start";
+        }
+
+        fens.forEach((fen) => {
+            let isFound = mode === "complete" || (mode === "progress" && fen.visited === true);
+            // Intro: all unfound. Progress: visited found. Complete: all found.
+            if (mode === "intro") isFound = false;
+
+            this.rootDiv.appendChild(this.createHeadCard(fen, isFound, layout.size, layout.gap));
+        });
+    }
+
+    createHeadCard(fenObj, isFound, size, gap) {
+        let regionDark = GenParam.RegionData[fenObj.region]
+            ? GenParam.RegionData[fenObj.region].darker_color
+            : "#37474F";
+        let regionLight = GenParam.RegionData[fenObj.region]
+            ? GenParam.RegionData[fenObj.region].lighter_color
+            : "#ECEFF1";
+
+        let card = document.createElement("div");
+        card.style.width = size + "px";
+        card.style.height = (size + 42) + "px";
+        card.style.margin = Math.max(8, gap / 2) + "px";
+        card.style.display = "flex";
+        card.style.flexDirection = "column";
+        card.style.alignItems = "center";
+        card.style.justifyContent = "flex-start";
+        card.style.opacity = "0";
+        card.style.transition = "opacity 280ms ease-out";
+
+        let headWrap = document.createElement("div");
+        headWrap.style.width = size + "px";
+        headWrap.style.height = size + "px";
+        headWrap.style.borderRadius = "22px";
+        headWrap.style.display = "flex";
+        headWrap.style.alignItems = "center";
+        headWrap.style.justifyContent = "center";
+        headWrap.style.boxSizing = "border-box";
+        headWrap.style.border = isFound
+            ? ("4px solid " + regionDark)
+            : "4px solid #90A4AE";
+        headWrap.style.background = isFound ? regionLight : "#CFD8DC";
+        headWrap.style.overflow = "hidden";
+        if (!isFound) {
+            headWrap.style.opacity = "0.7";
+            headWrap.style.filter = "blur(1.5px)";
+        }
+        card.appendChild(headWrap);
+
+        let svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        svg.style.width = "100%";
+        svg.style.height = "100%";
+        svg.style.overflow = "visible";
+        headWrap.appendChild(svg);
+
+        let headIcon = create_Fennimal_SVG_object_head_only(fenObj, false);
+        if (!isFound) {
+            headIcon.style.filter = "grayscale(100%) brightness(1.05)";
+        }
+        svg.appendChild(headIcon);
+
+        let label = document.createElement("div");
+        label.style.marginTop = "8px";
+        label.style.fontSize = Math.max(22, Math.round(size * 0.16)) + "px";
+        label.style.fontWeight = "700";
+        label.style.textAlign = "center";
+        label.style.color = isFound ? regionDark : "#546E7A";
+        if (!isFound) label.style.opacity = "0.7";
+        label.textContent = isFound ? fenObj.name : "?";
+        card.appendChild(label);
+
+        setTimeout(() => {
+            try {
+                let box = headIcon.getBBox();
+                if (box.width > 0 && box.height > 0) {
+                    let pad = size * 0.82;
+                    let scale = Math.min(pad / box.width, pad / box.height);
+                    let cx = box.x + box.width / 2;
+                    let cy = box.y + box.height / 2;
+                    headIcon.setAttribute(
+                        "transform",
+                        `translate(${size / 2}, ${size / 2}) scale(${scale}) translate(${-cx}, ${-cy})`
+                    );
+                }
+            } catch (e) { /* bbox unavailable */ }
+            card.style.opacity = "1";
+        }, 40);
+
+        return card;
+    }
+}
 
 class VerticalScrollableBox {
     constructor(parentElem, x, y, width, height) {

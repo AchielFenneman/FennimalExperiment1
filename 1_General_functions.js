@@ -775,6 +775,20 @@ function apply_Fennimal_animation_pivots(FennimalSVG) {
     });
 }
 
+/**
+ * Freeze all decorative CSS body/head flair on a Fennimal SVG
+ * (snowflakes, spores, heat waves, tails, curious tilt, climber arms, …).
+ */
+function freeze_fennimal_decorative_animations(FennimalSVG) {
+    if (!FennimalSVG) return;
+    FennimalSVG.classList.add("fennimal_pose_frozen");
+    // Inline fallback so mid-keyframe transforms also settle even if class CSS lags.
+    FennimalSVG.querySelectorAll("*").forEach((el) => {
+        el.style.animation = "none";
+        el.style.animationPlayState = "paused";
+    });
+}
+
 function create_Fennimal_SVG_object(FenObj, head_scale_factor, outline_only) {
     let TranslationGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
     let ScaleGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
@@ -1198,7 +1212,8 @@ function wait(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-MakeObjectDraggableObject = function(ElemParentLayer, MaskLayer, DraggableElem, Target, required_minimum_distance, returnfunc) {
+MakeObjectDraggableObject = function(ElemParentLayer, MaskLayer, DraggableElem, Target, required_minimum_distance, returnfunc, hooks) {
+    hooks = hooks || {};
     let Mask, dragging_is_enabled = false;
     let OriginalParent = DraggableElem.parentNode;
 
@@ -1237,6 +1252,8 @@ MakeObjectDraggableObject = function(ElemParentLayer, MaskLayer, DraggableElem, 
     function start_dragging() {
         if (dragging_is_enabled) {
             Outline.classList.remove("focus_on_SVG_outline");
+            if (typeof hooks.onStart === "function") hooks.onStart(DraggableElem);
+
             Mask = create_SVG_rect(0, 0, GenParam.SVG_width, GenParam.SVG_height);
             Mask.style.opacity = 0;
             MaskLayer.appendChild(Mask);
@@ -1254,8 +1271,18 @@ MakeObjectDraggableObject = function(ElemParentLayer, MaskLayer, DraggableElem, 
         current_delta_x = NewPos.x - OriginalPos.x;
         current_delta_y = NewPos.y - OriginalPos.y;
 
-        // No collision checks needed! Just move freely.
+        if (hooks.axis === "x") current_delta_y = 0;
+        if (hooks.axis === "y") current_delta_x = 0;
+        if (typeof hooks.constrainDelta === "function") {
+            let constrained = hooks.constrainDelta(current_delta_x, current_delta_y) || {};
+            if (typeof constrained.dx === "number") current_delta_x = constrained.dx;
+            if (typeof constrained.dy === "number") current_delta_y = constrained.dy;
+        }
+
         DragGroup.style.transform = `translate(${current_delta_x}px, ${current_delta_y}px)`;
+        if (typeof hooks.onMove === "function") {
+            hooks.onMove(current_delta_x, current_delta_y, DraggableElem);
+        }
     }
 
     function drag_cancelled() {
@@ -1271,14 +1298,26 @@ MakeObjectDraggableObject = function(ElemParentLayer, MaskLayer, DraggableElem, 
 
         setTimeout(() => {
             DragGroup.style.transition = "";
-            enable_object_draggable();
+            if (typeof hooks.onMiss === "function") {
+                // Caller is responsible for re-enabling / recreating drag state.
+                hooks.onMiss(DraggableElem);
+            } else {
+                enable_object_draggable();
+            }
         }, 350);
     }
 
     function release_dragging(event) {
         let dist_to_target = EUDistPoints(getMousePosition(event), getSVGInternalCenter(Target));
 
-        if (dist_to_target < required_minimum_distance) {
+        let dropSucceeded;
+        if (typeof hooks.validateDrop === "function") {
+            dropSucceeded = hooks.validateDrop(dist_to_target, event) === true;
+        } else {
+            dropSucceeded = dist_to_target < required_minimum_distance;
+        }
+
+        if (dropSucceeded) {
             if (Mask) Mask.remove();
 
             // 1. Move back to the original layer
@@ -1301,6 +1340,22 @@ MakeObjectDraggableObject = function(ElemParentLayer, MaskLayer, DraggableElem, 
     }
 
     enable_object_draggable();
+
+    return {
+        disable: disable_object_draggable,
+        enable: enable_object_draggable,
+        destroy: function() {
+            disable_object_draggable();
+            DraggableElem.onpointerdown = null;
+            if (Mask) Mask.remove();
+            if (Outline && Outline.parentNode) Outline.remove();
+            // Leave DraggableElem in place; only tear down drag scaffolding.
+            if (DragGroup.parentNode && DragGroup.contains(DraggableElem)) {
+                OriginalParent.appendChild(DraggableElem);
+            }
+            if (DragGroup.parentNode) DragGroup.remove();
+        }
+    };
 }
 
 function create_SVG_outline_of_group_ID(Group){
@@ -1462,6 +1517,11 @@ async function shared_toy_drop_sequence(DroppedToyElement, BoxMod, BasicsMod, Pa
         WorldState.change_partner_belief_in_box_contents(FenObj.toybox, FenObj.toy);
     }
 
+    // Restore box hit-testing so the participant can click to close (toy_to_box clears this while open).
+    if (BoxMod && typeof BoxMod.set_pointer_events_enabled === "function") {
+        BoxMod.set_pointer_events_enabled(true);
+    }
+
     // 3. Branching Logic: Who closes the box?
     if (PartnerMod.is_present) {
         Interface.Prompt.show_message(PartnerMod.partnername + " closes the " + BoxMod.boxname);
@@ -1469,5 +1529,599 @@ async function shared_toy_drop_sequence(DroppedToyElement, BoxMod, BasicsMod, Pa
         finish_callback();
     } else {
         BoxMod.wait_for_user_click("close", () => finish_callback());
+    }
+}
+
+/**
+ * Cartoon confetti burst used by broken-toy repair and ask_toy success.
+ * Pieces clean themselves up; resolve waits only for the outward pop.
+ */
+function spawn_confetti_burst(ParentLayer, centerX, centerY, options = {}) {
+    const colors = options.colors || ['#FF3B30', '#4CD964', '#007AFF', '#FFCC00', '#AF52DE'];
+    const numConfetti = options.count != null ? options.count : 24;
+    const insertBefore = options.insertBefore || null;
+    const awaitPopMs = options.awaitPopMs != null ? options.awaitPopMs : 700;
+
+    for (let i = 0; i < numConfetti; i++) {
+        let shapeType = Math.floor(Math.random() * 3);
+        let confetti;
+
+        if (shapeType === 0) {
+            confetti = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            let w = 25 + Math.random() * 35;
+            let h = 20 + Math.random() * 30;
+            confetti.setAttribute('width', w);
+            confetti.setAttribute('height', h);
+            confetti.setAttribute('x', -w / 2);
+            confetti.setAttribute('y', -h / 2);
+        } else if (shapeType === 1) {
+            confetti = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            let r = 12 + Math.random() * 18;
+            confetti.setAttribute('r', r);
+            confetti.setAttribute('cx', 0);
+            confetti.setAttribute('cy', 0);
+        } else {
+            confetti = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            confetti.setAttribute('points', '0,-25 25,20 -25,20');
+        }
+
+        confetti.setAttribute('fill', colors[Math.floor(Math.random() * colors.length)]);
+
+        let angle = (i / numConfetti) * Math.PI * 2 + (Math.random() * 0.3);
+        let dist = 200 + Math.random() * 150;
+        let endX = centerX + Math.cos(angle) * dist;
+        let endY = centerY + Math.sin(angle) * dist;
+        let rot = (Math.random() - 0.5) * 1080;
+
+        confetti.style.transformOrigin = "center";
+        confetti.style.transformBox = "fill-box";
+        confetti.style.transform = `translate(${centerX}px, ${centerY}px) scale(0)`;
+
+        if (insertBefore && insertBefore.parentNode === ParentLayer) {
+            ParentLayer.insertBefore(confetti, insertBefore);
+        } else {
+            ParentLayer.appendChild(confetti);
+        }
+
+        setTimeout(() => {
+            confetti.style.transition = "transform 600ms cubic-bezier(0.25, 1, 0.5, 1)";
+            confetti.style.transform = `translate(${endX}px, ${endY}px) scale(1) rotate(${rot}deg)`;
+        }, 20);
+
+        setTimeout(() => {
+            confetti.style.transition = "all 2000ms ease-in";
+            confetti.style.transform = `translate(${endX}px, ${endY + 300 + Math.random() * 200}px) scale(0.6) rotate(${rot + 360}deg)`;
+            confetti.style.opacity = 0;
+            setTimeout(() => confetti.remove(), 2000);
+        }, 650);
+    }
+
+    return wait(awaitPopMs);
+}
+
+/**
+ * Reusable bottom toy-choice panel (PartnerBelief / ask_toy).
+ * Options are resolved SVG toy ids (e.g. "plane"), not stimulus codes.
+ */
+class ToyChoiceBar {
+    constructor(parentLayer, W, H, options = {}) {
+        this.parentLayer = parentLayer;
+        this.W = W;
+        this.H = H;
+        this.bonus_stars = options.bonus_stars || 0;
+        this.panel_y_ratio = options.panel_y_ratio != null ? options.panel_y_ratio : 0.76;
+        this.btn_size = options.btn_size || 170;
+        this.spacing = options.spacing || 25;
+        this.UIGroup = null;
+        this._selectionHandler = null;
+        this._disabled = false;
+    }
+
+    static make_toy_static(SVG_Elem, toy_id) {
+        let hidden_elements = Array.from(SVG_Elem.getElementsByClassName("prep_element_hidden"));
+        hidden_elements.forEach(el => el.style.display = "none");
+
+        if (toy_id === "plane") {
+            let prop_alt = SVG_Elem.querySelector(".prop_alt");
+            let prop_spinning = SVG_Elem.querySelector(".prop_spinning");
+            if (prop_alt) prop_alt.style.display = "none";
+            if (prop_spinning) prop_spinning.style.display = "none";
+            let prop_base = SVG_Elem.querySelector(".prop_base");
+            if (prop_base) { prop_base.style.opacity = 1; prop_base.style.display = "inherit"; }
+        } else if (toy_id === "globe") {
+            let arcs = Array.from(SVG_Elem.getElementsByClassName("arc"));
+            arcs.forEach(a => a.style.display = "none");
+            let lights = Array.from(SVG_Elem.querySelectorAll(".light_1, .light_2, .light_3, .light_4"));
+            lights.forEach(l => l.style.fill = "#555555");
+        } else if (toy_id === "robot") {
+            let eye_lights = Array.from(SVG_Elem.getElementsByClassName("eye_light"));
+            let antennas = Array.from(SVG_Elem.getElementsByClassName("antenna"));
+            eye_lights.forEach(el => el.style.fill = "#444444");
+            antennas.forEach(el => el.style.fill = "#444444");
+            let switch_on = SVG_Elem.querySelector(".switch_toggle_on");
+            if (switch_on) switch_on.style.display = "none";
+            let switch_off = SVG_Elem.querySelector(".switch_toggle_off");
+            if (switch_off) switch_off.style.opacity = 1;
+        } else if (toy_id === "bubblewand") {
+            let soap = SVG_Elem.querySelector(".wand_soap");
+            if (soap) soap.style.display = "none";
+        } else if (toy_id === "jack") {
+            let crank_down = SVG_Elem.querySelector(".crank_down");
+            if (crank_down) crank_down.style.display = "none";
+            let lid_closed = SVG_Elem.querySelector(".box_lid_closed");
+            if (lid_closed) lid_closed.style.display = "none";
+        }
+    }
+
+    destroy() {
+        this._disabled = true;
+        this._selectionHandler = null;
+        if (this.UIGroup && this.UIGroup.parentNode) {
+            this.UIGroup.remove();
+        }
+        this.UIGroup = null;
+    }
+
+    async hide(fade_ms = 200) {
+        this._disabled = true;
+        this._selectionHandler = null;
+        if (!this.UIGroup) return;
+        this.UIGroup.style.transition = `all ${fade_ms}ms ease-in`;
+        this.UIGroup.style.opacity = 0;
+        this.UIGroup.style.transform = "scale(0.8)";
+        await wait(fade_ms);
+        this.destroy();
+    }
+
+    /**
+     * Build the bar and resolve with the selected toy id when clicked.
+     * @param {string[]} toyIds
+     * @returns {Promise<string>}
+     */
+    waitForSelection(toyIds) {
+        return new Promise(resolve => {
+            this.show(toyIds, (toy_id) => resolve(toy_id));
+        });
+    }
+
+    show(toyIds, onSelect) {
+        this.destroy();
+        this._disabled = false;
+        this._selectionHandler = onSelect;
+
+        this.UIGroup = create_SVG_group(0, 0);
+        this.parentLayer.appendChild(this.UIGroup);
+
+        const btn_size = this.btn_size;
+        const spacing = this.spacing;
+        const total_width = (toyIds.length * btn_size) + ((toyIds.length - 1) * spacing);
+        const start_x = (this.W - total_width) / 2;
+        const panel_y = this.panel_y_ratio * this.H;
+
+        let panel_height = btn_size + 40;
+        if (this.bonus_stars > 0) panel_height += 40;
+
+        let panel = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        panel.setAttribute('x', start_x - 30);
+        panel.setAttribute('y', panel_y - 20);
+        panel.setAttribute('width', total_width + 60);
+        panel.setAttribute('height', panel_height);
+        panel.setAttribute('rx', 20);
+        panel.setAttribute('fill', 'rgba(255, 215, 0, 0.45)');
+        panel.setAttribute('stroke', '#d4af37');
+        panel.setAttribute('stroke-width', '4');
+        this.UIGroup.appendChild(panel);
+
+        toyIds.forEach((toy_id, index) => {
+            let btn_x = start_x + (index * (btn_size + spacing));
+            let btn_y = panel_y;
+
+            let BtnGroup = create_SVG_group(0, 0);
+            this.UIGroup.appendChild(BtnGroup);
+
+            let btn_bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            btn_bg.setAttribute('x', btn_x);
+            btn_bg.setAttribute('y', btn_y);
+            btn_bg.setAttribute('width', btn_size);
+            btn_bg.setAttribute('height', btn_size);
+            btn_bg.setAttribute('rx', 15);
+            btn_bg.setAttribute('fill', '#d8c381');
+            btn_bg.setAttribute('stroke', '#b89f5d');
+            btn_bg.setAttribute('stroke-width', '3');
+            btn_bg.style.transition = "all 150ms ease";
+            BtnGroup.appendChild(btn_bg);
+
+            let template = document.getElementById("toy_" + toy_id);
+            if (!template) {
+                console.warn("ToyChoiceBar: missing toy_" + toy_id);
+                return;
+            }
+            let RawToy = template.cloneNode(true);
+            RawToy.style.display = "inherit";
+            set_toy_color_scheme(RawToy, toy_id, false);
+            ToyChoiceBar.make_toy_static(RawToy, toy_id);
+            BtnGroup.appendChild(RawToy);
+
+            let TBox = RawToy.getBBox();
+            let max_dim = Math.max(TBox.width, TBox.height) || 100;
+            let scale = (btn_size * 0.85) / max_dim;
+            let raw_cx = TBox.x + (TBox.width / 2);
+            let raw_cy = TBox.y + (TBox.height / 2);
+            let target_cx = btn_x + (btn_size / 2);
+            let target_cy = btn_y + (btn_size / 2);
+            RawToy.style.transformOrigin = `${raw_cx}px ${raw_cy}px`;
+            RawToy.style.transform = `translate(${target_cx - raw_cx}px, ${target_cy - raw_cy}px) scale(${scale})`;
+
+            let click_catcher = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            click_catcher.setAttribute('x', btn_x);
+            click_catcher.setAttribute('y', btn_y);
+            click_catcher.setAttribute('width', btn_size);
+            click_catcher.setAttribute('height', btn_size);
+            click_catcher.setAttribute('fill', 'transparent');
+            click_catcher.style.cursor = "pointer";
+            BtnGroup.appendChild(click_catcher);
+
+            click_catcher.onpointerenter = () => {
+                if (this._disabled) return;
+                btn_bg.setAttribute('fill', '#ebd89b');
+                btn_bg.setAttribute('stroke', 'gold');
+            };
+            click_catcher.onpointerleave = () => {
+                btn_bg.setAttribute('fill', '#d8c381');
+                btn_bg.setAttribute('stroke', '#b89f5d');
+            };
+            click_catcher.onpointerdown = () => {
+                if (this._disabled) return;
+                this._disabled = true;
+                AudioCont.play_sound_effect("button_click");
+                let handler = this._selectionHandler;
+                this._selectionHandler = null;
+                if (handler) handler(toy_id);
+            };
+        });
+
+        if (this.bonus_stars > 0) {
+            let bonus_text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            bonus_text.setAttribute('x', this.W / 2);
+            bonus_text.setAttribute('y', panel_y + btn_size + 45);
+            bonus_text.setAttribute('font-family', 'Arial, sans-serif');
+            bonus_text.setAttribute('font-size', '30');
+            bonus_text.setAttribute('font-weight', 'bold');
+            bonus_text.setAttribute('fill', 'navy');
+            bonus_text.setAttribute('text-anchor', 'middle');
+            bonus_text.textContent = this.bonus_stars === 1
+                ? "You can earn a bonus star for a correct answer!"
+                : `You can earn ${this.bonus_stars} bonus stars for a correct answer!`;
+            this.UIGroup.appendChild(bonus_text);
+        }
+
+        this.UIGroup.style.transformOrigin = `${this.W / 2}px ${panel_y + (btn_size / 2)}px`;
+        this.UIGroup.style.transform = "scale(0.8)";
+        this.UIGroup.style.opacity = 0;
+        this.UIGroup.style.transition = "all 300ms cubic-bezier(0.34, 1.56, 0.64, 1)";
+        window.getComputedStyle(this.UIGroup).opacity;
+        this.UIGroup.style.transform = "scale(1)";
+        this.UIGroup.style.opacity = 1;
+    }
+}
+
+/**
+ * Box-choice panel mirroring ToyChoiceBar (clones #toybox_* templates).
+ */
+class BoxChoiceBar {
+    constructor(parentLayer, W, H, options = {}) {
+        this.parentLayer = parentLayer;
+        this.W = W;
+        this.H = H;
+        this.bonus_stars = options.bonus_stars || 0;
+        this.panel_y_ratio = options.panel_y_ratio != null ? options.panel_y_ratio : 0.76;
+        this.btn_size = options.btn_size || 170;
+        this.spacing = options.spacing || 25;
+        this.UIGroup = null;
+        this._selectionHandler = null;
+        this._disabled = false;
+    }
+
+    destroy() {
+        this._disabled = true;
+        this._selectionHandler = null;
+        if (this.UIGroup && this.UIGroup.parentNode) this.UIGroup.remove();
+        this.UIGroup = null;
+    }
+
+    async hide(fade_ms = 200) {
+        this._disabled = true;
+        this._selectionHandler = null;
+        if (!this.UIGroup) return;
+        this.UIGroup.style.transition = `all ${fade_ms}ms ease-in`;
+        this.UIGroup.style.opacity = 0;
+        this.UIGroup.style.transform = "scale(0.8)";
+        await wait(fade_ms);
+        this.destroy();
+    }
+
+    waitForSelection(boxIds) {
+        return new Promise(resolve => {
+            this.show(boxIds, (box_id) => resolve(box_id));
+        });
+    }
+
+    show(boxIds, onSelect) {
+        this.destroy();
+        this._disabled = false;
+        this._selectionHandler = onSelect;
+
+        this.UIGroup = create_SVG_group(0, 0);
+        this.parentLayer.appendChild(this.UIGroup);
+
+        const btn_size = this.btn_size;
+        const spacing = this.spacing;
+        const total_width = (boxIds.length * btn_size) + ((boxIds.length - 1) * spacing);
+        const start_x = (this.W - total_width) / 2;
+        const panel_y = this.panel_y_ratio * this.H;
+
+        let panel_height = btn_size + 40;
+        if (this.bonus_stars > 0) panel_height += 40;
+
+        let panel = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        panel.setAttribute('x', start_x - 30);
+        panel.setAttribute('y', panel_y - 20);
+        panel.setAttribute('width', total_width + 60);
+        panel.setAttribute('height', panel_height);
+        panel.setAttribute('rx', 20);
+        panel.setAttribute('fill', 'rgba(255, 215, 0, 0.45)');
+        panel.setAttribute('stroke', '#d4af37');
+        panel.setAttribute('stroke-width', '4');
+        this.UIGroup.appendChild(panel);
+
+        boxIds.forEach((box_id, index) => {
+            let btn_x = start_x + (index * (btn_size + spacing));
+            let btn_y = panel_y;
+
+            let BtnGroup = create_SVG_group(0, 0);
+            this.UIGroup.appendChild(BtnGroup);
+
+            let btn_bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            btn_bg.setAttribute('x', btn_x);
+            btn_bg.setAttribute('y', btn_y);
+            btn_bg.setAttribute('width', btn_size);
+            btn_bg.setAttribute('height', btn_size);
+            btn_bg.setAttribute('rx', 15);
+            btn_bg.setAttribute('fill', '#d8c381');
+            btn_bg.setAttribute('stroke', '#b89f5d');
+            btn_bg.setAttribute('stroke-width', '3');
+            btn_bg.style.transition = "all 150ms ease";
+            BtnGroup.appendChild(btn_bg);
+
+            let template = document.getElementById("toybox_" + box_id);
+            if (!template) {
+                console.warn("BoxChoiceBar: missing toybox_" + box_id);
+                return;
+            }
+            let RawBox = template.cloneNode(true);
+            RawBox.style.display = "inherit";
+            Array.from(RawBox.getElementsByClassName("prep_element_hidden")).forEach(el => {
+                el.style.display = "none";
+            });
+            BtnGroup.appendChild(RawBox);
+
+            let TBox = RawBox.getBBox();
+            let max_dim = Math.max(TBox.width, TBox.height) || 100;
+            let scale = (btn_size * 0.85) / max_dim;
+            let raw_cx = TBox.x + (TBox.width / 2);
+            let raw_cy = TBox.y + (TBox.height / 2);
+            let target_cx = btn_x + (btn_size / 2);
+            let target_cy = btn_y + (btn_size / 2);
+            RawBox.style.transformOrigin = `${raw_cx}px ${raw_cy}px`;
+            RawBox.style.transform = `translate(${target_cx - raw_cx}px, ${target_cy - raw_cy}px) scale(${scale})`;
+
+            let click_catcher = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            click_catcher.setAttribute('x', btn_x);
+            click_catcher.setAttribute('y', btn_y);
+            click_catcher.setAttribute('width', btn_size);
+            click_catcher.setAttribute('height', btn_size);
+            click_catcher.setAttribute('fill', 'transparent');
+            click_catcher.style.cursor = "pointer";
+            BtnGroup.appendChild(click_catcher);
+
+            click_catcher.onpointerenter = () => {
+                if (this._disabled) return;
+                btn_bg.setAttribute('fill', '#ebd89b');
+                btn_bg.setAttribute('stroke', 'gold');
+            };
+            click_catcher.onpointerleave = () => {
+                btn_bg.setAttribute('fill', '#d8c381');
+                btn_bg.setAttribute('stroke', '#b89f5d');
+            };
+            click_catcher.onpointerdown = () => {
+                if (this._disabled) return;
+                this._disabled = true;
+                AudioCont.play_sound_effect("button_click");
+                let handler = this._selectionHandler;
+                this._selectionHandler = null;
+                if (handler) handler(box_id);
+            };
+        });
+
+        if (this.bonus_stars > 0) {
+            let bonus_text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            bonus_text.setAttribute('x', this.W / 2);
+            bonus_text.setAttribute('y', panel_y + btn_size + 45);
+            bonus_text.setAttribute('font-family', 'Arial, sans-serif');
+            bonus_text.setAttribute('font-size', '30');
+            bonus_text.setAttribute('font-weight', 'bold');
+            bonus_text.setAttribute('fill', 'navy');
+            bonus_text.setAttribute('text-anchor', 'middle');
+            bonus_text.textContent = this.bonus_stars === 1
+                ? "You can earn a bonus star for a correct answer!"
+                : `You can earn ${this.bonus_stars} bonus stars for a correct answer!`;
+            this.UIGroup.appendChild(bonus_text);
+        }
+
+        this.UIGroup.style.transformOrigin = `${this.W / 2}px ${panel_y + (btn_size / 2)}px`;
+        this.UIGroup.style.transform = "scale(0.8)";
+        this.UIGroup.style.opacity = 0;
+        this.UIGroup.style.transition = "all 300ms cubic-bezier(0.34, 1.56, 0.64, 1)";
+        window.getComputedStyle(this.UIGroup).opacity;
+        this.UIGroup.style.transform = "scale(1)";
+        this.UIGroup.style.opacity = 1;
+    }
+}
+
+/**
+ * Fennimal-face choice panel mirroring ToyChoiceBar / BoxChoiceBar.
+ * Options are FenObj snapshots (need .id, .head, .ColorScheme for head rendering).
+ * Resolves with the selected FenObj.id.
+ */
+class FennimalChoiceBar {
+    constructor(parentLayer, W, H, options = {}) {
+        this.parentLayer = parentLayer;
+        this.W = W;
+        this.H = H;
+        this.bonus_stars = options.bonus_stars || 0;
+        this.panel_y_ratio = options.panel_y_ratio != null ? options.panel_y_ratio : 0.76;
+        this.btn_size = options.btn_size || 170;
+        this.spacing = options.spacing || 25;
+        this.UIGroup = null;
+        this._selectionHandler = null;
+        this._disabled = false;
+    }
+
+    destroy() {
+        this._disabled = true;
+        this._selectionHandler = null;
+        if (this.UIGroup && this.UIGroup.parentNode) this.UIGroup.remove();
+        this.UIGroup = null;
+    }
+
+    async hide(fade_ms = 200) {
+        this._disabled = true;
+        this._selectionHandler = null;
+        if (!this.UIGroup) return;
+        this.UIGroup.style.transition = `all ${fade_ms}ms ease-in`;
+        this.UIGroup.style.opacity = 0;
+        this.UIGroup.style.transform = "scale(0.8)";
+        await wait(fade_ms);
+        this.destroy();
+    }
+
+    waitForSelection(fenObjs) {
+        return new Promise(resolve => {
+            this.show(fenObjs, (fen_id) => resolve(fen_id));
+        });
+    }
+
+    show(fenObjs, onSelect) {
+        this.destroy();
+        this._disabled = false;
+        this._selectionHandler = onSelect;
+
+        this.UIGroup = create_SVG_group(0, 0);
+        this.parentLayer.appendChild(this.UIGroup);
+
+        const btn_size = this.btn_size;
+        const spacing = this.spacing;
+        const total_width = (fenObjs.length * btn_size) + ((fenObjs.length - 1) * spacing);
+        const start_x = (this.W - total_width) / 2;
+        const panel_y = this.panel_y_ratio * this.H;
+
+        let panel_height = btn_size + 40;
+        if (this.bonus_stars > 0) panel_height += 40;
+
+        let panel = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        panel.setAttribute("x", start_x - 30);
+        panel.setAttribute("y", panel_y - 20);
+        panel.setAttribute("width", total_width + 60);
+        panel.setAttribute("height", panel_height);
+        panel.setAttribute("rx", 20);
+        panel.setAttribute("fill", "rgba(255, 215, 0, 0.45)");
+        panel.setAttribute("stroke", "#d4af37");
+        panel.setAttribute("stroke-width", "4");
+        this.UIGroup.appendChild(panel);
+
+        fenObjs.forEach((fenObj, index) => {
+            let btn_x = start_x + (index * (btn_size + spacing));
+            let btn_y = panel_y;
+            let fen_id = fenObj.id;
+
+            let BtnGroup = create_SVG_group(0, 0);
+            this.UIGroup.appendChild(BtnGroup);
+
+            let btn_bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            btn_bg.setAttribute("x", btn_x);
+            btn_bg.setAttribute("y", btn_y);
+            btn_bg.setAttribute("width", btn_size);
+            btn_bg.setAttribute("height", btn_size);
+            btn_bg.setAttribute("rx", 15);
+            btn_bg.setAttribute("fill", "#d8c381");
+            btn_bg.setAttribute("stroke", "#b89f5d");
+            btn_bg.setAttribute("stroke-width", "3");
+            btn_bg.style.transition = "all 150ms ease";
+            BtnGroup.appendChild(btn_bg);
+
+            let headIcon = create_Fennimal_SVG_object_head_only(fenObj, false);
+            headIcon.style.filter = "grayscale(100%)";
+            BtnGroup.appendChild(headIcon);
+
+            let TBox = headIcon.getBBox();
+            let max_dim = Math.max(TBox.width, TBox.height) || 100;
+            let scale = (btn_size * 0.85) / max_dim;
+            let raw_cx = TBox.x + (TBox.width / 2);
+            let raw_cy = TBox.y + (TBox.height / 2);
+            let target_cx = btn_x + (btn_size / 2);
+            let target_cy = btn_y + (btn_size / 2);
+            headIcon.style.transformOrigin = `${raw_cx}px ${raw_cy}px`;
+            headIcon.style.transform = `translate(${target_cx - raw_cx}px, ${target_cy - raw_cy}px) scale(${scale})`;
+
+            let click_catcher = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            click_catcher.setAttribute("x", btn_x);
+            click_catcher.setAttribute("y", btn_y);
+            click_catcher.setAttribute("width", btn_size);
+            click_catcher.setAttribute("height", btn_size);
+            click_catcher.setAttribute("fill", "transparent");
+            click_catcher.style.cursor = "pointer";
+            BtnGroup.appendChild(click_catcher);
+
+            click_catcher.onpointerenter = () => {
+                if (this._disabled) return;
+                btn_bg.setAttribute("fill", "#ebd89b");
+                btn_bg.setAttribute("stroke", "gold");
+            };
+            click_catcher.onpointerleave = () => {
+                btn_bg.setAttribute("fill", "#d8c381");
+                btn_bg.setAttribute("stroke", "#b89f5d");
+            };
+            click_catcher.onpointerdown = () => {
+                if (this._disabled) return;
+                this._disabled = true;
+                AudioCont.play_sound_effect("button_click");
+                let handler = this._selectionHandler;
+                this._selectionHandler = null;
+                if (handler) handler(fen_id);
+            };
+        });
+
+        if (this.bonus_stars > 0) {
+            let bonus_text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            bonus_text.setAttribute("x", this.W / 2);
+            bonus_text.setAttribute("y", panel_y + btn_size + 45);
+            bonus_text.setAttribute("font-family", "Arial, sans-serif");
+            bonus_text.setAttribute("font-size", "30");
+            bonus_text.setAttribute("font-weight", "bold");
+            bonus_text.setAttribute("fill", "navy");
+            bonus_text.setAttribute("text-anchor", "middle");
+            bonus_text.textContent = this.bonus_stars === 1
+                ? "You can earn a bonus star for a correct answer!"
+                : `You can earn ${this.bonus_stars} bonus stars for a correct answer!`;
+            this.UIGroup.appendChild(bonus_text);
+        }
+
+        this.UIGroup.style.transformOrigin = `${this.W / 2}px ${panel_y + (btn_size / 2)}px`;
+        this.UIGroup.style.transform = "scale(0.8)";
+        this.UIGroup.style.opacity = 0;
+        this.UIGroup.style.transition = "all 300ms cubic-bezier(0.34, 1.56, 0.64, 1)";
+        window.getComputedStyle(this.UIGroup).opacity;
+        this.UIGroup.style.transform = "scale(1)";
+        this.UIGroup.style.opacity = 1;
     }
 }

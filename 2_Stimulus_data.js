@@ -1,6 +1,6 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["test"];
+    this.Experiment_Code = ["mentalizing"];
 
     const All_Instructions_At_Start = {
         test: [],
@@ -16,35 +16,16 @@ let StimulusSettings = function () {
     const All_Fennimal_Sets = {
         test: {
             "A1": { head: "A1", head_group: "A", head_cluster: "A", region: "A", food_preference: "A", toy: "A", toybox: "A", hat: "A" },
-            "A2": { head: "A2", head_group: "A", head_cluster: "A", region: "B", hat: "B",  toy: "B", toybox: "B"}
-        },
-
-        mentalizing_2: {
-            "S1": { head: "A", region: "A", toy: "A", toybox: "A" },
-            "S2": { head: "B", region: "B", toy: "B", toybox: "B" },
-            "P1": { head: "D", region: "D", toy: "D", toybox: "A" },
-            "P2": { head: "E", region: "E", toy: "E", toybox: "B" },
-            "X":  { head: "G", region: "A", food_preference: "A" },
-            "Y":  { head: "H", region: "E", food_preference: "B" },
-            "I1": { head: "G", region: "F", toybox: "A" },
-            "I2": { head: "H", region: "G", toybox: "B" }
-        },
-
-        mentalizing_network: {
-            "S1": { head: "A", region: "A", toy: "A", toybox: "A", hat: "A"},
-            "S2": { head: "B", region: "B", toy: "B", toybox: "B" },
-            "S3": { head: "C", region: "C", toy: "C", toybox: "C" },
-            "P1": { head: "D", region: "D", toy: "D", toybox: "A" },
-            "P2": { head: "E", region: "E", toy: "E", toybox: "B", hat: "B"},
-            "P3": { head: "F", region: "F", toy: "F", toybox: "C" }
+            "A2": { head: "A2", head_group: "A", head_cluster: "A", region: "B", hat: "B",  toy: "B", toybox: "B"},
+            "A3": { head: "A3", head_group: "A", head_cluster: "A", region: "C", hat: "C",  toy: "C", toybox: "A"},
         },
 
         mentalizing: {
-            "S1": { head: "A", region: "A", toy: "A", toybox: "A", hat: "A", play_orthogonal_tasks: true},
+            "S1": { head: "A", region: "A", toy: "A", toybox: "A" },
             "S2": { head: "B", region: "B", toy: "B", toybox: "B" },
             "S3": { head: "C", region: "C", toy: "C", toybox: "C" },
             "P1": { head: "D", region: "D", toy: "D", toybox: "A" },
-            "P2": { head: "E", region: "E", toy: "E", toybox: "B", hat: "B", play_orthogonal_tasks: true},
+            "P2": { head: "E", region: "E", toy: "E", toybox: "B" },
             "P3": { head: "F", region: "F", toy: "F", toybox: "C" }
         },
     };
@@ -54,22 +35,63 @@ let StimulusSettings = function () {
     // ----------------------------------------------------
     let All_Experiment_Structures = {
         test: [
+           
             {
-                type: "on_call",
-                interaction_type: "dirty_toy",
+                type: "free_exploration",
+                partner_behavior: "active",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                ask_Fennimal: true,
+                // fennimals_asked defaults to all Fennimals in this phase (union of subblocks)
+                // fennimals_asked: ["A1", "A2", "A3"],
+                trial_subblocks: [
+                    {
+                        trials: [
+                            { Fennimal: "A1", interaction_type: "joint_box_cleaning" },
+                            { Fennimal: "A1", interaction_type: "photo_box" },
+                            { Fennimal: "A2", interaction_type: "feed_Fennimal" }
+                        ]
+                    },
+                    {
+                        Fennimals_encountered: ["A1"],
+                        interaction_type: "Fennimal_toy"
+                    },
+                    {
+                        Fennimals_encountered: ["A1"],
+                        interaction_type: "toy_to_box"
+                    },
+                    
+                ]
+            },
+
+
+            {
+                type: "partner_belief_individual_boxes",
+                include_practice_trial: true,
+                num_belief_blocks: 2,
+                include_reality_block_at_end: true,
+                bonus_stars_per_correct_answer: 4,
+                questions: [
+                    { question_id: "belief_A", target_box: "A" },
+                    { question_id: "belief_B", target_box: "B" },
+                    { question_id: "belief_C", target_box: "C" }
+                ]
+            },
+
+            {
+                type: "phone_room",
+                interaction_type: "joint_box_cleaning",
                 Fennimals_encountered: ["A1", "A2"],
-                partner_behavior: "absent",
+                ask_box: true,
+                boxes_asked: ["A", "B"],
+                partner_behavior: "present",
                 hint_type: ["icon"],
-                include_Fennefinder: true
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                skip_instructions: true
             },
 
-            {
-                type: "Fennimal_attribute_sorting_task",
-                Fennimals_encountered: ["A1", "A2"],
-                attribute_order: ["location", "head", "toy", "toybox"],
-                maximum_earnable_stars: 5
-
-            },
+            
 
             {
                 type: "jump_to_trial",
@@ -98,96 +120,52 @@ let StimulusSettings = function () {
             },
         ],
 
-        mentalizing_network: [
-            {
-                type: "pseudoday",
-                information: "new_Fennimals_spotted",
-                displayed_icons: ["S1", "S2", "S3"],
-                title: "Get to know some of the Fennimals on the island",
-                display_text: "Today, take %PARTNERNAME% with you to explore the island, find the Fennimals and play with them."
-            },
-            {
-                type: "free_exploration",
-                interaction_type: ["basic_intro"],
-                Fennimals_encountered: ["S1" , "S2", "S3"],
-                partner_behavior: "active",
-                include_Fennefinder: true,
-                force_climbing_tower_first: true
-            },
-            {
-                type: "hint_and_search",
-                interaction_type: ["broken_toy", "dirty_toy"],
-                Fennimals_encountered: ["S1" , "S2", "S3"],
-                partner_behavior: "active",
-                hint_type: ["icon", "toybox", "toy"],
-                include_Fennefinder: "low_power_mode",
-                included_orthogonal_tasks: ["find_box", "hat_blown_away", "fly_swatting"],
-                orthogonal_tasks_possible_after_trial: 3
-            },
-            {
-                type: "pseudoday",
-                information: "partner_leaves"
-            },
-            {
-                type: "pseudoday",
-                information: "new_Fennimals_spotted",
-                displayed_icons: ["P1", "P2", "P3"],
-                title: "Get to know some more Fennimals on the island",
-                display_text: "While %PARTNERNAME% is away, there are some Fennimals on the island who would love to get to know you! Unfortunately, we ran out of boxes to store the toys in, so we will have to reuse some of the boxes."
-            },
-            {
-                type: "free_exploration",
-                interaction_type: ["basic_intro"],
-                Fennimals_encountered: ["P1", "P2", "P3"],
-                partner_behavior: "absent",
-                include_Fennefinder: true,
-                force_climbing_tower_first: true
-            },
-            {
-                type: "hint_and_search",
-                interaction_type: ["broken_toy", "dirty_toy"],
-                Fennimals_encountered: ["P1", "P2", "P3"],
-                partner_behavior: "absent",
-                hint_type: ["icon", "toybox", "toy"],
-                include_Fennefinder: "low_power_mode",
-                included_orthogonal_tasks: ["find_box", "hat_blown_away", "fly_swatting"],
-                orthogonal_tasks_possible_after_trial: 3
-            },
-            {
-                type: "pseudoday",
-                information: "partner_returns"
-            },
-            {
-                // NEW: Our DV Task Block!
-                type: "partner_belief",
-                toyboxes_asked: ["A", "B", "C"],
-                toys_asked: ["A", "B", "C", "D", "E", "F"],
-                bonus_stars_per_correct_answer: 4
-            }
-        ],
 
         mentalizing: [
 
+            // BLOCK 1: Introduction to shared Fennimals
             {
                 type: "free_exploration",
-                interaction_type: ["basic_intro"],
-                Fennimals_encountered: ["S1" , "S2", "S3"],
+                interaction_type: ["Fennimal_toy"],
+                Fennimals_encountered: ["S1", "S2", "S3"],
                 partner_behavior: "active",
                 include_Fennefinder: true,
                 force_climbing_tower_first: true
             },
 
+            // BLOCK 2: Main shared block (toy_to_box first, then mixed joint/photo/feed)
             {
-                type: "on_call",
-                interaction_type: ["dirty_toy", "broken_toy"],
-                Fennimals_encountered: ["S1" , "S2", "S3"],
+                type: "phone_room",
                 partner_behavior: "active",
-                include_Fennefinder: true,
-                included_orthogonal_tasks: ["find_box_extended", "reach_hat", "fly_swat_extended"],
-                orthogonal_tasks_possible_after_trial: 3
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                ask_Fennimal: true,
+                ask_toy: true,
+                ask_box: true,
+                trial_subblocks: [
+                    {
+                        Fennimals_encountered: ["S1", "S2", "S3"],
+                        interaction_type: "Fennimal_toy"
+                    },
+                    {
+                        Fennimals_encountered: ["S1", "S2", "S3"],
+                        interaction_type: "Fennimal_toy"
+                    },
+                    {
+                        Fennimals_encountered: ["S1", "S2", "S3"],
+                        interaction_type: "toy_to_box"
+                    },
+                    {
+                        trials: [
+                            { Fennimal: "S1", interaction_type: "joint_box_cleaning" },
+                            { Fennimal: "S2", interaction_type: "photo_box" },
+                            { Fennimal: "S3", interaction_type: "photo_box" },
+                            { Fennimal: "S2", interaction_type: "feed_Fennimal" },
+                            { Fennimal: "S3", interaction_type: "feed_Fennimal" }
+                        ]
+                    }
+                ]
             },
-
-
 
             {
                 type: "pseudoday",
@@ -200,43 +178,78 @@ let StimulusSettings = function () {
                 title: "Get to know some more Fennimals on the island",
                 display_text: "While %PARTNERNAME% is away, there are some Fennimals on the island who would love to get to know you! Unfortunately, we ran out of boxes to store the toys in, so we will have to reuse some of the boxes."
             },
+
+            // BLOCK 3: Introduction to private Fennimals
             {
                 type: "free_exploration",
-                interaction_type: ["basic_intro"],
+                interaction_type: ["Fennimal_toy"],
                 Fennimals_encountered: ["P1", "P2", "P3"],
                 partner_behavior: "absent",
                 include_Fennefinder: true,
                 force_climbing_tower_first: true
             },
+
+            // BLOCK 4: Main private block (toy_to_box first, then mixed joint/photo/feed)
             {
-                type: "on_call",
-                interaction_type: ["dirty_toy", "broken_toy"],
-                Fennimals_encountered: ["P1" , "P2", "P3"],
+                type: "phone_room",
                 partner_behavior: "absent",
-                include_Fennefinder: true,
-                included_orthogonal_tasks: ["find_box_extended", "reach_hat", "fly_swat_extended"],
-                orthogonal_tasks_possible_after_trial: 3
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                ask_Fennimal: true,
+                ask_toy: true,
+                ask_box: true,
+                trial_subblocks: [
+                    {
+                        Fennimals_encountered: ["P1", "P2", "P3"],
+                        interaction_type: "Fennimal_toy"
+                    },
+                    {
+                        Fennimals_encountered: ["P1", "P2", "P3"],
+                        interaction_type: "Fennimal_toy"
+                    },
+                    {
+                        Fennimals_encountered: ["P1", "P2", "P3"],
+                        interaction_type: "toy_to_box"
+                    },
+                    {
+                        trials: [
+                            { Fennimal: "P3", interaction_type: "joint_box_cleaning" },
+                            { Fennimal: "P1", interaction_type: "photo_box" },
+                            { Fennimal: "P2", interaction_type: "photo_box" },
+                            { Fennimal: "P1", interaction_type: "feed_Fennimal" },
+                            { Fennimal: "P2", interaction_type: "feed_Fennimal" }
+                        ]
+                    }
+                ]
             },
 
             {
                 type: "pseudoday",
                 information: "partner_returns"
             },
-            {
 
-                type: "partner_belief",
-                toyboxes_asked: ["A", "B", "C"],
-                toys_asked: ["A", "B", "C", "D", "E", "F"],
-                bonus_stars_per_correct_answer: 4
+            // BLOCK 5: Partner belief (individual boxes)
+            {
+                type: "partner_belief_individual_boxes",
+                include_practice_trial: true,
+                num_belief_blocks: 2,
+                include_reality_block_at_end: true,
+                bonus_stars_per_correct_answer: 1,
+                questions: [
+                    { question_id: "belief_A", target_box: "A" },
+                    { question_id: "belief_B", target_box: "B" },
+                    { question_id: "belief_C", target_box: "C" }
+                ]
             },
+
+            // BLOCK 6: Attribute sorting (single-Fennimal presentation)
             {
                 type: "Fennimal_attribute_sorting_task",
                 Fennimals_encountered: ["S1", "S2", "S3", "P1", "P2", "P3"],
                 attribute_order: ["location", "head", "toy", "toybox"],
-                maximum_earnable_stars: 5
-
+                presentation: "single",
+                maximum_earnable_stars: 6
             },
-
 
         ]
     };
@@ -764,8 +777,19 @@ let StimulusTransformer = function (StimTemplate) {
     this.get_maximum_number_of_bonus_stars = function () {
         let max_stars = 0;
         this.Experiment_Structure.forEach(block => {
-            if (block.type === "partner_belief" && typeof block.bonus_stars_per_correct_answer === "number") {
+            if ((block.type === "partner_belief" || block.type === "partner_belief_multiple") && typeof block.bonus_stars_per_correct_answer === "number") {
                 max_stars += block.bonus_stars_per_correct_answer * block.toyboxes_asked.length;
+            }
+
+            if (block.type === "partner_belief_individual_boxes" && typeof block.bonus_stars_per_correct_answer === "number") {
+                let nBlocks = (typeof block.num_belief_blocks === "number" && block.num_belief_blocks > 0)
+                    ? block.num_belief_blocks
+                    : ((typeof block.num_repeated_blocks === "number" && block.num_repeated_blocks > 0) ? block.num_repeated_blocks : 1);
+                let nQuestions = (block.questions || []).length;
+                max_stars += block.bonus_stars_per_correct_answer * nQuestions * nBlocks;
+                if (block.include_reality_block_at_end === true) {
+                    max_stars += block.bonus_stars_per_correct_answer * nQuestions;
+                }
             }
 
             // FIX: Ensure the sorting task's stars are included in the global estimate

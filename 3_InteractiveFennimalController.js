@@ -268,7 +268,51 @@ class BasicElementsModule {
         this.gaze_target_element = null;
     }
 
+    /**
+     * Stop breathing / gaze / sway and all body CSS flair (snow, spores, heat, tails, …).
+     * Used when the Fennimal should appear frozen (e.g. in a photo).
+     */
+    freeze_character_pose() {
+        // Flag first so an in-flight RAF callback cannot re-schedule the loop.
+        this.character_animation_frozen = true;
+
+        if (this.animation_frame_id) {
+            cancelAnimationFrame(this.animation_frame_id);
+            this.animation_frame_id = null;
+        }
+        if (this.gaze_tracker) {
+            window.removeEventListener("pointermove", this.gaze_tracker);
+            this.gaze_tracker = null;
+        }
+
+        this.targetGazeX = 0;
+        this.targetGazeY = 0;
+        this.currentGazeX = 0;
+        this.currentGazeY = 0;
+        this.gaze_target_element = null;
+
+        if (this.FennimalScaleGroup) {
+            this.FennimalScaleGroup.style.transform = `scale(${this.baseScale != null ? this.baseScale : 1})`;
+        }
+        if (this.FennimalBody) {
+            this.FennimalBody.style.transform = "translate(0px, 0px) scale(1, 1)";
+        }
+        if (this.FennimalHead) {
+            this.FennimalHead.style.transform = "translate(0px, 0px) rotate(0deg)";
+        }
+        if (this.FennimalEyes) {
+            this.FennimalEyes.forEach((eye) => {
+                eye.style.transform = "translate(0px, 0px) scale(1.15)";
+            });
+        }
+
+        if (this.Fennimal) {
+            freeze_fennimal_decorative_animations(this.Fennimal);
+        }
+    }
+
     setup_character_animation() {
+        this.character_animation_frozen = false;
         this.is_slumped = false;
         this.gaze_target_element = null; // Add this variable
 
@@ -301,6 +345,7 @@ class BasicElementsModule {
     }
 
     render_character_frame(timestamp) {
+        if (this.character_animation_frozen) return;
         if (!this.FennimalHead || !this.FennimalBody) return;
 
         // Determine how dilated the eyes should be!
@@ -384,6 +429,7 @@ class BasicElementsModule {
             eye.style.transform = `translate(${(this.currentGazeX * 1.2) + shiverX}px, ${(this.currentGazeY * 1.2)}px) scale(${this.currentEyeScale})`;
         });
 
+        if (this.character_animation_frozen) return;
         this.animation_frame_id = requestAnimationFrame((t) => this.render_character_frame(t));
     }
 
@@ -561,30 +607,28 @@ class BasicElementsModule {
         });
     }
 
-    async perform_success_celebration(TargetBoxElement) {
-        // 1. Calculate the distance to move to the EXACT center of the target object
-        let boxCenter = getSVGInternalCenter(TargetBoxElement);
-        let fenCenter = getSVGInternalCenter(this.Fennimal);
+    async perform_success_celebration(TargetBoxElement = null) {
+        // Optional walk-to-target (used by box interactions). Skip when celebrating in place.
+        if (TargetBoxElement) {
+            let boxCenter = getSVGInternalCenter(TargetBoxElement);
+            let fenCenter = getSVGInternalCenter(this.Fennimal);
 
-        // Removed the offset so the Fennimal stands directly in front of the box
-        let targetX = boxCenter.x;
-        let dx = targetX - fenCenter.x;
+            let targetX = boxCenter.x;
+            let dx = targetX - fenCenter.x;
 
-        // 2. Walk over to the object smoothly
-        await this.Fennimal_move_relative(dx, 0, 600);
-        await wait(200);
+            await this.Fennimal_move_relative(dx, 0, 600);
+            await wait(200);
 
-        // Lock gaze on the box
-        this.set_gaze_target(TargetBoxElement);
+            this.set_gaze_target(TargetBoxElement);
+        }
+
         AudioCont.play_sound_effect("positive");
 
-        // 3. Helper function to create a burst of particles EXACTLY where the Fennimal currently is
+        // Helper function to create a burst of particles EXACTLY where the Fennimal currently is
         const jump_with_particle_burst = async (jump_height) => {
-            // Grab the real-time position of the Fennimal right before it jumps
             let currentFenCenter = getSVGInternalCenter(this.Fennimal);
 
             if (typeof SmallFeedbackSymbol !== "undefined") {
-                // Generate a burst of 5 particles simultaneously
                 for(let p = 0; p < 5; p++) {
                     let randomOffsetX = (Math.random() - 0.5) * 160;
                     let randomOffsetY = (Math.random() - 0.5) * 80;
@@ -593,33 +637,29 @@ class BasicElementsModule {
                     new SmallFeedbackSymbol(
                         this.ItemLayers.Plus2,
                         symbol,
-                        900, // Slightly faster burst speed
+                        900,
                         (currentFenCenter.x + randomOffsetX), (currentFenCenter.y - 150 + randomOffsetY),
                         (currentFenCenter.x + randomOffsetX), (currentFenCenter.y - 350 + randomOffsetY)
                     );
                 }
             }
-            // Execute the actual jump
             await this.Fennimal_jump(jump_height);
         };
 
-        // 4. The Centered Dance Routine
-        // Jumps at the center, slides right, jumps, slides left across the box, jumps, returns to center!
+        // The Centered Dance Routine
         await jump_with_particle_burst(100);
 
         await this.Fennimal_move_relative(300, 0, 400); // Slide Right
         await jump_with_particle_burst(150);
 
-        await this.Fennimal_move_relative(-600, 0, 600); // Slide Left (across the box)
+        await this.Fennimal_move_relative(-600, 0, 600); // Slide Left
         await jump_with_particle_burst(150);
 
         await this.Fennimal_move_relative(300, 0, 400); // Return to Center
         await jump_with_particle_burst(100);
 
-        // Cleanly release the gaze
         this.clear_gaze_target();
 
-        // Linger for a half-second so the participant can enjoy the visual reward
         await wait(500);
     }
 
@@ -673,6 +713,12 @@ class BoxModule {
     close_box() {
         AudioCont.play_sound_effect("box_open_" + this.FenObj.toybox);
         this.BoxTop.getElementsByClassName("lid")[0].style.opacity = 1;
+    }
+
+    set_pointer_events_enabled(enabled) {
+        let value = enabled ? "auto" : "none";
+        if (this.BoxBase) this.BoxBase.style.pointerEvents = value;
+        if (this.BoxTop) this.BoxTop.style.pointerEvents = value;
     }
 
     wait_for_user_click(action, callback) {
@@ -1324,6 +1370,7 @@ class BaseToyModule {
             }
 
             // --- Hitbox Fix 2.0 (UPDATED) ---
+            let chargeHitRect = null;
             let all_pieces = Array.from(this.ToyElement.querySelectorAll(".toy_part, .toy_frame, .tube_backside"));
             all_pieces.forEach(piece => {
                 piece.style.pointerEvents = "none";
@@ -1338,17 +1385,19 @@ class BaseToyModule {
                     child.style.pointerEvents = "all";
                 });
 
-                // NEW: Inject a massive invisible hitbox so the thin stick is always grabbable!
+                // Inject a temporary invisible hitbox so the thin stick is always grabbable while charging.
                 let wBox = wand_assembly.getBBox();
                 if (wBox.width > 0 && wBox.height > 0) {
-                    let hitRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                    hitRect.setAttribute('x', wBox.x - 30);
-                    hitRect.setAttribute('y', wBox.y - 30);
-                    hitRect.setAttribute('width', wBox.width + 60);
-                    hitRect.setAttribute('height', wBox.height + 60);
-                    hitRect.setAttribute('fill', 'transparent'); // Invisible but clickable!
-                    hitRect.setAttribute('stroke', 'none');
-                    wand_assembly.appendChild(hitRect);
+                    chargeHitRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    chargeHitRect.classList.add("bubblewand_charge_hitbox");
+                    chargeHitRect.setAttribute('x', wBox.x - 30);
+                    chargeHitRect.setAttribute('y', wBox.y - 30);
+                    chargeHitRect.setAttribute('width', wBox.width + 60);
+                    chargeHitRect.setAttribute('height', wBox.height + 60);
+                    chargeHitRect.setAttribute('fill', 'transparent');
+                    chargeHitRect.setAttribute('stroke', 'none');
+                    chargeHitRect.style.pointerEvents = "all";
+                    wand_assembly.appendChild(chargeHitRect);
                 }
             }
             // ---------------------------
@@ -1503,6 +1552,15 @@ class BaseToyModule {
                                         all_pieces.forEach(piece => {
                                             piece.style.pointerEvents = "";
                                         });
+
+                                        // Remove the temporary charging hitbox so later outlines
+                                        // do not include the invisible rectangle.
+                                        if (chargeHitRect) {
+                                            chargeHitRect.remove();
+                                            chargeHitRect = null;
+                                        } else {
+                                            Array.from(wand_assembly.querySelectorAll(".bubblewand_charge_hitbox")).forEach((rect) => rect.remove());
+                                        }
 
                                         setTimeout(() => resolve(), 200);
                                     }
@@ -2512,79 +2570,11 @@ class BrokenToyModule extends BaseToyModule {
             // ----------------------------------------------------
             // 2. The Giant Confetti Burst
             // ----------------------------------------------------
-            let pt = GenParam.SVGObject.createSVGPoint();
-            let targetRect = this.ToyElement.getBoundingClientRect();
-            pt.x = targetRect.x + (targetRect.width / 2);
-            pt.y = targetRect.y + (targetRect.height / 2);
-            let centerSVG = pt.matrixTransform(GenParam.SVGObject.getScreenCTM().inverse());
-
-            const colors = ['#FF3B30', '#4CD964', '#007AFF', '#FFCC00', '#AF52DE'];
-            const numConfetti = 24; // Increased slightly to fill the space!
-
-            for (let i = 0; i < numConfetti; i++) {
-                let shapeType = Math.floor(Math.random() * 3);
-                let confetti;
-
-                // GIANT CARTOON SIZES (20 to 60+ pixels)
-                if (shapeType === 0) {
-                    confetti = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                    let w = 25 + Math.random() * 35; // width 25-60
-                    let h = 20 + Math.random() * 30; // height 20-50
-                    confetti.setAttribute('width', w);
-                    confetti.setAttribute('height', h);
-                    // Crucial: offset by exactly half to center the rotation axis
-                    confetti.setAttribute('x', -w / 2);
-                    confetti.setAttribute('y', -h / 2);
-                } else if (shapeType === 1) {
-                    confetti = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                    let r = 12 + Math.random() * 18; // diameter 24-60
-                    confetti.setAttribute('r', r);
-                    confetti.setAttribute('cx', 0);
-                    confetti.setAttribute('cy', 0);
-                } else {
-                    confetti = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-                    // A massive triangle spanning roughly 50x45 pixels
-                    confetti.setAttribute('points', '0,-25 25,20 -25,20');
-                }
-
-                confetti.setAttribute('fill', colors[Math.floor(Math.random() * colors.length)]);
-
-                let angle = (i / numConfetti) * Math.PI * 2 + (Math.random() * 0.3);
-                // Pushed out further so the giant pieces don't overlap the toy too much
-                let dist = 200 + Math.random() * 150;
-
-                let endX = centerSVG.x + Math.cos(angle) * dist;
-                let endY = centerSVG.y + Math.sin(angle) * dist;
-                let rot = (Math.random() - 0.5) * 1080; // Massive amounts of spin
-
-                confetti.style.transformOrigin = "center";
-                confetti.style.transformBox = "fill-box";
-                confetti.style.transform = `translate(${centerSVG.x}px, ${centerSVG.y}px) scale(0)`;
-
-                ParentLayer.insertBefore(confetti, this.ToyElement);
-
-                // Frame 1: Explode outward (Slightly slower for grandeur)
-                setTimeout(() => {
-                    confetti.style.transition = "transform 600ms cubic-bezier(0.25, 1, 0.5, 1)";
-                    confetti.style.transform = `translate(${endX}px, ${endY}px) scale(1) rotate(${rot}deg)`;
-                }, 20);
-
-                // Frame 2: Float down and fade away (Dramatically extended!)
-                setTimeout(() => {
-                    confetti.style.transition = "all 2000ms ease-in"; // Floats for a full 2 seconds
-                    // Drops much further down the screen
-                    confetti.style.transform = `translate(${endX}px, ${endY + 300 + Math.random() * 200}px) scale(0.6) rotate(${rot + 360}deg)`;
-                    confetti.style.opacity = 0;
-
-                    setTimeout(() => confetti.remove(), 2000);
-                }, 650); // Starts falling exactly when the explosion finishes
-            }
-
-            // ----------------------------------------------------
-            // EXTENDED RESOLVE TIMEOUT
-            // Wait 2.8 seconds before returning control to the Trial sequence!
-            // ----------------------------------------------------
-            setTimeout(() => resolve(), 2800);
+            let centerSVG = getSVGInternalCenter(this.ToyElement);
+            spawn_confetti_burst(ParentLayer, centerSVG.x, centerSVG.y, {
+                insertBefore: this.ToyElement,
+                awaitPopMs: 2800
+            }).then(resolve);
         });
     }
 }
@@ -2663,6 +2653,38 @@ class PartnerModule {
             setTimeout(() => resolve(), 500);
         });
     }
+
+    // Light success reaction: bounce / dance in place (no speech).
+    celebrate_success() {
+        return new Promise(async resolve => {
+            if (!this.is_present || !this.PartnerTranslateGroup) {
+                resolve();
+                return;
+            }
+
+            let base = this.PartnerTranslateGroup.style.transform || "";
+            this.PartnerTranslateGroup.style.transition = "transform 140ms ease-out";
+
+            const hops = [
+                { y: -32, r: -8 },
+                { y: 0, r: 6 },
+                { y: -24, r: 8 },
+                { y: 0, r: -4 },
+                { y: -14, r: 4 },
+                { y: 0, r: 0 }
+            ];
+
+            for (let i = 0; i < hops.length; i++) {
+                let hop = hops[i];
+                this.PartnerTranslateGroup.style.transform =
+                    `${base} translateY(${hop.y}px) rotate(${hop.r}deg)`;
+                await wait(140);
+            }
+
+            this.PartnerTranslateGroup.style.transform = base;
+            resolve();
+        });
+    }
 }
 
 class GeneralTrialController {
@@ -2681,6 +2703,123 @@ class GeneralTrialController {
 
     // --- SCENARIO BRANCHING LOGIC ---
 
+    async appear_fennimal_with_name_prompt() {
+        if (this.basics.Fennimal) return;
+        await this.basics.create_and_appear_Fennimal(
+            this.basics.ItemLayers.Main,
+            0.4 * this.basics.W,
+            0.8 * this.basics.H,
+            1.75,
+            250
+        );
+        AudioCont.play_sound_effect("alert");
+        Interface.Prompt.show_message("This Fennimal is called " + this.FenObj.name);
+        await wait(1000);
+    }
+
+    async appear_correct_toy_on_fennimal() {
+        let bodyCenter = getSVGInternalCenter(this.basics.TargetPoints.Fennimal_body_center);
+        await this.toy.create_and_appear_toy(
+            this.basics.ItemLayers.Plus1,
+            "main",
+            bodyCenter.x,
+            bodyCenter.y,
+            4,
+            200
+        );
+        Interface.Prompt.show_message(this.FenObj.name + " would like to play with the " + this.FenObj.toy);
+        await wait(1000);
+    }
+
+    async run_ask_toy_step() {
+        if (!this.FenObj.ask_toy) return;
+
+        this.FenObj.toy_errors_made = [];
+        let options = Array.isArray(this.FenObj.toys_asked) ? [...this.FenObj.toys_asked] : [];
+        if (this.FenObj.toy && !options.includes(this.FenObj.toy)) {
+            options.push(this.FenObj.toy);
+            console.warn("ask_toy: FenObj.toy was missing from toys_asked; added it.");
+        }
+        if (options.length === 0) {
+            console.warn("ask_toy: no toys_asked options; skipping question.");
+            return;
+        }
+
+        let bar = new ToyChoiceBar(
+            this.basics.ItemLayers.Plus2,
+            this.basics.W,
+            this.basics.H
+        );
+
+        while (true) {
+            Interface.Prompt.show_message(
+                "Which toy does this " + this.FenObj.name + " like to play with?"
+            );
+            let selected = await bar.waitForSelection(shuffleArray([...options]));
+
+            if (selected === this.FenObj.toy) {
+                AudioCont.play_sound_effect("positive");
+                await bar.hide();
+                let burstCenter = getSVGInternalCenter(
+                    this.basics.TargetPoints.Fennimal_body_center || this.basics.Fennimal
+                );
+                await spawn_confetti_burst(
+                    this.basics.ItemLayers.Plus2,
+                    burstCenter.x,
+                    burstCenter.y,
+                    { awaitPopMs: 900 }
+                );
+                return;
+            }
+
+            AudioCont.play_sound_effect("rejected");
+            this.FenObj.toy_errors_made.push(selected);
+            Interface.Prompt.show_message("Oops, you picked the wrong toy!");
+            await bar.hide();
+            await wait(1000);
+        }
+    }
+
+    async run_ask_box_step() {
+        if (!this.FenObj.ask_box) return;
+
+        this.FenObj.box_errors_made = [];
+        let options = Array.isArray(this.FenObj.boxes_asked) ? [...this.FenObj.boxes_asked] : [];
+        if (this.FenObj.toybox && !options.includes(this.FenObj.toybox)) {
+            options.push(this.FenObj.toybox);
+            console.warn("ask_box: FenObj.toybox was missing from boxes_asked; added it.");
+        }
+        if (options.length === 0) {
+            console.warn("ask_box: no boxes_asked options; skipping question.");
+            return;
+        }
+
+        let bar = new BoxChoiceBar(
+            this.basics.ItemLayers.Plus2,
+            this.basics.W,
+            this.basics.H
+        );
+
+        while (true) {
+            Interface.Prompt.show_message(
+                "Which box does " + this.FenObj.name + " keep their toy in?"
+            );
+            let selected = await bar.waitForSelection(shuffleArray([...options]));
+
+            if (selected === this.FenObj.toybox) {
+                AudioCont.play_sound_effect("positive");
+                await bar.hide();
+                return;
+            }
+
+            AudioCont.play_sound_effect("rejected");
+            this.FenObj.box_errors_made.push(selected);
+            Interface.Prompt.show_message("Oops, you picked the wrong box!");
+            await bar.hide();
+            await wait(1000);
+        }
+    }
+
     async open_existing_box() {
         if (this.partner.is_present) {
             Interface.Prompt.show_message(this.partner.partnername + " opens the " + this.box.boxname);
@@ -2695,20 +2834,13 @@ class GeneralTrialController {
     }
 
     async run_empty_box_intro() {
-        await this.basics.create_and_appear_Fennimal(this.basics.ItemLayers.Main, 0.4 * this.basics.W, 0.8 * this.basics.H, 1.75, 250);
-        AudioCont.play_sound_effect("alert");
-        Interface.Prompt.show_message("This Fennimal is called " + this.FenObj.name);
-        await wait(1000);
-
-        let bodyCenter = getSVGInternalCenter(this.basics.TargetPoints.Fennimal_body_center);
-        await this.toy.create_and_appear_toy(this.basics.ItemLayers.Plus1, "main", bodyCenter.x, bodyCenter.y, 4, 200);
-        Interface.Prompt.show_message(this.FenObj.name + " would like to play with the " + this.FenObj.toy);
-        await wait (1000)
+        await this.appear_fennimal_with_name_prompt();
+        await this.appear_correct_toy_on_fennimal();
     }
 
     async run_correct_toy_intro() {
         await Promise.all([
-            this.basics.create_and_appear_Fennimal(this.basics.ItemLayers.Main, 0.4 * this.basics.W, 0.8 * this.basics.H, 1.75, 250),
+            this.appear_fennimal_with_name_prompt(),
             this.box.create_and_appear_box(this.basics.ItemLayers.Main, this.basics.ItemLayers.Plus2, 0.7 * this.basics.W, 0.7 * this.basics.H, 4, 100)
         ]);
         await wait(500);
@@ -2736,7 +2868,7 @@ class GeneralTrialController {
 
     async run_wrong_toy_intro() {
         await Promise.all([
-            this.basics.create_and_appear_Fennimal(this.basics.ItemLayers.Main, 0.4 * this.basics.W, 0.8 * this.basics.H, 1.75, 250),
+            this.appear_fennimal_with_name_prompt(),
             this.box.create_and_appear_box(this.basics.ItemLayers.Main, this.basics.ItemLayers.Plus2, 0.7 * this.basics.W, 0.7 * this.basics.H, 4, 100)
         ]);
         await wait(500);
@@ -2783,12 +2915,16 @@ class GeneralTrialController {
         }
         await this.basics.create_background_mask(true, 500);
 
+        // Fennimal first; optional ask_toy quiz before any toy / box branching.
+        await this.appear_fennimal_with_name_prompt();
+        await this.run_ask_toy_step();
+
         // Determine World State
         this.current_contents = WorldState.get_toybox_contents(this.FenObj.toybox);
 
         // BRANCHING INTRO
         if (!this.current_contents) {
-            await this.run_empty_box_intro();
+            await this.appear_correct_toy_on_fennimal();
         } else if (this.current_contents === this.FenObj.toy) {
             await this.run_correct_toy_intro();
         } else {
@@ -2865,6 +3001,335 @@ class GeneralTrialController {
         this.box.clean_up();
         this.toy.clean_up();
         if (this.wrong_toy) this.wrong_toy.clean_up();
+        if (this.partner.PartnerTranslateGroup) this.partner.PartnerTranslateGroup.remove();
+    }
+}
+
+// Play with the correct toy, celebrate in place (no box), then wander off-screen.
+class FennimalToyTrialController extends GeneralTrialController {
+    async start_sequence() {
+        this.basics.create_svg_sublayers();
+        if (this.partner.is_present) {
+            this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        }
+        await this.basics.create_background_mask(true, 500);
+
+        // No box in this trial type: Fennimal → optional ask_toy → toy on Fennimal → play.
+        await this.appear_fennimal_with_name_prompt();
+        await this.run_ask_toy_step();
+        await this.appear_correct_toy_on_fennimal();
+
+        await this.toy.charge_toy(this.basics.ItemLayers.Plus2, 0.5 * this.basics.W, 0.4 * this.basics.H, this.basics);
+        await this.toy.play_with_toy(this.basics);
+        await wait(500);
+        Interface.Prompt.show_message(this.FenObj.name + " has finished playing with the " + this.FenObj.toy);
+        await wait(500);
+
+        this.basics.Fennimal_move_relative(-400, 0, 500);
+        await this.toy.done_playing();
+
+        await this.basics.perform_success_celebration(null);
+
+        await wait(750);
+        Interface.Prompt.show_message(this.FenObj.name + " has wandered off...");
+
+        let fenCenter = getSVGInternalCenter(this.basics.Fennimal);
+        let dxOffscreen = -(fenCenter.x + 300);
+        await this.basics.Fennimal_move_relative(dxOffscreen, 0, 750);
+
+        await wait(1000);
+        this.returnfunc();
+    }
+}
+
+// No Fennimal: discarded toy in the middle, then store it in its toybox.
+class ToyToBoxTrialController {
+    constructor(FenObj, partner_is_present, returnfunc) {
+        this.FenObj = FenObj;
+        this.returnfunc = returnfunc;
+
+        this.basics = new BasicElementsModule(FenObj);
+        this.box = new BoxModule(FenObj);
+        this.toy = new StandardToyModule(FenObj);
+        this.partner = new PartnerModule(partner_is_present);
+
+        // Minimum distance from the box center required when dragging an old toy out.
+        this.oldToyClearDistance = 300;
+        this.old_toy = null;
+        this.oldToyDragController = null;
+    }
+
+    getScaledTemplateHalfWidth(elementId, scale) {
+        let template = document.getElementById(elementId);
+        if (!template) return 180 * (scale / 4);
+
+        let box = template.getBBox();
+        return (Math.max(box.width, 1) * scale) / 2;
+    }
+
+    getElementHalfWidthSVG(elem) {
+        if (!elem) return 0;
+
+        let rect = elem.getBoundingClientRect();
+        let svg = GenParam.SVGObject;
+        if (!svg || !svg.getScreenCTM) {
+            return Math.max(rect.width / 2, 120);
+        }
+
+        let inv = svg.getScreenCTM().inverse();
+        let p1 = svg.createSVGPoint();
+        let p2 = svg.createSVGPoint();
+        p1.x = rect.left;
+        p1.y = rect.top;
+        p2.x = rect.right;
+        p2.y = rect.bottom;
+        p1 = p1.matrixTransform(inv);
+        p2 = p2.matrixTransform(inv);
+        return Math.max(Math.abs(p2.x - p1.x) / 2, 80);
+    }
+
+    subtractForbiddenRanges(availableRanges, forbiddenRanges) {
+        let remaining = availableRanges.slice();
+
+        forbiddenRanges.forEach(([fStart, fEnd]) => {
+            let next = [];
+            remaining.forEach(([aStart, aEnd]) => {
+                if (fEnd <= aStart || fStart >= aEnd) {
+                    next.push([aStart, aEnd]);
+                    return;
+                }
+                if (fStart > aStart) next.push([aStart, Math.min(fStart, aEnd)]);
+                if (fEnd < aEnd) next.push([Math.max(fEnd, aStart), aEnd]);
+            });
+            remaining = next.filter(([start, end]) => end - start > 1);
+        });
+
+        return remaining;
+    }
+
+    pickNonOccludingBoxX(toyCenterX, toyHalfWidth, boxHalfWidth, partnerCenterX = null, partnerHalfWidth = null) {
+        const screenW = this.basics.W;
+        const margin = 50;
+        const gap = 50;
+        const minCenter = margin + boxHalfWidth;
+        const maxCenter = screenW - margin - boxHalfWidth;
+
+        const forbidden = [
+            [
+                toyCenterX - toyHalfWidth - boxHalfWidth - gap,
+                toyCenterX + toyHalfWidth + boxHalfWidth + gap
+            ]
+        ];
+
+        if (partnerCenterX !== null && partnerHalfWidth !== null) {
+            forbidden.push([
+                partnerCenterX - partnerHalfWidth - boxHalfWidth - gap,
+                partnerCenterX + partnerHalfWidth + boxHalfWidth + gap
+            ]);
+        }
+
+        let ranges = this.subtractForbiddenRanges([[minCenter, maxCenter]], forbidden);
+
+        if (ranges.length === 0) {
+            // Prefer the side away from the partner when possible.
+            if (partnerCenterX !== null && partnerCenterX > screenW * 0.5) {
+                return minCenter;
+            }
+            return (toyCenterX < screenW / 2) ? maxCenter : minCenter;
+        }
+
+        let range = ranges[Math.floor(Math.random() * ranges.length)];
+        return range[0] + Math.random() * (range[1] - range[0]);
+    }
+
+    async start_sequence() {
+        this.basics.create_svg_sublayers();
+        if (this.partner.is_present) {
+            this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        }
+        await this.basics.create_background_mask(true, 500);
+
+        const toyScale = 4;
+        const boxScale = 4;
+        const toyCenterX = 0.5 * this.basics.W;
+        const toyCenterY = 0.55 * this.basics.H;
+
+        await this.toy.create_and_appear_toy(
+            this.basics.ItemLayers.Plus1,
+            "main",
+            toyCenterX,
+            toyCenterY,
+            toyScale,
+            200
+        );
+
+        // Match the "discarded" look used after play sequences.
+        this.toy.ToyElement.style.transition = "all 200ms ease-out";
+        this.toy.ToyElement.style.transform += "translate(50px, 150px)";
+        await wait(200);
+
+        Interface.Prompt.show_message("Oops! The " + this.FenObj.toy + " has been left behind");
+        await wait(750);
+
+        Interface.Prompt.show_message("Let's keep the " + this.FenObj.toy + " safe in the " + this.box.boxname);
+
+        let toyHalfW = this.getScaledTemplateHalfWidth("toy_" + this.FenObj.toy, toyScale);
+        let boxHalfW = this.getScaledTemplateHalfWidth("toybox_" + this.FenObj.toybox, boxScale);
+        let liveToyCenter = getSVGInternalCenter(this.toy.ToyElement);
+
+        let partnerCenterX = null;
+        let partnerHalfW = null;
+        if (this.partner.is_present && this.partner.PartnerBaseGroup) {
+            partnerCenterX = getSVGInternalCenter(this.partner.PartnerBaseGroup).x;
+            partnerHalfW = this.getElementHalfWidthSVG(this.partner.PartnerBaseGroup);
+        }
+
+        let boxX = this.pickNonOccludingBoxX(
+            liveToyCenter.x,
+            toyHalfW,
+            boxHalfW,
+            partnerCenterX,
+            partnerHalfW
+        );
+        let boxY = 0.7 * this.basics.H;
+
+        await this.box.create_and_appear_box(
+            this.basics.ItemLayers.Main,
+            this.basics.ItemLayers.Plus2,
+            boxX,
+            boxY,
+            boxScale,
+            100
+        );
+        await wait(750);
+
+        // Treat same-toy contents as empty: participant just stores it again with no clear step.
+        let currentContents = WorldState.get_toybox_contents(this.FenObj.toybox);
+        this.boxNeedsClearing = (currentContents && currentContents !== this.FenObj.toy);
+
+        if (this.boxNeedsClearing) {
+            this.old_toy = new StandardToyModule({ toy: currentContents });
+            let boxTarget = getSVGInternalCenter(this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0]);
+            // Sit under the closed lid so opening reveals it.
+            await this.old_toy.create_and_appear_toy(
+                this.basics.ItemLayers.Plus1,
+                "old_box_contents",
+                boxTarget.x,
+                boxTarget.y,
+                boxScale,
+                0
+            );
+        }
+
+        if (this.partner.is_present) {
+            Interface.Prompt.show_message(this.partner.partnername + " opens the " + this.box.boxname);
+            await this.partner.move_to_element_and_act(this.box.BoxBase, () => this.box.open_box());
+            await wait(500);
+        } else {
+            await new Promise(resolve => {
+                this.box.wait_for_user_click("open", () => resolve());
+            });
+            await wait(500);
+        }
+
+        // Let the player grab toys through the open box artwork; restored before close.
+        this.box.set_pointer_events_enabled(false);
+
+        if (this.boxNeedsClearing) {
+            await this.clear_occupied_box();
+        }
+
+        this.handle_box_opened();
+    }
+
+    async clear_occupied_box() {
+        let oldToyName = this.old_toy.FenObj.toy;
+
+        Interface.Prompt.show_message("There is already a " + oldToyName + " in the " + this.box.boxname);
+        await wait(1200);
+
+        Interface.Prompt.show_message("Drag the " + oldToyName + " out of the box");
+        AudioCont.play_sound_effect("alert_minor");
+
+        await new Promise(resolve => {
+            const enableDragAway = () => {
+                this.oldToyDragController = new MakeObjectDraggableObject(
+                    this.basics.ItemLayers.Main,
+                    this.basics.ItemLayers.Plus2,
+                    this.old_toy.ToyElement,
+                    this.box.BoxBase,
+                    this.oldToyClearDistance,
+                    async (DraggedToyElement) => {
+                        // Released far enough from the box: hold, fade, clear state.
+                        Interface.Prompt.hide();
+                        await wait(1000);
+
+                        DraggedToyElement.style.transition = "opacity 400ms ease-in";
+                        DraggedToyElement.style.opacity = 0;
+                        await wait(400);
+
+                        if (this.old_toy) {
+                            this.old_toy.clean_up();
+                            this.old_toy = null;
+                        }
+                        WorldState.clear_toybox_contents(this.FenObj.toybox);
+                        this.oldToyDragController = null;
+                        resolve();
+                    },
+                    {
+                        validateDrop: (distToBox) => distToBox >= this.oldToyClearDistance,
+                        onMiss: () => {
+                            Interface.Prompt.show_message("Move it farther from the box");
+                            // Re-enable the same drag controller (drag_cancelled already snapped back).
+                            if (this.oldToyDragController && this.oldToyDragController.enable) {
+                                this.oldToyDragController.enable();
+                            }
+                        }
+                    }
+                );
+            };
+
+            enableDragAway();
+        });
+    }
+
+    handle_box_opened() {
+        Interface.Prompt.show_message("Please place the " + this.FenObj.toy + " in the " + this.box.boxname);
+        AudioCont.play_sound_effect("alert_minor");
+
+        new MakeObjectDraggableObject(
+            this.basics.ItemLayers.Main,
+            this.basics.ItemLayers.Plus2,
+            this.toy.ToyElement,
+            this.box.BoxBase,
+            200,
+            (DroppedToyElement) => {
+                shared_toy_drop_sequence(
+                    DroppedToyElement,
+                    this.box,
+                    this.basics,
+                    this.partner,
+                    this.FenObj,
+                    () => this.finish_trial()
+                );
+            }
+        );
+    }
+
+    async finish_trial() {
+        await wait(750);
+        this.returnfunc();
+    }
+
+    clean_up() {
+        if (this.oldToyDragController && this.oldToyDragController.destroy) {
+            this.oldToyDragController.destroy();
+            this.oldToyDragController = null;
+        }
+        this.basics.clean_up();
+        this.box.clean_up();
+        this.toy.clean_up();
+        if (this.old_toy) this.old_toy.clean_up();
         if (this.partner.PartnerTranslateGroup) this.partner.PartnerTranslateGroup.remove();
     }
 }
@@ -3041,6 +3506,22 @@ class DirtModule {
                 health: 100 // NEW: The spot requires 100 'pixels' of scrubbing to remove
             });
         }
+        this._initialTotalHealth = num_spots * 100;
+        this.scrubMode = "normal";
+        this.turnCleaned = 0;
+        this.turnQuota = 0;
+        this._turnResolve = null;
+        this._spongeInputBound = false;
+    }
+
+    get_remaining_health() {
+        return this.Spots
+            .filter(s => !s.is_cleaned)
+            .reduce((sum, s) => sum + Math.max(0, s.health), 0);
+    }
+
+    get_initial_total_health() {
+        return this._initialTotalHealth || (this.Spots.length * 100);
     }
 
     // ----------------------------------------------------
@@ -3081,6 +3562,7 @@ class DirtModule {
         let squishTimeout;
 
         this.SpongeTranslateGroup.onpointerdown = (e) => {
+            if (this._spongeActive === false) return;
             this.SpongeTranslateGroup.setPointerCapture(e.pointerId);
             this.SpongeTranslateGroup.style.transition = "none";
             this.SpongeTranslateGroup.style.cursor = "grabbing";
@@ -3163,6 +3645,205 @@ class DirtModule {
                 this.SpongeTranslateGroup.style.transform = this.SpongeBaseTransform;
             };
         };
+        this._spongeInputBound = true;
+        this._SpongeCenterGroup = SpongeCenterGroup;
+        this._spongeParentLayer = ParentLayer;
+        this._on_all_clean_callback = on_all_clean_callback;
+        this._spongeActiveX = center_x;
+        this._spongeActiveY = center_y;
+    }
+
+    /**
+     * Turn-based sponge: enable scrubbing until `quota` health is cleaned (or all dirt gone).
+     * Does not auto-despawn on full clean — caller handles finale.
+     */
+    start_scrub_turn(quota) {
+        this.scrubMode = "turn";
+        this.turnQuota = quota;
+        this.turnCleaned = 0;
+        this._rebind_sponge_pointer();
+        this._spongeActive = true;
+        if (this.SpongeTranslateGroup) {
+            this.SpongeTranslateGroup.style.cursor = "grab";
+            this.show_sponge_turn_outline();
+        }
+        return new Promise(resolve => {
+            this._turnResolve = resolve;
+        });
+    }
+
+    show_sponge_turn_outline() {
+        this.hide_sponge_turn_outline();
+        if (!this.SpongeTranslateGroup) return;
+        // Outline the visible sponge content (scale group), not the empty translate wrapper.
+        let target = this.SpongeScaleGroup || this.SpongeTranslateGroup;
+        this._spongeOutline = create_SVG_outline_of_group_ID(target);
+        this._spongeOutline.classList.add("focus_on_SVG_outline");
+        this.SpongeTranslateGroup.insertBefore(this._spongeOutline, this.SpongeTranslateGroup.firstChild);
+    }
+
+    hide_sponge_turn_outline() {
+        if (this._spongeOutline) {
+            this._spongeOutline.remove();
+            this._spongeOutline = null;
+        }
+    }
+
+    set_sponge_active(active) {
+        if (!this.SpongeTranslateGroup) return;
+        if (active) {
+            this.SpongeTranslateGroup.style.cursor = "grab";
+            this.SpongeTranslateGroup.style.filter = "none";
+            this.SpongeTranslateGroup.style.opacity = 1;
+            // Pulse outline cue
+            this.SpongeTranslateGroup.style.outline = "none";
+            if (!this._spongePulse) {
+                this.SpongeTranslateGroup.style.transition = "filter 300ms ease-in-out";
+                this.SpongeTranslateGroup.style.filter = "drop-shadow(0px 0px 12px gold)";
+                setTimeout(() => {
+                    if (this.SpongeTranslateGroup) this.SpongeTranslateGroup.style.filter = "none";
+                }, 500);
+            }
+            // Re-bind if previously cleared
+            if (!this.SpongeTranslateGroup.onpointerdown && this._spongeActiveX != null) {
+                // Input already bound in spawn_and_enable_sponge; only null it when disabling
+            }
+        } else {
+            this.SpongeTranslateGroup.onpointermove = null;
+            this.SpongeTranslateGroup.onpointerup = null;
+            // Keep onpointerdown but gate via scrubMode / flag
+            this.SpongeTranslateGroup.style.cursor = "auto";
+            this.SpongeTranslateGroup.style.filter = "grayscale(0.7) brightness(0.85)";
+        }
+        this._spongeActive = active;
+    }
+
+    async drop_sponge_to_floor(floor_y) {
+        if (!this.SpongeTranslateGroup) return;
+        this._spongeActive = false;
+        this.hide_sponge_turn_outline();
+        this.SpongeTranslateGroup.onpointerdown = null;
+        this.SpongeTranslateGroup.style.cursor = "auto";
+        let x = this._spongeActiveX;
+        this.SpongeFloorTransform = `translate(${x}px, ${floor_y}px)`;
+        this.SpongeTranslateGroup.style.transition = "all 450ms cubic-bezier(0.4, 0, 0.6, 1.2)";
+        this.SpongeTranslateGroup.style.transform = this.SpongeFloorTransform;
+        this.SpongeTranslateGroup.style.filter = "grayscale(0.7) brightness(0.85)";
+        await wait(450);
+    }
+
+    async raise_sponge_to_active() {
+        if (!this.SpongeTranslateGroup) return;
+        this._spongeActive = false;
+        this.SpongeTranslateGroup.onpointerdown = null;
+        this.SpongeBaseTransform = `translate(${this._spongeActiveX}px, ${this._spongeActiveY}px)`;
+        this.SpongeTranslateGroup.style.transition = "all 400ms cubic-bezier(0.34, 1.56, 0.64, 1)";
+        this.SpongeTranslateGroup.style.transform = this.SpongeBaseTransform;
+        this.SpongeTranslateGroup.style.filter = "none";
+        this.SpongeTranslateGroup.style.opacity = 1;
+        await wait(400);
+    }
+
+    _rebind_sponge_pointer() {
+        if (!this.SpongeTranslateGroup) return;
+        let center_x = this._spongeActiveX;
+        let center_y = this._spongeActiveY;
+        let ParentLayer = this._spongeParentLayer;
+        let SpongeCenterGroup = this._SpongeCenterGroup;
+        let squishTimeout;
+        let on_all_clean_callback = this._on_all_clean_callback;
+
+        this.SpongeTranslateGroup.onpointerdown = (e) => {
+            if (this._spongeActive === false) return;
+            this.SpongeTranslateGroup.setPointerCapture(e.pointerId);
+            this.SpongeTranslateGroup.style.transition = "none";
+            this.SpongeTranslateGroup.style.cursor = "grabbing";
+            // Hide focus outline while dragging to avoid CSS artifacts.
+            this.hide_sponge_turn_outline();
+
+            let pt = GenParam.SVGObject.createSVGPoint();
+            pt.x = e.clientX;
+            pt.y = e.clientY;
+            let startSvgPos = pt.matrixTransform(GenParam.SVGObject.getScreenCTM().inverse());
+            let lastSvgPos = startSvgPos;
+            let bubbleDistanceTracker = 0;
+
+            this.SpongeTranslateGroup.onpointermove = (ev) => {
+                if (this._spongeActive === false) return;
+                pt.x = ev.clientX;
+                pt.y = ev.clientY;
+                let currentSvgPos = pt.matrixTransform(GenParam.SVGObject.getScreenCTM().inverse());
+
+                let moveDx = currentSvgPos.x - startSvgPos.x;
+                let moveDy = currentSvgPos.y - startSvgPos.y;
+                let newX = center_x + moveDx;
+                let newY = center_y + moveDy;
+
+                let frameDx = currentSvgPos.x - lastSvgPos.x;
+                let frameDy = currentSvgPos.y - lastSvgPos.y;
+                let distanceMoved = Math.sqrt(frameDx * frameDx + frameDy * frameDy);
+                lastSvgPos = currentSvgPos;
+
+                let squish = Math.max(0.75, 1 - (distanceMoved * 0.015));
+                let stretch = Math.min(1.15, 1 + (distanceMoved * 0.005));
+                SpongeCenterGroup.style.transition = "transform 50ms ease-out";
+                SpongeCenterGroup.style.transform = `scale(${stretch}, ${squish})`;
+                clearTimeout(squishTimeout);
+                squishTimeout = setTimeout(() => {
+                    SpongeCenterGroup.style.transition = "transform 250ms cubic-bezier(0.25, 1.5, 0.5, 1)";
+                    SpongeCenterGroup.style.transform = `scale(1, 1)`;
+                }, 80);
+
+                let targetRect = this.TargetElement.getBoundingClientRect();
+                let isOverTarget = (
+                    ev.clientX >= targetRect.left &&
+                    ev.clientX <= targetRect.right &&
+                    ev.clientY >= targetRect.top &&
+                    ev.clientY <= targetRect.bottom
+                );
+                if (isOverTarget) {
+                    bubbleDistanceTracker += distanceMoved;
+                    if (bubbleDistanceTracker > 25) {
+                        let bubbleCount = Math.floor(bubbleDistanceTracker / 25);
+                        this.spawn_bubbles(currentSvgPos.x, currentSvgPos.y, ParentLayer, bubbleCount);
+                        bubbleDistanceTracker %= 25;
+                    }
+                }
+
+                this.SpongeTranslateGroup.style.transform = `translate(${newX}px, ${newY}px)`;
+                this.check_scrub_collision(newX, newY, distanceMoved, ParentLayer, on_all_clean_callback);
+            };
+
+            this.SpongeTranslateGroup.onpointerup = (ev) => {
+                this.SpongeTranslateGroup.onpointermove = null;
+                this.SpongeTranslateGroup.onpointerup = null;
+                this.SpongeTranslateGroup.releasePointerCapture(ev.pointerId);
+                clearTimeout(squishTimeout);
+                SpongeCenterGroup.style.transition = "transform 250ms ease-out";
+                SpongeCenterGroup.style.transform = `scale(1, 1)`;
+
+                // Turn still open: snap home and restore the turn cue outline.
+                if (this.scrubMode === "turn" && this._spongeActive && this._turnResolve) {
+                    this.SpongeTranslateGroup.style.cursor = "grab";
+                    this.SpongeTranslateGroup.style.transition = "all 400ms cubic-bezier(0.25, 1, 0.5, 1)";
+                    this.SpongeTranslateGroup.style.transform = this.SpongeBaseTransform;
+                    this.show_sponge_turn_outline();
+                } else {
+                    this.SpongeTranslateGroup.style.cursor = this._spongeActive ? "grab" : "auto";
+                }
+            };
+        };
+    }
+
+    async fade_out_sponge(ms = 400) {
+        if (!this.SpongeTranslateGroup) return;
+        this.hide_sponge_turn_outline();
+        this.SpongeTranslateGroup.onpointerdown = null;
+        this.SpongeTranslateGroup.style.transition = `opacity ${ms}ms ease-in`;
+        this.SpongeTranslateGroup.style.opacity = 0;
+        await wait(ms);
+        this.SpongeTranslateGroup.remove();
+        this.SpongeTranslateGroup = null;
     }
 
     check_scrub_collision(spongeGlobalX, spongeGlobalY, distanceMoved, ParentLayer, on_all_clean_callback) {
@@ -3190,7 +3871,12 @@ class DirtModule {
 
                 if (dist < 60) {
                     //Subtract the movement distance from the spot's health
-                    spot.health -= (distanceMoved * scrubPowerMultiplier);
+                    let damage = (distanceMoved * scrubPowerMultiplier);
+                    spot.health -= damage;
+
+                    if (this.scrubMode === "turn") {
+                        this.turnCleaned += damage;
+                    }
 
                     //Fade out the spot dynamically as it gets cleaner
                     spot.element.style.opacity = Math.max(0, spot.health / 100);
@@ -3212,7 +3898,7 @@ class DirtModule {
                         spot.element.style.transform += " scale(0)";
                         setTimeout(() => spot.element.remove(), 200);
 
-                        if (this.dirt_remaining <= 0) {
+                        if (this.dirt_remaining <= 0 && this.scrubMode !== "turn") {
                             Interface.Prompt.show_message("Great job! All the dirt is gone!")
                             this.SpongeTranslateGroup.onpointerdown = null;
                             this.SpongeTranslateGroup.style.transition = "all 500ms ease-in";
@@ -3240,6 +3926,19 @@ class DirtModule {
                             // Extended slightly to accommodate the new 300ms delay
                             setTimeout(() => on_all_clean_callback(), 3500);
                         }
+                    }
+
+                    if (this.scrubMode === "turn" && this._turnResolve &&
+                        (this.turnCleaned >= this.turnQuota || this.dirt_remaining <= 0)) {
+                        let resolveTurn = this._turnResolve;
+                        this._turnResolve = null;
+                        this._spongeActive = false;
+                        this.hide_sponge_turn_outline();
+                        if (this.SpongeTranslateGroup) {
+                            this.SpongeTranslateGroup.onpointermove = null;
+                            this.SpongeTranslateGroup.style.cursor = "auto";
+                        }
+                        resolveTurn();
                     }
                 }
             }
@@ -3449,6 +4148,48 @@ class FoliageModule {
             this.RemainingFoliageControllersByLocation[spot.layer][actual_x] = FoliageCont;
         });
     }
+
+    /** Single plant to the left of a box (joint_box_cleaning). */
+    spawn_one_plant_left_of(ItemLayers, target_x, target_y, offset_x = -200, offset_y = 60, size = 3.0) {
+        let actual_x = target_x + offset_x;
+        let actual_y = target_y + offset_y;
+        let FoliageCont = new this.FoliageSubController(
+            this,
+            ItemLayers.Plus2,
+            "Plus2",
+            actual_x,
+            actual_y,
+            size,
+            ItemLayers.Plus2
+        );
+        this.AllFoliageControllers.push(FoliageCont);
+        this.RemainingFoliageControllersByLocation.Plus2[actual_x] = FoliageCont;
+        return FoliageCont;
+    }
+
+    /** Apply one cut hit to a remaining plant (NPC / Fennimal turn). */
+    apply_one_cut_hit() {
+        let target = this.get_target_tree();
+        if (!target) return false;
+        let Cutsite = target.get_center_pos_on_screen();
+        Cutsite.x += (Math.random() - 0.5) * 40;
+        Cutsite.y += (Math.random() - 0.5) * 40;
+        target.cut_external(Cutsite);
+        return true;
+    }
+
+    async fade_out_all(ms = 400) {
+        for (let cont of this.AllFoliageControllers) {
+            if (cont && cont.Foliage) {
+                cont.Foliage.style.transition = `opacity ${ms}ms ease-in`;
+                cont.Foliage.style.opacity = 0;
+                cont.is_cuttable = false;
+            }
+        }
+        await wait(ms);
+        this.clear_all();
+    }
+
     make_foliage_cuttable(callback = null) {
         this.on_all_cleared_callback = callback;
         for (let contnum in this.AllFoliageControllers) {
@@ -3638,163 +4379,220 @@ class DustModule {
     }
 
     apply_dust_filter(BoxBase, BoxTop) {
-        if (!BoxBase || !BoxTop) return; // Safety guard!
+        if (!BoxBase && !BoxTop) return;
 
-        this.BoxBase = BoxBase;
-        this.BoxTop = BoxTop;
+        this.BoxBase = BoxBase || null;
+        this.BoxTop = BoxTop || null;
 
         this.dust_level = 100;
 
-        // Apply a heavy grayscale/sepia filter to make it look like thick dust
         let filter_string = `sepia(0.4) grayscale(0.6) brightness(0.7) contrast(0.8) blur(1px)`;
-        this.BoxBase.style.filter = filter_string;
-        this.BoxTop.style.filter = filter_string;
-
-        this.BoxBase.style.transition = "filter 400ms ease-out";
-        this.BoxTop.style.transition = "filter 400ms ease-out";
+        if (this.BoxBase) {
+            this.BoxBase.style.filter = filter_string;
+            this.BoxBase.style.transition = "filter 400ms ease-out";
+        }
+        if (this.BoxTop) {
+            this.BoxTop.style.filter = filter_string;
+            this.BoxTop.style.transition = "filter 400ms ease-out";
+        }
     }
 
-    spawn_and_enable_bellows(ParentLayer, box_center_x, box_center_y, on_clean_callback) {
+    spawn_and_enable_bellows(ParentLayer, box_center_x, box_center_y, on_clean_callback, options = {}) {
+        this.spawn_bellows(ParentLayer, box_center_x, box_center_y, options);
+        this._on_dust_clean_callback = on_clean_callback;
+        this._bellows_player_enabled = options.playerEnabled !== false;
+
+        if (this._bellows_player_enabled) {
+            this.BellowsTranslateGroup.style.cursor = "pointer";
+            this.BellowsTranslateGroup.onpointerdown = () => {
+                this.puff();
+            };
+        } else {
+            this.BellowsTranslateGroup.style.cursor = "auto";
+            this.BellowsTranslateGroup.onpointerdown = null;
+        }
+    }
+
+    /**
+     * Place bellows without requiring player input (NPC-driven trials).
+     * options: { offsetX, offsetY, scale, playerEnabled }
+     */
+    spawn_bellows(ParentLayer, box_center_x, box_center_y, options = {}) {
         let rawBellows = document.getElementById("bellows").cloneNode(true);
         rawBellows.id = "active_bellows";
         rawBellows.style.display = "inherit";
 
-        let bellowsOutline = create_SVG_outline_of_group_ID(rawBellows);
-        bellowsOutline.classList.add("focus_on_SVG_outline");
+        this._bellowsOutline = null;
+        if (options.showOutline !== false) {
+            this._bellowsOutline = create_SVG_outline_of_group_ID(rawBellows);
+            this._bellowsOutline.classList.add("focus_on_SVG_outline");
+        }
 
         this.BellowsScaleGroup = create_SVG_group(0, 0);
-        this.BellowsScaleGroup.style.transform = `scale(3.5)`;
-        this.BellowsScaleGroup.appendChild(bellowsOutline);
+        this.BellowsScaleGroup.style.transform = `scale(${options.scale != null ? options.scale : 3.5})`;
+        if (this._bellowsOutline) this.BellowsScaleGroup.appendChild(this._bellowsOutline);
         this.BellowsScaleGroup.appendChild(rawBellows);
 
         this.BellowsTranslateGroup = create_SVG_group(0, 0);
         this.BellowsTranslateGroup.appendChild(this.BellowsScaleGroup);
         ParentLayer.appendChild(this.BellowsTranslateGroup);
 
-        let start_x = box_center_x + 180;
-        let start_y = box_center_y - 800;
+        let offsetX = options.offsetX != null ? options.offsetX : 180;
+        let offsetY = options.offsetY != null ? options.offsetY : -40;
+        let start_x = box_center_x + offsetX;
+        let start_y = box_center_y + offsetY - 760;
+        this._bellowsRestTransform = `translate(${box_center_x + offsetX}px, ${box_center_y + offsetY}px)`;
         this.BellowsTranslateGroup.style.transform = `translate(${start_x}px, ${start_y}px)`;
 
-        let bellows_top = rawBellows.querySelector(".bellows_top");
-        let bellows_gasket = rawBellows.querySelector(".bellows_gasket");
-        let nozzle_point = rawBellows.querySelector(".nozzle_point");
+        this._bellows_top = rawBellows.querySelector(".bellows_top");
+        this._bellows_gasket = rawBellows.querySelector(".bellows_gasket");
+        this._bellows_nozzle = rawBellows.querySelector(".nozzle_point");
+        this._bellows_parent = ParentLayer;
+        this._bellows_box_cx = box_center_x;
+        this._bellows_box_cy = box_center_y;
+        this._bellows_puff_amount = options.puffAmount != null ? options.puffAmount : 10;
+        this._bellows_animating = false;
 
-        let pivot = bellows_top ? bellows_top.querySelector(".bellows_pivot_point") : null;
-
-        if (bellows_top && pivot) {
-            bellows_top.style.transformBox = "fill-box";
+        let pivot = this._bellows_top ? this._bellows_top.querySelector(".bellows_pivot_point") : null;
+        if (this._bellows_top && pivot) {
+            this._bellows_top.style.transformBox = "fill-box";
             let pBox = pivot.getBBox();
-            let bBox = bellows_top.getBBox();
+            let bBox = this._bellows_top.getBBox();
             let px = ((pBox.x + pBox.width / 2 - bBox.x) / bBox.width) * 100;
             let py = ((pBox.y + pBox.height / 2 - bBox.y) / bBox.height) * 100;
-            bellows_top.style.transformOrigin = `${px}% ${py}%`;
+            this._bellows_top.style.transformOrigin = `${px}% ${py}%`;
         }
-
-        if (bellows_gasket && pivot) {
-            bellows_gasket.style.transformBox = "fill-box";
+        if (this._bellows_gasket && pivot) {
+            this._bellows_gasket.style.transformBox = "fill-box";
             let pBox = pivot.getBBox();
-            let gBox = bellows_gasket.getBBox();
+            let gBox = this._bellows_gasket.getBBox();
             let px = ((pBox.x + pBox.width / 2 - gBox.x) / gBox.width) * 100;
             let py = ((pBox.y + pBox.height / 2 - gBox.y) / gBox.height) * 100;
-            bellows_gasket.style.transformOrigin = `${px}% ${py}%`;
+            this._bellows_gasket.style.transformOrigin = `${px}% ${py}%`;
         }
 
         this.BellowsTranslateGroup.style.opacity = 0;
         window.getComputedStyle(this.BellowsTranslateGroup).opacity;
         this.BellowsTranslateGroup.style.transition = "all 600ms cubic-bezier(0.34, 1.56, 0.64, 1)";
         this.BellowsTranslateGroup.style.opacity = 1;
-        this.BellowsTranslateGroup.style.cursor = "pointer";
+        this.BellowsTranslateGroup.style.transform = this._bellowsRestTransform;
 
-        let baseBoxBaseTransform = this.BoxBase.style.transform;
-        let baseBoxTopTransform = this.BoxTop.style.transform;
+        this._baseBoxBaseTransform = this.BoxBase ? this.BoxBase.style.transform : "";
+        this._baseBoxTopTransform = this.BoxTop ? this.BoxTop.style.transform : "";
+    }
 
-        let is_animating = false;
+    /**
+     * One bellows puff. Returns a Promise that resolves when the refill animation finishes.
+     * options.amount overrides dust reduction for this puff.
+     */
+    puff(options = {}) {
+        if (this._bellows_animating || this.dust_level <= 0 || !this.BellowsTranslateGroup) {
+            return Promise.resolve(false);
+        }
+        this._bellows_animating = true;
 
-        this.BellowsTranslateGroup.onpointerdown = () => {
-            if (is_animating || this.dust_level <= 0) return;
-            is_animating = true;
+        if (this._bellowsOutline) {
+            this._bellowsOutline.remove();
+            this._bellowsOutline = null;
+        }
 
-            if (bellowsOutline) {
-                bellowsOutline.remove();
-                bellowsOutline = null;
+        let amount = options.amount != null ? options.amount : this._bellows_puff_amount;
+        let ParentLayer = this._bellows_parent;
+        let box_center_x = this._bellows_box_cx;
+        let box_center_y = this._bellows_box_cy;
+
+        AudioCont.play_sound_effect("air_puff");
+
+        if (this._bellows_top) {
+            this._bellows_top.style.transition = "transform 50ms ease-in";
+            this._bellows_top.style.transform = "rotate(32deg)";
+        }
+        if (this._bellows_gasket) {
+            this._bellows_gasket.style.transition = "transform 50ms ease-in";
+            this._bellows_gasket.style.transform = "rotate(12deg) scale(0.9, 0.5)";
+        }
+
+        if (this.BoxBase || this.BoxTop) {
+            if (this.BoxBase) {
+                this.BoxBase.style.transition = "transform 50ms ease-in-out";
+                this.BoxBase.style.transform = this._baseBoxBaseTransform + " translate(-8px, 8px)";
             }
-
-            AudioCont.play_sound_effect("air_puff");
-
-            // A. Snappy Bellows Animation (Fast Down!)
-            if (bellows_top) {
-                bellows_top.style.transition = "transform 50ms ease-in";
-                bellows_top.style.transform = "rotate(32deg)";
+            if (this.BoxTop) {
+                this.BoxTop.style.transition = "transform 50ms ease-in-out";
+                this.BoxTop.style.transform = this._baseBoxTopTransform + " translate(-8px, 8px)";
             }
-            if (bellows_gasket) {
-                bellows_gasket.style.transition = "transform 50ms ease-in";
-                // TWEAK 1: Reduced rotation and squished much flatter (0.5) to keep it tucked inside the wood panels!
-                bellows_gasket.style.transform = "rotate(12deg) scale(0.9, 0.5)";
-            }
+        }
 
-            // B. Box Jiggle Effect (Impact!)
-            this.BoxBase.style.transition = "transform 50ms ease-in-out";
-            this.BoxTop.style.transition = "transform 50ms ease-in-out";
-            this.BoxBase.style.transform = baseBoxBaseTransform + " translate(-8px, 8px)";
-            this.BoxTop.style.transform = baseBoxTopTransform + " translate(-8px, 8px)";
+        if (this._bellows_nozzle && ParentLayer) {
+            let pt = GenParam.SVGObject.createSVGPoint();
+            let nBox = this._bellows_nozzle.getBBox();
+            pt.x = nBox.x + nBox.width / 2;
+            pt.y = nBox.y + nBox.height / 2;
+            let screenNozzle = pt.matrixTransform(this._bellows_nozzle.getScreenCTM());
+            let localNozzle = screenNozzle.matrixTransform(ParentLayer.getScreenCTM().inverse());
+            this.spawn_wind_streaks(ParentLayer, localNozzle.x, localNozzle.y, box_center_x, box_center_y);
+            this.spawn_dislodged_dust(ParentLayer, box_center_x, box_center_y);
+        }
 
-            // C. Spawn Wind and Dust Effects
-            if (nozzle_point) {
-                let pt = GenParam.SVGObject.createSVGPoint();
-                let nBox = nozzle_point.getBBox();
-                pt.x = nBox.x + nBox.width / 2;
-                pt.y = nBox.y + nBox.height / 2;
+        this.dust_level = Math.max(0, this.dust_level - amount);
+        let p = this.dust_level / 100;
+        let filter_string = `sepia(${0.4 * p}) grayscale(${0.6 * p}) brightness(${1 - (0.3 * p)}) contrast(${1 - (0.2 * p)}) blur(${1 * p}px)`;
+        if (this.BoxBase) this.BoxBase.style.filter = filter_string;
+        if (this.BoxTop) this.BoxTop.style.filter = filter_string;
 
-                let screenNozzle = pt.matrixTransform(nozzle_point.getScreenCTM());
-                let localNozzle = screenNozzle.matrixTransform(ParentLayer.getScreenCTM().inverse());
-
-                this.spawn_wind_streaks(ParentLayer, localNozzle.x, localNozzle.y, box_center_x, box_center_y);
-                this.spawn_dislodged_dust(ParentLayer, box_center_x, box_center_y);
-            }
-
-            // D. Update the CSS Filter
-            this.dust_level -= 10;
-            let p = this.dust_level / 100;
-
-            let filter_string = `sepia(${0.4 * p}) grayscale(${0.6 * p}) brightness(${1 - (0.3 * p)}) contrast(${1 - (0.2 * p)}) blur(${1 * p}px)`;
-            this.BoxBase.style.filter = filter_string;
-            this.BoxTop.style.filter = filter_string;
-
-            // E. Snap Back (Slow refill & box resets)
+        return new Promise(resolve => {
             setTimeout(() => {
-                this.BoxBase.style.transform = baseBoxBaseTransform;
-                this.BoxTop.style.transform = baseBoxTopTransform;
+                if (this.BoxBase) this.BoxBase.style.transform = this._baseBoxBaseTransform;
+                if (this.BoxTop) this.BoxTop.style.transform = this._baseBoxTopTransform;
 
-                if (bellows_top) {
-                    // TWEAK 2: Lengthened the refill time to 700ms for a massive, slow draw
-                    bellows_top.style.transition = "transform 700ms cubic-bezier(0.25, 1.5, 0.5, 1)";
-                    bellows_top.style.transform = "rotate(0deg)";
+                if (this._bellows_top) {
+                    this._bellows_top.style.transition = "transform 700ms cubic-bezier(0.25, 1.5, 0.5, 1)";
+                    this._bellows_top.style.transform = "rotate(0deg)";
                 }
-                if (bellows_gasket) {
-                    bellows_gasket.style.transition = "transform 700ms cubic-bezier(0.25, 1.5, 0.5, 1)";
-                    bellows_gasket.style.transform = "rotate(0deg) scale(1, 1)";
+                if (this._bellows_gasket) {
+                    this._bellows_gasket.style.transition = "transform 700ms cubic-bezier(0.25, 1.5, 0.5, 1)";
+                    this._bellows_gasket.style.transform = "rotate(0deg) scale(1, 1)";
                 }
 
                 if (this.dust_level <= 0) {
                     this.BellowsTranslateGroup.onpointerdown = null;
                     this.BellowsTranslateGroup.style.cursor = "auto";
-
-                    // Wait for the final slow refill to complete before playing success sound and flying away
                     setTimeout(() => {
-                        AudioCont.play_sound_effect("success");
-                        this.BellowsTranslateGroup.style.transition = "all 500ms ease-in";
-                        this.BellowsTranslateGroup.style.transform += " translate(200px, -200px) scale(0)";
-                        this.BellowsTranslateGroup.style.opacity = 0;
-                        setTimeout(() => on_clean_callback(), 600);
+                        if (typeof this._on_dust_clean_callback === "function") {
+                            // Legacy find_box_extended path: fly away + callback
+                            AudioCont.play_sound_effect("success");
+                            this.BellowsTranslateGroup.style.transition = "all 500ms ease-in";
+                            this.BellowsTranslateGroup.style.transform += " translate(200px, -200px) scale(0)";
+                            this.BellowsTranslateGroup.style.opacity = 0;
+                            setTimeout(() => {
+                                this._bellows_animating = false;
+                                this._on_dust_clean_callback();
+                                resolve(true);
+                            }, 600);
+                        } else {
+                            this._bellows_animating = false;
+                            resolve(true);
+                        }
                     }, 700);
                 } else {
-                    // TWEAK 3: Only locks the animation for 50ms! This lets them rapid-pump the bellows mid-refill.
+                    let unlockMs = options.waitForRefill ? 750 : 50;
                     setTimeout(() => {
-                        is_animating = false;
-                    }, 50);
+                        this._bellows_animating = false;
+                        resolve(true);
+                    }, unlockMs);
                 }
-            }, 50); // Box un-jiggles immediately after 50ms impact
-        };
+            }, 50);
+        });
+    }
+
+    async fade_out_bellows(ms = 400) {
+        if (!this.BellowsTranslateGroup) return;
+        this.BellowsTranslateGroup.onpointerdown = null;
+        this.BellowsTranslateGroup.style.transition = `opacity ${ms}ms ease-in`;
+        this.BellowsTranslateGroup.style.opacity = 0;
+        await wait(ms);
+        this.BellowsTranslateGroup.remove();
+        this.BellowsTranslateGroup = null;
     }
 
     spawn_wind_streaks(ParentLayer, startX, startY, targetX, targetY) {
@@ -4653,20 +5451,11 @@ class BrokenToyTrialController {
         new MakeObjectDraggableObject(
             this.basics.ItemLayers.Main,
             this.basics.ItemLayers.Plus2,
-            this.brokenToyLogic.ToyElement, // Note: Use this.toyLogic or this.brokenToyLogic in the other classes!
+            this.brokenToyLogic.ToyElement, // <-- FIXED
             this.box.BoxBase,
-            200, // The newly expanded drop radius!
-
-            // The callback now receives the exact SVG element that was dragged
+            200,
             (DroppedToyElement) => {
-                shared_toy_drop_sequence(
-                    DroppedToyElement, // The element we just caught
-                    this.box,
-                    this.basics,
-                    this.partner,
-                    this.FenObj,
-                    () => this.finish_trial() // Safely triggers the end of the trial
-                );
+                shared_toy_drop_sequence(DroppedToyElement, this.box, this.basics, this.partner, this.FenObj, () => this.finish_trial());
             }
         );
     }
@@ -4869,20 +5658,11 @@ class DirtyToyTrialController {
         new MakeObjectDraggableObject(
             this.basics.ItemLayers.Main,
             this.basics.ItemLayers.Plus2,
-            this.toyLogic.ToyElement, // Note: Use this.toyLogic or this.brokenToyLogic in the other classes!
+            this.toyLogic.ToyElement, // <-- FIXED
             this.box.BoxBase,
-            200, // The newly expanded drop radius!
-
-            // The callback now receives the exact SVG element that was dragged
+            200,
             (DroppedToyElement) => {
-                shared_toy_drop_sequence(
-                    DroppedToyElement, // The element we just caught
-                    this.box,
-                    this.basics,
-                    this.partner,
-                    this.FenObj,
-                    () => this.finish_trial() // Safely triggers the end of the trial
-                );
+                shared_toy_drop_sequence(DroppedToyElement, this.box, this.basics, this.partner, this.FenObj, () => this.finish_trial());
             }
         );
     }
@@ -5131,20 +5911,11 @@ class DirtyAndBrokenToyTrialController {
         new MakeObjectDraggableObject(
             this.basics.ItemLayers.Main,
             this.basics.ItemLayers.Plus2,
-            this.toy.ToyElement, // Note: Use this.toyLogic or this.brokenToyLogic in the other classes!
+            this.brokenToyLogic.ToyElement, // <-- FIXED
             this.box.BoxBase,
-            200, // The newly expanded drop radius!
-
-            // The callback now receives the exact SVG element that was dragged
+            200,
             (DroppedToyElement) => {
-                shared_toy_drop_sequence(
-                    DroppedToyElement, // The element we just caught
-                    this.box,
-                    this.basics,
-                    this.partner,
-                    this.FenObj,
-                    () => this.finish_trial() // Safely triggers the end of the trial
-                );
+                shared_toy_drop_sequence(DroppedToyElement, this.box, this.basics, this.partner, this.FenObj, () => this.finish_trial());
             }
         );
     }
@@ -5202,6 +5973,1965 @@ class DirtyAndBrokenToyTrialController {
     }
 }
 
+// Generalized photo trial. targetType selects spawn + polaroid contents only
+// ("toybox" now; "fennimal" later). Shared camera / viewfinder / shutter / feedback.
+class PhotoTrialController {
+    constructor(FenObj, partner_is_present, returnfunc, targetType = "toybox") {
+        this.FenObj = FenObj;
+        this.returnfunc = returnfunc;
+        this.targetType = targetType;
+
+        this.basics = new BasicElementsModule(FenObj);
+        this.box = new BoxModule(FenObj);
+        this.partner = new PartnerModule(partner_is_present);
+
+        this.params = GenParam.PhotoTrial;
+        this.is_photo_mode = false;
+        this.is_processing_shot = false;
+        this.reticlePos = { x: 0.5 * GenParam.SVG_width, y: 0.5 * GenParam.SVG_height };
+
+        this.CameraButton = null;
+        this.ViewfinderGroup = null;
+        this.ViewfinderDim = null;
+        this.ViewfinderReticle = null;
+        this.PolaroidGroup = null;
+        this.CloseButton = null;
+
+        this._onPointerMove = null;
+        this._onPointerDown = null;
+    }
+
+    getElementHalfWidthSVG(elem) {
+        if (!elem) return 0;
+
+        let rect = elem.getBoundingClientRect();
+        let svg = GenParam.SVGObject;
+        if (!svg || !svg.getScreenCTM) {
+            return Math.max(rect.width / 2, 120);
+        }
+
+        let inv = svg.getScreenCTM().inverse();
+        let p1 = svg.createSVGPoint();
+        let p2 = svg.createSVGPoint();
+        p1.x = rect.left;
+        p1.y = rect.top;
+        p2.x = rect.right;
+        p2.y = rect.bottom;
+        p1 = p1.matrixTransform(inv);
+        p2 = p2.matrixTransform(inv);
+        return Math.max(Math.abs(p2.x - p1.x) / 2, 80);
+    }
+
+    getElementHalfHeightSVG(elem) {
+        if (!elem) return 0;
+
+        let rect = elem.getBoundingClientRect();
+        let svg = GenParam.SVGObject;
+        if (!svg || !svg.getScreenCTM) {
+            return Math.max(rect.height / 2, 120);
+        }
+
+        let inv = svg.getScreenCTM().inverse();
+        let p1 = svg.createSVGPoint();
+        let p2 = svg.createSVGPoint();
+        p1.x = rect.left;
+        p1.y = rect.top;
+        p2.x = rect.right;
+        p2.y = rect.bottom;
+        p1 = p1.matrixTransform(inv);
+        p2 = p2.matrixTransform(inv);
+        return Math.max(Math.abs(p2.y - p1.y) / 2, 80);
+    }
+
+    pickRandomInRange(min, max) {
+        return min + Math.random() * (max - min);
+    }
+
+    pickBoxPlacement() {
+        const W = this.basics.W;
+        const H = this.basics.H;
+        const p = this.params;
+        const scale = this.pickRandomInRange(p.boxScaleMin, p.boxScaleMax);
+        const y = this.pickRandomInRange(p.boxYMin, p.boxYMax) * H;
+
+        const boxHalfW = this.getScaledTemplateHalfWidth("toybox_" + this.FenObj.toybox, scale);
+        const minX = p.boxXMargin + boxHalfW;
+        const maxX = W - p.boxXMargin - boxHalfW;
+
+        let partnerCenterX = null;
+        let partnerHalfW = null;
+        if (this.partner.is_present && this.partner.PartnerBaseGroup) {
+            partnerCenterX = getSVGInternalCenter(this.partner.PartnerBaseGroup).x;
+            partnerHalfW = this.getElementHalfWidthSVG(this.partner.PartnerBaseGroup);
+        }
+
+        let ranges = [[minX, maxX]];
+        if (partnerCenterX !== null && partnerHalfW !== null) {
+            const gap = p.partnerAvoidGap;
+            const fStart = partnerCenterX - partnerHalfW - boxHalfW - gap;
+            const fEnd = partnerCenterX + partnerHalfW + boxHalfW + gap;
+            let next = [];
+            ranges.forEach(([aStart, aEnd]) => {
+                if (fEnd <= aStart || fStart >= aEnd) {
+                    next.push([aStart, aEnd]);
+                    return;
+                }
+                if (fStart > aStart) next.push([aStart, Math.min(fStart, aEnd)]);
+                if (fEnd < aEnd) next.push([Math.max(fEnd, aStart), aEnd]);
+            });
+            ranges = next.filter(([start, end]) => end - start > 1);
+        }
+
+        let x;
+        if (ranges.length === 0) {
+            x = (partnerCenterX !== null && partnerCenterX > W * 0.5) ? minX : maxX;
+        } else {
+            let range = ranges[Math.floor(Math.random() * ranges.length)];
+            x = range[0] + Math.random() * (range[1] - range[0]);
+        }
+
+        return { x, y, scale };
+    }
+
+    getScaledTemplateHalfWidth(elementId, scale) {
+        let template = document.getElementById(elementId);
+        if (!template) return 180 * (scale / 4);
+
+        let box = template.getBBox();
+        return (Math.max(box.width, 1) * scale) / 2;
+    }
+
+    // --- Target spawn / polaroid contents (only pieces that differ by targetType) ---
+
+    async spawn_target() {
+        switch (this.targetType) {
+            case "toybox":
+                return this.spawn_toybox_target();
+            case "fennimal":
+                console.warn("PhotoTrialController: fennimal target not implemented yet; falling back to toybox.");
+                return this.spawn_toybox_target();
+            default:
+                console.error("PhotoTrialController: unknown targetType " + this.targetType);
+                return this.spawn_toybox_target();
+        }
+    }
+
+    async spawn_toybox_target() {
+        let place = this.pickBoxPlacement();
+        this.box_start_x = place.x;
+        this.box_start_y = place.y;
+        this.box_scale = place.scale;
+
+        await this.box.create_and_appear_box(
+            this.basics.ItemLayers.Main,
+            this.basics.ItemLayers.Plus1,
+            place.x,
+            place.y,
+            place.scale,
+            200
+        );
+
+        this.photoTargetElements = [this.box.BoxBase, this.box.BoxTop].filter(Boolean);
+    }
+
+    get_target_label() {
+        if (this._targetLabelOverride) return this._targetLabelOverride;
+        if (this.targetType === "toybox") return this.box.boxname;
+        return this.FenObj.name || "target";
+    }
+
+    create_polaroid_contents(groupScale, targetCircle) {
+        if (typeof this._polaroidContentsOverride === "function") {
+            return this._polaroidContentsOverride(groupScale, targetCircle);
+        }
+
+        if (this.targetType === "toybox") {
+            let template = document.getElementById("toybox_" + this.FenObj.toybox);
+            if (!template) return null;
+
+            // Full closed box: back + front + lid (do not strip front — that is the body).
+            let boxIcon = copy_scale_and_move_object_to_position(
+                template,
+                groupScale,
+                targetCircle.x,
+                targetCircle.y,
+                1
+            );
+
+            let rawBox = template.getBBox();
+            let bgRect = groupScale.getElementsByTagName("rect")[0];
+            let frameBox = bgRect ? bgRect.getBBox() : { width: 500, height: 600 };
+            let scaleFactorW = frameBox.width / Math.max(rawBox.width, 1);
+            let scaleFactorH = (0.75 * frameBox.height) / Math.max(rawBox.height, 1);
+            let minScale = Math.min(scaleFactorW, scaleFactorH) * 0.75;
+
+            let scaleGroup = boxIcon.getElementsByClassName("scale_group")[0];
+            if (scaleGroup) {
+                scaleGroup.style.transform = `scale(${minScale})`;
+            }
+
+            return boxIcon;
+        }
+        return null;
+    }
+
+    // --- Camera button / idle ---
+
+    show_camera_button() {
+        this.hide_camera_button();
+
+        let dims = Object.assign({}, GenParam.ActionButtonParameters_Center);
+        this.CameraButton = create_Action_Button_SVG_Element("camera", dims, false, false);
+        this.CameraButton.style.cursor = "pointer";
+        this.CameraButton.classList.add("photo_trial_camera_button");
+        this.basics.ItemLayers.Questions.appendChild(this.CameraButton);
+
+        this.CameraButton.onpointerdown = (evt) => {
+            evt.stopPropagation();
+            this.enter_photo_mode();
+        };
+    }
+
+    hide_camera_button() {
+        if (this.CameraButton) {
+            this.CameraButton.onpointerdown = null;
+            this.CameraButton.remove();
+            this.CameraButton = null;
+        }
+    }
+
+    // --- Viewfinder (built in JS) ---
+
+    build_viewfinder() {
+        this.remove_viewfinder();
+
+        const W = this.basics.W;
+        const H = this.basics.H;
+        const p = this.params;
+
+        this.ViewfinderGroup = create_SVG_group(0, 0, "photo_viewfinder", "photo_viewfinder");
+        this.ViewfinderGroup.style.cursor = "none";
+        this.basics.ItemLayers.Questions.appendChild(this.ViewfinderGroup);
+
+        // Dim overlay with a clear rectangular lens hole (evenodd).
+        this.ViewfinderDim = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        this.ViewfinderDim.setAttribute("fill", "#000");
+        this.ViewfinderDim.setAttribute("fill-rule", "evenodd");
+        this.ViewfinderDim.style.opacity = p.viewfinderDimOpacity;
+        this.ViewfinderDim.style.pointerEvents = "all";
+        this.ViewfinderGroup.appendChild(this.ViewfinderDim);
+
+        this.ViewfinderReticle = create_SVG_group(0, 0, "photo_viewfinder_reticle", undefined);
+        this.ViewfinderReticle.style.pointerEvents = "none";
+        this.ViewfinderGroup.appendChild(this.ViewfinderReticle);
+
+        const stroke = "#fff";
+        const strokeW = 5;
+        const r = p.reticleRadius;
+        const bl = p.bracketLength;
+        const halfLensW = 0.5 * p.lensWidth;
+        const halfLensH = 0.5 * p.lensHeight;
+
+        // Corner brackets relative to lens corners (updated each move via group transform).
+        const corners = [
+            { x: -halfLensW, y: -halfLensH, dx: 1, dy: 1 },
+            { x: halfLensW, y: -halfLensH, dx: -1, dy: 1 },
+            { x: -halfLensW, y: halfLensH, dx: 1, dy: -1 },
+            { x: halfLensW, y: halfLensH, dx: -1, dy: -1 }
+        ];
+
+        corners.forEach((c) => {
+            let h = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            h.setAttribute("x1", c.x);
+            h.setAttribute("y1", c.y);
+            h.setAttribute("x2", c.x + c.dx * bl);
+            h.setAttribute("y2", c.y);
+            h.setAttribute("stroke", stroke);
+            h.setAttribute("stroke-width", strokeW);
+            h.setAttribute("stroke-linecap", "round");
+            this.ViewfinderReticle.appendChild(h);
+
+            let v = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            v.setAttribute("x1", c.x);
+            v.setAttribute("y1", c.y);
+            v.setAttribute("x2", c.x);
+            v.setAttribute("y2", c.y + c.dy * bl);
+            v.setAttribute("stroke", stroke);
+            v.setAttribute("stroke-width", strokeW);
+            v.setAttribute("stroke-linecap", "round");
+            this.ViewfinderReticle.appendChild(v);
+        });
+
+        let circle = create_SVG_circle(0, 0, r, "photo_viewfinder_focus", undefined);
+        circle.setAttribute("fill", "none");
+        circle.setAttribute("stroke", stroke);
+        circle.setAttribute("stroke-width", strokeW);
+        this.ViewfinderReticle.appendChild(circle);
+
+        let crossH = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        crossH.setAttribute("x1", -12);
+        crossH.setAttribute("y1", 0);
+        crossH.setAttribute("x2", 12);
+        crossH.setAttribute("y2", 0);
+        crossH.setAttribute("stroke", stroke);
+        crossH.setAttribute("stroke-width", 3);
+        this.ViewfinderReticle.appendChild(crossH);
+
+        let crossV = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        crossV.setAttribute("x1", 0);
+        crossV.setAttribute("y1", -12);
+        crossV.setAttribute("x2", 0);
+        crossV.setAttribute("y2", 12);
+        crossV.setAttribute("stroke", stroke);
+        crossV.setAttribute("stroke-width", 3);
+        this.ViewfinderReticle.appendChild(crossV);
+
+        this.update_viewfinder_at(this.reticlePos.x, this.reticlePos.y);
+    }
+
+    update_viewfinder_at(x, y) {
+        const W = this.basics.W;
+        const H = this.basics.H;
+        const p = this.params;
+        const halfW = 0.5 * p.lensWidth;
+        const halfH = 0.5 * p.lensHeight;
+
+        this.reticlePos = { x, y };
+
+        if (this.ViewfinderDim) {
+            // Outer full-screen rect, inner lens hole (evenodd punch-out).
+            const d = [
+                `M 0 0 H ${W} V ${H} H 0 Z`,
+                `M ${x - halfW} ${y - halfH} H ${x + halfW} V ${y + halfH} H ${x - halfW} Z`
+            ].join(" ");
+            this.ViewfinderDim.setAttribute("d", d);
+        }
+
+        if (this.ViewfinderReticle) {
+            this.ViewfinderReticle.style.transform = `translate(${x}px, ${y}px)`;
+        }
+    }
+
+    remove_viewfinder() {
+        if (this.ViewfinderGroup) {
+            this.ViewfinderGroup.remove();
+            this.ViewfinderGroup = null;
+            this.ViewfinderDim = null;
+            this.ViewfinderReticle = null;
+        }
+    }
+
+    bind_photo_mode_listeners() {
+        this.unbind_photo_mode_listeners();
+
+        this._onPointerMove = (evt) => {
+            if (!this.is_photo_mode || this.is_processing_shot) return;
+            let pos = getMousePosition(evt);
+            this.update_viewfinder_at(pos.x, pos.y);
+        };
+
+        this._onPointerDown = (evt) => {
+            if (!this.is_photo_mode || this.is_processing_shot) return;
+            // Ignore clicks that bubbled from UI we already handled.
+            if (evt.target && evt.target.closest && evt.target.closest(".photo_trial_camera_button")) return;
+            this.take_shot();
+        };
+
+        GenParam.SVGObject.addEventListener("pointermove", this._onPointerMove);
+        GenParam.SVGObject.addEventListener("pointerdown", this._onPointerDown);
+    }
+
+    unbind_photo_mode_listeners() {
+        if (this._onPointerMove) {
+            GenParam.SVGObject.removeEventListener("pointermove", this._onPointerMove);
+            this._onPointerMove = null;
+        }
+        if (this._onPointerDown) {
+            GenParam.SVGObject.removeEventListener("pointerdown", this._onPointerDown);
+            this._onPointerDown = null;
+        }
+    }
+
+    enter_photo_mode() {
+        if (this.is_photo_mode || this.is_processing_shot) return;
+
+        this.is_photo_mode = true;
+        this.hide_camera_button();
+        AudioCont.play_sound_effect("camera_pickup");
+        Interface.Prompt.show_message("Aim at the " + this.get_target_label() + " and click to take a photo");
+
+        this.reticlePos = { x: 0.5 * this.basics.W, y: 0.5 * this.basics.H };
+        this.build_viewfinder();
+
+        // Defer listeners so the camera-button click cannot also fire the shutter.
+        setTimeout(() => {
+            if (this.is_photo_mode) this.bind_photo_mode_listeners();
+        }, 0);
+    }
+
+    exit_photo_mode() {
+        this.is_photo_mode = false;
+        this.unbind_photo_mode_listeners();
+        this.remove_viewfinder();
+    }
+
+    reticle_overlaps_target() {
+        if (!this.photoTargetElements || this.photoTargetElements.length === 0) return false;
+
+        // Union AABB of target pieces in SVG space.
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        let any = false;
+
+        this.photoTargetElements.forEach((elem) => {
+            if (!elem) return;
+            let cx = getSVGInternalCenter(elem).x;
+            let cy = getSVGInternalCenter(elem).y;
+            let hw = this.getElementHalfWidthSVG(elem);
+            let hh = this.getElementHalfHeightSVG(elem);
+            minX = Math.min(minX, cx - hw);
+            maxX = Math.max(maxX, cx + hw);
+            minY = Math.min(minY, cy - hh);
+            maxY = Math.max(maxY, cy + hh);
+            any = true;
+        });
+
+        if (!any) return false;
+
+        let rx = this.reticlePos.x;
+        let ry = this.reticlePos.y;
+        let pad = this.params.reticleRadius * 0.35;
+
+        return rx >= (minX - pad) && rx <= (maxX + pad) && ry >= (minY - pad) && ry <= (maxY + pad);
+    }
+
+    async take_shot() {
+        if (this.is_processing_shot) return;
+        this.is_processing_shot = true;
+
+        AudioCont.play_sound_effect("photo");
+        await this.play_shutter_flash();
+
+        let hit = this.reticle_overlaps_target();
+        this.exit_photo_mode();
+
+        // Beat between flash and polaroid so the reveal feels less abrupt.
+        await wait(this.params.polaroidAppearDelay);
+
+        if (hit) {
+            await this.handle_success();
+        } else {
+            await this.handle_miss();
+            this.is_processing_shot = false;
+            this.show_camera_button();
+            Interface.Prompt.show_message("Take a photo of the " + this.get_target_label());
+        }
+    }
+
+    async play_shutter_flash() {
+        const p = this.params;
+        let flash = create_SVG_rect(0, 0, this.basics.W, this.basics.H, "photo_trial_flash", undefined);
+        flash.style.fill = "#fff";
+        flash.style.opacity = 0;
+        flash.style.pointerEvents = "none";
+        flash.style.transition = `opacity ${p.flashInTime}ms ease-out`;
+        this.basics.ItemLayers.Questions.appendChild(flash);
+
+        window.getComputedStyle(flash).opacity;
+        flash.style.opacity = p.flashPeakOpacity;
+        await wait(p.flashInTime + p.flashHoldTime);
+
+        flash.style.transition = `opacity ${p.flashOutTime}ms ease-in`;
+        flash.style.opacity = 0;
+        await wait(p.flashOutTime);
+        flash.remove();
+    }
+
+    // --- Polaroid feedback ---
+
+    remove_polaroid() {
+        if (this.CloseButton) {
+            this.CloseButton.onpointerdown = null;
+            this.CloseButton.remove();
+            this.CloseButton = null;
+        }
+        if (this.PolaroidGroup) {
+            this.PolaroidGroup.remove();
+            this.PolaroidGroup = null;
+        }
+    }
+
+    async show_polaroid(withContents, { awaitClose = false } = {}) {
+        this.remove_polaroid();
+
+        const W = this.basics.W;
+        const H = this.basics.H;
+        const p = this.params;
+        const cx = 0.5 * W;
+        const cy = p.polaroidCenterY * H;
+
+        let groupTranslate = create_SVG_group(0, 0, undefined, "photo_trial_polaroid");
+        let groupRotate = create_SVG_group(0, 0, undefined, undefined);
+        let groupScale = create_SVG_group(0, 0, undefined, undefined);
+        groupRotate.appendChild(groupScale);
+        groupTranslate.appendChild(groupRotate);
+        this.basics.ItemLayers.Questions.appendChild(groupTranslate);
+        this.PolaroidGroup = groupTranslate;
+
+        let frame = copy_scale_and_move_object_to_position(
+            document.getElementById("polaroid_frame"),
+            groupScale,
+            cx,
+            cy,
+            1
+        );
+
+        let bgRect = frame.getElementsByTagName("rect")[0];
+        if (bgRect) {
+            let regionColor = GenParam.RegionData[this.FenObj.region]
+                ? GenParam.RegionData[this.FenObj.region].surrounding_color
+                : "#ffffff";
+            bgRect.style.fill = withContents ? regionColor : "#e8e8e8";
+            bgRect.style.display = "inherit";
+        }
+
+        let nameNode = frame.getElementsByTagName("text")[0];
+        if (nameNode && nameNode.childNodes[0]) {
+            nameNode.childNodes[0].innerHTML = withContents ? this.get_target_label() : "???";
+        }
+
+        let targetCircle = getSVGInternalCenter(frame.getElementsByTagName("circle")[0]);
+
+        if (withContents) {
+            this.create_polaroid_contents(groupScale, targetCircle);
+        }
+
+        groupScale.style.transformOrigin = "center";
+        groupRotate.style.transformOrigin = `${cx}px ${cy}px`;
+        groupScale.style.transform = `scale(${p.polaroidScale})`;
+        groupRotate.style.transform = "rotate(-3deg)";
+
+        groupTranslate.style.opacity = 0;
+        groupTranslate.style.transition = `opacity ${p.polaroidFadeTime}ms ease-out`;
+        window.getComputedStyle(groupTranslate).opacity;
+        groupTranslate.style.opacity = 1;
+        await wait(p.polaroidFadeTime);
+
+        if (awaitClose) {
+            await this.attach_polaroid_close_button(frame, groupTranslate);
+        }
+
+        return groupTranslate;
+    }
+
+    attach_polaroid_close_button(frame, parentGroup) {
+        return new Promise(resolve => {
+            const p = this.params;
+            const size = p.closeButtonSize;
+
+            // Screen → SVG for the scaled frame's top-left corner.
+            let screenRect = frame.getBoundingClientRect();
+            let svg = GenParam.SVGObject;
+            let inv = svg.getScreenCTM().inverse();
+            let topLeft = svg.createSVGPoint();
+            topLeft.x = screenRect.left;
+            topLeft.y = screenRect.top;
+            topLeft = topLeft.matrixTransform(inv);
+
+            let btnX = topLeft.x + 0.55 * size;
+            let btnY = topLeft.y + 0.55 * size;
+
+            this.CloseButton = create_SVG_buttonElement(btnX, btnY, size, size, "X", Math.round(0.7 * size));
+            this.CloseButton.classList.add("photo_trial_close_button");
+            this.CloseButton.style.cursor = "pointer";
+            this.CloseButton.style.opacity = 0;
+            this.CloseButton.style.transition = "opacity 200ms ease-out";
+            parentGroup.appendChild(this.CloseButton);
+
+            window.getComputedStyle(this.CloseButton).opacity;
+            this.CloseButton.style.opacity = 1;
+
+            this.CloseButton.onpointerdown = (evt) => {
+                evt.stopPropagation();
+                AudioCont.play_sound_effect("close_menu");
+                if (this.CloseButton) this.CloseButton.onpointerdown = null;
+                resolve();
+            };
+        });
+    }
+
+    async handle_miss() {
+        AudioCont.play_sound_effect("rejected");
+        let polaroid = await this.show_polaroid(false);
+        await wait(this.params.missPolaroidTime);
+
+        if (polaroid) {
+            polaroid.classList.add("photo_trial_polaroid_shake");
+            await wait(450);
+            polaroid.classList.remove("photo_trial_polaroid_shake");
+        }
+
+        this.remove_polaroid();
+    }
+
+    async handle_success() {
+        AudioCont.play_sound_effect("success");
+        Interface.Prompt.show_message("Nice shot! The " + this.get_target_label() + " looks good.");
+
+        let celebratePromise = this.partner.is_present
+            ? this.partner.celebrate_success()
+            : Promise.resolve();
+
+        await this.show_polaroid(true, { awaitClose: true });
+        await celebratePromise;
+
+        this.remove_polaroid();
+
+        if (this._embeddedMode) {
+            this.is_processing_shot = false;
+            let resolve = this._embeddedResolve;
+            this._embeddedResolve = null;
+            this._embeddedMode = false;
+            this.clean_up_photo_ui();
+            if (resolve) resolve();
+            return;
+        }
+
+        this.returnfunc();
+    }
+
+    /**
+     * Run camera → shot loop on an already-built scene.
+     * Resolves after a successful polaroid is closed. Does not call returnfunc / clean_up basics.
+     */
+    async run_embedded_capture_loop({
+        photoTargetElements,
+        polaroidContentsFn = null,
+        targetLabel = null
+    } = {}) {
+        this.photoTargetElements = photoTargetElements || this.photoTargetElements;
+        this._polaroidContentsOverride = polaroidContentsFn;
+        this._targetLabelOverride = targetLabel;
+        this._embeddedMode = true;
+        this.is_processing_shot = false;
+
+        Interface.Prompt.show_message(
+            "Take a photo of the " + this.get_target_label() + " to remember this moment!"
+        );
+        AudioCont.play_sound_effect("alert_minor");
+        this.show_camera_button();
+
+        return new Promise((resolve) => {
+            this._embeddedResolve = resolve;
+        });
+    }
+
+    clean_up_photo_ui() {
+        this.hide_camera_button();
+        this.exit_photo_mode();
+        this.remove_polaroid();
+        this.unbind_photo_mode_listeners();
+        this._polaroidContentsOverride = null;
+        this._targetLabelOverride = null;
+    }
+
+    // --- Orchestrator ---
+
+    async start_sequence() {
+        this.basics.create_svg_sublayers();
+        await this.basics.create_background_mask(false, 500);
+
+        if (this.partner.is_present) {
+            this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        }
+
+        await this.spawn_target();
+
+        Interface.Prompt.show_message(
+            "Take a photo of the " + this.get_target_label() + " to check if its still in good shape"
+        );
+        AudioCont.play_sound_effect("alert_minor");
+        this.show_camera_button();
+    }
+
+    clean_up() {
+        this.unbind_photo_mode_listeners();
+        this.hide_camera_button();
+        this.remove_viewfinder();
+        this.remove_polaroid();
+        this.basics.clean_up();
+        this.box.clean_up();
+        if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
+    }
+}
+
+// Hungry Fennimal: comfort → get correct food bag (backpack solo / partner handoff) → fill bowl → eat → dance + wander.
+class FeedFennimalTrialController {
+    constructor(FenObj, partner_is_present, returnfunc) {
+        this.FenObj = FenObj;
+        this.returnfunc = returnfunc;
+
+        this.basics = new BasicElementsModule(FenObj);
+        this.partner = new PartnerModule(partner_is_present);
+        this.params = GenParam.FeedTrial;
+
+        this.flavor = FenObj.food_preference;
+        this.FoodBowl = null;
+        this.Backpack = null;
+        this.bags = []; // { elem, flavor, inColumn }
+        this.columnBags = [];
+        this.dragControllers = [];
+        this.activeDragBag = null;
+        this.feedingComplete = false;
+    }
+
+    get_all_food_flavors() {
+        return Array.from(document.getElementsByClassName("foodbag_flavor"))
+            .map(b => b.id.split("_")[2])
+            .filter(Boolean);
+    }
+
+    extract_flavor_accent_color(flavor) {
+        let flavorEl = document.getElementById("foodbag_flavor_" + flavor);
+        if (!flavorEl) return "#892ca0";
+
+        let fill = flavorEl.getAttribute("fill");
+        if (fill && fill !== "none") return fill;
+
+        let painted = flavorEl.querySelector("[fill]:not([fill='none'])");
+        if (painted) {
+            let childFill = painted.getAttribute("fill");
+            if (childFill && childFill !== "none") return childFill;
+        }
+        return "#892ca0";
+    }
+
+    create_foodbag(flavor, parent, x, y, scale) {
+        let template = document.getElementById("foodbag");
+        let bag = copy_scale_and_move_object_to_position(template, parent, x, y, scale);
+
+        Array.from(bag.getElementsByClassName("foodbag_flavor")).forEach(flavorNode => {
+            let nodeFlavor = flavorNode.id.split("_")[2];
+            if (nodeFlavor !== flavor) {
+                flavorNode.remove();
+            } else {
+                flavorNode.style.display = "inherit";
+                flavorNode.removeAttribute("display");
+            }
+        });
+
+        let accent = this.extract_flavor_accent_color(flavor);
+        bag.querySelectorAll(".foodbag_color").forEach(swatch => {
+            swatch.setAttribute("fill", accent);
+            swatch.style.fill = accent;
+        });
+
+        bag.dataset.feedFlavor = flavor;
+        return bag;
+    }
+
+    pick_distractor_flavors(count) {
+        let others = this.get_all_food_flavors().filter(f => f !== this.flavor);
+        return shuffleArray(others).slice(0, count);
+    }
+
+    set_element_center(elem, x, y, time = 0) {
+        let center = getSVGInternalCenter(elem);
+        let dx = x - center.x;
+        let dy = y - center.y;
+        if (time > 0) {
+            elem.style.transition = `transform ${time}ms ease-in-out`;
+        } else {
+            elem.style.transition = "";
+        }
+        elem.style.transform = (elem.style.transform || "") + ` translate(${dx}px, ${dy}px)`;
+        return wait(time);
+    }
+
+    async move_bag_to_home(bagInfo, time = 350) {
+        if (!bagInfo || !bagInfo.elem) return;
+        await this.set_element_center(bagInfo.elem, bagInfo.homeX, bagInfo.homeY, time);
+    }
+
+    // --- Bowl ---
+
+    async spawn_empty_bowl() {
+        const p = this.params;
+        this.FoodBowl = copy_scale_and_move_object_to_position(
+            document.getElementById("foodbowl"),
+            this.basics.ItemLayers.Main,
+            p.bowlX * this.basics.W,
+            p.bowlY * this.basics.H,
+            p.bowlScale
+        );
+        this.FoodBowl.id = "feed_trial_foodbowl";
+
+        this.FoodBowl.querySelectorAll(".food").forEach(food => {
+            food.style.display = "none";
+            food.style.opacity = 0;
+        });
+
+        this.FoodBowl.style.opacity = 0;
+        window.getComputedStyle(this.FoodBowl).opacity;
+        this.FoodBowl.style.transition = "opacity 250ms ease-out";
+        this.FoodBowl.style.opacity = 1;
+        await wait(250);
+    }
+
+    reveal_bowl_food() {
+        // Query inside the cloned bowl only — template nodes in Items.svg share the same IDs.
+        ["first", "second", "third"].forEach(portion => {
+            let food = Array.from(this.FoodBowl.querySelectorAll(".food." + this.flavor))
+                .find(el => (el.id || "").includes(portion));
+            if (food) {
+                food.style.display = "inherit";
+                food.style.opacity = 1;
+            }
+        });
+    }
+
+    get_bowl_food_pieces() {
+        let pieces = Array.from(this.FoodBowl.querySelectorAll(".food." + this.flavor));
+        const order = { first: 0, second: 1, third: 2 };
+        pieces.sort((a, b) => {
+            let ka = Object.keys(order).find(k => (a.id || "").includes(k));
+            let kb = Object.keys(order).find(k => (b.id || "").includes(k));
+            return (order[ka] ?? 9) - (order[kb] ?? 9);
+        });
+        return pieces;
+    }
+
+    // --- Backpack (solo) ---
+
+    spawn_backpack() {
+        const p = this.params;
+        this.Backpack = copy_scale_and_move_object_to_position(
+            document.getElementById("backpack"),
+            this.basics.ItemLayers.Plus1,
+            p.backpackX * this.basics.W,
+            p.backpackY * this.basics.H,
+            p.backpackScale
+        );
+        this.Backpack.id = "feed_trial_backpack";
+
+        let flaps = this.Backpack.getElementsByClassName("backpack_flap");
+        for (let i = 0; i < flaps.length; i++) {
+            flaps[i].style.display = "inherit";
+            if (flaps[i].id && flaps[i].id.includes("closed")) flaps[i].style.opacity = 1;
+            if (flaps[i].id && flaps[i].id.includes("open")) flaps[i].style.opacity = 0;
+        }
+    }
+
+    open_backpack() {
+        let flaps = this.Backpack.getElementsByClassName("backpack_flap");
+        for (let i = 0; i < flaps.length; i++) {
+            flaps[i].style.display = "inherit";
+            flaps[i].style.transition = "opacity 250ms ease-in-out";
+            if (flaps[i].id && flaps[i].id.includes("closed")) flaps[i].style.opacity = 0;
+            if (flaps[i].id && flaps[i].id.includes("open")) flaps[i].style.opacity = 1;
+        }
+        return wait(280);
+    }
+
+    get_column_slot_ys(count) {
+        const p = this.params;
+        let top = p.bagColumnTopY * this.basics.H;
+        let bottom = p.bagColumnBottomY * this.basics.H;
+        if (count <= 1) return [(top + bottom) / 2];
+        let ys = [];
+        for (let i = 0; i < count; i++) {
+            ys.push(top + (i / (count - 1)) * (bottom - top));
+        }
+        return ys;
+    }
+
+    get_backpack_column_x() {
+        return this.params.backpackX * this.basics.W;
+    }
+
+    async pop_bags_from_backpack(flavors) {
+        const p = this.params;
+        const x = this.get_backpack_column_x();
+        const startY = p.backpackY * this.basics.H - 40;
+        // First bag out = highest slot; last out = lowest.
+        let slotYs = this.get_column_slot_ys(flavors.length);
+
+        this.bags = [];
+        this.columnBags = [];
+
+        for (let i = 0; i < flavors.length; i++) {
+            let bag = this.create_foodbag(
+                flavors[i],
+                this.basics.ItemLayers.Plus2,
+                x,
+                startY,
+                p.bagScale
+            );
+            bag.style.opacity = 0;
+            let entry = {
+                elem: bag,
+                flavor: flavors[i],
+                inColumn: true,
+                homeX: x,
+                homeY: slotYs[i]
+            };
+            this.bags.push(entry);
+            this.columnBags.push(entry);
+
+            window.getComputedStyle(bag).opacity;
+            bag.style.transition = `opacity ${p.bagMoveTime}ms ease-out, transform ${p.bagMoveTime}ms ease-in-out`;
+            bag.style.opacity = 1;
+            await this.set_element_center(bag, x, slotYs[i], p.bagMoveTime);
+            await wait(p.bagPopStagger);
+        }
+    }
+
+    async respread_column_bags(animate = true) {
+        let active = this.columnBags.filter(b => b.inColumn && b.elem);
+        let slotYs = this.get_column_slot_ys(active.length);
+        let x = this.get_backpack_column_x();
+        let time = animate ? this.params.bagMoveTime : 0;
+
+        // Tear down drag scaffolding first so outlines aren't left behind when bags move.
+        active.forEach(b => {
+            if (b.dragController) {
+                b.dragController.destroy();
+                b.dragController = null;
+            }
+        });
+        this.dragControllers = this.dragControllers.filter(c =>
+            this.activeDragBag && this.activeDragBag.dragController === c
+        );
+
+        active.forEach((b, i) => {
+            b.homeX = x;
+            b.homeY = slotYs[i];
+        });
+        await Promise.all(active.map((b) => this.move_bag_to_home(b, time)));
+
+        // Recreate drag handles for bags still in the column (not the one being held).
+        active.forEach(bagInfo => {
+            if (!bagInfo.elem || !bagInfo.elem.parentNode) return;
+            let controller = MakeObjectDraggableObject(
+                this.basics.ItemLayers.Plus2,
+                this.basics.ItemLayers.Questions,
+                bagInfo.elem,
+                this.FoodBowl,
+                this.params.dropDistance,
+                (elem) => this.on_bag_dropped_on_bowl(elem),
+                {
+                    onStart: (elem) => this.on_bag_drag_start(elem),
+                    onMiss: (elem) => this.on_bag_drag_miss(elem)
+                }
+            );
+            this.dragControllers.push(controller);
+            bagInfo.dragController = controller;
+        });
+    }
+
+    destroy_all_drag_controllers() {
+        this.dragControllers.forEach(c => {
+            if (c && c.destroy) c.destroy();
+        });
+        this.dragControllers = [];
+        this.bags.forEach(b => { b.dragController = null; });
+    }
+
+    enable_bag_dragging() {
+        this.destroy_all_drag_controllers();
+
+        this.bags.forEach(bagInfo => {
+            if (!bagInfo.elem || !bagInfo.elem.parentNode) return;
+
+            let controller = MakeObjectDraggableObject(
+                this.basics.ItemLayers.Plus2,
+                this.basics.ItemLayers.Questions,
+                bagInfo.elem,
+                this.FoodBowl,
+                this.params.dropDistance,
+                (elem) => this.on_bag_dropped_on_bowl(elem),
+                {
+                    onStart: (elem) => this.on_bag_drag_start(elem),
+                    onMiss: (elem) => this.on_bag_drag_miss(elem)
+                }
+            );
+            this.dragControllers.push(controller);
+            bagInfo.dragController = controller;
+        });
+    }
+
+    find_bag_info(elem) {
+        return this.bags.find(b => b.elem === elem);
+    }
+
+    on_bag_drag_start(elem) {
+        let info = this.find_bag_info(elem);
+        if (!info) return;
+        this.activeDragBag = info;
+        info.inColumn = false;
+        this.respread_column_bags(true);
+    }
+
+    async on_bag_drag_miss(elem) {
+        let info = this.find_bag_info(elem);
+        if (!info || this.feedingComplete) return;
+
+        if (this.partner.is_present) {
+            await this.move_bag_to_home(info, 300);
+            this.enable_bag_dragging();
+            return;
+        }
+
+        info.inColumn = true;
+        if (!this.columnBags.includes(info)) this.columnBags.push(info);
+        await this.respread_column_bags(true);
+        this.enable_bag_dragging();
+    }
+
+    async on_bag_dropped_on_bowl(elem) {
+        if (this.feedingComplete) return;
+
+        let info = this.find_bag_info(elem);
+        if (!info) return;
+
+        if (info.flavor !== this.flavor) {
+            AudioCont.play_sound_effect("rejected");
+
+            if (this.partner.is_present) {
+                await this.move_bag_to_home(info, 300);
+                this.enable_bag_dragging();
+                return;
+            }
+
+            info.inColumn = true;
+            if (!this.columnBags.includes(info)) this.columnBags.push(info);
+            await this.respread_column_bags(true);
+            this.enable_bag_dragging();
+            return;
+        }
+
+        this.feedingComplete = true;
+        this.destroy_all_drag_controllers();
+        await this.handle_correct_feed(info);
+    }
+
+    async wait_for_backpack_open_click() {
+        return new Promise(resolve => {
+            Interface.Prompt.show_message("Click to open the backpack");
+            AudioCont.play_sound_effect("alert_minor");
+
+            this.Backpack.style.cursor = "pointer";
+            let outline = create_SVG_outline_of_group_ID(this.Backpack);
+            this.Backpack.parentNode.insertBefore(outline, this.Backpack);
+            outline.classList.add("focus_on_SVG_outline");
+
+            this.Backpack.onpointerdown = () => {
+                this.Backpack.onpointerdown = null;
+                this.Backpack.style.cursor = "auto";
+                outline.remove();
+                resolve();
+            };
+        });
+    }
+
+    async run_solo_backpack_sequence() {
+        this.spawn_backpack();
+        await this.wait_for_backpack_open_click();
+        await this.open_backpack();
+
+        let distractors = this.pick_distractor_flavors(2);
+        // Pop order: correct among the three, shuffled for column order but first out = highest slot.
+        let flavors = shuffleArray([this.flavor, ...distractors]);
+        await this.pop_bags_from_backpack(flavors);
+
+        Interface.Prompt.show_message("This Fennimal likes " + this.flavor);
+        await wait(750);
+        Interface.Prompt.show_message(
+            "Drag the " + this.flavor + " bag to " + this.FenObj.name + "'s bowl"
+        );
+        this.enable_bag_dragging();
+    }
+
+    // --- Partner handoff ---
+
+    async run_partner_handoff_sequence() {
+        const p = this.params;
+        Interface.Prompt.show_message(
+            this.partner.partnername + " has brought some food for " + this.FenObj.name
+        );
+        await wait(750);
+
+        let partnerCenter = getSVGInternalCenter(this.partner.PartnerBaseGroup);
+        let bagStartX = partnerCenter.x + p.partnerBagOffsetX;
+        let bagStartY = partnerCenter.y + p.partnerBagOffsetY;
+
+        let bag = this.create_foodbag(
+            this.flavor,
+            this.basics.ItemLayers.Plus2,
+            bagStartX,
+            bagStartY,
+            p.bagScale
+        );
+        bag.style.opacity = 0;
+        window.getComputedStyle(bag).opacity;
+        bag.style.transition = "opacity 250ms ease-out";
+        bag.style.opacity = 1;
+        await wait(250);
+
+        let entry = { elem: bag, flavor: this.flavor, inColumn: false };
+        this.bags = [entry];
+        this.columnBags = [];
+
+        let bowlCenter = getSVGInternalCenter(this.FoodBowl);
+        let bagTargetX = bowlCenter.x + 140;
+        let bagTargetY = bagStartY;
+        let partnerDx = bagTargetX - bagStartX;
+
+        // Move partner + bag left together.
+        this.partner.PartnerTranslateGroup.style.transition = "transform 700ms ease-in-out";
+        this.partner.PartnerTranslateGroup.style.transform =
+            (this.partner.PartnerTranslateGroup.style.transform || "") + ` translateX(${partnerDx}px)`;
+        await this.set_element_center(bag, bagTargetX, bagTargetY, 700);
+
+        // Bag lifts; partner returns home.
+        let liftY = bagTargetY + p.partnerHandoffLift;
+        await this.set_element_center(bag, bagTargetX, liftY, 300);
+        entry.homeX = bagTargetX;
+        entry.homeY = liftY;
+        await this.partner.return_to_start();
+
+        Interface.Prompt.show_message(
+            "Drag the " + this.flavor + " bag to " + this.FenObj.name + "'s bowl"
+        );
+        this.enable_bag_dragging();
+    }
+
+    // --- Correct feed aftermath ---
+
+    async fade_out_bags_and_backpack() {
+        let fadeTargets = this.bags.map(b => b.elem).filter(Boolean);
+        if (this.Backpack) fadeTargets.push(this.Backpack);
+
+        fadeTargets.forEach(el => {
+            el.style.transition = "opacity 350ms ease-out";
+            el.style.opacity = 0;
+            el.style.pointerEvents = "none";
+        });
+        await wait(350);
+        fadeTargets.forEach(el => el.remove());
+        this.bags = [];
+        this.Backpack = null;
+    }
+
+    async slide_bowl_to_mouth() {
+        let mouth = getSVGInternalCenter(this.basics.TargetPoints.Fennimal_mouth);
+        let bowlCenter = getSVGInternalCenter(this.FoodBowl);
+        // Align bowl center X with mouth; keep roughly same Y (grounded).
+        await this.set_element_center(this.FoodBowl, mouth.x, bowlCenter.y, 500);
+        await wait(200);
+    }
+
+    async animate_eating() {
+        // Food pieces live inside a scaled bowl; reparent into an unscaled layer but keep
+        // bowlScale so size matches what was visible in the bowl.
+        let mouth = getSVGInternalCenter(this.basics.TargetPoints.Fennimal_mouth);
+        let pieces = this.get_bowl_food_pieces();
+        let layer = this.basics.ItemLayers.Plus2;
+        let scale = this.params.bowlScale;
+
+        Interface.Prompt.show_message(this.FenObj.name + " loves " + this.flavor + "!");
+
+        for (let i = 0; i < pieces.length; i++) {
+            let food = pieces[i];
+            let start = getSVGInternalCenter(food);
+
+            food.removeAttribute("transform");
+            food.style.transition = "none";
+            food.style.transform = "";
+            food.style.opacity = 1;
+            food.style.display = "inherit";
+
+            let zeroGroup = create_SVG_group(0, 0, "zero_translate_group");
+            let scaleGroup = create_SVG_group(0, 0, "scale_group");
+            let mainPos = create_SVG_group(0, 0, "main_translate_group");
+            zeroGroup.appendChild(food);
+            scaleGroup.appendChild(zeroGroup);
+            mainPos.appendChild(scaleGroup);
+            layer.appendChild(mainPos);
+
+            let baseCenter = getSVGInternalCenter(zeroGroup);
+            zeroGroup.style.transform = `translate(${-baseCenter.x}px, ${-baseCenter.y}px)`;
+            scaleGroup.style.transform = `scale(${scale})`;
+            mainPos.style.transition = "none";
+            mainPos.style.transform = `translate(${start.x}px, ${start.y}px)`;
+
+            window.getComputedStyle(mainPos).transform;
+            mainPos.style.transition = `transform ${this.params.eatMoveTime}ms ease-in-out`;
+            mainPos.style.transform = `translate(${mouth.x}px, ${mouth.y}px)`;
+            await wait(this.params.eatMoveTime);
+
+            food.style.transition = "opacity 150ms ease-out";
+            food.style.opacity = 0;
+            AudioCont.play_sound_effect("chew");
+
+            for (let h = 0; h < 2; h++) {
+                setTimeout(() => {
+                    this.basics.spawn_happy_heart(
+                        mouth.x + (Math.random() - 0.5) * 40,
+                        mouth.y - 20,
+                        layer
+                    );
+                }, h * 80);
+            }
+            await wait(180);
+            mainPos.style.display = "none";
+        }
+    }
+
+    async handle_correct_feed(correctBagInfo) {
+        AudioCont.play_sound_effect("success");
+        await this.fade_out_bags_and_backpack();
+
+        this.reveal_bowl_food();
+        await wait(300);
+        await this.slide_bowl_to_mouth();
+        await this.animate_eating();
+
+        await this.basics.perform_success_celebration(null);
+        await wait(750);
+
+        Interface.Prompt.show_message(this.FenObj.name + " has wandered off...");
+        let fenCenter = getSVGInternalCenter(this.basics.Fennimal);
+        let dxOffscreen = -(fenCenter.x + 300);
+        await this.basics.Fennimal_move_relative(dxOffscreen, 0, 750);
+        await wait(500);
+        this.returnfunc();
+    }
+
+    // --- Orchestrator ---
+
+    async start_sequence() {
+        if (!this.flavor) {
+            console.error("FeedFennimalTrialController: FenObj has no food_preference");
+            this.flavor = this.get_all_food_flavors()[0];
+        }
+
+        this.basics.create_svg_sublayers();
+        if (this.partner.is_present) {
+            this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        }
+        await this.basics.create_background_mask(true, 500);
+
+        const p = this.params;
+        await this.basics.create_and_appear_Fennimal(
+            this.basics.ItemLayers.Main,
+            p.fennimalX * this.basics.W,
+            p.fennimalY * this.basics.H,
+            p.fennimalScale,
+            250
+        );
+        await this.spawn_empty_bowl();
+
+        Interface.Prompt.show_message(
+            this.FenObj.name + " is hungry. Click to cheer " + this.FenObj.name + " up."
+        );
+        AudioCont.play_sound_effect("sad");
+        await this.basics.trigger_comfort_checkin();
+        await wait(400);
+
+        if (this.partner.is_present) {
+            await this.run_partner_handoff_sequence();
+        } else {
+            await this.run_solo_backpack_sequence();
+        }
+    }
+
+    clean_up() {
+        this.destroy_all_drag_controllers();
+        this.bags.forEach(b => { if (b.elem) b.elem.remove(); });
+        if (this.Backpack) this.Backpack.remove();
+        if (this.FoodBowl) this.FoodBowl.remove();
+        this.basics.clean_up();
+        if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
+    }
+}
+
+// Bind Fennimal ↔ toybox: optional ask_Fennimal → joint turn-based cleaning → handoff → photo → walk off.
+class JointBoxCleaningTrialController {
+    constructor(FenObj, partner_is_present, returnfunc) {
+        this.FenObj = FenObj;
+        this.returnfunc = returnfunc;
+        this.params = GenParam.JointBoxCleaning;
+
+        this.basics = new BasicElementsModule(FenObj);
+        this.box = new BoxModule(FenObj);
+        this.partner = new PartnerModule(partner_is_present);
+        this.dirt = new DirtModule();
+        this.dust = new DustModule();
+        this.foliage = new FoliageModule(FenObj, partner_is_present);
+        this.foliage.foliage_base_health = this.params.cleaningRounds;
+
+        this.ShearsGroup = null;
+        this.fenHome = null;
+        this.boxCenter = null;
+        this.dragController = null;
+        this.photoSession = null;
+    }
+
+    async start_sequence() {
+        const p = this.params;
+        this.basics.create_svg_sublayers();
+        if (this.partner.is_present) {
+            this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        }
+        await this.basics.create_background_mask(true, 500);
+
+        if (this.FenObj.ask_Fennimal) {
+            // Box first (no Fennimal) → identity quiz → Fennimal appears
+            await this.spawn_closed_box({ announce: true });
+            await this.run_ask_fennimal_question();
+            await this.appear_fennimal_for_trial();
+            await this.add_dirt_to_existing_box();
+        } else {
+            // Legacy opening: Fennimal first, then dirty box (no ask_box)
+            await this.basics.create_and_appear_Fennimal(
+                this.basics.ItemLayers.Main,
+                p.fennimalX * this.basics.W,
+                p.fennimalY * this.basics.H,
+                p.fennimalScale,
+                250
+            );
+            AudioCont.play_sound_effect("alert");
+            Interface.Prompt.show_message("This Fennimal is called " + this.FenObj.name);
+            await wait(900);
+            await this.spawn_dirty_scene();
+        }
+
+        // Fennimal walks left of box (behind / around on x)
+        await this.move_fennimal_beside_box();
+
+        // Comfort
+        Interface.Prompt.show_message(
+            this.FenObj.name + " is sad that their box is so dirty. Click on " + this.FenObj.name + " to comfort them!"
+        );
+        await this.basics.trigger_comfort_checkin();
+
+        // Introduce collaborators, then turn-based cleaning
+        await this.introduce_cleaning_tools();
+        await this.run_cleaning_rounds();
+
+        // Clean reveal + encoding pause
+        await this.play_clean_reveal();
+
+        // Hand box to Fennimal (x-axis drag); box stays on screen at end
+        await this.run_box_handoff();
+
+        await wait(500);
+        this.returnfunc();
+    }
+
+    async spawn_closed_box({ announce = false } = {}) {
+        const p = this.params;
+        let bx = p.boxX * this.basics.W;
+        let by = p.boxY * this.basics.H;
+
+        await this.box.create_and_appear_box(
+            this.basics.ItemLayers.Main,
+            this.basics.ItemLayers.Plus2,
+            bx,
+            by,
+            p.boxScale,
+            200
+        );
+        if (this.box.BoxBase) {
+            this.box.BoxBase.remove();
+            this.box.BoxBase = null;
+        }
+        this.boxCenter = getSVGInternalCenter(this.box.BoxTop);
+
+        if (announce) {
+            Interface.Prompt.show_message("Look at this " + this.box.boxname + "!");
+            await wait(900);
+        }
+    }
+
+    async run_ask_fennimal_question() {
+        this.FenObj.fennimal_errors_made = [];
+
+        let optionObjs = Array.isArray(this.FenObj.fennimals_asked_objects)
+            ? this.FenObj.fennimals_asked_objects.map((f) => JSON.parse(JSON.stringify(f)))
+            : [];
+
+        // Ensure the correct Fennimal is always among the choices
+        if (!optionObjs.some((f) => f.id === this.FenObj.id)) {
+            optionObjs.push(JSON.parse(JSON.stringify(this.FenObj)));
+            console.warn("ask_Fennimal: trial Fennimal was missing from fennimals_asked; added it.");
+        }
+
+        if (optionObjs.length === 0) {
+            console.warn("ask_Fennimal: no fennimals_asked options; skipping question.");
+            return;
+        }
+
+        let bar = new FennimalChoiceBar(
+            this.basics.ItemLayers.Plus2,
+            this.basics.W,
+            this.basics.H
+        );
+
+        while (true) {
+            Interface.Prompt.show_message("Which Fennimal keeps their toy in this box?");
+            let selected = await bar.waitForSelection(shuffleArray([...optionObjs]));
+            if (selected === this.FenObj.id) {
+                AudioCont.play_sound_effect("positive");
+                await bar.hide();
+                let burstCenter = this.boxCenter || getSVGInternalCenter(this.box.BoxTop);
+                await spawn_confetti_burst(
+                    this.basics.ItemLayers.Plus2,
+                    burstCenter.x,
+                    burstCenter.y,
+                    { awaitPopMs: 900 }
+                );
+                return;
+            }
+            AudioCont.play_sound_effect("rejected");
+            this.FenObj.fennimal_errors_made.push(selected);
+            Interface.Prompt.show_message("Oops, you picked the wrong Fennimal!");
+            await bar.hide();
+            await wait(1000);
+        }
+    }
+
+    async appear_fennimal_for_trial() {
+        const p = this.params;
+        await this.basics.create_and_appear_Fennimal(
+            this.basics.ItemLayers.Main,
+            p.fennimalX * this.basics.W,
+            p.fennimalY * this.basics.H,
+            p.fennimalScale,
+            250
+        );
+        AudioCont.play_sound_effect("alert");
+        Interface.Prompt.show_message("This Fennimal is called " + this.FenObj.name);
+        await wait(900);
+    }
+
+    async add_dirt_to_existing_box() {
+        const p = this.params;
+        this.boxCenter = getSVGInternalCenter(this.box.BoxTop);
+
+        this.dirt.spawn_dirt_on_element(this.box.BoxTop, this.basics.ItemLayers.Plus2, p.dirtSpots);
+        this.foliage.spawn_one_plant_left_of(
+            this.basics.ItemLayers,
+            this.boxCenter.x,
+            this.boxCenter.y,
+            p.foliageOffsetX,
+            p.foliageOffsetY,
+            p.foliageSize
+        );
+        this.dust.apply_dust_filter(null, this.box.BoxTop);
+
+        Interface.Prompt.show_message("Oh no, the " + this.box.boxname + " is dirty!");
+        await wait(2000);
+    }
+
+    async spawn_dirty_scene() {
+        await this.spawn_closed_box({ announce: false });
+        await this.add_dirt_to_existing_box();
+    }
+
+    async move_fennimal_beside_box() {
+        const p = this.params;
+        let fen = getSVGInternalCenter(this.basics.Fennimal);
+        let restOffset = p.fennimalRestOffsetX != null ? p.fennimalRestOffsetX : -150;
+        let targetX = this.boxCenter.x + restOffset;
+        targetX = Math.max(120, targetX);
+        let dx = targetX - fen.x;
+        // Walk past then settle at rest (further right / closer to the box)
+        await this.basics.Fennimal_move_relative(dx * 0.55, 0, 400);
+        await this.basics.Fennimal_move_relative(dx * 0.45, 0, 400);
+        this.fenHome = getSVGInternalCenter(this.basics.Fennimal);
+    }
+
+    async introduce_cleaning_tools() {
+        const p = this.params;
+        Interface.Prompt.show_message("Let's clean the box together!");
+        await wait(2000);
+
+        // Bellows (left of box, raised) — NPC operated, no player click outline
+        this.dust.spawn_bellows(
+            this.basics.ItemLayers.Plus2,
+            this.boxCenter.x,
+            this.boxCenter.y,
+            {
+                offsetX: p.bellowsOffsetX,
+                offsetY: p.bellowsOffsetY,
+                puffAmount: p.dustPerPuff,
+                playerEnabled: false,
+                showOutline: false
+            }
+        );
+        this.dust._on_dust_clean_callback = null;
+        await this.flash_attention(this.dust.BellowsTranslateGroup);
+
+        if (this.partner.is_present) {
+            Interface.Prompt.show_message(
+                this.partner.partnername + " will clean the dust off of the " + this.box.boxname + "!"
+            );
+            // Stay in the corner while idle; only approach during their turn
+            await this.partner.return_to_start();
+            await wait(1000);
+        }
+
+        // Fennimal + shears at the cleaning rest position
+        Interface.Prompt.show_message(
+            this.FenObj.name + " will cut down the plants!"
+        );
+        this.spawn_garden_shears();
+        await this.flash_attention(this.ShearsGroup);
+        await wait(800);
+
+        // Sponge between box and partner corner
+        let spongeX = p.spongeActiveX * this.basics.W;
+        let spongeY = p.spongeActiveY * this.basics.H;
+        this.dirt.spawn_and_enable_sponge(
+            this.basics.ItemLayers.Plus2,
+            spongeX,
+            spongeY,
+            () => {}
+        );
+        this.dirt._spongeActive = false;
+        this.dirt.SpongeTranslateGroup.onpointerdown = null;
+        await this.flash_attention(this.dirt.SpongeTranslateGroup);
+        Interface.Prompt.show_message(
+            "You have to wash away the dirt from the " + this.box.boxname + "."
+        );
+        await wait(1800);
+
+        Interface.Prompt.show_message("Let's clean the " + this.box.boxname + " together!");
+        await wait(1200);
+    }
+
+    async flash_attention(elem, popMs = 400) {
+        if (!elem) return;
+        let baseTransform = elem.style.transform || "";
+        elem.style.transition =
+            `transform ${popMs}ms cubic-bezier(0.175, 0.885, 0.32, 1.275), filter ${Math.round(popMs * 0.75)}ms ease-out`;
+        elem.style.filter = "brightness(1.5) drop-shadow(0px 0px 25px gold)";
+        elem.style.transform = baseTransform + " scale(1.18)";
+        await wait(popMs);
+        elem.style.transition =
+            `transform ${popMs}ms ease-in-out, filter ${Math.round(popMs * 1.4)}ms ease-in`;
+        elem.style.transform = baseTransform;
+        elem.style.filter = "none";
+        await wait(popMs);
+    }
+
+    spawn_garden_shears() {
+        const p = this.params;
+        let template = document.getElementById("gardenshears");
+        let fen = getSVGInternalCenter(
+            this.basics.TargetPoints.Fennimal_body_center || this.basics.Fennimal
+        );
+        let x = fen.x + p.shearsOffsetX;
+        let y = fen.y + p.shearsOffsetY;
+
+        this.ShearsGroup = create_SVG_group(0, 0);
+        this.basics.ItemLayers.Plus2.appendChild(this.ShearsGroup);
+
+        if (!template) {
+            console.warn("gardenshears SVG missing; shears visual skipped");
+            this._shearsOpen = null;
+            this._shearsClosed = null;
+            return;
+        }
+
+        let shears = template.cloneNode(true);
+        shears.style.display = "inherit";
+        shears.id = "active_garden_shears";
+        shears.classList.remove("invisible_element");
+        this.ShearsGroup.appendChild(shears);
+
+        this._shearsOpen = shears.querySelector(".garden_shears_open");
+        this._shearsClosed = shears.querySelector(".garden_shears_closed");
+
+        // Baseline: open visible, closed hidden
+        if (this._shearsOpen) {
+            this._shearsOpen.style.opacity = 1;
+            this._shearsOpen.style.pointerEvents = "none";
+        }
+        if (this._shearsClosed) {
+            this._shearsClosed.classList.remove("invisible_element");
+            this._shearsClosed.style.opacity = 0;
+            this._shearsClosed.style.pointerEvents = "none";
+        }
+
+        let bbox = shears.getBBox();
+        let cx = bbox.x + bbox.width / 2;
+        let cy = bbox.y + bbox.height / 2;
+        let scale = p.shearsScale != null ? p.shearsScale : 2.2;
+        shears.style.transformOrigin = `${cx}px ${cy}px`;
+        shears.style.transform = `translate(${x - cx}px, ${y - cy}px) scale(${scale})`;
+        this._shearsElem = shears;
+
+        this.ShearsGroup.style.opacity = 0;
+        window.getComputedStyle(this.ShearsGroup).opacity;
+        this.ShearsGroup.style.transition = "opacity 300ms ease-out";
+        this.ShearsGroup.style.opacity = 1;
+    }
+
+    async animate_shears_snap() {
+        if (!this._shearsOpen || !this._shearsClosed) return;
+
+        const p = this.params;
+        let closeMs = p.shearsCloseMs != null ? p.shearsCloseMs : 100;
+        let openMs = p.shearsOpenMs != null ? p.shearsOpenMs : 180;
+
+        this._shearsOpen.style.transition = `opacity ${closeMs}ms ease-in`;
+        this._shearsClosed.style.transition = `opacity ${closeMs}ms ease-in`;
+        this._shearsOpen.style.opacity = 0;
+        this._shearsClosed.style.opacity = 1;
+        await wait(closeMs);
+
+        this._shearsOpen.style.transition = `opacity ${openMs}ms ease-out`;
+        this._shearsClosed.style.transition = `opacity ${openMs}ms ease-out`;
+        this._shearsOpen.style.opacity = 1;
+        this._shearsClosed.style.opacity = 0;
+        await wait(openMs);
+    }
+
+    async run_cleaning_rounds() {
+        const p = this.params;
+        let rounds = p.cleaningRounds;
+        let totalHealth = this.dirt.get_initial_total_health();
+        let quota = totalHealth / rounds;
+        let floorY = p.spongeFloorY * this.basics.H;
+
+        for (let r = 0; r < rounds; r++) {
+            // Player sponge turn
+            Interface.Prompt.show_message(
+                "Please clean the " + this.box.boxname + " with the sponge"
+            );
+            await this.dirt.raise_sponge_to_active();
+            await this.dirt.start_scrub_turn(quota);
+            await this.dirt.drop_sponge_to_floor(floorY);
+            Interface.Prompt.hide();
+            await wait(200);
+
+            if (this.partner.is_present) {
+                // Partner → bellows, then Fennimal → shears
+                await this.partner_bellows_turn();
+                await this.fennimal_shears_turn();
+            } else {
+                // Solo: Fennimal shears, then Fennimal bellows
+                await this.fennimal_shears_turn();
+                await this.fennimal_bellows_turn();
+            }
+        }
+    }
+
+    async partner_bellows_turn() {
+        Interface.Prompt.hide();
+        let bellows = this.dust.BellowsTranslateGroup;
+        let partnerCenter = getSVGInternalCenter(this.partner.PartnerTranslateGroup);
+        let bellowsCenter = bellows
+            ? getSVGInternalCenter(bellows)
+            : { x: this.boxCenter.x - 200, y: this.boxCenter.y };
+        // Approach bellows from the corner, puff, then return home
+        let approachX = bellowsCenter.x + 140;
+        let dx = approachX - partnerCenter.x;
+        this.partner.PartnerTranslateGroup.style.transition = "transform 450ms ease-in-out";
+        this.partner.PartnerTranslateGroup.style.transform =
+            (this.partner.PartnerTranslateGroup.style.transform || "") + ` translateX(${dx}px)`;
+        await wait(450);
+        await this.dust.puff({ amount: this.params.dustPerPuff, waitForRefill: true });
+        await this.partner.return_to_start();
+        await wait(200);
+    }
+
+    async move_fennimal_and_shears(dx, time) {
+        this.basics.Fennimal.style.transition = "all " + time + "ms ease-in-out";
+        this.basics.Fennimal.style.transform += "translate(" + dx + "px, 0px)";
+        if (this.ShearsGroup) {
+            this.ShearsGroup.style.transition = "transform " + time + "ms ease-in-out";
+            this.ShearsGroup.style.transform =
+                (this.ShearsGroup.style.transform || "") + " translate(" + dx + "px, 0px)";
+        }
+        await wait(time);
+    }
+
+    async fennimal_shears_turn() {
+        Interface.Prompt.hide();
+        let fen = getSVGInternalCenter(this.basics.Fennimal);
+        let plant = this.foliage.get_target_tree();
+        if (plant) {
+            let plantPos = plant.get_center_pos_on_screen();
+            let dx = (plantPos.x - 80) - fen.x;
+            await this.move_fennimal_and_shears(dx, 350);
+        }
+        await this.animate_shears_snap();
+        this.foliage.apply_one_cut_hit();
+        await wait(200);
+        // Return toward rest position together
+        let now = getSVGInternalCenter(this.basics.Fennimal);
+        let homeX = this.fenHome ? this.fenHome.x : now.x;
+        await this.move_fennimal_and_shears(homeX - now.x, 350);
+    }
+
+    async fennimal_bellows_turn() {
+        Interface.Prompt.hide();
+        // Walk behind box toward bellows, puff, return — shears travel with Fennimal
+        let fen = getSVGInternalCenter(this.basics.Fennimal);
+        let bellows = this.dust.BellowsTranslateGroup;
+        let bx = bellows ? getSVGInternalCenter(bellows).x : this.boxCenter.x - 200;
+        let dx = (bx + 40) - fen.x;
+        await this.move_fennimal_and_shears(dx, 450);
+        await this.dust.puff({ amount: this.params.dustPerPuff, waitForRefill: true });
+        let now = getSVGInternalCenter(this.basics.Fennimal);
+        let homeX = this.fenHome ? this.fenHome.x : now.x;
+        await this.move_fennimal_and_shears(homeX - now.x, 450);
+    }
+
+    async play_clean_reveal() {
+        const p = this.params;
+
+        // Fade cleaning tools / foliage remnants
+        await Promise.all([
+            this.dirt.fade_out_sponge(400),
+            this.dust.fade_out_bellows(400),
+            this.fade_out_shears(400),
+            this.foliage.fade_out_all(400)
+        ]);
+
+        // Clear any leftover dust filter / dirt
+        if (this.box.BoxBase) this.box.BoxBase.style.filter = "none";
+        if (this.box.BoxTop) this.box.BoxTop.style.filter = "none";
+        this.dirt.Spots.forEach(s => {
+            if (s.element && s.element.parentNode) s.element.remove();
+        });
+        this.dirt.Spots = [];
+        this.dirt.dirt_remaining = 0;
+
+        // Return actors
+        if (this.partner.is_present) {
+            await this.partner.return_to_start();
+        }
+        let fen = getSVGInternalCenter(this.basics.Fennimal);
+        let restOffset = p.fennimalRestOffsetX != null ? p.fennimalRestOffsetX : -150;
+        let leftX = Math.max(120, this.boxCenter.x + restOffset);
+        await this.basics.Fennimal_move_relative(leftX - fen.x, 0, 400);
+        this.fenHome = getSVGInternalCenter(this.basics.Fennimal);
+
+        // Glow + confetti + encoding statement
+        let baseT = this.box.BoxTop.style.transform || "";
+        this.box.BoxTop.style.transition = "transform 350ms ease-out, filter 350ms ease-out";
+        this.box.BoxTop.style.filter = "brightness(1.25) drop-shadow(0px 0px 18px gold)";
+        this.box.BoxTop.style.transform = baseT + " scale(1.06)";
+
+        AudioCont.play_sound_effect("positive");
+        Interface.Prompt.show_message("Yay! The " + this.box.boxname + " is all clean again!");
+        let c = getSVGInternalCenter(this.box.BoxTop);
+        spawn_confetti_burst(this.basics.ItemLayers.Plus2, c.x, c.y, { awaitPopMs: 700 });
+        await wait(900);
+
+        this.box.BoxTop.style.transform = baseT;
+        this.box.BoxTop.style.filter = "none";
+
+        Interface.Prompt.show_message(
+            "This clean " + this.box.boxname + " belongs to " + this.FenObj.name + "!"
+        );
+        await wait(p.encodingPauseMs);
+    }
+
+    async fade_out_shears(ms = 400) {
+        if (!this.ShearsGroup) return;
+        this.ShearsGroup.style.transition = `opacity ${ms}ms ease-in`;
+        this.ShearsGroup.style.opacity = 0;
+        await wait(ms);
+        this.ShearsGroup.remove();
+        this.ShearsGroup = null;
+        this._shearsElem = null;
+        this._shearsOpen = null;
+        this._shearsClosed = null;
+    }
+
+    async run_box_handoff() {
+        const p = this.params;
+        Interface.Prompt.show_message(
+            "Hand the clean " + this.box.boxname + " to " + this.FenObj.name + "."
+        );
+        AudioCont.play_sound_effect("alert_minor");
+
+        // Pulse Fennimal as drop target
+        this.basics.Fennimal.style.transition = "filter 400ms ease-in-out";
+        this.basics.Fennimal.style.filter = "drop-shadow(0px 0px 14px gold)";
+
+        let fenTarget = this.basics.TargetPoints.Fennimal_body_center || this.basics.Fennimal;
+
+        await new Promise(resolve => {
+            this.dragController = MakeObjectDraggableObject(
+                this.basics.ItemLayers.Plus2,
+                this.basics.ItemLayers.Questions,
+                this.box.BoxTop,
+                fenTarget,
+                p.dropDistance,
+                (elem) => {
+                    this.basics.Fennimal.style.filter = "none";
+                    resolve(elem);
+                },
+                {
+                    axis: "x",
+                    onMiss: () => {
+                        if (this.dragController) this.dragController.enable();
+                    }
+                }
+            );
+        });
+
+        // Snap / accept: align box beside Fennimal
+        let fen = getSVGInternalCenter(this.basics.Fennimal);
+        let boxNow = getSVGInternalCenter(this.box.BoxTop);
+        let dx = (fen.x + 160) - boxNow.x;
+        this.box.BoxTop.style.transition = "transform 400ms ease-in-out";
+        this.box.BoxTop.style.transform += ` translate(${dx}px, 0px)`;
+        await wait(450);
+
+        // Joint move to center
+        let midX = 0.5 * this.basics.W;
+        fen = getSVGInternalCenter(this.basics.Fennimal);
+        boxNow = getSVGInternalCenter(this.box.BoxTop);
+        let fenDx = midX - 140 - fen.x;
+        let boxDx = midX + 40 - boxNow.x;
+        this.basics.Fennimal_move_relative(fenDx, 0, 600);
+        this.box.BoxTop.style.transition = "transform 600ms ease-in-out";
+        this.box.BoxTop.style.transform += ` translate(${boxDx}px, 0px)`;
+        await wait(650);
+
+        // Brief paired tableau, then celebrate; photo while Fennimal is still present; then walk off
+        await wait(500);
+        await this.basics.perform_success_celebration(null);
+        await wait(400);
+
+        await this.run_end_photo();
+
+        Interface.Prompt.show_message(this.FenObj.name + " has wandered off...");
+        fen = getSVGInternalCenter(this.basics.Fennimal);
+        await this.basics.Fennimal_move_relative(-(fen.x + 300), 0, 750);
+        await wait(500);
+    }
+
+    async pose_fennimal_behind_box_for_photo() {
+        this.basics.freeze_character_pose();
+        this.boxCenter = getSVGInternalCenter(this.box.BoxTop);
+        let fen = getSVGInternalCenter(this.basics.Fennimal);
+        // Same y-level; only slide behind the box on x.
+        let targetX = this.boxCenter.x - 90;
+        await this.basics.Fennimal_move_relative(targetX - fen.x, 0, 500);
+        // Re-snap in case a late animation frame ran during the slide.
+        this.basics.freeze_character_pose();
+        this.fenHome = getSVGInternalCenter(this.basics.Fennimal);
+    }
+
+    create_joint_cleaning_polaroid_contents(groupScale, targetCircle) {
+        let template = document.getElementById("toybox_" + this.FenObj.toybox);
+        if (!template) return null;
+
+        let contents = create_SVG_group(0, 0);
+        groupScale.appendChild(contents);
+
+        // Slight downward bias so the Fennimal+box pair sits in the visual center of the frame.
+        let pairCy = targetCircle.y + 35;
+
+        // Fennimal behind the box — larger so the pair fills more of the frame.
+        let fenIcon = create_Fennimal_SVG_object(this.FenObj, 0.55, false);
+        fenIcon.querySelectorAll(".prep_element_hidden").forEach((el) => el.remove());
+        fenIcon.style.display = "inherit";
+        // Neutral / frozen pose in the polaroid (no breathing, gaze, or body flair).
+        let fenScaleGroup = fenIcon.getElementsByClassName("Fennimal_scale_group")[0];
+        let fenBody = fenIcon.getElementsByClassName("Fennimal_body")[0];
+        let fenHead = fenIcon.getElementsByClassName("Fennimal_head")[0];
+        if (fenBody) fenBody.style.transform = "translate(0px, 0px) scale(1, 1)";
+        if (fenHead) fenHead.style.transform = "translate(0px, 0px) rotate(0deg)";
+        fenIcon.querySelectorAll(".eye_gaze").forEach((eye) => {
+            eye.style.transform = "translate(0px, 0px) scale(1.15)";
+        });
+        freeze_fennimal_decorative_animations(fenIcon);
+        contents.appendChild(fenIcon);
+
+        let fenBox = fenIcon.getBBox();
+        let bgRect = groupScale.getElementsByTagName("rect")[0];
+        let frameBox = bgRect ? bgRect.getBBox() : { width: 500, height: 600 };
+        let fenScale = Math.min(
+            (frameBox.width * 0.88) / Math.max(fenBox.width, 1),
+            (frameBox.height * 0.78) / Math.max(fenBox.height, 1)
+        );
+        let fenCx = fenBox.x + fenBox.width / 2;
+        let fenCy = fenBox.y + fenBox.height / 2;
+        // Keep scale-group identity; place via outer transform only.
+        if (fenScaleGroup) fenScaleGroup.style.transform = "";
+        fenIcon.setAttribute(
+            "transform",
+            `translate(${targetCircle.x}, ${pairCy - 70}) scale(${fenScale}) translate(${-fenCx}, ${-fenCy})`
+        );
+
+        let boxIcon = copy_scale_and_move_object_to_position(
+            template,
+            contents,
+            targetCircle.x,
+            pairCy + 70,
+            1
+        );
+        let rawBox = template.getBBox();
+        let scaleFactorW = frameBox.width / Math.max(rawBox.width, 1);
+        let scaleFactorH = (0.62 * frameBox.height) / Math.max(rawBox.height, 1);
+        let minScale = Math.min(scaleFactorW, scaleFactorH) * 0.82;
+        let scaleGroup = boxIcon.getElementsByClassName("scale_group")[0];
+        if (scaleGroup) {
+            scaleGroup.style.transform = `scale(${minScale})`;
+        }
+
+        return contents;
+    }
+
+    async run_end_photo() {
+        await this.pose_fennimal_behind_box_for_photo();
+
+        this.photoSession = new PhotoTrialController(
+            this.FenObj,
+            this.partner.is_present,
+            () => {},
+            "toybox"
+        );
+        // Reuse the live scene (do not rebuild basics/box/partner).
+        this.photoSession.basics = this.basics;
+        this.photoSession.box = this.box;
+        this.photoSession.partner = this.partner;
+
+        await this.photoSession.run_embedded_capture_loop({
+            photoTargetElements: [this.box.BoxTop].filter(Boolean),
+            polaroidContentsFn: (groupScale, targetCircle) =>
+                this.create_joint_cleaning_polaroid_contents(groupScale, targetCircle),
+            targetLabel: this.box.boxname
+        });
+
+        this.photoSession = null;
+    }
+
+    clean_up() {
+        if (this.photoSession) {
+            this.photoSession.clean_up_photo_ui();
+            this.photoSession = null;
+        }
+        if (this.dragController && this.dragController.destroy) this.dragController.destroy();
+        this.dirt.clean_up();
+        this.dust.clean_up();
+        this.foliage.clean_up();
+        if (this.ShearsGroup) this.ShearsGroup.remove();
+        this.box.clean_up();
+        this.basics.clean_up();
+        if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
+    }
+}
+
 class TrialFactory {
     // The "static" keyword lets us call this function directly on the class
     static build(interaction_type, FenObj, partner_is_present, returnfunc) {
@@ -5226,6 +7956,21 @@ class TrialFactory {
                 // Your standard box interaction from earlier
                 return new GeneralTrialController(FenObj, partner_is_present, returnfunc);
 
+            case "Fennimal_toy":
+                return new FennimalToyTrialController(FenObj, partner_is_present, returnfunc);
+
+            case "toy_to_box":
+                return new ToyToBoxTrialController(FenObj, partner_is_present, returnfunc);
+
+            case "photo_box":
+                return new PhotoTrialController(FenObj, partner_is_present, returnfunc, "toybox");
+
+            case "feed_Fennimal":
+                return new FeedFennimalTrialController(FenObj, partner_is_present, returnfunc);
+
+            case "joint_box_cleaning":
+                return new JointBoxCleaningTrialController(FenObj, partner_is_present, returnfunc);
+
             case "broken_toy":
                 // Your standard box interaction from earlier
                 return new BrokenToyTrialController(FenObj, partner_is_present, returnfunc);
@@ -5243,7 +7988,7 @@ class TrialFactory {
     }
 }
 
-class PartnerBeliefTaskController {
+class PartnerBeliefMultipleController {
 
     constructor(ParentLayer, TaskObj, partner_is_present, returnfunc) {
         this.ParentLayer = ParentLayer;
@@ -5501,39 +8246,7 @@ class PartnerBeliefTaskController {
     }
 
     make_toy_static(SVG_Elem, toy_id) {
-        let hidden_elements = Array.from(SVG_Elem.getElementsByClassName("prep_element_hidden"));
-        hidden_elements.forEach(el => el.style.display = "none");
-
-        if (toy_id === "plane") {
-            let prop_alt = SVG_Elem.querySelector(".prop_alt");
-            let prop_spinning = SVG_Elem.querySelector(".prop_spinning");
-            if (prop_alt) prop_alt.style.display = "none";
-            if (prop_spinning) prop_spinning.style.display = "none";
-            let prop_base = SVG_Elem.querySelector(".prop_base");
-            if (prop_base) { prop_base.style.opacity = 1; prop_base.style.display = "inherit"; }
-        } else if (toy_id === "globe") {
-            let arcs = Array.from(SVG_Elem.getElementsByClassName("arc"));
-            arcs.forEach(a => a.style.display = "none");
-            let lights = Array.from(SVG_Elem.querySelectorAll(".light_1, .light_2, .light_3, .light_4"));
-            lights.forEach(l => l.style.fill = "#555555");
-        } else if (toy_id === "robot") {
-            let eye_lights = Array.from(SVG_Elem.getElementsByClassName("eye_light"));
-            let antennas = Array.from(SVG_Elem.getElementsByClassName("antenna"));
-            eye_lights.forEach(el => el.style.fill = "#444444");
-            antennas.forEach(el => el.style.fill = "#444444");
-            let switch_on = SVG_Elem.querySelector(".switch_toggle_on");
-            if (switch_on) switch_on.style.display = "none";
-            let switch_off = SVG_Elem.querySelector(".switch_toggle_off");
-            if (switch_off) switch_off.style.opacity = 1;
-        } else if (toy_id === "bubblewand") {
-            let soap = SVG_Elem.querySelector(".wand_soap");
-            if (soap) soap.style.display = "none";
-        } else if (toy_id === "jack") {
-            let crank_down = SVG_Elem.querySelector(".crank_down");
-            if (crank_down) crank_down.style.display = "none";
-            let lid_closed = SVG_Elem.querySelector(".box_lid_closed");
-            if (lid_closed) lid_closed.style.display = "none";
-        }
+        ToyChoiceBar.make_toy_static(SVG_Elem, toy_id);
     }
 
     set_partner_direction(dir) {
@@ -5661,108 +8374,14 @@ class PartnerBeliefTaskController {
     }
 
     show_toy_selection_grid() {
-        this.UIGroup = create_SVG_group(0, 0);
-        this.ItemLayers.Plus2.appendChild(this.UIGroup);
-
-        const btn_size = 170;
-        const spacing = 25;
-        const total_width = (this.AllToyOptions.length * btn_size) + ((this.AllToyOptions.length - 1) * spacing);
-        const start_x = (this.W - total_width) / 2;
-        const panel_y = 0.76 * this.H;
-
-        let panel_height = btn_size + 40;
-        if (this.bonus_stars > 0) {
-            panel_height += 40;
-        }
-
-        let panel = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-        panel.setAttribute('x', start_x - 30);
-        panel.setAttribute('y', panel_y - 20);
-        panel.setAttribute('width', total_width + 60);
-        panel.setAttribute('height', panel_height);
-        panel.setAttribute('rx', 20);
-
-        panel.setAttribute('fill', 'rgba(255, 215, 0, 0.45)');
-        panel.setAttribute('stroke', '#d4af37');
-        panel.setAttribute('stroke-width', '4');
-        this.UIGroup.appendChild(panel);
-
-        this.AllToyOptions.forEach((toy_id, index) => {
-            let btn_x = start_x + (index * (btn_size + spacing));
-            let btn_y = panel_y;
-
-            let BtnGroup = create_SVG_group(0, 0);
-            this.UIGroup.appendChild(BtnGroup);
-
-            let btn_bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            btn_bg.setAttribute('x', btn_x); btn_bg.setAttribute('y', btn_y);
-            btn_bg.setAttribute('width', btn_size); btn_bg.setAttribute('height', btn_size);
-            btn_bg.setAttribute('rx', 15);
-            btn_bg.setAttribute('fill', '#d8c381');
-            btn_bg.setAttribute('stroke', '#b89f5d');
-            btn_bg.setAttribute('stroke-width', '3');
-            btn_bg.style.transition = "all 150ms ease";
-            BtnGroup.appendChild(btn_bg);
-
-            let RawToy = document.getElementById("toy_" + toy_id).cloneNode(true);
-            RawToy.style.display = "inherit";
-            set_toy_color_scheme(RawToy, toy_id, false);
-            this.make_toy_static(RawToy, toy_id);
-            BtnGroup.appendChild(RawToy);
-
-            let TBox = RawToy.getBBox();
-            let max_dim = Math.max(TBox.width, TBox.height) || 100;
-            let margin_ratio = 0.85;
-            let scale = (btn_size * margin_ratio) / max_dim;
-
-            let raw_cx = TBox.x + (TBox.width / 2);
-            let raw_cy = TBox.y + (TBox.height / 2);
-            let target_cx = btn_x + (btn_size / 2);
-            let target_cy = btn_y + (btn_size / 2);
-
-            RawToy.style.transformOrigin = `${raw_cx}px ${raw_cy}px`;
-            RawToy.style.transform = `translate(${target_cx - raw_cx}px, ${target_cy - raw_cy}px) scale(${scale})`;
-
-            let click_catcher = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            click_catcher.setAttribute('x', btn_x); click_catcher.setAttribute('y', btn_y);
-            click_catcher.setAttribute('width', btn_size); click_catcher.setAttribute('height', btn_size);
-            click_catcher.setAttribute('fill', 'transparent'); click_catcher.style.cursor = "pointer";
-            BtnGroup.appendChild(click_catcher);
-
-            click_catcher.onpointerenter = () => { btn_bg.setAttribute('fill', '#ebd89b'); btn_bg.setAttribute('stroke', 'gold'); };
-            click_catcher.onpointerleave = () => { btn_bg.setAttribute('fill', '#d8c381'); btn_bg.setAttribute('stroke', '#b89f5d'); };
-            click_catcher.onpointerdown = () => {
-                AudioCont.play_sound_effect("button_click");
-                this.on_toy_selected(toy_id);
-            };
-        });
-
-        if (this.bonus_stars > 0) {
-            let bonus_text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            bonus_text.setAttribute('x', this.W / 2);
-            bonus_text.setAttribute('y', panel_y + btn_size + 45);
-            bonus_text.setAttribute('font-family', 'Arial, sans-serif');
-            bonus_text.setAttribute('font-size', '30');
-            bonus_text.setAttribute('font-weight', 'bold');
-            bonus_text.setAttribute('fill', 'navy');
-            bonus_text.setAttribute('text-anchor', 'middle');
-
-            if (this.bonus_stars === 1) {
-                bonus_text.textContent = "You can earn a bonus star for a correct answer!";
-            } else {
-                bonus_text.textContent = `You can earn ${this.bonus_stars} bonus stars for a correct answer!`;
-            }
-            this.UIGroup.appendChild(bonus_text);
-        }
-
-        this.UIGroup.style.transformOrigin = `${this.W/2}px ${panel_y + (btn_size/2)}px`;
-        this.UIGroup.style.transform = "scale(0.8)";
-        this.UIGroup.style.opacity = 0;
-        this.UIGroup.style.transition = "all 300ms cubic-bezier(0.34, 1.56, 0.64, 1)";
-
-        window.getComputedStyle(this.UIGroup).opacity;
-        this.UIGroup.style.transform = "scale(1)";
-        this.UIGroup.style.opacity = 1;
+        this.choiceBar = new ToyChoiceBar(
+            this.ItemLayers.Plus2,
+            this.W,
+            this.H,
+            { bonus_stars: this.bonus_stars }
+        );
+        this.choiceBar.show(this.AllToyOptions, (toy_id) => this.on_toy_selected(toy_id));
+        this.UIGroup = this.choiceBar.UIGroup;
     }
 
     on_toy_selected(selected_toy_id) {
@@ -5770,9 +8389,18 @@ class PartnerBeliefTaskController {
         let actual_belief = WorldState.get_partner_belief_in_box_contents(current_box_data.id);
         let is_correct = (selected_toy_id === actual_belief);
 
+        // --- NEW: Find Associated Fennimals ---
+        // Look through the global Fennimal templates to see which ones own this box
+        let associated_fennimals = [];
+        if (typeof topController !== "undefined" && topController.dataCont && topController.dataCont.experimentData) {
+            let templates = topController.dataCont.experimentData.fennimals;
+            associated_fennimals = templates.filter(f => f.toybox === current_box_data.id).map(f => f.id);
+        }
+
         let answer_data = {
-            type: "partner_belief_box",
+            type: "partner_belief_multiple_box",
             box: current_box_data.id,
+            associated_fennimals: associated_fennimals, // <-- ADDED THIS FOR EASY REFERENCE
             selected_toy: selected_toy_id,
             partner_actual_belief: actual_belief,
             correct: is_correct,
@@ -5797,7 +8425,6 @@ class PartnerBeliefTaskController {
 
         setTimeout(() => this.start_next_box_trial(), 600);
     }
-
     async finish_task() {
         this.TaskObj.PartnerBeliefAnswers = this.ParticipantAnswers;
 
@@ -5851,6 +8478,1256 @@ class PartnerBeliefTaskController {
         this.ItemLayers.Main.remove();
         this.ItemLayers.Plus1.remove();
         this.ItemLayers.Plus2.remove();
+    }
+}
+
+// DEPRECATED: temporary alias for PartnerBeliefMultipleController.
+// Remove during a future spring-cleaning pass once all callers use the new name / partner_belief_multiple phase type.
+const PartnerBeliefTaskController = PartnerBeliefMultipleController;
+
+/**
+ * One-box-at-a-time partner-belief DV task with radial 3AFC (flexible N) and RT.
+ * Stimulus phase type: "partner_belief_individual_boxes"
+ */
+class PartnerBeliefIndividualBoxesController {
+    constructor(ParentLayer, TaskObj, returnfunc, expCont) {
+        this.ParentLayer = ParentLayer;
+        this.TaskObj = TaskObj;
+        this.returnfunc = returnfunc;
+        this.expCont = expCont;
+
+        this.W = GenParam.SVG_width;
+        this.H = GenParam.SVG_height;
+
+        this.bonus_stars = (typeof TaskObj.bonus_stars_per_correct_answer === "number")
+            ? TaskObj.bonus_stars_per_correct_answer
+            : 0;
+
+        // Prefer num_belief_blocks; accept deprecated num_repeated_blocks as an alias.
+        if (typeof TaskObj.num_belief_blocks === "number" && TaskObj.num_belief_blocks > 0) {
+            this.num_belief_blocks = TaskObj.num_belief_blocks;
+        } else if (typeof TaskObj.num_repeated_blocks === "number" && TaskObj.num_repeated_blocks > 0) {
+            console.warn("PartnerBeliefIndividualBoxes: num_repeated_blocks is deprecated; use num_belief_blocks.");
+            this.num_belief_blocks = TaskObj.num_repeated_blocks;
+        } else {
+            this.num_belief_blocks = 1;
+        }
+
+        this.include_reality_block_at_end = TaskObj.include_reality_block_at_end === true;
+        this.include_practice_trial = TaskObj.include_practice_trial === true;
+
+        this.FEATURE_SHAPES = ["circle", "triangle", "square"];
+        this.FEATURE_COLORS = [
+            { id: "blue", fill: "#4FC3F7", stroke: "#0277BD" },
+            { id: "orange", fill: "#FFB74D", stroke: "#EF6C00" },
+            { id: "purple", fill: "#BA68C8", stroke: "#7B1FA2" }
+        ];
+
+        this.partnername = "your partner";
+        this.Icons = {};
+        this.ParticipantAnswers = [];
+        this.overall_presentation_index = 0;
+        this.distractor_rule_counter = 0;
+
+        this.table_center_x = 0.5 * this.W;
+        this.table_center_y = 0.58 * this.H;
+        this.box_center_x = this.table_center_x;
+        this.box_center_y = this.table_center_y - 10;
+        this.radial_radius = 260;
+        this.btn_size = 150;
+
+        this.expStartPerf = expCont ? expCont.experimentStartPerf : performance.now();
+        this.expStartDate = expCont ? expCont.experimentStartTime : Date.now();
+
+        let settings = WorldState.get_partner_icon_settings();
+        if (settings && settings.name) this.partnername = settings.name;
+        let gender = (settings && settings.type) ? settings.type : "male";
+
+        let getIcon = (dir) => {
+            let icon = WorldState.get_person_icon("partner", dir);
+            if (!icon) {
+                let el = document.getElementById(`icon_player_${gender}_${dir}`);
+                icon = el ? el.cloneNode(true) : null;
+            }
+            return icon;
+        };
+        this.Icons = {
+            back: getIcon("back"),
+            left: getIcon("left"),
+            right: getIcon("right")
+        };
+
+        this.questions = this._normalizeQuestions(TaskObj.questions || []);
+        this.lureCycle = this._normalizeLureCycle(TaskObj.lure_cycle);
+        this.trialQueue = this._buildTrialQueue();
+    }
+
+    _elapsedPerfMs() {
+        return Math.round(performance.now() - this.expStartPerf);
+    }
+
+    _elapsedDateMs() {
+        return Date.now() - this.expStartDate;
+    }
+
+    _normalizeQuestions(rawQuestions) {
+        if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) {
+            console.error("PartnerBeliefIndividualBoxes: questions[] is required and must be non-empty.");
+            return [];
+        }
+
+        let seenIds = new Set();
+        let mapped = [];
+
+        rawQuestions.forEach((q, index) => {
+            if (!q || typeof q.question_id !== "string" || !q.question_id.length) {
+                console.error(`PartnerBeliefIndividualBoxes: question at index ${index} is missing mandatory question_id.`);
+                return;
+            }
+            if (seenIds.has(q.question_id)) {
+                console.error(`PartnerBeliefIndividualBoxes: duplicate question_id "${q.question_id}".`);
+                return;
+            }
+            seenIds.add(q.question_id);
+
+            if (!q.target_box) {
+                console.error(`PartnerBeliefIndividualBoxes: question "${q.question_id}" needs target_box.`);
+                return;
+            }
+            if (Object.prototype.hasOwnProperty.call(q, "answer_options")) {
+                console.error(
+                    `PartnerBeliefIndividualBoxes: question "${q.question_id}" must not set answer_options. ` +
+                    "Options are auto-built as belief / reality / cyclic lure from WorldState."
+                );
+                return;
+            }
+
+            let boxMapped = this.expCont.stimuli.get_assigned_names_of_code_array("toybox", [q.target_box]);
+            let target_box = boxMapped && boxMapped[0];
+            if (!target_box) {
+                console.error(`PartnerBeliefIndividualBoxes: failed to map target_box code for question "${q.question_id}".`);
+                return;
+            }
+
+            mapped.push({
+                question_id: q.question_id,
+                target_box_code: q.target_box,
+                target_box: target_box
+            });
+        });
+
+        return mapped;
+    }
+
+    /**
+     * Box-code cycle used for the lure: lure for box i = partner belief of the next box.
+     * Defaults to unique target_box codes in questions[] order (e.g. A→B→C→A).
+     */
+    _normalizeLureCycle(rawCycle) {
+        let codes;
+        if (Array.isArray(rawCycle) && rawCycle.length >= 2) {
+            codes = [...rawCycle];
+        } else {
+            codes = [];
+            this.questions.forEach(q => {
+                if (!codes.includes(q.target_box_code)) codes.push(q.target_box_code);
+            });
+        }
+
+        if (codes.length < 2) {
+            console.error(
+                "PartnerBeliefIndividualBoxes: lure cycle needs at least 2 boxes " +
+                "(provide lure_cycle or at least two distinct target_box values in questions[])."
+            );
+            return { codes: [], boxes: [] };
+        }
+
+        let boxes = this.expCont.stimuli.get_assigned_names_of_code_array("toybox", codes);
+        if (!boxes || boxes.includes(false) || boxes.some(b => !b)) {
+            console.error("PartnerBeliefIndividualBoxes: failed to map lure_cycle toybox codes.", codes);
+            return { codes: [], boxes: [] };
+        }
+
+        return { codes, boxes };
+    }
+
+    _codeForAssignedName(type, assignedName) {
+        let map = this.expCont.stimuli.get_Feature_maps()[type];
+        if (!map || assignedName === undefined || assignedName === null || assignedName === false) return null;
+        for (let code in map) {
+            if (map[code] === assignedName) return code;
+        }
+        return null;
+    }
+
+    _buildTrialQueue() {
+        let queue = [];
+
+        if (this.include_practice_trial) {
+            queue.push(this._makeFeatureMatchTrial({
+                section: "practice",
+                trial_kind: "practice",
+                match_rule: "shape",
+                question_id: "practice_shape",
+                trial_instance_id: "practice_shape",
+                block_index: 0,
+                position_in_block: 1,
+                is_practice: true
+            }));
+            queue.push(this._makeFeatureMatchTrial({
+                section: "practice",
+                trial_kind: "practice",
+                match_rule: "color",
+                question_id: "practice_color",
+                trial_instance_id: "practice_color",
+                block_index: 0,
+                position_in_block: 2,
+                is_practice: true
+            }));
+        }
+
+        for (let b = 1; b <= this.num_belief_blocks; b++) {
+            let blockTrials = shuffleArray([...this.questions]);
+            blockTrials.forEach((q, i) => {
+                queue.push(this._makeFeatureMatchTrial({
+                    section: "belief",
+                    trial_kind: "distractor",
+                    match_rule: this._nextDistractorRule(),
+                    question_id: `distractor_before_${q.question_id}_b${b}`,
+                    trial_instance_id: `distractor_${q.question_id}_b${b}`,
+                    block_index: b,
+                    position_in_block: i + 1,
+                    is_practice: false,
+                    precedes_question_id: q.question_id
+                }));
+
+                queue.push({
+                    section: "belief",
+                    trial_kind: "belief",
+                    is_practice: false,
+                    question_id: q.question_id,
+                    trial_instance_id: `${q.question_id}_belief_b${b}`,
+                    block_index: b,
+                    belief_block_index: b,
+                    position_in_block: i + 1,
+                    presentation_number_for_box: b,
+                    target_box_code: q.target_box_code,
+                    target_box: q.target_box
+                });
+            });
+        }
+
+        if (this.include_reality_block_at_end) {
+            let realityTrials = shuffleArray([...this.questions]);
+            realityTrials.forEach((q, i) => {
+                queue.push(this._makeFeatureMatchTrial({
+                    section: "reality",
+                    trial_kind: "distractor",
+                    match_rule: this._nextDistractorRule(),
+                    question_id: `distractor_before_${q.question_id}_reality`,
+                    trial_instance_id: `distractor_${q.question_id}_reality`,
+                    block_index: 1,
+                    position_in_block: i + 1,
+                    is_practice: false,
+                    precedes_question_id: q.question_id
+                }));
+
+                queue.push({
+                    section: "reality",
+                    trial_kind: "reality",
+                    is_practice: false,
+                    question_id: q.question_id,
+                    trial_instance_id: `${q.question_id}_reality`,
+                    block_index: 1,
+                    position_in_block: i + 1,
+                    presentation_number_for_box: 1,
+                    target_box_code: q.target_box_code,
+                    target_box: q.target_box
+                });
+            });
+        }
+
+        return queue;
+    }
+
+    _nextDistractorRule() {
+        // Alternate shape/color so both appear about equally often.
+        this.distractor_rule_counter++;
+        return (this.distractor_rule_counter % 2 === 1) ? "shape" : "color";
+    }
+
+    /**
+     * Build an orthogonal shape/color match trial (practice or distractor).
+     * Exactly one option matches the rule; features are orthogonalized.
+     */
+    _makeFeatureMatchTrial(meta) {
+        let match_rule = meta.match_rule;
+        let shapes = shuffleArray([...this.FEATURE_SHAPES]);
+        let colors = shuffleArray([...this.FEATURE_COLORS]);
+
+        let targetShape = shapes[0];
+        let otherShape = shapes[1];
+        let lureShape = shapes[2];
+        let targetColor = colors[0];
+        let otherColor = colors[1];
+        let lureColor = colors[2];
+
+        let target = { id: "target", shape: targetShape, color: targetColor };
+        let correct, foil, lure;
+
+        if (match_rule === "shape") {
+            correct = { id: "opt_correct", shape: targetShape, color: otherColor, role: "correct" };
+            foil = { id: "opt_foil", shape: otherShape, color: targetColor, role: "color_foil" };
+            lure = { id: "opt_lure", shape: lureShape, color: lureColor, role: "lure" };
+        } else {
+            correct = { id: "opt_correct", shape: otherShape, color: targetColor, role: "correct" };
+            foil = { id: "opt_foil", shape: targetShape, color: otherColor, role: "shape_foil" };
+            lure = { id: "opt_lure", shape: lureShape, color: lureColor, role: "lure" };
+        }
+
+        return {
+            ...meta,
+            match_rule,
+            target_features: target,
+            answer_options: shuffleArray([correct, foil, lure]),
+            correct_option_id: correct.id
+        };
+    }
+
+    /**
+     * Build the fixed 3AFC triad for a target box:
+     *   belief  = partner's belief about the target box
+     *   reality = current contents of the target box
+     *   lure    = partner's belief about the next box in lureCycle (A→B→C→A by default)
+     * Fails loud if any piece is missing or the three toys are not distinct.
+     */
+    _buildBeliefRealityCyclicTriad(trial) {
+        if (!this.lureCycle || this.lureCycle.codes.length < 2) {
+            console.error("PartnerBeliefIndividualBoxes: lure cycle is not configured.");
+            return null;
+        }
+
+        let cycleIndex = this.lureCycle.codes.indexOf(trial.target_box_code);
+        if (cycleIndex < 0) {
+            console.error(
+                `PartnerBeliefIndividualBoxes: target_box "${trial.target_box_code}" is not in the lure cycle ` +
+                `[${this.lureCycle.codes.join(", ")}].`
+            );
+            return null;
+        }
+
+        let lureIndex = (cycleIndex + 1) % this.lureCycle.codes.length;
+        let lure_source_box_code = this.lureCycle.codes[lureIndex];
+        let lure_source_box = this.lureCycle.boxes[lureIndex];
+
+        let belief = WorldState.get_partner_belief_in_box_contents(trial.target_box);
+        let reality = WorldState.get_toybox_contents(trial.target_box);
+        if (reality === false) reality = undefined;
+        let lure = WorldState.get_partner_belief_in_box_contents(lure_source_box);
+
+        if (belief === undefined) {
+            console.error(
+                `PartnerBeliefIndividualBoxes: missing partner belief for target box "${trial.target_box}" ` +
+                `(question "${trial.question_id}").`
+            );
+            return null;
+        }
+        if (reality === undefined) {
+            console.error(
+                `PartnerBeliefIndividualBoxes: missing current contents for target box "${trial.target_box}" ` +
+                `(question "${trial.question_id}").`
+            );
+            return null;
+        }
+        if (lure === undefined) {
+            console.error(
+                `PartnerBeliefIndividualBoxes: missing partner belief for lure-source box "${lure_source_box}" ` +
+                `(code "${lure_source_box_code}", question "${trial.question_id}").`
+            );
+            return null;
+        }
+        if (belief === reality || belief === lure || reality === lure) {
+            console.error(
+                `PartnerBeliefIndividualBoxes: belief/reality/lure are not three distinct toys for ` +
+                `question "${trial.question_id}" (box "${trial.target_box}"): ` +
+                `belief=${belief}, reality=${reality}, lure=${lure} (from ${lure_source_box_code}).`
+            );
+            return null;
+        }
+
+        let option_roles = {};
+        option_roles[belief] = "belief";
+        option_roles[reality] = "reality";
+        option_roles[lure] = "lure";
+
+        let answer_options = shuffleArray([belief, reality, lure]);
+        let answer_option_codes = answer_options.map(toy => this._codeForAssignedName("toy", toy));
+
+        return {
+            answer_options,
+            answer_option_codes,
+            belief_answer: belief,
+            reality_answer: reality,
+            lure_answer: lure,
+            lure_source_box_code,
+            lure_source_box,
+            option_roles
+        };
+    }
+
+    async start_sequence() {
+        this.ParentLayer.style.display = "inherit";
+
+        if (typeof Interface !== "undefined") {
+            if (Interface.player_moved_to_new_region) Interface.player_moved_to_new_region("Home");
+            if (Interface.Locator && Interface.Locator.change_locator_name) Interface.Locator.change_locator_name("Warehouse");
+            Interface.Prompt.hide();
+        }
+
+        this.ItemLayers = {
+            Neg1: create_SVG_group(0, 0),
+            Main: create_SVG_group(0, 0),
+            Plus1: create_SVG_group(0, 0),
+            Plus2: create_SVG_group(0, 0)
+        };
+        this.ParentLayer.appendChild(this.ItemLayers.Neg1);
+        this.ParentLayer.appendChild(this.ItemLayers.Main);
+        this.ParentLayer.appendChild(this.ItemLayers.Plus1);
+        this.ParentLayer.appendChild(this.ItemLayers.Plus2);
+
+        this.BlackOverlay = create_SVG_rect(0, 0, this.W, this.H);
+        this.BlackOverlay.setAttribute("fill", "black");
+        this.BlackOverlay.style.opacity = 1;
+        this.BlackOverlay.style.pointerEvents = "none";
+        this.ItemLayers.Plus2.appendChild(this.BlackOverlay);
+
+        for (let i = 0; i < this.trialQueue.length; i++) {
+            this.overall_presentation_index = i + 1;
+            await this.run_trial(this.trialQueue[i]);
+        }
+
+        await this.finish_task();
+    }
+
+    async fade_black(toOpacity, ms = 350) {
+        this.BlackOverlay.style.transition = `opacity ${ms}ms ease-in-out`;
+        window.getComputedStyle(this.BlackOverlay).opacity;
+        this.BlackOverlay.style.opacity = toOpacity;
+        await wait(ms);
+    }
+
+    clear_scene_contents() {
+        if (this.bubble_float_interval) {
+            clearInterval(this.bubble_float_interval);
+            this.bubble_float_interval = null;
+        }
+        [this.ItemLayers.Neg1, this.ItemLayers.Main, this.ItemLayers.Plus1].forEach(layer => {
+            while (layer.firstChild) layer.removeChild(layer.firstChild);
+        });
+        // Keep BlackOverlay in Plus2; remove other Plus2 children
+        Array.from(this.ItemLayers.Plus2.childNodes).forEach(child => {
+            if (child !== this.BlackOverlay) child.remove();
+        });
+        this.PartnerTranslateGroup = null;
+        this.PartnerScaleGroup = null;
+        this.QuestionBubbleGroup = null;
+        this.radialUIGroup = null;
+        this.BoxElement = null;
+        this.CurtainGroup = null;
+        this.CentralTargetGroup = null;
+    }
+
+    setup_background_and_table(smaller = true) {
+        this.OpaqueBackdrop = create_SVG_rect(0, 0, this.W, this.H);
+        this.OpaqueBackdrop.setAttribute("fill", "white");
+        this.ItemLayers.Neg1.appendChild(this.OpaqueBackdrop);
+
+        this.Background = document.createElementNS("http://www.w3.org/2000/svg", "image");
+        this.Background.setAttribute("href", "./Locations/Home_warehouse.png");
+        this.Background.setAttribute("width", "100%");
+        this.Background.setAttribute("height", "100%");
+        this.Background.setAttribute("preserveAspectRatio", "none");
+        this.ItemLayers.Neg1.appendChild(this.Background);
+
+        this.BackgroundMask = create_SVG_rect(0, 0, this.W, this.H);
+        this.BackgroundMask.setAttribute("fill", GenParam.RegionData ? GenParam.RegionData["Home"].surrounding_color : "#f4f4f9");
+        this.BackgroundMask.style.opacity = 0.3;
+        this.BackgroundMask.style.mixBlendMode = "multiply";
+        this.ItemLayers.Neg1.appendChild(this.BackgroundMask);
+
+        this.TableGroup = create_SVG_group(0, 0);
+        this.ItemLayers.Neg1.appendChild(this.TableGroup);
+
+        let table_w = smaller ? 0.58 * this.W : 0.85 * this.W;
+        let table_h = 70;
+        let table_x = (this.W - table_w) / 2;
+        let table_y = this.table_center_y;
+
+        const leg_width = 28;
+        const leg_height = 320;
+        [table_x + 0.08 * table_w, table_x + 0.92 * table_w - leg_width].forEach(lx => {
+            let leg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            leg.setAttribute("x", lx);
+            leg.setAttribute("y", table_y + 30);
+            leg.setAttribute("width", leg_width);
+            leg.setAttribute("height", leg_height);
+            leg.setAttribute("fill", "#4E342E");
+            this.TableGroup.appendChild(leg);
+        });
+
+        let top = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        top.setAttribute("x", table_x);
+        top.setAttribute("y", table_y);
+        top.setAttribute("width", table_w);
+        top.setAttribute("height", table_h);
+        top.setAttribute("rx", 15);
+        top.setAttribute("fill", "#795548");
+        this.TableGroup.appendChild(top);
+
+        let lip = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        lip.setAttribute("x", table_x);
+        lip.setAttribute("y", table_y + table_h - 10);
+        lip.setAttribute("width", table_w);
+        lip.setAttribute("height", 10);
+        lip.setAttribute("fill", "#3E2723");
+        this.TableGroup.appendChild(lip);
+    }
+
+    place_target_box(boxId) {
+        let template = document.getElementById("toybox_" + boxId);
+        if (!template) {
+            console.error("PartnerBeliefIndividualBoxes: missing toybox_" + boxId);
+            return null;
+        }
+        let BoxObj = copy_scale_and_move_object_to_position(
+            template,
+            this.ItemLayers.Main,
+            this.box_center_x,
+            this.box_center_y,
+            2.5
+        );
+        Array.from(BoxObj.getElementsByClassName("alignment_field")).forEach(t => t.remove());
+        BoxObj.style.opacity = 0;
+        BoxObj.style.pointerEvents = "none";
+        this.BoxElement = BoxObj;
+        return BoxObj;
+    }
+
+    create_curtain_with_reveal_circle() {
+        this.CurtainGroup = create_SVG_group(0, 0, "pb_curtain", undefined);
+        this.ItemLayers.Plus1.appendChild(this.CurtainGroup);
+
+        let curtain_w = 220;
+        let curtain_h = 200;
+        let cx = this.box_center_x;
+        let cy = this.box_center_y - 20;
+
+        let fabric = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        fabric.setAttribute("x", cx - curtain_w / 2);
+        fabric.setAttribute("y", cy - curtain_h / 2);
+        fabric.setAttribute("width", curtain_w);
+        fabric.setAttribute("height", curtain_h);
+        fabric.setAttribute("rx", 18);
+        fabric.setAttribute("fill", "#6d4c41");
+        fabric.setAttribute("stroke", "#3e2723");
+        fabric.setAttribute("stroke-width", "6");
+        this.CurtainGroup.appendChild(fabric);
+
+        let fold = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        fold.setAttribute("x", cx - curtain_w / 2 + 18);
+        fold.setAttribute("y", cy - curtain_h / 2);
+        fold.setAttribute("width", 28);
+        fold.setAttribute("height", curtain_h);
+        fold.setAttribute("fill", "rgba(0,0,0,0.18)");
+        this.CurtainGroup.appendChild(fold);
+
+        let circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("cx", cx);
+        circle.setAttribute("cy", cy);
+        circle.setAttribute("r", 42);
+        circle.setAttribute("fill", "rgba(255,255,255,0.15)");
+        circle.setAttribute("stroke", "gold");
+        circle.setAttribute("stroke-width", "7");
+        circle.style.filter = "drop-shadow(0px 0px 12px gold)";
+        circle.style.cursor = "pointer";
+        this.CurtainGroup.appendChild(circle);
+        this.RevealCircle = circle;
+
+        return new Promise(resolve => {
+            circle.onpointerdown = (evt) => {
+                if (evt && evt.pointerType) this.last_input_type = evt.pointerType;
+                circle.onpointerdown = null;
+                circle.style.cursor = "auto";
+                resolve({
+                    reveal_click_elapsed_perf_ms: this._elapsedPerfMs(),
+                    reveal_click_elapsed_date_ms: this._elapsedDateMs(),
+                    reveal_click_perf: performance.now(),
+                    input_type: this.last_input_type || "unknown"
+                });
+            };
+        });
+    }
+
+    async setup_partner_at_offscreen() {
+        this.PartnerTranslateGroup = create_SVG_group(0, 0);
+        this.ItemLayers.Plus2.insertBefore(this.PartnerTranslateGroup, this.BlackOverlay);
+
+        this.PartnerScaleGroup = create_SVG_group(0, 0);
+        this.PartnerTranslateGroup.appendChild(this.PartnerScaleGroup);
+
+        for (let dir in this.Icons) {
+            if (!this.Icons[dir]) continue;
+            let icon = this.Icons[dir];
+            icon.style.display = (dir === "back") ? "inherit" : "none";
+            icon.querySelectorAll(".prep_element_hidden").forEach(el => el.remove());
+            icon.style.transform = "";
+            icon.removeAttribute("transform");
+            this.PartnerScaleGroup.appendChild(icon);
+        }
+
+        this.partner_x = 0.9 * this.W;
+        this.partner_y = this.H + 300;
+        this.PartnerTranslateGroup.style.transform = `translate(${this.partner_x}px, ${this.partner_y}px)`;
+        this.PartnerScaleGroup.style.transform = "scale(40)";
+        this.PartnerTranslateGroup.style.opacity = 1;
+        window.getComputedStyle(this.PartnerTranslateGroup).transform;
+    }
+
+    set_partner_direction(dir) {
+        for (let key in this.Icons) {
+            if (this.Icons[key]) this.Icons[key].style.display = (key === dir) ? "inherit" : "none";
+        }
+    }
+
+    async animate_partner_enter_and_face_box() {
+        this.set_partner_direction("back");
+        this.partner_y = 0.95 * this.H;
+        this.PartnerTranslateGroup.style.transition = "transform 600ms ease-out";
+        this.PartnerTranslateGroup.style.transform = `translate(${this.partner_x}px, ${this.partner_y}px)`;
+        await wait(800);
+
+        this.PartnerTranslateGroup.style.transition = "transform 1200ms ease-in-out";
+        this.PartnerScaleGroup.style.transition = "transform 1200ms ease-in-out";
+        this.partner_y = 0.65 * this.H;
+        this.partner_x = 0.85 * this.W;
+        this.PartnerTranslateGroup.style.transform = `translate(${this.partner_x}px, ${this.partner_y}px)`;
+        this.PartnerScaleGroup.style.transform = "scale(30)";
+        await wait(1400);
+
+        this.set_partner_direction("back");
+        this.partner_y = this.box_center_y + 40;
+        this.PartnerTranslateGroup.style.transition = "transform 800ms ease-out";
+        this.PartnerScaleGroup.style.transition = "transform 800ms ease-out";
+        this.PartnerTranslateGroup.style.transform = `translate(${this.partner_x}px, ${this.partner_y}px)`;
+        this.PartnerScaleGroup.style.transform = "scale(24)";
+        await wait(800);
+
+        // Stop on the right of the box (outside the radial button ring), then face left toward it
+        let targetX = this.box_center_x + 400;
+        this.set_partner_direction(targetX < this.partner_x ? "left" : "right");
+        this.partner_x = targetX;
+        this.PartnerTranslateGroup.style.transition = "transform 1000ms ease-in-out";
+        this.PartnerTranslateGroup.style.transform = `translate(${this.partner_x}px, ${this.partner_y}px)`;
+        await wait(1000);
+
+        this.set_partner_direction("left");
+        this.show_question_bubble();
+        AudioCont.play_sound_effect("alert_minor");
+    }
+
+    show_question_bubble() {
+        this.QuestionBubbleGroup = create_SVG_group(0, 0);
+        this.PartnerTranslateGroup.appendChild(this.QuestionBubbleGroup);
+
+        let dot1 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        dot1.setAttribute("cx", "-25"); dot1.setAttribute("cy", "30"); dot1.setAttribute("r", "12");
+        dot1.setAttribute("fill", "rgba(255, 255, 255, 0.85)");
+        dot1.setAttribute("stroke", "#ccc"); dot1.setAttribute("stroke-width", "2");
+
+        let dot2 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        dot2.setAttribute("cx", "5"); dot2.setAttribute("cy", "-5"); dot2.setAttribute("r", "18");
+        dot2.setAttribute("fill", "rgba(255, 255, 255, 0.85)");
+        dot2.setAttribute("stroke", "#ccc"); dot2.setAttribute("stroke-width", "2");
+
+        let bubble = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
+        bubble.setAttribute("cx", "50"); bubble.setAttribute("cy", "-70");
+        bubble.setAttribute("rx", "70"); bubble.setAttribute("ry", "55");
+        bubble.setAttribute("fill", "rgba(255, 255, 255, 0.85)");
+        bubble.setAttribute("stroke", "#ccc"); bubble.setAttribute("stroke-width", "4");
+
+        let text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", "50"); text.setAttribute("y", "-35");
+        text.setAttribute("font-family", "Arial, sans-serif");
+        text.setAttribute("font-weight", "bold");
+        text.setAttribute("font-size", "95");
+        text.setAttribute("fill", "gold");
+        text.setAttribute("stroke", "#b8860b");
+        text.setAttribute("stroke-width", "2");
+        text.setAttribute("text-anchor", "middle");
+        text.textContent = "?";
+
+        this.QuestionBubbleGroup.appendChild(dot1);
+        this.QuestionBubbleGroup.appendChild(dot2);
+        this.QuestionBubbleGroup.appendChild(bubble);
+        this.QuestionBubbleGroup.appendChild(text);
+
+        this.QuestionBubbleGroup.style.transformOrigin = "0px 40px";
+        this.QuestionBubbleGroup.style.transform = "translate(50px, -300px) scale(0)";
+        this.QuestionBubbleGroup.style.transition = "transform 400ms cubic-bezier(0.34, 1.56, 0.64, 1)";
+        window.getComputedStyle(this.QuestionBubbleGroup).transform;
+        this.QuestionBubbleGroup.style.transform = "translate(50px, -300px) scale(1.6)";
+
+        this.bubble_float_interval = setInterval(() => {
+            if (!this.QuestionBubbleGroup) return;
+            this.QuestionBubbleGroup.style.transition = "transform 1000ms ease-in-out";
+            this.QuestionBubbleGroup.style.transform = "translate(50px, -315px) scale(1.6)";
+            setTimeout(() => {
+                if (!this.QuestionBubbleGroup) return;
+                this.QuestionBubbleGroup.style.transform = "translate(50px, -285px) scale(1.6)";
+            }, 1000);
+        }, 2000);
+    }
+
+    hide_question_bubble() {
+        if (this.bubble_float_interval) {
+            clearInterval(this.bubble_float_interval);
+            this.bubble_float_interval = null;
+        }
+        if (this.QuestionBubbleGroup) {
+            this.QuestionBubbleGroup.remove();
+            this.QuestionBubbleGroup = null;
+        }
+    }
+
+    async animate_partner_exit() {
+        if (!this.PartnerTranslateGroup) return;
+        this.hide_question_bubble();
+        this.set_partner_direction("right");
+        this.PartnerTranslateGroup.style.transition = "transform 1200ms ease-in, opacity 400ms ease-in 800ms";
+        let currentTransform = this.PartnerTranslateGroup.style.transform;
+        this.PartnerTranslateGroup.style.transform = currentTransform + " translateX(1500px)";
+        this.PartnerTranslateGroup.style.opacity = 0;
+        await wait(1200);
+    }
+
+    _add_focus_outline_to_button(BtnGroup, btn_bg) {
+        let outline = btn_bg.cloneNode(true);
+        outline.removeAttribute("fill");
+        outline.setAttribute("fill", "none");
+        outline.removeAttribute("stroke");
+        outline.style.stroke = "";
+        outline.removeAttribute("stroke-width");
+        outline.style.strokeWidth = "";
+        outline.style.pointerEvents = "none";
+        outline.classList.add("focus_on_SVG_outline");
+        BtnGroup.insertBefore(outline, btn_bg.nextSibling);
+        return outline;
+    }
+
+    _create_toy_choice_button(parent, toy_id, btn_x, btn_y, onSelect) {
+        let BtnGroup = create_SVG_group(0, 0);
+        parent.appendChild(BtnGroup);
+
+        let btn_bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        btn_bg.setAttribute("x", btn_x);
+        btn_bg.setAttribute("y", btn_y);
+        btn_bg.setAttribute("width", this.btn_size);
+        btn_bg.setAttribute("height", this.btn_size);
+        btn_bg.setAttribute("rx", 15);
+        btn_bg.setAttribute("fill", "#d8c381");
+        btn_bg.setAttribute("stroke", "#b89f5d");
+        btn_bg.setAttribute("stroke-width", "3");
+        BtnGroup.appendChild(btn_bg);
+        this._add_focus_outline_to_button(BtnGroup, btn_bg);
+
+        let template = document.getElementById("toy_" + toy_id);
+        if (template) {
+            let RawToy = template.cloneNode(true);
+            RawToy.style.display = "inherit";
+            set_toy_color_scheme(RawToy, toy_id, false);
+            ToyChoiceBar.make_toy_static(RawToy, toy_id);
+            BtnGroup.appendChild(RawToy);
+
+            let TBox = RawToy.getBBox();
+            let max_dim = Math.max(TBox.width, TBox.height) || 100;
+            let scale = (this.btn_size * 0.85) / max_dim;
+            let raw_cx = TBox.x + (TBox.width / 2);
+            let raw_cy = TBox.y + (TBox.height / 2);
+            let target_cx = btn_x + (this.btn_size / 2);
+            let target_cy = btn_y + (this.btn_size / 2);
+            RawToy.style.transformOrigin = `${raw_cx}px ${raw_cy}px`;
+            RawToy.style.transform = `translate(${target_cx - raw_cx}px, ${target_cy - raw_cy}px) scale(${scale})`;
+        }
+
+        let click_catcher = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        click_catcher.setAttribute("x", btn_x);
+        click_catcher.setAttribute("y", btn_y);
+        click_catcher.setAttribute("width", this.btn_size);
+        click_catcher.setAttribute("height", this.btn_size);
+        click_catcher.setAttribute("fill", "transparent");
+        click_catcher.style.cursor = "pointer";
+        BtnGroup.appendChild(click_catcher);
+
+        click_catcher.onpointerenter = () => {
+            btn_bg.setAttribute("fill", "#ebd89b");
+            btn_bg.setAttribute("stroke", "gold");
+        };
+        click_catcher.onpointerleave = () => {
+            btn_bg.setAttribute("fill", "#d8c381");
+            btn_bg.setAttribute("stroke", "#b89f5d");
+        };
+        click_catcher.onpointerdown = (evt) => onSelect(toy_id, evt, BtnGroup);
+
+        return BtnGroup;
+    }
+
+    _drawFeatureShape(parent, shape, color, cx, cy, size = 42) {
+        let el;
+        if (shape === "circle") {
+            el = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            el.setAttribute("cx", cx);
+            el.setAttribute("cy", cy);
+            el.setAttribute("r", size);
+        } else if (shape === "square") {
+            el = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            el.setAttribute("x", cx - size);
+            el.setAttribute("y", cy - size);
+            el.setAttribute("width", size * 2);
+            el.setAttribute("height", size * 2);
+            el.setAttribute("rx", 8);
+        } else {
+            el = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+            el.setAttribute("points", `${cx},${cy - size - 6} ${cx + size + 6},${cy + size} ${cx - size - 6},${cy + size}`);
+        }
+        el.setAttribute("fill", color.fill);
+        el.setAttribute("stroke", color.stroke);
+        el.setAttribute("stroke-width", "4");
+        parent.appendChild(el);
+        return el;
+    }
+
+    place_central_feature_target(targetFeatures) {
+        this.CentralTargetGroup = create_SVG_group(0, 0);
+        this.CentralTargetGroup.style.opacity = 0;
+        this.ItemLayers.Main.appendChild(this.CentralTargetGroup);
+        this._drawFeatureShape(
+            this.CentralTargetGroup,
+            targetFeatures.shape,
+            targetFeatures.color,
+            this.box_center_x,
+            this.box_center_y - 20,
+            48
+        );
+        return this.CentralTargetGroup;
+    }
+
+    _create_feature_choice_button(parent, option, btn_x, btn_y, onSelect) {
+        let BtnGroup = create_SVG_group(0, 0);
+        parent.appendChild(BtnGroup);
+
+        let btn_bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        btn_bg.setAttribute("x", btn_x);
+        btn_bg.setAttribute("y", btn_y);
+        btn_bg.setAttribute("width", this.btn_size);
+        btn_bg.setAttribute("height", this.btn_size);
+        btn_bg.setAttribute("rx", 15);
+        btn_bg.setAttribute("fill", "#d8c381");
+        btn_bg.setAttribute("stroke", "#b89f5d");
+        btn_bg.setAttribute("stroke-width", "3");
+        BtnGroup.appendChild(btn_bg);
+        this._add_focus_outline_to_button(BtnGroup, btn_bg);
+
+        this._drawFeatureShape(
+            BtnGroup,
+            option.shape,
+            option.color,
+            btn_x + this.btn_size / 2,
+            btn_y + this.btn_size / 2,
+            42
+        );
+
+        let click_catcher = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        click_catcher.setAttribute("x", btn_x);
+        click_catcher.setAttribute("y", btn_y);
+        click_catcher.setAttribute("width", this.btn_size);
+        click_catcher.setAttribute("height", this.btn_size);
+        click_catcher.setAttribute("fill", "transparent");
+        click_catcher.style.cursor = "pointer";
+        BtnGroup.appendChild(click_catcher);
+
+        click_catcher.onpointerenter = () => {
+            btn_bg.setAttribute("fill", "#ebd89b");
+            btn_bg.setAttribute("stroke", "gold");
+        };
+        click_catcher.onpointerleave = () => {
+            btn_bg.setAttribute("fill", "#d8c381");
+            btn_bg.setAttribute("stroke", "#b89f5d");
+        };
+        click_catcher.onpointerdown = (evt) => onSelect(option.id, evt, BtnGroup);
+
+        return BtnGroup;
+    }
+
+    /**
+     * Reveal box/target (optional) + radial options on the same frame; resolve on first pointerdown.
+     * mode: "toys" | "features"
+     */
+    show_radial_options_and_wait(options, { mode = "toys", showBox = false, showCentralTarget = false } = {}) {
+        return new Promise(resolve => {
+            let n = options.length;
+            let baseAngle = Math.random() * Math.PI * 2;
+            let layout = [];
+
+            this.radialUIGroup = create_SVG_group(0, 0);
+            this.radialUIGroup.style.opacity = 0;
+            this.ItemLayers.Plus2.insertBefore(this.radialUIGroup, this.BlackOverlay);
+
+            let disabled = false;
+            let handleSelect = (selected_id, evt) => {
+                if (disabled) return;
+                disabled = true;
+                let response_perf = performance.now();
+                let input_type = (evt && evt.pointerType) ? evt.pointerType : (this.last_input_type || "unknown");
+                let selected_layout = layout.find(l => l.option_id === selected_id);
+
+                if (this.radialUIGroup) {
+                    this.radialUIGroup.style.transition = "opacity 150ms ease-in";
+                    this.radialUIGroup.style.opacity = 0;
+                    setTimeout(() => {
+                        if (this.radialUIGroup) this.radialUIGroup.remove();
+                        this.radialUIGroup = null;
+                    }, 160);
+                }
+
+                resolve({
+                    selected_id,
+                    selected_angle_rad: selected_layout ? selected_layout.angle_rad : null,
+                    selected_angle_deg: selected_layout ? selected_layout.angle_deg : null,
+                    option_layout: layout,
+                    response_onset_elapsed_perf_ms: this._responseOnsetElapsedPerf,
+                    response_onset_elapsed_date_ms: this._responseOnsetElapsedDate,
+                    response_elapsed_perf_ms: this._elapsedPerfMs(),
+                    response_elapsed_date_ms: this._elapsedDateMs(),
+                    reaction_time_ms: Math.round(response_perf - this._responseOnsetPerf),
+                    response_perf,
+                    input_type
+                });
+            };
+
+            options.forEach((opt, i) => {
+                let angle = baseAngle + (i * 2 * Math.PI / n);
+                let bx = this.box_center_x + Math.cos(angle) * this.radial_radius - this.btn_size / 2;
+                let by = this.box_center_y + Math.sin(angle) * this.radial_radius - this.btn_size / 2;
+                let option_id = (typeof opt === "string") ? opt : opt.id;
+                layout.push({
+                    option_id,
+                    slot_index: i,
+                    angle_rad: angle,
+                    angle_deg: angle * 180 / Math.PI,
+                    btn_x: bx,
+                    btn_y: by,
+                    option_meta: (typeof opt === "string") ? { id: opt } : {
+                        id: opt.id,
+                        shape: opt.shape,
+                        color_id: opt.color.id,
+                        role: opt.role
+                    }
+                });
+
+                if (mode === "features") {
+                    this._create_feature_choice_button(this.radialUIGroup, opt, bx, by, handleSelect);
+                } else {
+                    this._create_toy_choice_button(this.radialUIGroup, opt, bx, by, handleSelect);
+                }
+            });
+
+            requestAnimationFrame(() => {
+                if (this.CurtainGroup) {
+                    this.CurtainGroup.remove();
+                    this.CurtainGroup = null;
+                }
+                if (showBox && this.BoxElement) {
+                    this.BoxElement.style.opacity = 1;
+                }
+                if (showCentralTarget && this.CentralTargetGroup) {
+                    this.CentralTargetGroup.style.opacity = 1;
+                }
+                this.radialUIGroup.style.opacity = 1;
+
+                this._responseOnsetPerf = performance.now();
+                this._responseOnsetElapsedPerf = this._elapsedPerfMs();
+                this._responseOnsetElapsedDate = this._elapsedDateMs();
+            });
+        });
+    }
+
+    async run_trial(trial) {
+        await this.fade_black(1, 300);
+        this.clear_scene_contents();
+        this.setup_background_and_table(true);
+
+        if (trial.trial_kind === "practice" || trial.trial_kind === "distractor") {
+            await this.run_feature_match_trial(trial);
+        } else if (trial.trial_kind === "belief") {
+            await this.run_belief_trial(trial);
+        } else if (trial.trial_kind === "reality") {
+            await this.run_reality_trial(trial);
+        }
+    }
+
+    _featureMatchPrompt(match_rule) {
+        return match_rule === "shape"
+            ? "Choose the object with the same shape."
+            : "Choose the object with the same color.";
+    }
+
+    async run_feature_match_trial(trial) {
+        this.place_central_feature_target(trial.target_features);
+        let revealPromise = this.create_curtain_with_reveal_circle();
+        await this.fade_black(0, 350);
+
+        Interface.Prompt.show_message("Click on the circle to start the question");
+        let revealMeta = await revealPromise;
+        Interface.Prompt.show_message(this._featureMatchPrompt(trial.match_rule));
+
+        let response = await this.show_radial_options_and_wait(trial.answer_options, {
+            mode: "features",
+            showBox: false,
+            showCentralTarget: true
+        });
+
+        Interface.Prompt.hide();
+        AudioCont.play_sound_effect("button_click");
+
+        let selected_meta = (trial.answer_options || []).find(o => o.id === response.selected_id);
+
+        this.ParticipantAnswers.push({
+            type: trial.trial_kind === "practice"
+                ? "partner_belief_individual_practice"
+                : "partner_belief_individual_distractor",
+            trial_kind: trial.trial_kind,
+            section: trial.section,
+            is_practice: trial.is_practice === true,
+            is_distractor: trial.trial_kind === "distractor",
+            question_id: trial.question_id,
+            trial_instance_id: trial.trial_instance_id,
+            block_index: trial.block_index,
+            position_in_block: trial.position_in_block,
+            overall_presentation_index: this.overall_presentation_index,
+            precedes_question_id: trial.precedes_question_id || null,
+            match_rule: trial.match_rule,
+            target_features: {
+                shape: trial.target_features.shape,
+                color_id: trial.target_features.color.id
+            },
+            answer_options: trial.answer_options.map(o => ({
+                id: o.id,
+                shape: o.shape,
+                color_id: o.color.id,
+                role: o.role
+            })),
+            correct_option_id: trial.correct_option_id,
+            selected_answer: response.selected_id,
+            selected_option_role: selected_meta ? selected_meta.role : "unknown",
+            correct: response.selected_id === trial.correct_option_id,
+            option_layout: response.option_layout,
+            selected_angle_rad: response.selected_angle_rad,
+            selected_angle_deg: response.selected_angle_deg,
+            reveal_click_elapsed_perf_ms: revealMeta.reveal_click_elapsed_perf_ms,
+            reveal_click_elapsed_date_ms: revealMeta.reveal_click_elapsed_date_ms,
+            response_onset_elapsed_perf_ms: response.response_onset_elapsed_perf_ms,
+            response_onset_elapsed_date_ms: response.response_onset_elapsed_date_ms,
+            response_elapsed_perf_ms: response.response_elapsed_perf_ms,
+            response_elapsed_date_ms: response.response_elapsed_date_ms,
+            reaction_time_ms: response.reaction_time_ms,
+            input_type: response.input_type,
+            stars_earned: 0
+        });
+
+        await wait(400);
+    }
+
+    async run_belief_trial(trial) {
+        let triad = this._buildBeliefRealityCyclicTriad(trial);
+        if (!triad) {
+            console.error(`PartnerBeliefIndividualBoxes: skipping belief trial "${trial.question_id}" due to invalid triad.`);
+            await this.fade_black(0, 200);
+            return;
+        }
+
+        this.place_target_box(trial.target_box);
+        let revealPromise = this.create_curtain_with_reveal_circle();
+
+        await this.setup_partner_at_offscreen();
+        await this.fade_black(0, 350);
+        await this.animate_partner_enter_and_face_box();
+
+        let printed_box_name = GenParam.get_box_printed_name(trial.target_box);
+        Interface.Prompt.show_message("Click on the circle to start the question");
+        let revealMeta = await revealPromise;
+
+        Interface.Prompt.show_message(
+            `What does ${this.partnername} believe is in the ${printed_box_name}? Answer as quickly and accurately as you can.`
+        );
+
+        let response = await this.show_radial_options_and_wait(triad.answer_options, {
+            mode: "toys",
+            showBox: true
+        });
+
+        Interface.Prompt.hide();
+        AudioCont.play_sound_effect("button_click");
+
+        let is_correct = (response.selected_id === triad.belief_answer);
+        let selected_role = triad.option_roles[response.selected_id] || "unknown";
+        let stars_earned = (this.bonus_stars > 0 && is_correct) ? this.bonus_stars : 0;
+
+        let associated_fennimals = [];
+        if (this.expCont && this.expCont.dataCont && this.expCont.dataCont.experimentData) {
+            let templates = this.expCont.dataCont.experimentData.fennimals || [];
+            associated_fennimals = templates.filter(f => f.toybox === trial.target_box).map(f => f.id);
+        }
+
+        this.ParticipantAnswers.push({
+            type: "partner_belief_individual_belief",
+            trial_kind: "belief",
+            section: "belief",
+            is_practice: false,
+            question_id: trial.question_id,
+            trial_instance_id: trial.trial_instance_id,
+            block_index: trial.block_index,
+            belief_block_index: trial.belief_block_index,
+            position_in_block: trial.position_in_block,
+            presentation_number_for_box: trial.presentation_number_for_box,
+            overall_presentation_index: this.overall_presentation_index,
+            target_box_code: trial.target_box_code,
+            target_box: trial.target_box,
+            associated_fennimals: associated_fennimals,
+            answer_option_rule: "belief_reality_cyclic_lure",
+            answer_option_codes: triad.answer_option_codes,
+            answer_options: triad.answer_options,
+            belief_answer: triad.belief_answer,
+            reality_answer: triad.reality_answer,
+            lure_answer: triad.lure_answer,
+            lure_source_box_code: triad.lure_source_box_code,
+            lure_source_box: triad.lure_source_box,
+            option_roles: triad.option_roles,
+            selected_answer: response.selected_id,
+            selected_answer_role: selected_role,
+            correct: is_correct,
+            option_layout: response.option_layout,
+            selected_angle_rad: response.selected_angle_rad,
+            selected_angle_deg: response.selected_angle_deg,
+            reveal_click_elapsed_perf_ms: revealMeta.reveal_click_elapsed_perf_ms,
+            reveal_click_elapsed_date_ms: revealMeta.reveal_click_elapsed_date_ms,
+            response_onset_elapsed_perf_ms: response.response_onset_elapsed_perf_ms,
+            response_onset_elapsed_date_ms: response.response_onset_elapsed_date_ms,
+            response_elapsed_perf_ms: response.response_elapsed_perf_ms,
+            response_elapsed_date_ms: response.response_elapsed_date_ms,
+            reaction_time_ms: response.reaction_time_ms,
+            input_type: response.input_type,
+            stars_earned: stars_earned
+        });
+
+        await this.animate_partner_exit();
+        await wait(200);
+    }
+
+    async run_reality_trial(trial) {
+        let triad = this._buildBeliefRealityCyclicTriad(trial);
+        if (!triad) {
+            console.error(`PartnerBeliefIndividualBoxes: skipping reality trial "${trial.question_id}" due to invalid triad.`);
+            await this.fade_black(0, 200);
+            return;
+        }
+
+        this.place_target_box(trial.target_box);
+        let revealPromise = this.create_curtain_with_reveal_circle();
+        await this.fade_black(0, 350);
+
+        let printed_box_name = GenParam.get_box_printed_name(trial.target_box);
+        Interface.Prompt.show_message("Click on the circle to start the question");
+        let revealMeta = await revealPromise;
+
+        Interface.Prompt.show_message(
+            `Which toy is currently in the ${printed_box_name}? Answer as quickly and accurately as you can.`
+        );
+
+        let response = await this.show_radial_options_and_wait(triad.answer_options, {
+            mode: "toys",
+            showBox: true
+        });
+
+        Interface.Prompt.hide();
+        AudioCont.play_sound_effect("button_click");
+
+        let is_correct = (response.selected_id === triad.reality_answer);
+        let selected_role = triad.option_roles[response.selected_id] || "unknown";
+        let stars_earned = (this.bonus_stars > 0 && is_correct) ? this.bonus_stars : 0;
+
+        let associated_fennimals = [];
+        if (this.expCont && this.expCont.dataCont && this.expCont.dataCont.experimentData) {
+            let templates = this.expCont.dataCont.experimentData.fennimals || [];
+            associated_fennimals = templates.filter(f => f.toybox === trial.target_box).map(f => f.id);
+        }
+
+        this.ParticipantAnswers.push({
+            type: "partner_belief_individual_reality",
+            trial_kind: "reality",
+            section: "reality",
+            is_practice: false,
+            question_id: trial.question_id,
+            trial_instance_id: trial.trial_instance_id,
+            block_index: trial.block_index,
+            position_in_block: trial.position_in_block,
+            presentation_number_for_box: trial.presentation_number_for_box,
+            overall_presentation_index: this.overall_presentation_index,
+            target_box_code: trial.target_box_code,
+            target_box: trial.target_box,
+            associated_fennimals: associated_fennimals,
+            answer_option_rule: "belief_reality_cyclic_lure",
+            answer_option_codes: triad.answer_option_codes,
+            answer_options: triad.answer_options,
+            belief_answer: triad.belief_answer,
+            reality_answer: triad.reality_answer,
+            lure_answer: triad.lure_answer,
+            lure_source_box_code: triad.lure_source_box_code,
+            lure_source_box: triad.lure_source_box,
+            option_roles: triad.option_roles,
+            selected_answer: response.selected_id,
+            selected_answer_role: selected_role,
+            correct: is_correct,
+            option_layout: response.option_layout,
+            selected_angle_rad: response.selected_angle_rad,
+            selected_angle_deg: response.selected_angle_deg,
+            reveal_click_elapsed_perf_ms: revealMeta.reveal_click_elapsed_perf_ms,
+            reveal_click_elapsed_date_ms: revealMeta.reveal_click_elapsed_date_ms,
+            response_onset_elapsed_perf_ms: response.response_onset_elapsed_perf_ms,
+            response_onset_elapsed_date_ms: response.response_onset_elapsed_date_ms,
+            response_elapsed_perf_ms: response.response_elapsed_perf_ms,
+            response_elapsed_date_ms: response.response_elapsed_date_ms,
+            reaction_time_ms: response.reaction_time_ms,
+            input_type: response.input_type,
+            stars_earned: stars_earned
+        });
+
+        await wait(400);
+    }
+
+    async finish_task() {
+        await this.fade_black(1, 400);
+        this.TaskObj.PartnerBeliefAnswers = this.ParticipantAnswers;
+        this.returnfunc();
+    }
+
+    clean_up() {
+        if (this.bubble_float_interval) clearInterval(this.bubble_float_interval);
+        if (this.ItemLayers) {
+            Object.values(this.ItemLayers).forEach(layer => {
+                if (layer && layer.parentNode) layer.remove();
+            });
+        }
+        Interface.Prompt.hide();
     }
 }
 

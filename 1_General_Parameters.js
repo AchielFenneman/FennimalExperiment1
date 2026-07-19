@@ -495,10 +495,162 @@ GENERALPARAM = function () {
     //In phases where stars can be earned, this color defined the background of the instructions
     this.background_fill_for_instructions_where_stars_can_be_earned = "#faf8eb"
 
-    //Determines whether the icons on the map should be cleared between days
+    // AUTOTRAVEL AND PHONE ROOM SETTINGS
+    this.AutoTravel = {
+        speed: 2.5,
+        arrivalDistance: 8,
+        partnerCatchupDelay: 1000,
+        partnerFollowStopDistance: 4,
+        startDelay: 500,
+        iconFadeTime: 650,
+        iconHoldDelay: 400,
+        travellingLabel: "Travelling...",
+        partnerStartOffset: {
+            x: 0,
+            y: 0
+        }
+    }
 
+    this.MapFlair = {
+        showAutoTravelTrackmarks: true,
+        trackmarkSpacing: 22,
+        trackmarkRadius: 5,
+        trackmarkFadeTime: 2400,
+        trackmarkColor: "#5c4030",
+        trackmarkOpacity: 0.7
+    }
 
+    this.PhoneRoom = {
+        backgroundColor: "#d9e7ef",
+        floorColor: "#b7c8d2",
+        roomFadeTime: 500,
+        ringStartDelay: 500,
+        phoneRingInterval: 2600,
+        phoneShakeDuration: 450,
+        returnToPhoneRoomAfterFinalTrial: true,
 
+        table: {
+            x: 0.25 * this.SVG_width,
+            y: 0.73 * this.SVG_height,
+            width: 0.5 * this.SVG_width,
+            height: 0.22 * this.SVG_height
+        },
+        tableColor: "#8b5e3c",
+        tableFrontColor: "#6f452b",
+
+        phoneCenter: {
+            x: 0.5 * this.SVG_width,
+            y: 0.65 * this.SVG_height
+        },
+
+        partnerCenter: {
+            x: 0.5 * this.SVG_width,
+            y: 0.61 * this.SVG_height
+        },
+        partnerScale: 21,
+        partnerExitTime: 900,
+        partnerExitX: -250
+    }
+    this.PhoneRoomFlair = {
+        showPhoneRipples: true,
+        showExclamationMark: true,
+        dimRoomOnAnswer: true,
+        polishPartnerExit: true,
+        showHintRainclouds: true,
+        sequentialHintText: true,
+
+        answerDimTime: 250,
+        attentionPulseTime: 1100,
+        phoneRippleInterval: 700,
+        phoneRippleDuration: 1400,
+        phoneRippleStartRadius: 28,
+        phoneRippleMaxRadius: 260,
+        phoneRippleStrokeWidth: 14,
+        phoneRippleOpacity: 0.95,
+        phoneRippleColor: "#FFE566",
+        partnerTurnPause: 220
+    }
+
+    // Photo trial (photo_box now; photo_fennimal later via same controller)
+    this.PhotoTrial = {
+        boxScaleMin: 2.5,
+        boxScaleMax: 4,
+        boxYMin: 0.45,
+        boxYMax: 0.75,
+        boxXMargin: 80,
+        partnerAvoidGap: 100,
+        lensWidth: 420,
+        lensHeight: 480,
+        reticleRadius: 36,
+        bracketLength: 48,
+        viewfinderDimOpacity: 0.55,
+        flashPeakOpacity: 0.5,
+        flashInTime: 70,
+        flashHoldTime: 40,
+        flashOutTime: 220,
+        polaroidAppearDelay: 500,
+        polaroidFadeTime: 350,
+        missPolaroidTime: 750,
+        polaroidScale: 0.825,
+        polaroidCenterY: 0.42,
+        closeButtonSize: 72
+    }
+
+    // Feed Fennimal trial
+    this.FeedTrial = {
+        fennimalX: 0.38,
+        fennimalY: 0.82,
+        fennimalScale: 1.75,
+        bowlX: 0.58,
+        bowlY: 0.78,
+        bowlScale: 3.5,
+        backpackX: 0.88,
+        backpackY: 0.78,
+        backpackScale: 3,
+        bagScale: 3.5,
+        bagColumnTopY: 0.18,
+        bagColumnBottomY: 0.55,
+        bagPopStagger: 90,
+        bagMoveTime: 250,
+        dropDistance: 200,
+        eatMoveTime: 400,
+        partnerBagOffsetX: -55,
+        partnerBagOffsetY: -40,
+        partnerHandoffLift: -50
+    }
+
+    // Joint Fennimal + box cleaning (memory binding, no toy)
+    this.JointBoxCleaning = {
+        fennimalX: 0.28,
+        fennimalY: 0.82,
+        fennimalScale: 1.75,
+        boxX: 0.55,
+        boxY: 0.72,
+        boxScale: 4,
+        cleaningRounds: 4,
+        dirtSpots: 8,
+        dustPerPuff: 25,
+        // Between box (~0.55) and partner corner (~0.9)
+        spongeActiveX: 0.55,
+        spongeActiveY: 0.58,
+        spongeFloorY: 0.88,
+        bellowsOffsetX: 200,
+        bellowsOffsetY: -700,
+        // Closer to box / higher / smaller
+        foliageOffsetX: -210,
+        foliageOffsetY: 50,
+        foliageSize: 1.5,
+        foliageHitsPerRound: 1,
+        // Resting spot while waiting (closer to box = further right)
+        fennimalRestOffsetX: -650,
+        encodingPauseMs: 1400,
+        dropDistance: 220,
+        shearsOffsetX: 90,
+        shearsOffsetY: -80,
+        shearsScale: 2.2,
+        shearsCloseMs: 200,
+        shearsOpenMs: 360
+    }
 }
 
 

@@ -50,9 +50,43 @@ class DataController {
     }
 
     storePhaseData(cleanDataObj) {
-        this.experimentData.storedData.push(JSON.parse(JSON.stringify(cleanDataObj)));
-        this.recordTimestamp(cleanDataObj.type);
-        this.storeAllData(false)
+        // Deep clone so we don't accidentally mutate the live game state
+        let clonedPhaseData = JSON.parse(JSON.stringify(cleanDataObj));
+
+        // DRY Helper: Compares a Fennimal to its template and strips redundancies
+        const stripRedundantFennimalData = (fenObj) => {
+            if (!fenObj || !fenObj.id) return fenObj;
+
+            let template = this.experimentData.fennimals.find(f => f.id === fenObj.id);
+            if (template) {
+                for (let key in template) {
+                    // We stringify for a safe deep-comparison of nested arrays/objects
+                    if (fenObj[key] !== undefined && JSON.stringify(fenObj[key]) === JSON.stringify(template[key])) {
+                        delete fenObj[key]; // Redundant! Strip it.
+                    }
+                }
+            }
+
+            // Always strip these internal tracking variables
+            delete fenObj.search_status;
+            delete fenObj.visited;
+
+            return fenObj;
+        };
+
+        // Apply stripping to the planned sequence
+        if (clonedPhaseData.Fennimals_in_phase && Array.isArray(clonedPhaseData.Fennimals_in_phase)) {
+            clonedPhaseData.Fennimals_in_phase = clonedPhaseData.Fennimals_in_phase.map(stripRedundantFennimalData);
+        }
+
+        // Apply stripping to the completed interaction records
+        if (clonedPhaseData.Data && Array.isArray(clonedPhaseData.Data)) {
+            clonedPhaseData.Data = clonedPhaseData.Data.map(stripRedundantFennimalData);
+        }
+
+        this.experimentData.storedData.push(clonedPhaseData);
+        this.recordTimestamp(clonedPhaseData.type);
+        this.storeAllData(false);
     }
 
     storeAllData(bool_experiment_completed) {
@@ -156,30 +190,347 @@ class TrialGenerator {
     }
 
     generateTrialsForPhase(phaseData) {
-        let interactionTypesArr = Array.isArray(phaseData.interaction_type) ? phaseData.interaction_type : [phaseData.interaction_type];
-        const baseFennimalSet = this.stimuli.get_Fennimals_in_array(phaseData.Fennimals_encountered);
+        this.validatePhaseTrialSpec(phaseData);
 
-        // 1. Generate all main trials
+        let mainTrials;
+        let orthogonalTrials = [];
+
+        if (Array.isArray(phaseData.trial_subblocks)) {
+            // Ordered subblocks: shuffle within each, then concatenate (preserves subblock order).
+            mainTrials = this.generateTrialsFromSubblocks(phaseData);
+        } else {
+            mainTrials = this.generateCartesianMainTrials(
+                phaseData.Fennimals_encountered,
+                phaseData.interaction_type,
+                phaseData
+            );
+
+            if (phaseData.included_orthogonal_tasks) {
+                orthogonalTrials = this.getOrthogonalTaskTrials(phaseData);
+            }
+        }
+
+        // Stamp block-level ask_toy / ask_box / ask_Fennimal onto every trial in the block (main + orthogonal).
+        mainTrials = this.applyAskToySettingsToTrials(mainTrials, phaseData);
+        orthogonalTrials = this.applyAskToySettingsToTrials(orthogonalTrials, phaseData);
+        mainTrials = this.applyAskBoxSettingsToTrials(mainTrials, phaseData);
+        orthogonalTrials = this.applyAskBoxSettingsToTrials(orthogonalTrials, phaseData);
+        mainTrials = this.applyAskFennimalSettingsToTrials(mainTrials, phaseData);
+        orthogonalTrials = this.applyAskFennimalSettingsToTrials(orthogonalTrials, phaseData);
+
+        if (Array.isArray(phaseData.trial_subblocks)) {
+            // Subblock order is intentional; do not re-shuffle across subblock boundaries.
+            return mainTrials;
+        }
+
+        return this.smartShuffleTrials(mainTrials, orthogonalTrials);
+    }
+
+    /**
+     * Fail loud on ambiguous / conflicting trial specs so experiment setup mistakes are obvious in testing.
+     */
+    validatePhaseTrialSpec(phaseData) {
+        let hasSubblocks = Array.isArray(phaseData.trial_subblocks);
+        let hasTopLevelFennimals = phaseData.Fennimals_encountered !== undefined && phaseData.Fennimals_encountered !== null;
+        let hasTopLevelInteractionType = phaseData.interaction_type !== undefined && phaseData.interaction_type !== null;
+
+        if (hasSubblocks) {
+            if (phaseData.trial_subblocks.length === 0) {
+                throw new Error(
+                    `TrialGenerator: phase type "${phaseData.type}" has trial_subblocks as an empty array. ` +
+                    `Remove trial_subblocks or add at least one subblock.`
+                );
+            }
+
+            if (hasTopLevelFennimals) {
+                throw new Error(
+                    `TrialGenerator: phase type "${phaseData.type}" sets both trial_subblocks and top-level Fennimals_encountered. ` +
+                    `Use one or the other — when trial_subblocks is present, put Fennimals only inside each subblock.`
+                );
+            }
+
+            if (hasTopLevelInteractionType) {
+                throw new Error(
+                    `TrialGenerator: phase type "${phaseData.type}" sets both trial_subblocks and top-level interaction_type. ` +
+                    `Use one or the other — when trial_subblocks is present, put interaction_type only inside each subblock (or on each explicit trial).`
+                );
+            }
+
+            if (phaseData.included_orthogonal_tasks) {
+                throw new Error(
+                    `TrialGenerator: phase type "${phaseData.type}" sets both trial_subblocks and included_orthogonal_tasks. ` +
+                    `Orthogonal mixing across ordered subblocks is not supported — remove one of these fields.`
+                );
+            }
+
+            phaseData.trial_subblocks.forEach((subblock, index) => {
+                this.validateSubblockSpec(subblock, index, phaseData.type);
+            });
+            return;
+        }
+
+        if (!hasTopLevelFennimals) {
+            throw new Error(
+                `TrialGenerator: phase type "${phaseData.type}" is missing Fennimals_encountered ` +
+                `(and has no trial_subblocks).`
+            );
+        }
+
+        if (!hasTopLevelInteractionType) {
+            throw new Error(
+                `TrialGenerator: phase type "${phaseData.type}" is missing interaction_type ` +
+                `(and has no trial_subblocks).`
+            );
+        }
+    }
+
+    validateSubblockSpec(subblock, index, phaseType) {
+        if (!subblock || typeof subblock !== "object" || Array.isArray(subblock)) {
+            throw new Error(
+                `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}] must be an object.`
+            );
+        }
+
+        let hasTrials = Array.isArray(subblock.trials);
+        let hasCartesianFennimals = subblock.Fennimals_encountered !== undefined && subblock.Fennimals_encountered !== null;
+        let hasCartesianInteraction = subblock.interaction_type !== undefined && subblock.interaction_type !== null;
+
+        if (hasTrials && (hasCartesianFennimals || hasCartesianInteraction)) {
+            throw new Error(
+                `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}] mixes explicit trials with ` +
+                `Fennimals_encountered / interaction_type. Use either a cartesian subblock ` +
+                `({ Fennimals_encountered, interaction_type }) OR an explicit list ({ trials: [...] }), not both.`
+            );
+        }
+
+        if (hasTrials) {
+            if (subblock.trials.length === 0) {
+                throw new Error(
+                    `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}].trials is empty.`
+                );
+            }
+            subblock.trials.forEach((trialSpec, trialIndex) => {
+                if (!trialSpec || typeof trialSpec !== "object") {
+                    throw new Error(
+                        `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}].trials[${trialIndex}] must be an object.`
+                    );
+                }
+                if (!trialSpec.Fennimal) {
+                    throw new Error(
+                        `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}].trials[${trialIndex}] ` +
+                        `is missing required field "Fennimal".`
+                    );
+                }
+                if (trialSpec.interaction_type === undefined || trialSpec.interaction_type === null) {
+                    throw new Error(
+                        `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}].trials[${trialIndex}] ` +
+                        `is missing required field "interaction_type".`
+                    );
+                }
+            });
+            return;
+        }
+
+        if (!hasCartesianFennimals || !hasCartesianInteraction) {
+            throw new Error(
+                `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}] must define either ` +
+                `"trials: [...]" OR both "Fennimals_encountered" and "interaction_type".`
+            );
+        }
+
+        if (!Array.isArray(subblock.Fennimals_encountered) || subblock.Fennimals_encountered.length === 0) {
+            throw new Error(
+                `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}].Fennimals_encountered ` +
+                `must be a non-empty array.`
+            );
+        }
+    }
+
+    generateTrialsFromSubblocks(phaseData) {
+        let allTrials = [];
+
+        phaseData.trial_subblocks.forEach((subblock, subblockIndex) => {
+            let subblockTrials;
+
+            if (Array.isArray(subblock.trials)) {
+                subblockTrials = this.generateExplicitTrials(subblock.trials, phaseData);
+            } else {
+                subblockTrials = this.generateCartesianMainTrials(
+                    subblock.Fennimals_encountered,
+                    subblock.interaction_type,
+                    phaseData
+                );
+            }
+
+            subblockTrials = set_property_to_all_elem_in_arr("trial_subblock_index", subblockIndex, subblockTrials);
+            subblockTrials = this.smartShuffleTrials(subblockTrials, []);
+            allTrials.push(...subblockTrials);
+        });
+
+        return allTrials;
+    }
+
+    generateExplicitTrials(trialSpecs, phaseData) {
+        let trials = [];
+
+        trialSpecs.forEach((trialSpec, trialIndex) => {
+            let fenArr = this.stimuli.get_Fennimals_in_array([trialSpec.Fennimal]);
+            if (!fenArr || fenArr.length === 0) {
+                throw new Error(
+                    `TrialGenerator: unknown Fennimal id "${trialSpec.Fennimal}" in an explicit trial_subblocks trial ` +
+                    `(phase type "${phaseData.type}", trials[${trialIndex}]).`
+                );
+            }
+
+            let trial = JSON.parse(JSON.stringify(fenArr[0]));
+            trial.interaction_type = trialSpec.interaction_type;
+            this.applyPhaseHintTypeIfNeeded(trial, phaseData);
+            trials.push(trial);
+        });
+
+        return trials;
+    }
+
+    generateCartesianMainTrials(fennimalsEncountered, interactionType, phaseData) {
+        let interactionTypesArr = Array.isArray(interactionType) ? interactionType : [interactionType];
+        const baseFennimalSet = this.stimuli.get_Fennimals_in_array(fennimalsEncountered);
+
+        if (!baseFennimalSet || baseFennimalSet.length === 0) {
+            throw new Error(
+                `TrialGenerator: no Fennimals found for ids ${JSON.stringify(fennimalsEncountered)} ` +
+                `(phase type "${phaseData.type}").`
+            );
+        }
+
         let mainTrials = [];
         for (let i = 0; i < interactionTypesArr.length; i++) {
-            let newSet = set_property_to_all_elem_in_arr("interaction_type", interactionTypesArr[i], JSON.parse(JSON.stringify(baseFennimalSet)));
+            let newSet = set_property_to_all_elem_in_arr(
+                "interaction_type",
+                interactionTypesArr[i],
+                JSON.parse(JSON.stringify(baseFennimalSet))
+            );
+            newSet.forEach(trial => this.applyPhaseHintTypeIfNeeded(trial, phaseData));
             mainTrials.push(...newSet);
         }
 
-        // Apply hint types if applicable
-        if (phaseData.type === "hint_and_search") {
-            let hintTypeArr = Array.isArray(phaseData.hint_type) ? phaseData.hint_type : [phaseData.hint_type];
-            mainTrials = set_property_to_all_elem_in_arr("hint_type", hintTypeArr[0], mainTrials);
+        return mainTrials;
+    }
+
+    applyPhaseHintTypeIfNeeded(trial, phaseData) {
+        if (phaseData.type !== "hint_and_search") return trial;
+        let hintTypeArr = Array.isArray(phaseData.hint_type) ? phaseData.hint_type : [phaseData.hint_type];
+        trial.hint_type = hintTypeArr[0];
+        return trial;
+    }
+
+    applyAskToySettingsToTrials(trials, phaseData) {
+        if (!phaseData.ask_toy || !trials || trials.length === 0) return trials;
+
+        let toysAskedMapped;
+        if (Array.isArray(phaseData.toys_asked) && phaseData.toys_asked.length > 0) {
+            toysAskedMapped = this.stimuli.get_assigned_names_of_code_array("toy", phaseData.toys_asked);
+            if (!toysAskedMapped || toysAskedMapped.includes(false) || toysAskedMapped.some(t => !t)) {
+                console.warn("ask_toy: failed to map toys_asked codes", phaseData.toys_asked);
+                toysAskedMapped = (toysAskedMapped || []).filter(t => t);
+            }
+        } else {
+            toysAskedMapped = this.collectUniqueAttributeFromPhaseFennimals(phaseData, "toy");
+            if (toysAskedMapped.length === 0) {
+                console.warn("ask_toy is true but no toys_asked / phase toys could be resolved");
+            }
         }
 
-        // 2. Generate all orthogonal trials
-        let orthogonalTrials = [];
-        if (phaseData.included_orthogonal_tasks) {
-            orthogonalTrials = this.getOrthogonalTaskTrials(phaseData);
+        trials = set_property_to_all_elem_in_arr("ask_toy", true, trials);
+        trials = set_property_to_all_elem_in_arr("toys_asked", toysAskedMapped, trials);
+        return trials;
+    }
+
+    applyAskBoxSettingsToTrials(trials, phaseData) {
+        if (!phaseData.ask_box || !trials || trials.length === 0) return trials;
+
+        let boxesAskedMapped;
+        if (Array.isArray(phaseData.boxes_asked) && phaseData.boxes_asked.length > 0) {
+            boxesAskedMapped = this.stimuli.get_assigned_names_of_code_array("toybox", phaseData.boxes_asked);
+            if (!boxesAskedMapped || boxesAskedMapped.includes(false) || boxesAskedMapped.some(b => !b)) {
+                console.warn("ask_box: failed to map boxes_asked codes", phaseData.boxes_asked);
+                boxesAskedMapped = (boxesAskedMapped || []).filter(b => b);
+            }
+        } else {
+            boxesAskedMapped = this.collectUniqueAttributeFromPhaseFennimals(phaseData, "toybox");
+            if (boxesAskedMapped.length === 0) {
+                console.warn("ask_box is true but no boxes_asked / phase toyboxes could be resolved");
+            }
         }
 
-        // 3. Run the Smart Shuffle (Grace period removed for maximum randomization!)
-        return this.smartShuffleTrials(mainTrials, orthogonalTrials);
+        trials = set_property_to_all_elem_in_arr("ask_box", true, trials);
+        trials = set_property_to_all_elem_in_arr("boxes_asked", boxesAskedMapped, trials);
+        return trials;
+    }
+
+    /**
+     * Unique assigned attribute values (e.g. toy / toybox) across Fennimals in this phase block.
+     */
+    collectUniqueAttributeFromPhaseFennimals(phaseData, attribute) {
+        let ids = this.collectFennimalIdsInPhase(phaseData);
+        let fenObjects = this.stimuli.get_Fennimals_in_array(ids);
+        let values = [];
+        (fenObjects || []).forEach((fen) => {
+            if (fen && fen[attribute] && !values.includes(fen[attribute])) {
+                values.push(fen[attribute]);
+            }
+        });
+        return values;
+    }
+
+    /**
+     * Stamp ask_Fennimal onto all trials. fennimals_asked defaults to every Fennimal id in the phase
+     * (union across trial_subblocks when present). Also stamps fennimals_asked_objects for head UI.
+     */
+    applyAskFennimalSettingsToTrials(trials, phaseData) {
+        if (!phaseData.ask_Fennimal || !trials || trials.length === 0) return trials;
+
+        let ids = Array.isArray(phaseData.fennimals_asked) && phaseData.fennimals_asked.length > 0
+            ? [...phaseData.fennimals_asked]
+            : this.collectFennimalIdsInPhase(phaseData);
+
+        if (!ids || ids.length === 0) {
+            console.warn("ask_Fennimal is true but no fennimals_asked / phase Fennimals could be resolved");
+            ids = [];
+        }
+
+        let fenObjects = this.stimuli.get_Fennimals_in_array(ids);
+
+        trials = set_property_to_all_elem_in_arr("ask_Fennimal", true, trials);
+        trials = set_property_to_all_elem_in_arr("fennimals_asked", ids, trials);
+        trials = set_property_to_all_elem_in_arr("fennimals_asked_objects", fenObjects, trials);
+        return trials;
+    }
+
+    collectFennimalIdsInPhase(phaseData) {
+        let idSet = new Set();
+
+        if (Array.isArray(phaseData.trial_subblocks)) {
+            phaseData.trial_subblocks.forEach((subblock) => {
+                if (Array.isArray(subblock.trials)) {
+                    subblock.trials.forEach((trialSpec) => {
+                        if (trialSpec && trialSpec.Fennimal) idSet.add(trialSpec.Fennimal);
+                    });
+                } else if (Array.isArray(subblock.Fennimals_encountered)) {
+                    subblock.Fennimals_encountered.forEach((id) => idSet.add(id));
+                } else if (subblock.Fennimals_encountered === "all") {
+                    this.stimuli.get_Fennimals_in_array("all").forEach((fen) => idSet.add(fen.id));
+                }
+            });
+            return Array.from(idSet);
+        }
+
+        if (phaseData.Fennimals_encountered === "all") {
+            return this.stimuli.get_Fennimals_in_array("all").map((fen) => fen.id);
+        }
+        if (Array.isArray(phaseData.Fennimals_encountered)) {
+            return [...phaseData.Fennimals_encountered];
+        }
+        return [];
     }
 
     getOrthogonalTaskTrials(phaseData) {
@@ -295,6 +646,7 @@ class TaskEvaluator {
 class ExperimentController {
     constructor() {
         this.experimentStartTime = Date.now();
+        this.experimentStartPerf = performance.now();
         this.stimulusSettings = new StimulusSettings();
         this.stimuli = new StimulusTransformer(this.stimulusSettings);
         console.log(this.stimuli.get_all_Fennimals_objects_in_array());
@@ -310,6 +662,7 @@ class ExperimentController {
 
         this.mapCont = new MapController(this, WorldState);
         this.instrCont = new InstructionsController(this, WorldState, this.stimuli);
+        this.phoneRoomCont = new PhoneRoomController(this, WorldState, this.instrCont); //TODO: this should probably be moved to a different section (not all experiments will use a phoneroomcontroller)
 
         // State Tracking
         this.remainingExperimentPhases = JSON.parse(JSON.stringify(this.stimulusSettings.Experiment_Structure));
@@ -334,6 +687,7 @@ class ExperimentController {
 
     startExperiment() {
         this.checkIfPhoneBoothIsNeeded();
+        this.checkIfPhoneRoomAssetIsNeeded();
         this.showNextGeneralInstructionsPage();
         this.mapCont.disable_map_interactions();
     }
@@ -366,10 +720,31 @@ class ExperimentController {
         // Route to the appropriate setup logic
         switch (this.currentPhaseType) {
             case "partner_belief":
+            case "partner_belief_multiple":
+                // "partner_belief" is a deprecated alias for "partner_belief_multiple" (spring-cleaning candidate).
                 this.flagPartnerBeliefInstructionsShown = false;
                 let partnerName = WorldState.get_partner_icon_settings().name;
                 let partnerPresent = WorldState.get_current_partner_role() === "active";
-                this.instrCont.initializePartnerBeliefInstructions(partnerName, partnerPresent, this.currentPhaseData.bonus_stars_per_correct_answer, this.currentPhaseData.toyboxes_asked.length, this.currentDayNum);
+                this.instrCont.initializePartnerBeliefInstructions(
+                    partnerName,
+                    partnerPresent,
+                    this.currentPhaseData.bonus_stars_per_correct_answer,
+                    this.currentPhaseData.toyboxes_asked.length,
+                    this.currentDayNum
+                );
+                break;
+            case "partner_belief_individual_boxes":
+                this.flagPartnerBeliefInstructionsShown = false;
+                let pbIndPartnerName = WorldState.get_partner_icon_settings().name;
+                this.instrCont.initializePartnerBeliefIndividualBoxesInstructions(
+                    pbIndPartnerName,
+                    this.currentPhaseData.bonus_stars_per_correct_answer,
+                    (this.currentPhaseData.questions || []).length,
+                    this.currentPhaseData.num_belief_blocks ?? this.currentPhaseData.num_repeated_blocks,
+                    this.currentPhaseData.include_practice_trial === true,
+                    this.currentPhaseData.include_reality_block_at_end === true,
+                    this.currentDayNum
+                );
                 break;
             case "free_exploration":
                 this.setupTrialBasedPhase();
@@ -395,13 +770,23 @@ class ExperimentController {
             case "on_call":
                 this.setupTrialBasedPhase();
 
-                // THE FIX: Use the standard 'skip_instructions' parameter!
                 if (!this.currentPhaseData.skip_instructions) {
                     this.flagOnCallInstructionsShown = false;
                     this.instrCont.initializeOnCallPhaseGeneralInstructions(this.currentDayNum, this.currentPhaseData.include_Fennefinder);
                 } else {
                     this.flagOnCallInstructionsShown = true;
                     this.startNextTrialInOnCallPhase();
+                }
+                break;
+            case "phone_room":
+                this.setupTrialBasedPhase();
+
+                if (this.currentPhaseData.skip_instructions === true) {
+                    this.flagPhoneRoomInstructionsShown = true;
+                    this.startNextTrialInPhoneRoomPhase();
+                } else {
+                    this.flagPhoneRoomInstructionsShown = false;
+                    this.instrCont.initializePhoneRoomPhaseGeneralInstructions(this.currentDayNum);
                 }
                 break;
             case "name_recall_task":
@@ -418,7 +803,8 @@ class ExperimentController {
                     this.currentDayNum,
                     this.stimuli.get_Fennimals_in_array(fensToAsk),
                     this.currentPhaseData.attribute_order,
-                    maxStars
+                    maxStars,
+                    this.currentPhaseData.presentation
                 );
                 break;
             case "pseudoday":
@@ -433,10 +819,10 @@ class ExperimentController {
 
     setupTrialBasedPhase() {
         this.currentPhaseData.Fennimals_in_phase = this.trialGenerator.generateTrialsForPhase(this.currentPhaseData);
-        console.log(this.currentPhaseData.Fennimals_in_phase )
         this.currentPhaseData.number_interactions_in_phase = this.currentPhaseData.Fennimals_in_phase.length;
         this.currentPhaseData.Data = [];
         this.currentTrialNumInDay = 0;
+        this.executionQueue = [...this.currentPhaseData.Fennimals_in_phase];
     }
 
     setupPartnerBeliefPhase() {
@@ -449,16 +835,19 @@ class ExperimentController {
         let pLayer = document.getElementById("Fennimals_Layer");
         let pbPartnerPresent = WorldState.get_current_partner_role() === "active";
 
-        let currentTask = new PartnerBeliefTaskController(pLayer, this.currentPhaseData, pbPartnerPresent, () => {
+        // PartnerBeliefMultipleController (PartnerBeliefTaskController remains a deprecated alias).
+        let currentTask = new PartnerBeliefMultipleController(pLayer, this.currentPhaseData, pbPartnerPresent, () => {
 
-            // FIX 3: Attach the answers directly to the rich phase data object, preserving the configurations
+            // FIX: Attach the answers, then delete the duplicate source array to prevent JSON bloat!
             this.currentPhaseData.answers = this.currentPhaseData.PartnerBeliefAnswers;
+            delete this.currentPhaseData.PartnerBeliefAnswers;
 
-            let earned = this.currentPhaseData.PartnerBeliefAnswers.reduce((sum, ans) => sum + (ans.stars_earned || 0), 0);
+            // Calculate using the new .answers array
+            let earned = this.currentPhaseData.answers.reduce((sum, ans) => sum + (ans.stars_earned || 0), 0);
             let maxPossible = this.currentPhaseData.bonus_stars_per_correct_answer * this.currentPhaseData.toyboxes_asked.length;
 
             this.currentPhaseData.bonus_stars_earned = earned; // Tag it locally for easy access in R
-            this.dataCont.recordStarsEarned(this.currentDayNum, "partner_belief", earned, maxPossible);
+            this.dataCont.recordStarsEarned(this.currentDayNum, this.currentPhaseType, earned, maxPossible);
 
             currentTask.clean_up();
             document.getElementById("Map").style.display = "inherit";
@@ -466,6 +855,48 @@ class ExperimentController {
             // This naturally calls phaseCompleted(), which will now properly store this rich object!
             this.phaseCompleted();
         });
+        currentTask.start_sequence();
+    }
+
+    setupPartnerBeliefIndividualBoxesPhase() {
+        this.mapCont.disable_map_interactions();
+        document.getElementById("Map").style.display = "none";
+
+        // Ensure partner is treated as present for this DV task.
+        WorldState.change_partner_role_behavior("active");
+
+        let pLayer = document.getElementById("Fennimals_Layer");
+        let currentTask = new PartnerBeliefIndividualBoxesController(
+            pLayer,
+            this.currentPhaseData,
+            () => {
+                this.currentPhaseData.answers = this.currentPhaseData.PartnerBeliefAnswers;
+                delete this.currentPhaseData.PartnerBeliefAnswers;
+
+                let experimentalAnswers = this.currentPhaseData.answers.filter(a =>
+                    a.trial_kind === "belief" || a.trial_kind === "reality"
+                );
+                let earned = experimentalAnswers.reduce((sum, ans) => sum + (ans.stars_earned || 0), 0);
+                let nBlocks = (typeof this.currentPhaseData.num_belief_blocks === "number" && this.currentPhaseData.num_belief_blocks > 0)
+                    ? this.currentPhaseData.num_belief_blocks
+                    : ((typeof this.currentPhaseData.num_repeated_blocks === "number" && this.currentPhaseData.num_repeated_blocks > 0)
+                        ? this.currentPhaseData.num_repeated_blocks
+                        : 1);
+                let nQuestions = (this.currentPhaseData.questions || []).length;
+                let maxPossible = (this.currentPhaseData.bonus_stars_per_correct_answer || 0) * nQuestions * nBlocks;
+                if (this.currentPhaseData.include_reality_block_at_end === true) {
+                    maxPossible += (this.currentPhaseData.bonus_stars_per_correct_answer || 0) * nQuestions;
+                }
+
+                this.currentPhaseData.bonus_stars_earned = earned;
+                this.dataCont.recordStarsEarned(this.currentDayNum, "partner_belief_individual_boxes", earned, maxPossible);
+
+                currentTask.clean_up();
+                document.getElementById("Map").style.display = "inherit";
+                this.phaseCompleted();
+            },
+            this
+        );
         currentTask.start_sequence();
     }
 
@@ -495,9 +926,9 @@ class ExperimentController {
     }
 
     startNextTrialInHintAndSearchPhase() {
-        if (this.currentPhaseData.Fennimals_in_phase.length > 0) {
+        if (this.executionQueue.length > 0) {
             this.currentTrialNumInDay++;
-            this.currentTrial = this.currentPhaseData.Fennimals_in_phase.shift();
+            this.currentTrial = this.executionQueue.shift();
             WorldState.add_Fennimal_to_map(this.currentTrial);
 
             this.instrCont.initializeHintAndSearchPhaseTrialInstructions(this.currentTrial, this.currentTrial.hint_type, ((this.currentTrialNumInDay - 1) / this.currentPhaseData.number_interactions_in_phase) * 100);
@@ -509,8 +940,8 @@ class ExperimentController {
     }
 
     jumpToNextTrial() {
-        if (this.currentPhaseData.Fennimals_in_phase.length > 0) {
-            this.currentTrial = this.currentPhaseData.Fennimals_in_phase.shift();
+        if (this.executionQueue.length > 0) {
+            this.currentTrial = this.executionQueue.shift();
             WorldState.add_Fennimal_to_map(this.currentTrial);
             this.mapCont.jump_player_to_location(this.currentTrial.location, this.currentTrial.region);
         } else {
@@ -520,7 +951,7 @@ class ExperimentController {
 
     // --- ON CALL PHASE LOGIC ---
     startNextTrialInOnCallPhase() {
-        if (this.currentPhaseData.Fennimals_in_phase.length === 0) {
+        if (this.executionQueue.length === 0) {
             this.phaseCompleted();
             return;
         }
@@ -528,7 +959,7 @@ class ExperimentController {
         this.instrCont.parentElem.innerHTML = "";
         this.instrCont.parentElem.style.display = "none";
 
-        this.currentFennimalToSearchFor = this.currentPhaseData.Fennimals_in_phase.shift();
+        this.currentFennimalToSearchFor = this.executionQueue.shift();
 
         // --- IDEA 3: THE AUDITORY NUDGE ---
         // Instantly start the ringing beacon, no matter where they are!
@@ -574,16 +1005,91 @@ class ExperimentController {
     }
 
     checkIfPhoneBoothIsNeeded() {
-        // Safety check to ensure the data is loaded
-        if (!this.ExpData || !this.ExpData.sequence) return;
-
-        // Scan the entire experiment sequence for any "on_call" phases
-        let needsBooth = this.ExpData.sequence.some(phase => phase.phase_type === "on_call");
+        let needsBooth = this.experimentIncludesPhaseType("on_call");
 
         if (!needsBooth) {
             this.mapCont.remove_phone_booth();
         }
     }
+
+    checkIfPhoneRoomAssetIsNeeded() {
+        let needsPhoneRoom = this.experimentIncludesPhaseType("phone_room");
+
+        if (!needsPhoneRoom) {
+            this.mapCont.remove_phone_room_asset();
+        } else if (!document.getElementById("phone_room")) {
+            console.warn("Experiment uses phone_room, but #phone_room was not found on the map. Auto-travel will use Home center fallback.");
+        }
+    }
+
+    phoneRoomAnswered() {
+        this.waitingForPhoneRoomHintToClose = true;
+        this.instrCont.setupPhoneRoomHintElements(this.currentTrial);
+        this.instrCont.showPhoneRoomHint();
+    }
+
+    phoneRoomHintClosed() {
+        this.phoneRoomCont.exitRoomBeforeMap(() => {
+            this.mapCont.autoTravelToTrialLocation(this.currentTrial, () => {
+                this.mapCont.enter_location(this.currentTrial.location, this.currentTrial.region);
+            });
+        });
+    }
+
+    shouldReturnToPhoneRoomAfterCurrentTrial() {
+        let phaseSetting = this.currentPhaseData.return_to_phone_room_after_final_trial;
+        let shouldReturnAfterFinalTrial = phaseSetting !== undefined
+            ? phaseSetting
+            : GenParam.PhoneRoom.returnToPhoneRoomAfterFinalTrial;
+
+        let isFinalPhoneRoomTrial = this.executionQueue.length === 0;
+
+        return !isFinalPhoneRoomTrial || shouldReturnAfterFinalTrial;
+    }
+
+    completePhoneRoomTrialAndReturnHome(fenObj) {
+        this.mapCont.disable_map_interactions();
+
+        // First leave the location visually, then start the automated return leg.
+        this.mapCont.return_to_map();
+
+        setTimeout(() => {
+            this.mapCont.autoTravelBackToPhoneRoom(fenObj, () => {
+                this.phoneRoomReturnCompleted();
+            });
+        }, GenParam.map_to_location_transition_speed);
+    }
+
+    phoneRoomReturnCompleted() {
+        this.mapCont.disable_map_interactions();
+        this.mapCont.remove_all_action_buttons();
+
+        if (this.mapCont.RequestInstructionsButton) {
+            this.mapCont.RequestInstructionsButton.style.display = "none";
+        }
+
+        this.startNextTrialInPhoneRoomPhase();
+    }
+
+
+    startNextTrialInPhoneRoomPhase() {
+        this.mapCont.disable_map_interactions();
+        Interface.FenneFinder.hide();
+
+        if (this.executionQueue.length === 0) {
+            this.phaseCompleted();
+            return;
+        }
+
+        this.currentTrialNumInDay++;
+        this.currentTrial = this.executionQueue.shift();
+
+        WorldState.rebuild_state_from_available_locations([]);
+        WorldState.populate_map_with_array_of_Fennimals([this.currentTrial], false);
+
+        this.phoneRoomCont.showRoom(this.currentTrial, () => this.phoneRoomAnswered());
+    }
+
 
     phaseCompleted() {
         if (this.currentFennimal) this.currentFennimal.clean_up();
@@ -712,13 +1218,29 @@ class ExperimentController {
                 }
                 break;
             case "partner_belief":
+            case "partner_belief_multiple":
                 if (!this.flagPartnerBeliefInstructionsShown) {
                     this.flagPartnerBeliefInstructionsShown = true;
                     this.setupPartnerBeliefPhase();
                 }
                 break;
+            case "partner_belief_individual_boxes":
+                if (!this.flagPartnerBeliefInstructionsShown) {
+                    this.flagPartnerBeliefInstructionsShown = true;
+                    this.setupPartnerBeliefIndividualBoxesPhase();
+                }
+                break;
             case "pseudoday":
                 this.startNextExperimentPhase();
+                break;
+            case "phone_room":
+                if (!this.flagPhoneRoomInstructionsShown) {
+                    this.flagPhoneRoomInstructionsShown = true;
+                    this.startNextTrialInPhoneRoomPhase();
+                } else if (this.waitingForPhoneRoomHintToClose) {
+                    this.waitingForPhoneRoomHintToClose = false;
+                    this.phoneRoomHintClosed();
+                }
                 break;
         }
     }
@@ -808,6 +1330,21 @@ class ExperimentController {
                 this.readyForNextOnCallTrial = true;
                 this.mapCont.allow_participant_to_leave_location(true);
                 break;
+            case "phone_room":
+                this.instrCont.updateProgressWithinDay(
+                    (this.currentInteractionNumInPhase / this.currentPhaseData.number_interactions_in_phase) * 100
+                );
+
+                // The return leg is part of the trial lifecycle unless this is the final trial
+                // and final-return has explicitly been disabled.
+                setTimeout(() => {
+                    if (this.shouldReturnToPhoneRoomAfterCurrentTrial()) {
+                        this.completePhoneRoomTrialAndReturnHome(fenObj);
+                    } else {
+                        this.phaseCompleted();
+                    }
+                }, 500);
+                break;
         }
     }
 
@@ -816,10 +1353,8 @@ class ExperimentController {
         let allFound = allFennimals.every(f => f.name === undefined || f.visited === true);
 
         if (allFound) {
-            AudioCont.play_sound_effect("alert");
-            this.instrCont.instructionsRequestedByParticipant();
             this.flagExplorationPhaseCompleted = true;
-            this.instrCont.updateExplorationPhaseInstructionsToShowCompletion();
+            this.instrCont.showFreeExplorationCompletionScreen();
         } else {
             this.mapCont.allow_participant_to_leave_location(true);
         }
@@ -873,6 +1408,14 @@ class ExperimentController {
     questionnairePageCompleted(pageData) {
         this.dataCont.storeQuestionnaireData(pageData);
         this.startNextQuestionnairePage();
+    }
+
+    experimentIncludesPhaseType(phaseType) {
+        if (!this.stimulusSettings || !Array.isArray(this.stimulusSettings.Experiment_Structure)) {
+            return false;
+        }
+
+        return this.stimulusSettings.Experiment_Structure.some(phase => phase.type === phaseType);
     }
 
     submitExperiment() {

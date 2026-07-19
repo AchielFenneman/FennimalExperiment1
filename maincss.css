@@ -242,6 +242,69 @@ html, body {
     }
 }
 
+.arrival_ripple_circle {
+    pointer-events: none;
+    stroke-width: 8px;
+    stroke: #FFE566;
+    fill: none;
+    animation: arrival_ripple_circle_animation 900ms ease-out forwards;
+}
+
+@keyframes arrival_ripple_circle_animation {
+    to {
+        r: 110;
+        opacity: 0;
+    }
+}
+
+.auto_travel_trackmark {
+    pointer-events: none;
+    stroke: none;
+    animation: auto_travel_trackmark_fade var(--auto-travel-trackmark-fade-time, 1800ms) ease-out forwards;
+}
+
+@keyframes auto_travel_trackmark_fade {
+    to {
+        opacity: 0;
+    }
+}
+
+#Scannimals_Task_SVG.auto_travel_sepia {
+    filter: sepia(0.28) saturate(0.88) brightness(1) contrast(1.01);
+    transition: filter 500ms ease;
+}
+
+.auto_travel_wash {
+    fill: rgba(120, 78, 36, 0.08);
+    pointer-events: none;
+}
+
+.auto_travel_status_text {
+    fill: #f4e6c8;
+    stroke: #3b2a1c;
+    stroke-width: 3.5px;
+    paint-order: stroke fill;
+    font-size: 56px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    pointer-events: none;
+    opacity: 0.95;
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: auto_travel_status_text_pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes auto_travel_status_text_pulse {
+    0%, 100% {
+        opacity: 0.95;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.55;
+        transform: scale(1.03);
+    }
+}
+
 .map_sublayer {
     display: inherit;
 }
@@ -1698,6 +1761,13 @@ html, body {
     100% { transform: rotate(0deg); }
 }
 
+/* Hard freeze for photos / static portraits — kills all body-specific CSS loops */
+.fennimal_pose_frozen,
+.fennimal_pose_frozen * {
+    animation: none !important;
+    animation-play-state: paused !important;
+}
+
 
 
 /* --- PHONE BOOTH ANTENNA SCANNING --- */
@@ -1754,4 +1824,83 @@ html, body {
         stroke-width: 18px; /* Massive physical bulge instead of heavy blurs */
         filter: drop-shadow(0px 0px 20px #80e5ff);
     }
+}
+
+
+
+/*PHONE ROOM*/
+.phone_room_ripple {
+    pointer-events: none;
+}
+
+.phone_room_phone {
+    transform-box: fill-box;
+    transform-origin: center;
+}
+
+#PhoneRoomAttention {
+    pointer-events: none;
+    transform-box: fill-box;
+    transform-origin: 0px -30px;
+    opacity: 0;
+    filter: drop-shadow(0px 3px 0px rgba(31, 41, 55, 0.35));
+}
+
+.phone_room_attention_active#PhoneRoomAttention {
+    opacity: 1;
+    animation: phone_room_attention_indicator_pulse var(--phone-room-attention-pulse-time, 1.1s) ease-in-out infinite;
+}
+
+.phone_room_attention_active.phone_room_answer_label {
+    animation: phone_room_attention_label_pulse var(--phone-room-attention-pulse-time, 1.1s) ease-in-out infinite;
+}
+
+@keyframes phone_room_attention_indicator_pulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 0.55;
+    }
+}
+
+@keyframes phone_room_attention_label_pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.45;
+    }
+}
+
+.phone_room_partner_exiting {
+    animation: phone_room_partner_exit_bob 260ms ease-in-out infinite alternate;
+}
+
+@keyframes phone_room_partner_exit_bob {
+    from {
+        filter: drop-shadow(0px 0px 0px rgba(0, 0, 0, 0));
+    }
+    to {
+        filter: drop-shadow(0px 8px 3px rgba(0, 0, 0, 0.20));
+    }
+}
+
+.phone_room_hint_sequential {
+    transition: opacity 300ms ease-in-out;
+}
+
+/* Photo trial: miss polaroid shake + partner celebrate bounce */
+.photo_trial_polaroid_shake {
+    animation: photo_trial_polaroid_shake 420ms ease-in-out;
+}
+
+@keyframes photo_trial_polaroid_shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-18px) rotate(-2deg); }
+    40% { transform: translateX(18px) rotate(2deg); }
+    60% { transform: translateX(-12px) rotate(-1deg); }
+    80% { transform: translateX(10px) rotate(1deg); }
 }
