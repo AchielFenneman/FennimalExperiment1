@@ -440,6 +440,7 @@ class BasicElementsModule {
             this.targetGazeX = 0;
             this.targetGazeY = 5;
             this.Fennimal.classList.add("is-slumped");
+            AudioCont.play_sound_effect("sad");
 
             // ----------------------------------------------------
             // 1. Setup the Thundercloud Cluster
@@ -595,19 +596,22 @@ class BasicElementsModule {
         });
     }
 
-    Fennimal_jump(amount) {
+    Fennimal_jump(amount, timing = {}) {
+        const ms = timing.ms != null ? timing.ms : 200;
+        const resolveMs = timing.resolveMs != null ? timing.resolveMs : 500;
+
         return new Promise(resolve => {
             let prejump_transform = this.Fennimal.style.transform;
             AudioCont.play_sound_effect("jump");
-            this.Fennimal.style.transition = "all 200ms ease-out";
+            this.Fennimal.style.transition = `all ${ms}ms ease-out`;
             this.Fennimal.style.transform += "translateY(-" + amount + "px)";
 
-            setTimeout(() => { this.Fennimal.style.transform = prejump_transform }, 200);
-            setTimeout(() => resolve(), 500);
+            setTimeout(() => { this.Fennimal.style.transform = prejump_transform }, ms);
+            setTimeout(() => resolve(), resolveMs);
         });
     }
 
-    async perform_success_celebration(TargetBoxElement = null) {
+    async perform_success_celebration(TargetBoxElement = null, { extended = false } = {}) {
         // Optional walk-to-target (used by box interactions). Skip when celebrating in place.
         if (TargetBoxElement) {
             let boxCenter = getSVGInternalCenter(TargetBoxElement);
@@ -616,51 +620,61 @@ class BasicElementsModule {
             let targetX = boxCenter.x;
             let dx = targetX - fenCenter.x;
 
-            await this.Fennimal_move_relative(dx, 0, 600);
-            await wait(200);
+            await this.Fennimal_move_relative(dx, 0, 350);
+            await wait(100);
 
             this.set_gaze_target(TargetBoxElement);
         }
 
+        // Default: two short jumps (jump SFX) with a heart burst between them.
+        const shortJump = { ms: 160, resolveMs: 340 };
+
+        await this.Fennimal_jump(104, shortJump);
+        let currentFenCenter = getSVGInternalCenter(this.Fennimal);
+        const heartCount = extended ? 12 : 8;
+        for (let i = 0; i < heartCount; i++) {
+            setTimeout(() => {
+                this.spawn_happy_heart(
+                    currentFenCenter.x + (Math.random() - 0.5) * 140,
+                    currentFenCenter.y - 80 - Math.random() * 60,
+                    this.ItemLayers.Plus2
+                );
+            }, i * 35);
+        }
+        await this.Fennimal_jump(84, shortJump);
+
+        if (!extended) {
+            this.clear_gaze_target();
+            return;
+        }
+
+        // Reserved for special multi-step trials: longer dance + particle bursts.
         AudioCont.play_sound_effect("positive");
-
-        // Helper function to create a burst of particles EXACTLY where the Fennimal currently is
         const jump_with_particle_burst = async (jump_height) => {
-            let currentFenCenter = getSVGInternalCenter(this.Fennimal);
-
+            let center = getSVGInternalCenter(this.Fennimal);
             if (typeof SmallFeedbackSymbol !== "undefined") {
-                for(let p = 0; p < 5; p++) {
+                for (let p = 0; p < 5; p++) {
                     let randomOffsetX = (Math.random() - 0.5) * 160;
                     let randomOffsetY = (Math.random() - 0.5) * 80;
                     let symbol = Math.random() > 0.5 ? "heart" : "star";
-
                     new SmallFeedbackSymbol(
                         this.ItemLayers.Plus2,
                         symbol,
                         900,
-                        (currentFenCenter.x + randomOffsetX), (currentFenCenter.y - 150 + randomOffsetY),
-                        (currentFenCenter.x + randomOffsetX), (currentFenCenter.y - 350 + randomOffsetY)
+                        center.x + randomOffsetX, center.y - 150 + randomOffsetY,
+                        center.x + randomOffsetX, center.y - 350 + randomOffsetY
                     );
                 }
             }
             await this.Fennimal_jump(jump_height);
         };
 
-        // The Centered Dance Routine
-        await jump_with_particle_burst(100);
-
-        await this.Fennimal_move_relative(300, 0, 400); // Slide Right
-        await jump_with_particle_burst(150);
-
-        await this.Fennimal_move_relative(-600, 0, 600); // Slide Left
-        await jump_with_particle_burst(150);
-
-        await this.Fennimal_move_relative(300, 0, 400); // Return to Center
-        await jump_with_particle_burst(100);
-
+        await this.Fennimal_move_relative(260, 0, 320);
+        await jump_with_particle_burst(110);
+        await this.Fennimal_move_relative(-520, 0, 480);
+        await jump_with_particle_burst(110);
+        await this.Fennimal_move_relative(260, 0, 320);
         this.clear_gaze_target();
-
-        await wait(500);
     }
 
     clean_up() {
@@ -2341,7 +2355,9 @@ class BrokenToyModule extends BaseToyModule {
         super(FenObj); // Hook up to the parent!
     }
 
-    setup_toy_in_box(ParentLayer, center_x, center_y) {
+    // Create the toy with all repairable parts overlapped at its centre.
+    // The caller chooses whether that starting position is a box or a Fennimal.
+    setup_overlapping_broken_toy(ParentLayer, center_x, center_y) {
         this.ToyElement = copy_scale_and_move_object_to_position(
             document.getElementById("toy_" + this.FenObj.toy),
             ParentLayer, center_x, center_y, this.parentScale
@@ -3053,10 +3069,11 @@ class ToyToBoxTrialController {
         this.toy = new StandardToyModule(FenObj);
         this.partner = new PartnerModule(partner_is_present);
 
-        // Minimum distance from the box center required when dragging an old toy out.
-        this.oldToyClearDistance = 300;
+        // Minimum |Δx| from the box center required when dragging an old toy out.
+        this.oldToyClearDistance = 400;
         this.old_toy = null;
         this.oldToyDragController = null;
+        this.groundY = null;
     }
 
     getScaledTemplateHalfWidth(elementId, scale) {
@@ -3167,6 +3184,7 @@ class ToyToBoxTrialController {
         this.toy.ToyElement.style.transition = "all 200ms ease-out";
         this.toy.ToyElement.style.transform += "translate(50px, 150px)";
         await wait(200);
+        this.groundY = getSVGInternalCenter(this.toy.ToyElement).y;
 
         Interface.Prompt.show_message("Oops! The " + this.FenObj.toy + " has been left behind");
         await wait(750);
@@ -3244,6 +3262,9 @@ class ToyToBoxTrialController {
 
     async clear_occupied_box() {
         let oldToyName = this.old_toy.FenObj.toy;
+        let groundY = (this.groundY != null)
+            ? this.groundY
+            : getSVGInternalCenter(this.toy.ToyElement).y;
 
         Interface.Prompt.show_message("There is already a " + oldToyName + " in the " + this.box.boxname);
         await wait(1200);
@@ -3260,27 +3281,35 @@ class ToyToBoxTrialController {
                     this.box.BoxBase,
                     this.oldToyClearDistance,
                     async (DraggedToyElement) => {
-                        // Released far enough from the box: hold, fade, clear state.
+                        // Accepted: lock in place (no longer draggable), optionally fall to ground.
                         Interface.Prompt.hide();
-                        await wait(1000);
-
-                        DraggedToyElement.style.transition = "opacity 400ms ease-in";
-                        DraggedToyElement.style.opacity = 0;
-                        await wait(400);
-
-                        if (this.old_toy) {
-                            this.old_toy.clean_up();
-                            this.old_toy = null;
+                        if (this.oldToyDragController && this.oldToyDragController.destroy) {
+                            this.oldToyDragController.destroy();
                         }
-                        WorldState.clear_toybox_contents(this.FenObj.toybox);
                         this.oldToyDragController = null;
+                        DraggedToyElement.style.pointerEvents = "none";
+                        DraggedToyElement.style.cursor = "auto";
+
+                        let current = getSVGInternalCenter(DraggedToyElement);
+                        if (current.y < groundY) {
+                            let dy = groundY - current.y;
+                            DraggedToyElement.style.transition = "transform 350ms ease-in";
+                            DraggedToyElement.style.transform += ` translate(0px, ${dy}px)`;
+                            await wait(350);
+                        }
+
+                        // Same WorldState update as before; visual toy stays on screen.
+                        WorldState.clear_toybox_contents(this.FenObj.toybox);
                         resolve();
                     },
                     {
-                        validateDrop: (distToBox) => distToBox >= this.oldToyClearDistance,
+                        validateDrop: (distToBox, event) => {
+                            let toyCenter = getSVGInternalCenter(this.old_toy.ToyElement);
+                            let boxCenter = getSVGInternalCenter(this.box.BoxBase);
+                            return Math.abs(toyCenter.x - boxCenter.x) >= this.oldToyClearDistance;
+                        },
                         onMiss: () => {
-                            Interface.Prompt.show_message("Move it farther from the box");
-                            // Re-enable the same drag controller (drag_cancelled already snapped back).
+                            Interface.Prompt.show_message("Move it farther to the side of the box");
                             if (this.oldToyDragController && this.oldToyDragController.enable) {
                                 this.oldToyDragController.enable();
                             }
@@ -3469,8 +3498,8 @@ class DirtModule {
     parentScale = 4;
 
     constructor() {
-        AudioCont.load_audio("scrub", "scrub.wav", false);
-        AudioCont.load_audio("water_splash", "water_splash.wav", false);
+        AudioCont.load_audio("scrub", "scrub.mp3", false);
+        AudioCont.load_audio("water_splash", "water_splash.mp3", false);
     }
 
     spawn_dirt_on_element(TargetElement, ParentLayer, num_spots) {
@@ -3978,7 +4007,10 @@ class DirtModule {
                 bubble.style.transform = `translate(${startX + driftX}px, ${startY + driftY - 20}px) scale(1.4)`;
                 bubble.style.opacity = "0";
 
-                setTimeout(() => bubble.remove(), 100);
+                setTimeout(() => {
+                    bubble.remove();
+                    AudioCont.play_sound_effect("bubble_pop_small");
+                }, 100);
             }, 600 + Math.random() * 500);
         }
     }
@@ -4374,8 +4406,8 @@ class FoliageModule {
 class DustModule {
     constructor() {
         // Preload sounds
-        AudioCont.load_audio("air_puff", "air_puff.wav", false); // Add a puffy air sound to your Audio folder!
-        AudioCont.load_audio("success", "success.wav", false);
+        AudioCont.load_audio("air_puff", "air_puff.mp3", false); // Add a puffy air sound to your Audio folder!
+        AudioCont.load_audio("success", "success.mp3", false);
     }
 
     apply_dust_filter(BoxBase, BoxTop) {
@@ -5362,7 +5394,7 @@ class FindBoxExtendedTrialController extends FindBoxTrialController {
     }
 }
 
-class BrokenToyTrialController {
+class BrokenToyInBoxTrialController {
 
     constructor(FenObj, partner_is_present, returnfunc) {
         this.FenObj = FenObj;
@@ -5516,7 +5548,7 @@ class BrokenToyTrialController {
         await this.box.create_and_appear_box(this.basics.ItemLayers.Main, this.basics.ItemLayers.Plus2, 0.5 * this.basics.W, 0.8 * this.basics.H, 4, 100);
 
         let boxCenter = getSVGInternalCenter(this.box.BoxBase);
-        this.brokenToyLogic.setup_toy_in_box(this.basics.ItemLayers.Main, boxCenter.x, boxCenter.y);
+        this.brokenToyLogic.setup_overlapping_broken_toy(this.basics.ItemLayers.Main, boxCenter.x, boxCenter.y);
 
         await wait(1000);
         this.box.wait_for_user_click("open", async () => {
@@ -5556,6 +5588,165 @@ class BrokenToyTrialController {
         if (this.failsafe_timeout) clearTimeout(this.failsafe_timeout);
         this.basics.clean_up();
         this.box.clean_up();
+        this.brokenToyLogic.clean_up();
+        if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
+    }
+}
+
+// Repair a broken toy without a box: Fennimal → optional toy question → repair → charge/play → toy left behind.
+class BrokenToyNoBoxTrialController extends GeneralTrialController {
+    constructor(FenObj, partner_is_present, returnfunc) {
+        super(FenObj, partner_is_present, returnfunc);
+        this.brokenToyLogic = new BrokenToyModule(FenObj);
+        this.trial_is_active = true;
+        this.failsafe_timeout = null;
+    }
+
+    handle_part_placed(remaining_count) {
+        if (remaining_count === 0) {
+            this.handle_all_parts_placed();
+        } else {
+            this.reset_failsafe_timer();
+        }
+    }
+
+    reset_failsafe_timer() {
+        if (this.failsafe_timeout) clearTimeout(this.failsafe_timeout);
+        if (!this.trial_is_active || this.partner.is_present) return;
+        this.failsafe_timeout = setTimeout(() => this.trigger_auto_solve(), 30000);
+    }
+
+    trigger_auto_solve() {
+        if (!this.trial_is_active) return;
+
+        let targetPart = this.brokenToyLogic.get_random_unplaced_part();
+        if (!targetPart) return;
+
+        targetPart.is_locked = true;
+        this.brokenToyLogic.set_part_transform(targetPart, 0, 0, 0);
+        setTimeout(() => {
+            this.brokenToyLogic.snap_part_to_correct(
+                targetPart,
+                (count) => this.handle_part_placed(count)
+            );
+        }, 600);
+    }
+
+    async partner_repair_loop() {
+        if (!this.trial_is_active) return;
+
+        await wait(5000 + (Math.random() * 5000));
+        if (!this.trial_is_active) return;
+
+        let targetPart = this.brokenToyLogic.get_random_unplaced_part();
+        if (!targetPart) return;
+
+        targetPart.is_locked = true;
+        let partnerGroup = this.partner.PartnerTranslateGroup;
+        partnerGroup.style.transition = "all 1000ms ease-in-out";
+
+        let dxToPart = getSVGInternalCenter(targetPart.element).x - getSVGInternalCenter(partnerGroup).x;
+        partnerGroup.style.transform += `translateX(${dxToPart}px)`;
+        await wait(1200);
+
+        let dxToFrame = getSVGInternalCenter(this.brokenToyLogic.ToyFrame).x - getSVGInternalCenter(partnerGroup).x;
+        partnerGroup.style.transform += `translateX(${dxToFrame}px)`;
+        this.brokenToyLogic.set_part_transform(targetPart, 0, 0, 0);
+        await wait(600);
+
+        this.brokenToyLogic.snap_part_to_correct(
+            targetPart,
+            (count) => this.handle_part_placed(count)
+        );
+        partnerGroup.style.transform = "";
+        await wait(1000);
+        this.partner_repair_loop();
+    }
+
+    async handle_all_parts_placed() {
+        this.trial_is_active = false;
+        if (this.failsafe_timeout) clearTimeout(this.failsafe_timeout);
+
+        this.brokenToyLogic.restore_pointer_events();
+        Interface.Prompt.hide();
+        await wait(1000);
+        AudioCont.play_sound_effect("positive");
+        Interface.Prompt.show_message("You did it! You fixed the " + this.FenObj.toy + "!");
+        await this.brokenToyLogic.play_repair_celebration(this.basics.ItemLayers.Plus2);
+        await wait(200);
+        await this.brokenToyLogic.shrink_to_normal();
+
+        let fennimalCenter = getSVGInternalCenter(this.basics.TargetPoints.Fennimal_body_center);
+        await this.brokenToyLogic.move_to_center_of_target_and_shrink(fennimalCenter);
+        await this.brokenToyLogic.charge_toy(
+            this.basics.ItemLayers.Plus2,
+            0.5 * this.basics.W,
+            0.4 * this.basics.H,
+            this.basics
+        );
+        await this.brokenToyLogic.play_with_toy(this.basics);
+        await wait(500);
+        Interface.Prompt.show_message(this.FenObj.name + " has finished playing with the " + this.FenObj.toy);
+        await wait(500);
+
+        // Match Fennimal_toy: the Fennimal leaves and the repaired toy remains on the ground.
+        await this.basics.Fennimal_move_relative(-400, 0, 500);
+        await this.brokenToyLogic.done_playing();
+        await this.basics.perform_success_celebration(null);
+        await wait(750);
+        Interface.Prompt.show_message(this.FenObj.name + " has wandered off...");
+
+        let fennimal = getSVGInternalCenter(this.basics.Fennimal);
+        await this.basics.Fennimal_move_relative(-(fennimal.x + 300), 0, 750);
+        await wait(1000);
+        this.returnfunc();
+    }
+
+    async start_sequence() {
+        this.basics.create_svg_sublayers();
+        if (this.partner.is_present) {
+            this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        }
+        await this.basics.create_background_mask(true, 500);
+
+        await this.appear_fennimal_with_name_prompt();
+        await this.run_ask_toy_step();
+
+        let fennimalCenter = getSVGInternalCenter(this.basics.TargetPoints.Fennimal_body_center);
+        this.brokenToyLogic.setup_overlapping_broken_toy(
+            this.basics.ItemLayers.Plus1,
+            fennimalCenter.x,
+            fennimalCenter.y
+        );
+        this.brokenToyLogic.ToyElement.style.opacity = 1;
+        Interface.Prompt.show_message("Oh no! The " + this.FenObj.toy + " is broken!");
+        AudioCont.play_sound_effect("sad");
+        await wait(900);
+
+        await this.brokenToyLogic.move_to_center_and_explode(
+            this.basics.ItemLayers.Plus2,
+            0.5 * this.basics.W,
+            0.4 * this.basics.H
+        );
+        await wait(500);
+        Interface.Prompt.show_message(
+            `Oh no, ${this.FenObj.name} is upset! Click on ${this.FenObj.name} to cheer ${this.FenObj.name} up.`
+        );
+        await this.basics.trigger_comfort_checkin();
+        await wait(500);
+
+        Interface.Prompt.show_message("Please move all the parts to their correct position!");
+        this.brokenToyLogic.enable_dragging((count) => this.handle_part_placed(count));
+        if (this.partner.is_present) {
+            this.partner_repair_loop();
+        } else {
+            this.reset_failsafe_timer();
+        }
+    }
+
+    clean_up() {
+        if (this.failsafe_timeout) clearTimeout(this.failsafe_timeout);
+        this.basics.clean_up();
         this.brokenToyLogic.clean_up();
         if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
     }
@@ -5941,7 +6132,7 @@ class DirtyAndBrokenToyTrialController {
         await this.box.create_and_appear_box(this.basics.ItemLayers.Main, this.basics.ItemLayers.Plus2, boxCenter.x, boxCenter.y, 4, 100);
 
         // Prep the broken toy inside the box
-        this.brokenToyLogic.setup_toy_in_box(this.basics.ItemLayers.Main, boxCenter.x, boxCenter.y);
+        this.brokenToyLogic.setup_overlapping_broken_toy(this.basics.ItemLayers.Main, boxCenter.x, boxCenter.y);
 
         // Spawn Foliage
         this.foliageLogic.spawn_foliage_around_target(this.basics.ItemLayers, boxCenter.x, boxCenter.y);
@@ -7513,6 +7704,7 @@ class JointBoxCleaningTrialController {
 
     async flash_attention(elem, popMs = 400) {
         if (!elem) return;
+        AudioCont.play_sound_effect("alert_minor");
         let baseTransform = elem.style.transform || "";
         elem.style.transition =
             `transform ${popMs}ms cubic-bezier(0.175, 0.885, 0.32, 1.275), filter ${Math.round(popMs * 0.75)}ms ease-out`;
@@ -7590,6 +7782,7 @@ class JointBoxCleaningTrialController {
         this._shearsClosed.style.transition = `opacity ${closeMs}ms ease-in`;
         this._shearsOpen.style.opacity = 0;
         this._shearsClosed.style.opacity = 1;
+        AudioCont.play_sound_effect("garden_shear_snip");
         await wait(closeMs);
 
         this._shearsOpen.style.transition = `opacity ${openMs}ms ease-out`;
@@ -7615,7 +7808,7 @@ class JointBoxCleaningTrialController {
             await this.dirt.start_scrub_turn(quota);
             await this.dirt.drop_sponge_to_floor(floorY);
             Interface.Prompt.hide();
-            await wait(200);
+            await wait(400);
 
             if (this.partner.is_present) {
                 // Partner → bellows, then Fennimal → shears
@@ -7806,9 +7999,9 @@ class JointBoxCleaningTrialController {
         this.box.BoxTop.style.transform += ` translate(${boxDx}px, 0px)`;
         await wait(650);
 
-        // Brief paired tableau, then celebrate; photo while Fennimal is still present; then walk off
+        // Brief paired tableau, then use the extended celebration before the end photo.
         await wait(500);
-        await this.basics.perform_success_celebration(null);
+        await this.basics.perform_success_celebration(null, { extended: true });
         await wait(400);
 
         await this.run_end_photo();
@@ -7971,9 +8164,11 @@ class TrialFactory {
             case "joint_box_cleaning":
                 return new JointBoxCleaningTrialController(FenObj, partner_is_present, returnfunc);
 
-            case "broken_toy":
-                // Your standard box interaction from earlier
-                return new BrokenToyTrialController(FenObj, partner_is_present, returnfunc);
+            case "broken_toy_in_box":
+                return new BrokenToyInBoxTrialController(FenObj, partner_is_present, returnfunc);
+
+            case "broken_toy_no_box":
+                return new BrokenToyNoBoxTrialController(FenObj, partner_is_present, returnfunc);
 
             case "dirty_toy":
                 return new DirtyToyTrialController(FenObj, partner_is_present, returnfunc);
@@ -8796,12 +8991,12 @@ class PartnerBeliefIndividualBoxesController {
 
     /**
      * Build the fixed 3AFC triad for a target box:
-     *   belief  = partner's belief about the target box
-     *   reality = current contents of the target box
-     *   lure    = partner's belief about the next box in lureCycle (A→B→C→A by default)
+     *   belief trial:  target belief (old), target reality (new), next-box belief (old lure)
+     *   reality trial: target belief (old), target reality (new), next-box reality (new lure)
+     * The lure source follows lureCycle (A→B→C→A by default).
      * Fails loud if any piece is missing or the three toys are not distinct.
      */
-    _buildBeliefRealityCyclicTriad(trial) {
+    _buildBeliefRealityCyclicTriad(trial, trialKind) {
         if (!this.lureCycle || this.lureCycle.codes.length < 2) {
             console.error("PartnerBeliefIndividualBoxes: lure cycle is not configured.");
             return null;
@@ -8820,10 +9015,21 @@ class PartnerBeliefIndividualBoxesController {
         let lure_source_box_code = this.lureCycle.codes[lureIndex];
         let lure_source_box = this.lureCycle.boxes[lureIndex];
 
+        if (trialKind !== "belief" && trialKind !== "reality") {
+            console.error(`PartnerBeliefIndividualBoxes: unsupported triad trial kind "${trialKind}".`);
+            return null;
+        }
+
         let belief = WorldState.get_partner_belief_in_box_contents(trial.target_box);
         let reality = WorldState.get_toybox_contents(trial.target_box);
         if (reality === false) reality = undefined;
-        let lure = WorldState.get_partner_belief_in_box_contents(lure_source_box);
+        let lure_source_type = (trialKind === "belief")
+            ? "partner_belief"
+            : "current_contents";
+        let lure = (trialKind === "belief")
+            ? WorldState.get_partner_belief_in_box_contents(lure_source_box)
+            : WorldState.get_toybox_contents(lure_source_box);
+        if (lure === false) lure = undefined;
 
         if (belief === undefined) {
             console.error(
@@ -8841,7 +9047,7 @@ class PartnerBeliefIndividualBoxesController {
         }
         if (lure === undefined) {
             console.error(
-                `PartnerBeliefIndividualBoxes: missing partner belief for lure-source box "${lure_source_box}" ` +
+                `PartnerBeliefIndividualBoxes: missing ${lure_source_type} for lure-source box "${lure_source_box}" ` +
                 `(code "${lure_source_box_code}", question "${trial.question_id}").`
             );
             return null;
@@ -8871,6 +9077,7 @@ class PartnerBeliefIndividualBoxesController {
             lure_answer: lure,
             lure_source_box_code,
             lure_source_box,
+            lure_source_type,
             option_roles
         };
     }
@@ -9388,7 +9595,6 @@ class PartnerBeliefIndividualBoxesController {
                 disabled = true;
                 let response_perf = performance.now();
                 let input_type = (evt && evt.pointerType) ? evt.pointerType : (this.last_input_type || "unknown");
-                let selected_layout = layout.find(l => l.option_id === selected_id);
 
                 if (this.radialUIGroup) {
                     this.radialUIGroup.style.transition = "opacity 150ms ease-in";
@@ -9401,15 +9607,8 @@ class PartnerBeliefIndividualBoxesController {
 
                 resolve({
                     selected_id,
-                    selected_angle_rad: selected_layout ? selected_layout.angle_rad : null,
-                    selected_angle_deg: selected_layout ? selected_layout.angle_deg : null,
                     option_layout: layout,
-                    response_onset_elapsed_perf_ms: this._responseOnsetElapsedPerf,
-                    response_onset_elapsed_date_ms: this._responseOnsetElapsedDate,
-                    response_elapsed_perf_ms: this._elapsedPerfMs(),
-                    response_elapsed_date_ms: this._elapsedDateMs(),
                     reaction_time_ms: Math.round(response_perf - this._responseOnsetPerf),
-                    response_perf,
                     input_type
                 });
             };
@@ -9421,17 +9620,8 @@ class PartnerBeliefIndividualBoxesController {
                 let option_id = (typeof opt === "string") ? opt : opt.id;
                 layout.push({
                     option_id,
-                    slot_index: i,
-                    angle_rad: angle,
-                    angle_deg: angle * 180 / Math.PI,
-                    btn_x: bx,
-                    btn_y: by,
-                    option_meta: (typeof opt === "string") ? { id: opt } : {
-                        id: opt.id,
-                        shape: opt.shape,
-                        color_id: opt.color.id,
-                        role: opt.role
-                    }
+                    x: Math.round(bx),
+                    y: Math.round(by)
                 });
 
                 if (mode === "features") {
@@ -9481,13 +9671,32 @@ class PartnerBeliefIndividualBoxesController {
             : "Choose the object with the same color.";
     }
 
+    /**
+     * Compact on-screen choice buttons for storage:
+     * id + meaning-in-context (role) + content fields + rounded x/y.
+     */
+    _buildStoredOptions(responseLayout, optionInfos) {
+        let byId = {};
+        (responseLayout || []).forEach((loc) => {
+            byId[loc.option_id] = loc;
+        });
+        return (optionInfos || []).map((info) => {
+            let loc = byId[info.id] || {};
+            return {
+                ...info,
+                x: (typeof loc.x === "number") ? loc.x : null,
+                y: (typeof loc.y === "number") ? loc.y : null
+            };
+        });
+    }
+
     async run_feature_match_trial(trial) {
         this.place_central_feature_target(trial.target_features);
         let revealPromise = this.create_curtain_with_reveal_circle();
         await this.fade_black(0, 350);
 
         Interface.Prompt.show_message("Click on the circle to start the question");
-        let revealMeta = await revealPromise;
+        await revealPromise;
         Interface.Prompt.show_message(this._featureMatchPrompt(trial.match_rule));
 
         let response = await this.show_radial_options_and_wait(trial.answer_options, {
@@ -9499,56 +9708,35 @@ class PartnerBeliefIndividualBoxesController {
         Interface.Prompt.hide();
         AudioCont.play_sound_effect("button_click");
 
-        let selected_meta = (trial.answer_options || []).find(o => o.id === response.selected_id);
-
         this.ParticipantAnswers.push({
-            type: trial.trial_kind === "practice"
-                ? "partner_belief_individual_practice"
-                : "partner_belief_individual_distractor",
             trial_kind: trial.trial_kind,
-            section: trial.section,
-            is_practice: trial.is_practice === true,
-            is_distractor: trial.trial_kind === "distractor",
             question_id: trial.question_id,
-            trial_instance_id: trial.trial_instance_id,
             block_index: trial.block_index,
-            position_in_block: trial.position_in_block,
-            overall_presentation_index: this.overall_presentation_index,
-            precedes_question_id: trial.precedes_question_id || null,
+            trial_index: this.overall_presentation_index,
             match_rule: trial.match_rule,
-            target_features: {
+            target: {
                 shape: trial.target_features.shape,
                 color_id: trial.target_features.color.id
             },
-            answer_options: trial.answer_options.map(o => ({
-                id: o.id,
-                shape: o.shape,
-                color_id: o.color.id,
-                role: o.role
-            })),
-            correct_option_id: trial.correct_option_id,
-            selected_answer: response.selected_id,
-            selected_option_role: selected_meta ? selected_meta.role : "unknown",
+            options: this._buildStoredOptions(
+                response.option_layout,
+                trial.answer_options.map((o) => ({
+                    id: o.id,
+                    role: o.role,
+                    shape: o.shape,
+                    color_id: o.color.id
+                }))
+            ),
+            selected: response.selected_id,
             correct: response.selected_id === trial.correct_option_id,
-            option_layout: response.option_layout,
-            selected_angle_rad: response.selected_angle_rad,
-            selected_angle_deg: response.selected_angle_deg,
-            reveal_click_elapsed_perf_ms: revealMeta.reveal_click_elapsed_perf_ms,
-            reveal_click_elapsed_date_ms: revealMeta.reveal_click_elapsed_date_ms,
-            response_onset_elapsed_perf_ms: response.response_onset_elapsed_perf_ms,
-            response_onset_elapsed_date_ms: response.response_onset_elapsed_date_ms,
-            response_elapsed_perf_ms: response.response_elapsed_perf_ms,
-            response_elapsed_date_ms: response.response_elapsed_date_ms,
-            reaction_time_ms: response.reaction_time_ms,
-            input_type: response.input_type,
-            stars_earned: 0
+            reaction_time_ms: response.reaction_time_ms
         });
 
         await wait(400);
     }
 
     async run_belief_trial(trial) {
-        let triad = this._buildBeliefRealityCyclicTriad(trial);
+        let triad = this._buildBeliefRealityCyclicTriad(trial, "belief");
         if (!triad) {
             console.error(`PartnerBeliefIndividualBoxes: skipping belief trial "${trial.question_id}" due to invalid triad.`);
             await this.fade_black(0, 200);
@@ -9564,7 +9752,7 @@ class PartnerBeliefIndividualBoxesController {
 
         let printed_box_name = GenParam.get_box_printed_name(trial.target_box);
         Interface.Prompt.show_message("Click on the circle to start the question");
-        let revealMeta = await revealPromise;
+        await revealPromise;
 
         Interface.Prompt.show_message(
             `What does ${this.partnername} believe is in the ${printed_box_name}? Answer as quickly and accurately as you can.`
@@ -9579,54 +9767,23 @@ class PartnerBeliefIndividualBoxesController {
         AudioCont.play_sound_effect("button_click");
 
         let is_correct = (response.selected_id === triad.belief_answer);
-        let selected_role = triad.option_roles[response.selected_id] || "unknown";
-        let stars_earned = (this.bonus_stars > 0 && is_correct) ? this.bonus_stars : 0;
-
-        let associated_fennimals = [];
-        if (this.expCont && this.expCont.dataCont && this.expCont.dataCont.experimentData) {
-            let templates = this.expCont.dataCont.experimentData.fennimals || [];
-            associated_fennimals = templates.filter(f => f.toybox === trial.target_box).map(f => f.id);
-        }
 
         this.ParticipantAnswers.push({
-            type: "partner_belief_individual_belief",
             trial_kind: "belief",
-            section: "belief",
-            is_practice: false,
             question_id: trial.question_id,
-            trial_instance_id: trial.trial_instance_id,
             block_index: trial.block_index,
-            belief_block_index: trial.belief_block_index,
-            position_in_block: trial.position_in_block,
-            presentation_number_for_box: trial.presentation_number_for_box,
-            overall_presentation_index: this.overall_presentation_index,
-            target_box_code: trial.target_box_code,
+            trial_index: this.overall_presentation_index,
             target_box: trial.target_box,
-            associated_fennimals: associated_fennimals,
-            answer_option_rule: "belief_reality_cyclic_lure",
-            answer_option_codes: triad.answer_option_codes,
-            answer_options: triad.answer_options,
-            belief_answer: triad.belief_answer,
-            reality_answer: triad.reality_answer,
-            lure_answer: triad.lure_answer,
-            lure_source_box_code: triad.lure_source_box_code,
-            lure_source_box: triad.lure_source_box,
-            option_roles: triad.option_roles,
-            selected_answer: response.selected_id,
-            selected_answer_role: selected_role,
+            options: this._buildStoredOptions(
+                response.option_layout,
+                triad.answer_options.map((toyId) => ({
+                    id: toyId,
+                    role: triad.option_roles[toyId] || "unknown"
+                }))
+            ),
+            selected: response.selected_id,
             correct: is_correct,
-            option_layout: response.option_layout,
-            selected_angle_rad: response.selected_angle_rad,
-            selected_angle_deg: response.selected_angle_deg,
-            reveal_click_elapsed_perf_ms: revealMeta.reveal_click_elapsed_perf_ms,
-            reveal_click_elapsed_date_ms: revealMeta.reveal_click_elapsed_date_ms,
-            response_onset_elapsed_perf_ms: response.response_onset_elapsed_perf_ms,
-            response_onset_elapsed_date_ms: response.response_onset_elapsed_date_ms,
-            response_elapsed_perf_ms: response.response_elapsed_perf_ms,
-            response_elapsed_date_ms: response.response_elapsed_date_ms,
-            reaction_time_ms: response.reaction_time_ms,
-            input_type: response.input_type,
-            stars_earned: stars_earned
+            reaction_time_ms: response.reaction_time_ms
         });
 
         await this.animate_partner_exit();
@@ -9634,7 +9791,7 @@ class PartnerBeliefIndividualBoxesController {
     }
 
     async run_reality_trial(trial) {
-        let triad = this._buildBeliefRealityCyclicTriad(trial);
+        let triad = this._buildBeliefRealityCyclicTriad(trial, "reality");
         if (!triad) {
             console.error(`PartnerBeliefIndividualBoxes: skipping reality trial "${trial.question_id}" due to invalid triad.`);
             await this.fade_black(0, 200);
@@ -9647,7 +9804,7 @@ class PartnerBeliefIndividualBoxesController {
 
         let printed_box_name = GenParam.get_box_printed_name(trial.target_box);
         Interface.Prompt.show_message("Click on the circle to start the question");
-        let revealMeta = await revealPromise;
+        await revealPromise;
 
         Interface.Prompt.show_message(
             `Which toy is currently in the ${printed_box_name}? Answer as quickly and accurately as you can.`
@@ -9662,53 +9819,23 @@ class PartnerBeliefIndividualBoxesController {
         AudioCont.play_sound_effect("button_click");
 
         let is_correct = (response.selected_id === triad.reality_answer);
-        let selected_role = triad.option_roles[response.selected_id] || "unknown";
-        let stars_earned = (this.bonus_stars > 0 && is_correct) ? this.bonus_stars : 0;
-
-        let associated_fennimals = [];
-        if (this.expCont && this.expCont.dataCont && this.expCont.dataCont.experimentData) {
-            let templates = this.expCont.dataCont.experimentData.fennimals || [];
-            associated_fennimals = templates.filter(f => f.toybox === trial.target_box).map(f => f.id);
-        }
 
         this.ParticipantAnswers.push({
-            type: "partner_belief_individual_reality",
             trial_kind: "reality",
-            section: "reality",
-            is_practice: false,
             question_id: trial.question_id,
-            trial_instance_id: trial.trial_instance_id,
             block_index: trial.block_index,
-            position_in_block: trial.position_in_block,
-            presentation_number_for_box: trial.presentation_number_for_box,
-            overall_presentation_index: this.overall_presentation_index,
-            target_box_code: trial.target_box_code,
+            trial_index: this.overall_presentation_index,
             target_box: trial.target_box,
-            associated_fennimals: associated_fennimals,
-            answer_option_rule: "belief_reality_cyclic_lure",
-            answer_option_codes: triad.answer_option_codes,
-            answer_options: triad.answer_options,
-            belief_answer: triad.belief_answer,
-            reality_answer: triad.reality_answer,
-            lure_answer: triad.lure_answer,
-            lure_source_box_code: triad.lure_source_box_code,
-            lure_source_box: triad.lure_source_box,
-            option_roles: triad.option_roles,
-            selected_answer: response.selected_id,
-            selected_answer_role: selected_role,
+            options: this._buildStoredOptions(
+                response.option_layout,
+                triad.answer_options.map((toyId) => ({
+                    id: toyId,
+                    role: triad.option_roles[toyId] || "unknown"
+                }))
+            ),
+            selected: response.selected_id,
             correct: is_correct,
-            option_layout: response.option_layout,
-            selected_angle_rad: response.selected_angle_rad,
-            selected_angle_deg: response.selected_angle_deg,
-            reveal_click_elapsed_perf_ms: revealMeta.reveal_click_elapsed_perf_ms,
-            reveal_click_elapsed_date_ms: revealMeta.reveal_click_elapsed_date_ms,
-            response_onset_elapsed_perf_ms: response.response_onset_elapsed_perf_ms,
-            response_onset_elapsed_date_ms: response.response_onset_elapsed_date_ms,
-            response_elapsed_perf_ms: response.response_elapsed_perf_ms,
-            response_elapsed_date_ms: response.response_elapsed_date_ms,
-            reaction_time_ms: response.reaction_time_ms,
-            input_type: response.input_type,
-            stars_earned: stars_earned
+            reaction_time_ms: response.reaction_time_ms
         });
 
         await wait(400);
@@ -9730,4 +9857,3 @@ class PartnerBeliefIndividualBoxesController {
         Interface.Prompt.hide();
     }
 }
-

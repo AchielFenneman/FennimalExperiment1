@@ -35,6 +35,27 @@ let StimulusSettings = function () {
     // ----------------------------------------------------
     let All_Experiment_Structures = {
         test: [
+            {
+                type: "phone_room",
+                interaction_type: "joint_box_cleaning",
+                Fennimals_encountered: ["A1", "A2"],
+                ask_box: true,
+                boxes_asked: ["A", "B"],
+                partner_behavior: "present",
+                hint_type: ["icon"],
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                skip_instructions: true
+            },
+            {
+                type: "Fennimal_attribute_sorting_task",
+                Fennimals_encountered: ["A1"],
+                attribute_order: ["region", "head", "toy", "toybox"],
+                presentation: "single",
+                maximum_earnable_stars: 6
+            },
+
+            
            
             {
                 type: "free_exploration",
@@ -78,18 +99,7 @@ let StimulusSettings = function () {
                 ]
             },
 
-            {
-                type: "phone_room",
-                interaction_type: "joint_box_cleaning",
-                Fennimals_encountered: ["A1", "A2"],
-                ask_box: true,
-                boxes_asked: ["A", "B"],
-                partner_behavior: "present",
-                hint_type: ["icon"],
-                include_Fennefinder: false,
-                return_to_phone_room_after_final_trial: false,
-                skip_instructions: true
-            },
+            
 
             
 
@@ -145,7 +155,7 @@ let StimulusSettings = function () {
                 trial_subblocks: [
                     {
                         Fennimals_encountered: ["S1", "S2", "S3"],
-                        interaction_type: "Fennimal_toy"
+                        interaction_type: "broken_toy_no_box"
                     },
                     {
                         Fennimals_encountered: ["S1", "S2", "S3"],
@@ -201,7 +211,7 @@ let StimulusSettings = function () {
                 trial_subblocks: [
                     {
                         Fennimals_encountered: ["P1", "P2", "P3"],
-                        interaction_type: "Fennimal_toy"
+                        interaction_type: "broken_toy_no_box"
                     },
                     {
                         Fennimals_encountered: ["P1", "P2", "P3"],
@@ -213,11 +223,11 @@ let StimulusSettings = function () {
                     },
                     {
                         trials: [
-                            { Fennimal: "P3", interaction_type: "joint_box_cleaning" },
+                            { Fennimal: "P2", interaction_type: "joint_box_cleaning" },
                             { Fennimal: "P1", interaction_type: "photo_box" },
-                            { Fennimal: "P2", interaction_type: "photo_box" },
+                            { Fennimal: "P3", interaction_type: "photo_box" },
                             { Fennimal: "P1", interaction_type: "feed_Fennimal" },
-                            { Fennimal: "P2", interaction_type: "feed_Fennimal" }
+                            { Fennimal: "P3", interaction_type: "feed_Fennimal" }
                         ]
                     }
                 ]
@@ -267,7 +277,7 @@ let StimulusSettings = function () {
     const All_Forced_Head_Lists = {
         test: ["roller", "brush", "tube", "palette"],
         mentalizing_network: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant",  "shark", "blockhead", "parrot", "stocking"],
-        mentalizing: ["astro", "cupcake", "tube", "tv", "skull", "elephant", "blockhead", "parrot"],
+        mentalizing: ["astro", "cupcake", "tube", "tv", "jacko", "elephant", "blockhead", "parrot"],
     };
 
     const All_Allowed_Head_Groups_List = { test: false, mentalizing_1: false };

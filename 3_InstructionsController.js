@@ -1493,7 +1493,7 @@ class InstructionsController {
                 };
 
             default:
-                // Placeholder for other interaction types (broken_toy, dirty_toy, fly_swat, etc.).
+                // Placeholder for other interaction types (broken_toy_in_box, broken_toy_no_box, dirty_toy, fly_swat, etc.).
                 // Keep the slumped Fennimal until type-specific copy/visuals are written.
                 return {
                     ...baseConfig,

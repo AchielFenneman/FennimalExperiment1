@@ -53,6 +53,9 @@ class DataController {
         // Deep clone so we don't accidentally mutate the live game state
         let clonedPhaseData = JSON.parse(JSON.stringify(cleanDataObj));
 
+        // Planned trial sequence is recoverable from phase config + templates; drop it from exports
+        delete clonedPhaseData.Fennimals_in_phase;
+
         // DRY Helper: Compares a Fennimal to its template and strips redundancies
         const stripRedundantFennimalData = (fenObj) => {
             if (!fenObj || !fenObj.id) return fenObj;
@@ -67,17 +70,21 @@ class DataController {
                 }
             }
 
-            // Always strip these internal tracking variables
+            // Always strip these internal / redundant fields from stored interaction records
             delete fenObj.search_status;
             delete fenObj.visited;
+            delete fenObj.ColorScheme;
+            // Phase-level ask-option stamps (and nested fen objects) — keep behavioral deltas only
+            delete fenObj.fennimals_asked_objects;
+            delete fenObj.fennimals_asked;
+            delete fenObj.toys_asked;
+            delete fenObj.boxes_asked;
+            delete fenObj.ask_toy;
+            delete fenObj.ask_box;
+            delete fenObj.ask_Fennimal;
 
             return fenObj;
         };
-
-        // Apply stripping to the planned sequence
-        if (clonedPhaseData.Fennimals_in_phase && Array.isArray(clonedPhaseData.Fennimals_in_phase)) {
-            clonedPhaseData.Fennimals_in_phase = clonedPhaseData.Fennimals_in_phase.map(stripRedundantFennimalData);
-        }
 
         // Apply stripping to the completed interaction records
         if (clonedPhaseData.Data && Array.isArray(clonedPhaseData.Data)) {
@@ -876,7 +883,11 @@ class ExperimentController {
                 let experimentalAnswers = this.currentPhaseData.answers.filter(a =>
                     a.trial_kind === "belief" || a.trial_kind === "reality"
                 );
-                let earned = experimentalAnswers.reduce((sum, ans) => sum + (ans.stars_earned || 0), 0);
+                let bonusPerCorrect = this.currentPhaseData.bonus_stars_per_correct_answer || 0;
+                let earned = experimentalAnswers.reduce(
+                    (sum, ans) => sum + (ans.correct ? bonusPerCorrect : 0),
+                    0
+                );
                 let nBlocks = (typeof this.currentPhaseData.num_belief_blocks === "number" && this.currentPhaseData.num_belief_blocks > 0)
                     ? this.currentPhaseData.num_belief_blocks
                     : ((typeof this.currentPhaseData.num_repeated_blocks === "number" && this.currentPhaseData.num_repeated_blocks > 0)

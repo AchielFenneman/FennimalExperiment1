@@ -99,7 +99,9 @@ class AudioControllerObject {
             wind_up_spring: "wind_up_spring.wav",
             spring_release: "spring_release.wav",
 
-            scrub: "scrub.wav",
+            scrub: "scrub.mp3",
+            garden_shear_snip: "garden_shears_snip.mp3",
+            travel: "travel.mp3",
 
         };
 
@@ -165,6 +167,7 @@ class AudioControllerObject {
         audio.volume = 1.0;
         if (effect === "heartbeat") audio.volume = 0.10;
         if (effect === "battery_low") audio.volume = 0.20;
+        if (effect === "travel") audio.volume = 0.50;
 
         // Reset and play
         audio.pause();

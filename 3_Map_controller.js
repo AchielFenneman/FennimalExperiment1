@@ -220,8 +220,22 @@ class MapController {
     // ----------------------------------------------------
     // MAP VIEW MANAGEMENT
     // ----------------------------------------------------
+    should_play_travel_sound() {
+        // Skip behind-the-scenes zooms (phase resets, phone room off-map setup, etc.)
+        let mapRoot = document.getElementById("Map");
+        if (!mapRoot || mapRoot.style.display === "none") return false;
+        if (!this.Map_Layer || this.Map_Layer.style.display === "none") return false;
+        if (this.currently_in_location) return false;
+
+        // Audible while freely exploring, or while watching an on-screen auto-travel.
+        return !!this.player_allowed_to_move || !!this.autoTravelWash || !!this.autoTravelFrameId;
+    }
+
     zoom_map_to_region(region_name) {
         AudioCont.stop_all_region_sounds();
+        if (region_name !== "All" && this.should_play_travel_sound()) {
+            AudioCont.play_sound_effect("travel");
+        }
 
         let coords = GenParam.Map_Region_Centers_Percentage[region_name] || { x: 50, y: 50 };
         let zoom_level = region_name === "All" ? 1 : (region_name === "Home" ? GenParam.map_zoom_level_center : GenParam.map_zoom_level);
@@ -867,7 +881,15 @@ class MapController {
 
     forceAutoTravelRegion(region) {
         if (!region || !GenParam.RegionData[region]) return;
-        if (this.current_region === region) return;
+
+        // disable_map_interactions() stops ambient audio without clearing current_region.
+        // Auto-travel (especially phone_room return legs) can therefore already be "in" a
+        // region with no soundscape playing — always ensure audio is running.
+        if (this.current_region === region) {
+            AudioCont.stop_all_region_sounds();
+            AudioCont.play_region_sound(region);
+            return;
+        }
 
         this.current_region = region;
         this.zoom_map_to_region(region);
@@ -876,6 +898,14 @@ class MapController {
         if (region === "Home" && this.ExpCont.playerReturnedHome) {
             this.ExpCont.playerReturnedHome();
         }
+    }
+
+    ensureAutoTravelRegionSound() {
+        if (!this.current_region || this.current_region === "All") return;
+        if (!GenParam.RegionData[this.current_region]) return;
+
+        AudioCont.stop_all_region_sounds();
+        AudioCont.play_region_sound(this.current_region);
     }
 
     buildAutoRouteToLocation(trialObj) {
@@ -921,6 +951,10 @@ class MapController {
             this.Partner.jump_to_position(startPoint.x - GenParam.AutoTravel.partnerStartOffset.x, startPoint.y - GenParam.AutoTravel.partnerStartOffset.y);
             this.Partner.update_behavior();
         }
+
+        // disable_map_interactions() stops region audio; phone_room never re-enables the map,
+        // so restart ambient for the region we are about to travel through.
+        this.ensureAutoTravelRegionSound();
 
         this.setAutoTravelCharacterIconOpacity(0, false);
         this.showAutoTravelChrome();
@@ -1034,6 +1068,7 @@ class MapController {
     }
 
     runAutoTravelStartSequence(onReadyToMove) {
+        AudioCont.play_sound_effect("alert_minimal");
         this.fadeInAutoTravelCharacterIcons(() => {
             this.autoTravelStartTimeout = setTimeout(() => {
                 this.autoTravelStartTimeout = null;
@@ -1043,6 +1078,7 @@ class MapController {
     }
 
     runAutoTravelArrivalSequence(onComplete) {
+        AudioCont.play_sound_effect("alert_minimal");
         this.autoTravelStartTimeout = setTimeout(() => {
             this.autoTravelStartTimeout = null;
             this.fadeOutAutoTravelCharacterIcons(() => {

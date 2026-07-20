@@ -143,7 +143,7 @@ One target at a time; hint instruction, then find & interact. Supports orthogona
 
 | Field | Meaning |
 |---|---|
-| `interaction_type` | Array, e.g. `["broken_toy","dirty_toy"]` |
+| `interaction_type` | Array, e.g. `["broken_toy_in_box","dirty_toy"]` |
 | `hint_type` | Array, e.g. `["icon","toybox","toy"]` — **main trials currently get the first element only** |
 | `included_orthogonal_tasks` | Extra trial types mixed into the queue (**not** compatible with `trial_subblocks`) |
 | `orthogonal_tasks_possible_after_trial` | Present in stimulus; **not enforced in code yet** |
@@ -189,11 +189,10 @@ One-box-at-a-time DV task with curtain reveal, radial forced-choice options, and
 
 **Answer options (fixed rule `belief_reality_cyclic_lure`):** for each question the controller auto-builds a shuffled 3AFC triad from `WorldState`:
 
-1. **belief** — partner belief about the target box  
-2. **reality** — current contents of the target box  
-3. **lure** — partner belief about the *next* box in `lure_cycle` (so A uses B’s belief toy, B uses C’s, C uses A’s)
+- **Belief trials:** target-box partner belief (old; correct) + target-box current contents (new) + partner belief about the *next* box in `lure_cycle` (old lure).
+- **Reality trials:** target-box partner belief (old) + target-box current contents (new; correct) + current contents of the *next* box in `lure_cycle` (new lure).
 
-Fails loud if any piece is missing or the three toys are not distinct. Logged fields include `lure_source_box` / `lure_source_box_code`, `lure_answer`, and `option_roles`.
+Thus, with A→B→C→A, A’s lure comes from B, B’s from C, and C’s from A; only the source type changes by trial kind. Fails loud if any piece is missing or the three toys are not distinct. Logged fields include `lure_source_box`, `lure_source_box_code`, `lure_source_type`, `lure_answer`, and `option_roles`.
 
 **Trial structure:** optional practice → for each belief block: (distractor → belief)×N → optional final reality block: (distractor → reality)×N. Distractors alternate shape/color matching with orthogonal features. Question presentation order is shuffled within each block.
 
@@ -251,7 +250,7 @@ Like a simplified intro: Fennimal + toy play + celebrate + wander off. **No box.
 #### `toy_to_box` → `ToyToBoxTrialController`
 No Fennimal: abandoned toy on screen → open box → drag toy in.
 
-If the box already holds a **different** toy: opening reveals it → participant must drag it far enough away (≥300px from box; tunable via `oldToyClearDistance`) → hold → fade out → clear WorldState → then place the new toy. Same-toy contents are treated as an empty box. Partner (if present) only opens the box and otherwise observes.
+If the box already holds a **different** toy: opening reveals it → participant must drag it far enough sideways (`|Δx| ≥ 300` from box; tunable via `oldToyClearDistance`) → on release it locks in place, falls to the discarded-toy ground line if above it, and stays on screen → WorldState box contents are cleared → then place the new toy. Same-toy contents are treated as an empty box. Partner (if present) only opens the box and otherwise observes.
 
 **Needs:** `toy`, `toybox`.
 
@@ -292,10 +291,15 @@ Each sponge turn ends after ~25% of total dirt-mask health is cleaned; sponge dr
 
 ### Repair / clean / hazards
 
-#### `broken_toy` → `BrokenToyTrialController`
+#### `broken_toy_in_box` → `BrokenToyInBoxTrialController`
 Open box → toy breaks into parts → comfort → drag-repair (partner helps, or solo auto-solve timer) → charge/play → store in box.
 
 **Needs:** `toy`, `toybox`.
+
+#### `broken_toy_no_box` → `BrokenToyNoBoxTrialController`
+Fennimal appears → optional `ask_toy` choice bar → the broken toy appears overlapping on the Fennimal → pieces move and zoom to the centre → comfort → drag-repair (partner helps, or solo auto-solve timer) → charge/play → toy is left on the ground as the Fennimal walks away.
+
+**Needs:** `name`, `toy`. Does not render a box or write toybox contents to `WorldState`.
 
 #### `dirty_toy` → `DirtyToyTrialController`
 Box hidden in foliage → cut plants → open → scrub dirty toy → play → store.
@@ -346,7 +350,7 @@ Set on the **phase block** (applies to every trial FenObj in that block, includi
 }
 ```
 
-**Currently implemented in:** `basic_intro`, `Fennimal_toy`.  
+**Currently implemented in:** `basic_intro`, `Fennimal_toy`, `broken_toy_no_box`.  
 **Data:** `toy_errors_made` — ordered array of wrong toy names.
 
 **UI:** `ToyChoiceBar`.
@@ -477,7 +481,8 @@ toy_to_box
 photo_box
 feed_Fennimal
 joint_box_cleaning
-broken_toy
+broken_toy_in_box
+broken_toy_no_box
 dirty_toy
 dirty_and_broken_toy
 fly_swat

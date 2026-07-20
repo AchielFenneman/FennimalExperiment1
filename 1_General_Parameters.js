@@ -497,13 +497,13 @@ GENERALPARAM = function () {
 
     // AUTOTRAVEL AND PHONE ROOM SETTINGS
     this.AutoTravel = {
-        speed: 2.5,
+        speed: 4,
         arrivalDistance: 8,
-        partnerCatchupDelay: 1000,
+        partnerCatchupDelay: 800,
         partnerFollowStopDistance: 4,
-        startDelay: 500,
-        iconFadeTime: 650,
-        iconHoldDelay: 400,
+        startDelay: 250,
+        iconFadeTime: 450,
+        iconHoldDelay: 300,
         travellingLabel: "Travelling...",
         partnerStartOffset: {
             x: 0,
