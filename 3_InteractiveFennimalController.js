@@ -3346,7 +3346,7 @@ class ToyToBoxTrialController {
     }
 
     async finish_trial() {
-        await wait(750);
+        await wait(2000);
         this.returnfunc();
     }
 

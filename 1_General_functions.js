@@ -1106,6 +1106,28 @@ function capitalize_first_letter_in_string(str){
     return String(str).charAt(0).toUpperCase() + String(str).slice(1);
 }
 
+/**
+ * Set an SVG <image> href to a location PNG.
+ * Tries Region_location.png (lowercase), then Region_Location.png if that 404s
+ * (GitHub Pages is case-sensitive; Windows is not).
+ */
+function set_location_background_image(imgElem, regionName, locationName) {
+    let region = String(regionName || "");
+    let loc = String(locationName || "");
+    let primary = `./Locations/${region}_${loc.toLowerCase()}.png`;
+    let fallback = `./Locations/${region}_${capitalize_first_letter_in_string(loc.toLowerCase())}.png`;
+
+    imgElem.setAttribute("href", primary);
+    if (primary === fallback) return;
+
+    let onError = () => {
+        imgElem.removeEventListener("error", onError);
+        console.warn(`Location image not found: ${primary}; retrying ${fallback}`);
+        imgElem.setAttribute("href", fallback);
+    };
+    imgElem.addEventListener("error", onError);
+}
+
 function copy_scale_and_move_object_to_position(Elem,Parent, center_x, center_y, scale_factor, optional_new_id){
     //Copying the object and creating the group structure
     let SVG = Elem.cloneNode(true);

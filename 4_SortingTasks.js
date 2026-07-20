@@ -630,9 +630,9 @@ class FennimalSortingTargetSceneBox {
     buildSceneElements() {
         // 1. Background Image
         this.bgImage = document.createElementNS("http://www.w3.org/2000/svg", 'image');
-        let locName = this.fenObj.location ? this.fenObj.location.toLowerCase() : "lake";
+        let locName = this.fenObj.location ? this.fenObj.location : "lake";
         let regName = this.fenObj.region ? capitalize_first_letter_in_string(this.fenObj.region) : "North";
-        this.bgImage.setAttribute("href", `./Locations/${regName}_${locName}.png`);
+        set_location_background_image(this.bgImage, regName, locName);
         this.bgImage.setAttribute("width", "100%");
         this.bgImage.setAttribute("height", "100%");
         this.bgImage.setAttribute("preserveAspectRatio", "xMidYMid slice");

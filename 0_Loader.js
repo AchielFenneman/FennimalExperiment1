@@ -198,10 +198,11 @@ function set_all_global_variables(){
 ImageLoader = function(Array_of_visited_regions_and_locations, LocationHolderElem){
 
     for(let i = 0; i < Array_of_visited_regions_and_locations.length; i++){
-        let filename = Array_of_visited_regions_and_locations[i][1] + "_" + Array_of_visited_regions_and_locations[i][0].toLowerCase() + ".png"
-        let NewGroup = create_SVG_group(0,0,"location","location_" + Array_of_visited_regions_and_locations[i][0] )
+        let locationName = Array_of_visited_regions_and_locations[i][0];
+        let regionName = Array_of_visited_regions_and_locations[i][1];
+        let NewGroup = create_SVG_group(0,0,"location","location_" + locationName )
         let Img = document.createElementNS("http://www.w3.org/2000/svg", 'image')
-        Img.setAttribute("href", "./Locations/" + filename)
+        set_location_background_image(Img, regionName, locationName)
         Img.setAttribute("width", "100%")
         Img.setAttribute("height", "100%")
         Img.setAttribute('preserveAspectRatio', 'none')
