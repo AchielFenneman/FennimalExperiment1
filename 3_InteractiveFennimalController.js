@@ -880,6 +880,26 @@ class BaseToyModule {
         if (basics) basics.clear_gaze_target();
     }
 
+    // Pulsing interaction cue for toy charging (same visual language as MakeObjectDraggableObject).
+    // Half stroke width: outlines live inside the scaled toy, so the global 15px reads too thick.
+    create_charge_outline(target, options = {}) {
+        if (!target) return null;
+        let parent = options.insertInto || target.parentNode;
+        if (!parent) return null;
+
+        let outline = create_SVG_outline_of_group_ID(target);
+        outline.style.transform = "";
+        if (!options.keepSvgTransform) outline.removeAttribute("transform");
+        outline.style.pointerEvents = "none";
+        outline.style.strokeWidth = "7.5px";
+        outline.style.opacity = "";
+        outline.classList.add("focus_on_SVG_outline");
+
+        let before = options.insertInto ? parent.firstChild : target;
+        parent.insertBefore(outline, before);
+        return outline;
+    }
+
     charge_car() {
         return new Promise(resolve => {
             Interface.Prompt.show_message("Please pull back the car to charge its spring");
@@ -887,6 +907,51 @@ class BaseToyModule {
             let totalScale = this.parentScale * this.zoomFactor;
             let friction = 0.95;
             let pull_target = 100;
+
+            // Animated outline (same cue as MakeObjectDraggableObject) so the car reads as interactive.
+            let outline = this.create_charge_outline(this.ToyElement, { insertInto: this.ToyElement });
+
+            // Direction hint: reuse block_arrow_left (points right) — sit at toy mid-y, just to the right.
+            let arrowSource = document.getElementById("block_arrow_left");
+            let arrowWrap = null;
+            if (arrowSource) {
+                let arrowSVG = arrowSource.cloneNode(true);
+                arrowSVG.removeAttribute("id");
+                arrowSVG.style.display = "inherit";
+                arrowSVG.style.pointerEvents = "none";
+                arrowSVG.style.opacity = 0.55;
+                arrowSVG.classList.add("focus_on_SVG_fill");
+
+                let aZeroT = create_SVG_group(0, 0);
+                let scale = create_SVG_group(0, 0);
+                let pulse = create_SVG_group(0, 0);
+                arrowWrap = create_SVG_group(0, 0);
+                arrowWrap.style.pointerEvents = "none";
+
+                aZeroT.appendChild(arrowSVG);
+                scale.appendChild(aZeroT);
+                pulse.appendChild(scale);
+                arrowWrap.appendChild(pulse);
+                this.ToyElement.parentNode.appendChild(arrowWrap);
+
+                aZeroT.style.transform = `translate(${-getSVGInternalCenter(aZeroT).x}px, ${-getSVGInternalCenter(aZeroT).y}px)`;
+                scale.style.transform = "scale(2.5)";
+                pulse.classList.add("charge_hint_arrow_pulse_right");
+
+                let carCenter = getSVGInternalCenter(this.ToyElement);
+                let carBox = this.ToyElement.getBBox();
+                let localRight = GenParam.SVGObject.createSVGPoint();
+                localRight.x = carBox.x + carBox.width;
+                localRight.y = carBox.y + 0.5 * carBox.height;
+                let screenRight = localRight.matrixTransform(this.ToyElement.getScreenCTM());
+                let svgRight = screenRight.matrixTransform(GenParam.SVGObject.getScreenCTM().inverse());
+                arrowWrap.style.transform = `translate(${svgRight.x + 110}px, ${carCenter.y}px)`;
+            }
+
+            let clear_charge_cues = () => {
+                if (outline && outline.parentNode) outline.remove();
+                if (arrowWrap && arrowWrap.parentNode) arrowWrap.remove();
+            };
 
             this.ToyElement.style.cursor = "grab";
 
@@ -911,7 +976,8 @@ class BaseToyModule {
                     let currentSvgPos = pt.matrixTransform(GenParam.SVGObject.getScreenCTM().inverse());
 
                     let rawDx = (currentSvgPos.x - startSvgPos.x) / totalScale;
-                    currentTx = rawDx * friction;
+                    // Car faces left: only allow pulling backwards (to the right).
+                    currentTx = Math.max(0, rawDx * friction);
 
                     let new_x = this.centered_x + currentTx;
                     this.ToyElement.style.transform = `translate(${new_x}px, ${this.centered_y}px) scale(${this.zoomFactor})`;
@@ -926,9 +992,10 @@ class BaseToyModule {
                     // FIX: Stop the wind-up sound immediately when they let go!
                     AudioCont.stop_looping_sound_effect("toy_car_windup");
 
-                    if (Math.abs(currentTx) >= pull_target) {
+                    if (currentTx >= pull_target) {
                         // FIX: Only lock the toy (prevent re-grabbing) if they actually pulled it far enough!
                         this.ToyElement.onpointerdown = null;
+                        clear_charge_cues();
 
                         AudioCont.play_sound_effect("success");
                         this.ToyElement.style.transition = "all 600ms cubic-bezier(0.25, 1, 0.5, 1)";
@@ -939,6 +1006,7 @@ class BaseToyModule {
                         this.ToyElement.style.cursor = "grab";
                         this.ToyElement.style.transition = "all 300ms ease-out";
                         this.ToyElement.style.transform = `translate(${this.centered_x}px, ${this.centered_y}px) scale(${this.zoomFactor})`;
+                        Interface.Prompt.show_message("Pull the car a little bit further");
                     }
                 };
             };
@@ -965,8 +1033,17 @@ class BaseToyModule {
             prop_base.style.cursor = "pointer";
             prop_alt.style.cursor = "pointer";
 
+            let outline_base = this.create_charge_outline(prop_base);
+            let outline_alt = this.create_charge_outline(prop_alt);
+            if (outline_alt) outline_alt.style.opacity = "0";
+
             let clicks = 0;
             const required_clicks = 6;
+
+            const clear_prop_outlines = () => {
+                if (outline_base && outline_base.parentNode) outline_base.remove();
+                if (outline_alt && outline_alt.parentNode) outline_alt.remove();
+            };
 
             const handle_click = () => {
                 clicks++;
@@ -975,9 +1052,13 @@ class BaseToyModule {
                 if (clicks % 2 !== 0) {
                     prop_base.style.opacity = 0;
                     prop_alt.style.opacity = 1;
+                    if (outline_base) outline_base.style.opacity = "0";
+                    if (outline_alt) outline_alt.style.opacity = "";
                 } else {
                     prop_base.style.opacity = 1;
                     prop_alt.style.opacity = 0;
+                    if (outline_base) outline_base.style.opacity = "";
+                    if (outline_alt) outline_alt.style.opacity = "0";
                 }
 
                 if (clicks >= required_clicks) {
@@ -985,6 +1066,7 @@ class BaseToyModule {
                     prop_alt.onpointerdown = null;
                     prop_base.style.cursor = "auto";
                     prop_alt.style.cursor = "auto";
+                    clear_prop_outlines();
 
                     AudioCont.play_sound_effect("success");
                     resolve();
@@ -1010,6 +1092,7 @@ class BaseToyModule {
 
             open_valves.forEach((open_valve, index) => {
                 let closed_valve = closed_valves[index];
+                let valve_outline = this.create_charge_outline(open_valve);
 
                 open_valve.style.transition = "opacity 50ms ease-out";
                 open_valve.style.opacity = 1;
@@ -1025,6 +1108,7 @@ class BaseToyModule {
                     open_valve.style.cursor = "auto";
                     open_valve.style.opacity = 0;
                     if (closed_valve) closed_valve.style.opacity = 1;
+                    if (valve_outline && valve_outline.parentNode) valve_outline.remove();
 
                     let sound_key = "trumpet_note_" + sound_suffixes[index % 3];
                     AudioCont.play_sound_effect(sound_key);
@@ -1066,19 +1150,24 @@ class BaseToyModule {
             }
 
             toggle_off.style.cursor = "pointer";
+            let outline_switch = this.create_charge_outline(toggle_off, { keepSvgTransform: true });
+            let outline_button = null;
 
             // Part 1: Flip the Switch
             toggle_off.onpointerdown = () => {
                 AudioCont.play_sound_effect("switch_flicked");
                 toggle_off.onpointerdown = null;
                 toggle_off.style.cursor = "auto";
+                if (outline_switch && outline_switch.parentNode) outline_switch.remove();
 
                 this.set_robot_state("charging_step_1");
+                outline_button = this.create_charge_outline(start_button);
 
                 // Part 2: Press the glowing red Start Button
                 start_button.onpointerdown = () => {
                     AudioCont.play_sound_effect("success");
                     start_button.onpointerdown = null;
+                    if (outline_button && outline_button.parentNode) outline_button.remove();
 
                     this.set_robot_state("charged");
 
@@ -1130,6 +1219,8 @@ class BaseToyModule {
             let total_shake = 0;
             // Bumped up slightly because tracking two axes generates numbers faster!
             const required_shake = 4000;
+
+            let outline_globe = this.create_charge_outline(this.ToyElement, { insertInto: this.ToyElement });
 
             let last_mouse_x = 0;
             let last_mouse_y = 0;
@@ -1186,6 +1277,7 @@ class BaseToyModule {
                         this.ToyElement.onpointerdown = null;
                         this.ToyElement.releasePointerCapture(ev.pointerId);
                         this.ToyElement.style.cursor = "auto";
+                        if (outline_globe && outline_globe.parentNode) outline_globe.remove();
 
                         this.ToyElement.style.transition = "transform 300ms cubic-bezier(0.25, 1, 0.5, 1)";
                         this.ToyElement.style.transform = `translate(${this.centered_x}px, ${this.centered_y}px) scale(${this.zoomFactor})`;
@@ -1260,6 +1352,16 @@ class BaseToyModule {
 
             crank_up.parentNode.appendChild(crankHitbox);
 
+            // Pulsing outline on the crank (both poses), same cue as car/plane charge.
+            let outline_crank_up = this.create_charge_outline(crank_up, { keepSvgTransform: true });
+            let outline_crank_down = crank_down ? this.create_charge_outline(crank_down, { keepSvgTransform: true }) : null;
+            if (outline_crank_down) outline_crank_down.style.opacity = "0";
+
+            const clear_crank_outlines = () => {
+                if (outline_crank_up && outline_crank_up.parentNode) outline_crank_up.remove();
+                if (outline_crank_down && outline_crank_down.parentNode) outline_crank_down.remove();
+            };
+
             // 3. The Winding Logic
             let cranks = 0;
             const max_cranks = 6;
@@ -1272,7 +1374,9 @@ class BaseToyModule {
 
                 AudioCont.play_sound_effect("wind_up_spring");
                 crank_up.style.opacity = 0;
+                if (outline_crank_up) outline_crank_up.style.opacity = "0";
                 if (crank_down) crank_down.style.opacity = 1;
+                if (outline_crank_down) outline_crank_down.style.opacity = "";
 
                 // --- NEW: Decoupled Animation Math ---
                 // 1. Squash the spring
@@ -1290,11 +1394,14 @@ class BaseToyModule {
 
                 setTimeout(() => {
                     crank_up.style.opacity = 1;
+                    if (outline_crank_up) outline_crank_up.style.opacity = "";
                     if (crank_down) crank_down.style.opacity = 0;
+                    if (outline_crank_down) outline_crank_down.style.opacity = "0";
                     is_cranking = false;
 
                     if (cranks >= max_cranks) {
                         crankHitbox.remove();
+                        clear_crank_outlines();
 
                         setTimeout(() => {
                             AudioCont.play_sound_effect("success");
@@ -1392,12 +1499,18 @@ class BaseToyModule {
 
             if (bottle_cap) bottle_cap.style.pointerEvents = "all";
 
+            // Cap outline first; wand outline prepared early (before hitbox) so the clone stays clean.
+            let outline_cap = this.create_charge_outline(bottle_cap);
+            let outline_wand = this.create_charge_outline(wand_assembly, { insertInto: wand_assembly });
+            if (outline_wand) outline_wand.style.opacity = "0";
+
             if (wand_assembly) {
                 wand_assembly.style.pointerEvents = "all";
                 let wand_children = Array.from(wand_assembly.children);
                 wand_children.forEach(child => {
                     child.style.pointerEvents = "all";
                 });
+                if (outline_wand) outline_wand.style.pointerEvents = "none";
 
                 // Inject a temporary invisible hitbox so the thin stick is always grabbable while charging.
                 let wBox = wand_assembly.getBBox();
@@ -1465,6 +1578,8 @@ class BaseToyModule {
                 bottle_cap.style.pointerEvents = "none";
                 bottle_cap.style.transition = "opacity 200ms ease-out";
                 bottle_cap.style.opacity = 0;
+                if (outline_cap && outline_cap.parentNode) outline_cap.remove();
+                if (outline_wand) outline_wand.style.opacity = "";
 
                 if (tube_backside) {
                     tube_backside.style.transition = "opacity 200ms ease-in";
@@ -1529,6 +1644,7 @@ class BaseToyModule {
                                 wand_assembly.onpointerdown = null;
                                 wand_assembly.releasePointerCapture(e.pointerId);
                                 wand_assembly.style.cursor = "auto";
+                                if (outline_wand && outline_wand.parentNode) outline_wand.remove();
 
                                 if (wand_soap) {
                                     wand_soap.style.transition = "opacity 300ms ease-in";
@@ -2670,6 +2786,18 @@ class PartnerModule {
         });
     }
 
+    // Swap facing sprite (back / left / right). Visual-only; no limbs or voice.
+    set_direction(dir) {
+        if (!this.is_present || !this.PartnerScaleGroup) return;
+        let icon = WorldState.get_person_icon("partner", dir);
+        if (!icon) return;
+        while (this.PartnerScaleGroup.firstChild) {
+            this.PartnerScaleGroup.removeChild(this.PartnerScaleGroup.firstChild);
+        }
+        this.PartnerIcon = icon;
+        this.PartnerScaleGroup.appendChild(icon);
+    }
+
     // Light success reaction: bounce / dance in place (no speech).
     celebrate_success() {
         return new Promise(async resolve => {
@@ -3502,17 +3630,19 @@ class DirtModule {
         AudioCont.load_audio("water_splash", "water_splash.mp3", false);
     }
 
-    spawn_dirt_on_element(TargetElement, ParentLayer, num_spots) {
+    spawn_dirt_on_element(TargetElement, ParentLayer, num_spots, options = {}) {
         this.TargetElement = TargetElement;
         this.dirt_remaining = num_spots;
         let targetBBox = TargetElement.getBBox();
+        const colors = (options.colors && options.colors.length)
+            ? options.colors
+            : ['#4A3B2C', '#3E2723', '#5D4037', '#4E342E'];
 
         for (let i = 0; i < num_spots; i++) {
             let spot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
             let radius = 15 + (Math.random() * 15);
             spot.setAttribute('r', radius);
 
-            const colors = ['#4A3B2C', '#3E2723', '#5D4037', '#4E342E'];
             spot.setAttribute('fill', colors[Math.floor(Math.random() * colors.length)]);
 
             let paddingX = targetBBox.width * 0.15;
@@ -5406,7 +5536,7 @@ class BrokenToyInBoxTrialController {
         this.brokenToyLogic = new BrokenToyModule(FenObj);
 
         this.trial_is_active = true;
-        this.failsafe_timeout = null; // Track the 30s timer
+        this.failsafe_timeout = null; // Track the idle auto-place timer
     }
 
     handle_part_placed(remaining_count) {
@@ -5423,7 +5553,7 @@ class BrokenToyInBoxTrialController {
         // Only run failsafe if the trial is active AND there is no partner
         if (!this.trial_is_active || this.partner.is_present) return;
 
-        this.failsafe_timeout = setTimeout(() => this.trigger_auto_solve(), 30000);
+        this.failsafe_timeout = setTimeout(() => this.trigger_auto_solve(), 10000);
     }
 
     // NEW: The 30-second Auto-Solve
@@ -5613,7 +5743,7 @@ class BrokenToyNoBoxTrialController extends GeneralTrialController {
     reset_failsafe_timer() {
         if (this.failsafe_timeout) clearTimeout(this.failsafe_timeout);
         if (!this.trial_is_active || this.partner.is_present) return;
-        this.failsafe_timeout = setTimeout(() => this.trigger_auto_solve(), 30000);
+        this.failsafe_timeout = setTimeout(() => this.trigger_auto_solve(), 10000);
     }
 
     trigger_auto_solve() {
@@ -5928,7 +6058,7 @@ class DirtyAndBrokenToyTrialController {
         this.dirtLogic = new DirtModule();
 
         this.trial_is_active = true;
-        this.failsafe_timeout = null; // Track the 30s timer for the broken toy part
+        this.failsafe_timeout = null; // Track the idle auto-place timer for the broken toy part
     }
 
     // --- PHASE 1: Foliage Cleared ---
@@ -6165,7 +6295,7 @@ class DirtyAndBrokenToyTrialController {
 }
 
 // Generalized photo trial. targetType selects spawn + polaroid contents only
-// ("toybox" now; "fennimal" later). Shared camera / viewfinder / shutter / feedback.
+// ("toybox" / "fennimal"). Shared camera / viewfinder / shutter / feedback.
 class PhotoTrialController {
     constructor(FenObj, partner_is_present, returnfunc, targetType = "toybox") {
         this.FenObj = FenObj;
@@ -6246,8 +6376,38 @@ class PhotoTrialController {
         const y = this.pickRandomInRange(p.boxYMin, p.boxYMax) * H;
 
         const boxHalfW = this.getScaledTemplateHalfWidth("toybox_" + this.FenObj.toybox, scale);
-        const minX = p.boxXMargin + boxHalfW;
-        const maxX = W - p.boxXMargin - boxHalfW;
+        let place = this.pickHorizontalPlacementAvoidingPartner(boxHalfW, p.boxXMargin, y);
+        return { x: place.x, y: place.y, scale };
+    }
+
+    pickFennimalPlacement() {
+        const H = this.basics.H;
+        const p = this.params;
+        const scale = this.pickRandomInRange(p.fennimalScaleMin, p.fennimalScaleMax);
+        // create_and_appear_Fennimal treats y as the feet / baseline.
+        const y = this.pickRandomInRange(p.fennimalYMin, p.fennimalYMax) * H;
+        const fenHalfW = this.estimateFennimalHalfWidth(scale);
+        let place = this.pickHorizontalPlacementAvoidingPartner(fenHalfW, p.fennimalXMargin, y);
+        return { x: place.x, y: place.y, scale };
+    }
+
+    estimateFennimalHalfWidth(scale) {
+        let temp = create_Fennimal_SVG_object(this.FenObj, GenParam.Fennimal_head_size, false);
+        temp.style.opacity = 0;
+        temp.style.pointerEvents = "none";
+        this.basics.ItemLayers.Main.appendChild(temp);
+        let scaleGroup = temp.getElementsByClassName("Fennimal_scale_group")[0];
+        if (scaleGroup) scaleGroup.style.transform = `scale(${scale})`;
+        let box = temp.getBBox();
+        temp.remove();
+        return Math.max((box.width * scale) / 2, 80);
+    }
+
+    pickHorizontalPlacementAvoidingPartner(halfW, xMargin, y) {
+        const W = this.basics.W;
+        const p = this.params;
+        const minX = xMargin + halfW;
+        const maxX = W - xMargin - halfW;
 
         let partnerCenterX = null;
         let partnerHalfW = null;
@@ -6259,8 +6419,8 @@ class PhotoTrialController {
         let ranges = [[minX, maxX]];
         if (partnerCenterX !== null && partnerHalfW !== null) {
             const gap = p.partnerAvoidGap;
-            const fStart = partnerCenterX - partnerHalfW - boxHalfW - gap;
-            const fEnd = partnerCenterX + partnerHalfW + boxHalfW + gap;
+            const fStart = partnerCenterX - partnerHalfW - halfW - gap;
+            const fEnd = partnerCenterX + partnerHalfW + halfW + gap;
             let next = [];
             ranges.forEach(([aStart, aEnd]) => {
                 if (fEnd <= aStart || fStart >= aEnd) {
@@ -6281,7 +6441,7 @@ class PhotoTrialController {
             x = range[0] + Math.random() * (range[1] - range[0]);
         }
 
-        return { x, y, scale };
+        return { x, y };
     }
 
     getScaledTemplateHalfWidth(elementId, scale) {
@@ -6299,8 +6459,7 @@ class PhotoTrialController {
             case "toybox":
                 return this.spawn_toybox_target();
             case "fennimal":
-                console.warn("PhotoTrialController: fennimal target not implemented yet; falling back to toybox.");
-                return this.spawn_toybox_target();
+                return this.spawn_fennimal_target();
             default:
                 console.error("PhotoTrialController: unknown targetType " + this.targetType);
                 return this.spawn_toybox_target();
@@ -6325,10 +6484,49 @@ class PhotoTrialController {
         this.photoTargetElements = [this.box.BoxBase, this.box.BoxTop].filter(Boolean);
     }
 
+    async spawn_fennimal_target() {
+        let place = this.pickFennimalPlacement();
+        this.fen_start_x = place.x;
+        this.fen_start_y = place.y;
+        this.fen_scale = place.scale;
+
+        await this.basics.create_and_appear_Fennimal(
+            this.basics.ItemLayers.Main,
+            place.x,
+            place.y,
+            place.scale,
+            250
+        );
+
+        this.photoTargetElements = [this.basics.Fennimal].filter(Boolean);
+    }
+
     get_target_label() {
         if (this._targetLabelOverride) return this._targetLabelOverride;
         if (this.targetType === "toybox") return this.box.boxname;
-        return this.FenObj.name || "target";
+        return this.FenObj.name || "Fennimal";
+    }
+
+    get_intro_prompt() {
+        if (this.targetType === "fennimal") {
+            return "Please take a photo of " + this.get_target_label();
+        }
+        return "Take a photo of the " + this.get_target_label() + " to check if its still in good shape";
+    }
+
+    get_retry_prompt() {
+        if (this.targetType === "fennimal") {
+            return "Take a photo of " + this.get_target_label();
+        }
+        return "Take a photo of the " + this.get_target_label();
+    }
+
+    get_success_prompt() {
+        if (this._successPromptOverride) return this._successPromptOverride;
+        if (this.targetType === "fennimal") {
+            return "Nice shot! Thats a great photo of " + this.get_target_label();
+        }
+        return "Nice shot! The " + this.get_target_label() + " looks good.";
     }
 
     create_polaroid_contents(groupScale, targetCircle) {
@@ -6363,6 +6561,41 @@ class PhotoTrialController {
 
             return boxIcon;
         }
+
+        if (this.targetType === "fennimal") {
+            let fenIcon = create_Fennimal_SVG_object(this.FenObj, GenParam.Fennimal_head_size, false);
+            fenIcon.querySelectorAll(".prep_element_hidden").forEach((el) => el.remove());
+            fenIcon.style.display = "inherit";
+
+            let fenScaleGroup = fenIcon.getElementsByClassName("Fennimal_scale_group")[0];
+            let fenBody = fenIcon.getElementsByClassName("Fennimal_body")[0];
+            let fenHead = fenIcon.getElementsByClassName("Fennimal_head")[0];
+            if (fenBody) fenBody.style.transform = "translate(0px, 0px) scale(1, 1)";
+            if (fenHead) fenHead.style.transform = "translate(0px, 0px) rotate(0deg)";
+            fenIcon.querySelectorAll(".eye_gaze").forEach((eye) => {
+                eye.style.transform = "translate(0px, 0px) scale(1.15)";
+            });
+            freeze_fennimal_decorative_animations(fenIcon);
+            groupScale.appendChild(fenIcon);
+
+            let fenBox = fenIcon.getBBox();
+            let bgRect = groupScale.getElementsByTagName("rect")[0];
+            let frameBox = bgRect ? bgRect.getBBox() : { width: 500, height: 600 };
+            let fenScale = Math.min(
+                (frameBox.width * 0.82) / Math.max(fenBox.width, 1),
+                (frameBox.height * 0.78) / Math.max(fenBox.height, 1)
+            );
+            let fenCx = fenBox.x + fenBox.width / 2;
+            let fenCy = fenBox.y + fenBox.height / 2;
+            if (fenScaleGroup) fenScaleGroup.style.transform = "";
+            fenIcon.setAttribute(
+                "transform",
+                `translate(${targetCircle.x}, ${targetCircle.y}) scale(${fenScale}) translate(${-fenCx}, ${-fenCy})`
+            );
+
+            return fenIcon;
+        }
+
         return null;
     }
 
@@ -6614,7 +6847,7 @@ class PhotoTrialController {
             await this.handle_miss();
             this.is_processing_shot = false;
             this.show_camera_button();
-            Interface.Prompt.show_message("Take a photo of the " + this.get_target_label());
+            Interface.Prompt.show_message(this.get_retry_prompt());
         }
     }
 
@@ -6766,7 +6999,7 @@ class PhotoTrialController {
 
     async handle_success() {
         AudioCont.play_sound_effect("success");
-        Interface.Prompt.show_message("Nice shot! The " + this.get_target_label() + " looks good.");
+        Interface.Prompt.show_message(this.get_success_prompt());
 
         let celebratePromise = this.partner.is_present
             ? this.partner.celebrate_success()
@@ -6797,16 +7030,19 @@ class PhotoTrialController {
     async run_embedded_capture_loop({
         photoTargetElements,
         polaroidContentsFn = null,
-        targetLabel = null
+        targetLabel = null,
+        introPrompt = null,
+        successPrompt = null
     } = {}) {
         this.photoTargetElements = photoTargetElements || this.photoTargetElements;
         this._polaroidContentsOverride = polaroidContentsFn;
         this._targetLabelOverride = targetLabel;
+        this._successPromptOverride = successPrompt;
         this._embeddedMode = true;
         this.is_processing_shot = false;
 
         Interface.Prompt.show_message(
-            "Take a photo of the " + this.get_target_label() + " to remember this moment!"
+            introPrompt || ("Take a photo of the " + this.get_target_label() + " to remember this moment!")
         );
         AudioCont.play_sound_effect("alert_minor");
         this.show_camera_button();
@@ -6823,6 +7059,7 @@ class PhotoTrialController {
         this.unbind_photo_mode_listeners();
         this._polaroidContentsOverride = null;
         this._targetLabelOverride = null;
+        this._successPromptOverride = null;
     }
 
     // --- Orchestrator ---
@@ -6837,9 +7074,7 @@ class PhotoTrialController {
 
         await this.spawn_target();
 
-        Interface.Prompt.show_message(
-            "Take a photo of the " + this.get_target_label() + " to check if its still in good shape"
-        );
+        Interface.Prompt.show_message(this.get_intro_prompt());
         AudioCont.play_sound_effect("alert_minor");
         this.show_camera_button();
     }
@@ -7466,6 +7701,8 @@ class JointBoxCleaningTrialController {
         this.boxCenter = null;
         this.dragController = null;
         this.photoSession = null;
+        this.bindingOutlineGroup = null;
+        this._fenHandoffBaseTransform = null;
     }
 
     async start_sequence() {
@@ -7610,7 +7847,12 @@ class JointBoxCleaningTrialController {
         const p = this.params;
         this.boxCenter = getSVGInternalCenter(this.box.BoxTop);
 
-        this.dirt.spawn_dirt_on_element(this.box.BoxTop, this.basics.ItemLayers.Plus2, p.dirtSpots);
+        this.dirt.spawn_dirt_on_element(
+            this.box.BoxTop,
+            this.basics.ItemLayers.Plus2,
+            p.dirtSpots,
+            { colors: this.get_region_dirt_colors() }
+        );
         this.foliage.spawn_one_plant_left_of(
             this.basics.ItemLayers,
             this.boxCenter.x,
@@ -7623,6 +7865,72 @@ class JointBoxCleaningTrialController {
 
         Interface.Prompt.show_message("Oh no, the " + this.box.boxname + " is dirty!");
         await wait(2000);
+    }
+
+    get_region_dirt_colors() {
+        let region = this.FenObj && this.FenObj.region;
+        let rd = (region && GenParam.RegionData && GenParam.RegionData[region])
+            ? GenParam.RegionData[region]
+            : null;
+        // Solid region dark only (no brown mix) so the tint reads clearly.
+        let dark = this.sanitize_hex_color(
+            (rd && rd.darker_color) || '#4E342E'
+        ) || '#4E342E';
+        return [dark];
+    }
+
+    sanitize_hex_color(raw) {
+        if (typeof raw !== "string" || !raw.length) return null;
+        if (raw[0] === "#" && raw.length === 9) return raw.slice(0, 7);
+        return raw;
+    }
+
+    get_binding_outline_color() {
+        // Prefer a bright fill sampled from the box artwork; fall back to region accent.
+        let boxColor = this.sample_box_accent_color();
+        if (boxColor) return boxColor;
+
+        let region = this.FenObj && this.FenObj.region;
+        let rd = (region && GenParam.RegionData && GenParam.RegionData[region])
+            ? GenParam.RegionData[region]
+            : null;
+        if (!rd) return '#FFD54F';
+        return this.sanitize_hex_color(rd.lighter_color || rd.contrast_color || '#FFD54F') || '#FFD54F';
+    }
+
+    sample_box_accent_color() {
+        let template = document.getElementById("toybox_" + this.FenObj.toybox);
+        if (!template) return null;
+        let nodes = template.querySelectorAll("[fill]");
+        let goldBest = null;
+        let goldScore = -1;
+        let brightBest = null;
+        let brightLum = -1;
+        for (let i = 0; i < nodes.length; i++) {
+            let fill = nodes[i].getAttribute("fill");
+            if (!fill || fill === "none" || fill === "transparent") continue;
+            if (fill[0] === "#" && fill.length >= 7) {
+                let hex = fill.slice(0, 7);
+                let r = parseInt(hex.slice(1, 3), 16);
+                let g = parseInt(hex.slice(3, 5), 16);
+                let b = parseInt(hex.slice(5, 7), 16);
+                let lum = (r + g + b) / 3;
+                if (lum < 40) continue;
+                if (lum > brightLum) {
+                    brightLum = lum;
+                    brightBest = hex;
+                }
+                // Prefer bright gold / yellow accents (crate hardware, etc.).
+                if (r >= 200 && g >= 160 && b <= 160) {
+                    let score = lum + (r + g - b);
+                    if (score > goldScore) {
+                        goldScore = score;
+                        goldBest = hex;
+                    }
+                }
+            }
+        }
+        return goldBest || brightBest;
     }
 
     async spawn_dirty_scene() {
@@ -7878,6 +8186,8 @@ class JointBoxCleaningTrialController {
         let bx = bellows ? getSVGInternalCenter(bellows).x : this.boxCenter.x - 200;
         let dx = (bx + 40) - fen.x;
         await this.move_fennimal_and_shears(dx, 450);
+        // Small hop as Fennimal works the bellows
+        this.basics.Fennimal_jump(110, { ms: 120, resolveMs: 240 });
         await this.dust.puff({ amount: this.params.dustPerPuff, waitForRefill: true });
         let now = getSVGInternalCenter(this.basics.Fennimal);
         let homeX = this.fenHome ? this.fenHome.x : now.x;
@@ -7904,9 +8214,10 @@ class JointBoxCleaningTrialController {
         this.dirt.Spots = [];
         this.dirt.dirt_remaining = 0;
 
-        // Return actors
+        // Keep partner in the corner during handoff so they don't block the drag path.
         if (this.partner.is_present) {
             await this.partner.return_to_start();
+            this.partner.set_direction("back");
         }
         let fen = getSVGInternalCenter(this.basics.Fennimal);
         let restOffset = p.fennimalRestOffsetX != null ? p.fennimalRestOffsetX : -150;
@@ -7914,7 +8225,7 @@ class JointBoxCleaningTrialController {
         await this.basics.Fennimal_move_relative(leftX - fen.x, 0, 400);
         this.fenHome = getSVGInternalCenter(this.basics.Fennimal);
 
-        // Glow + confetti + encoding statement
+        // Brief solo box sparkle (binding silhouette comes after handoff).
         let baseT = this.box.BoxTop.style.transform || "";
         this.box.BoxTop.style.transition = "transform 350ms ease-out, filter 350ms ease-out";
         this.box.BoxTop.style.filter = "brightness(1.25) drop-shadow(0px 0px 18px gold)";
@@ -7933,6 +8244,110 @@ class JointBoxCleaningTrialController {
             "This clean " + this.box.boxname + " belongs to " + this.FenObj.name + "!"
         );
         await wait(p.encodingPauseMs);
+    }
+
+    create_or_update_binding_outline() {
+        const p = this.params;
+        if (!this.basics.Fennimal || !this.box.BoxTop) return null;
+
+        this.remove_binding_outline();
+
+        let color = this.get_binding_outline_color();
+        let strokeW = p.bindingOutlineStrokeWidth != null ? p.bindingOutlineStrokeWidth : 22;
+
+        // Silhouette clone of Fennimal + box together (same technique as draggable outlines).
+        let outline = create_SVG_outline_of_multiple_groups(
+            this.basics.Fennimal,
+            this.box.BoxTop
+        );
+        outline.classList.add("binding_ownership_outline");
+        outline.style.stroke = color;
+        outline.style.strokeWidth = strokeW + "px";
+        outline.style.filter = `drop-shadow(0px 0px 12px ${color})`;
+        outline.style.pointerEvents = "none";
+
+        // Outline-only look: strip fills so the clone reads as a halo, not a duplicate.
+        outline.querySelectorAll("*").forEach((child) => {
+            child.removeAttribute("fill");
+            child.style.fill = "none";
+            child.removeAttribute("stroke");
+            child.style.stroke = "";
+            child.removeAttribute("stroke-width");
+            child.style.strokeWidth = "";
+        });
+
+        // Behind the live Fennimal so only the outer halo shows (not internal strokes).
+        // Box lives on Plus2, so its outline on Main still peeks around the box edges.
+        let fenParent = this.basics.Fennimal.parentNode || this.basics.ItemLayers.Main;
+        fenParent.insertBefore(outline, this.basics.Fennimal);
+        this.bindingOutlineGroup = outline;
+
+        // Matching live-element glow in box/region color.
+        let glow = `drop-shadow(0px 0px 16px ${color})`;
+        this.basics.Fennimal.style.filter = glow;
+        this.box.BoxTop.style.filter = glow;
+
+        return outline;
+    }
+
+    async pulse_binding_outline() {
+        if (!this.bindingOutlineGroup) return;
+        let el = this.bindingOutlineGroup;
+        el.style.transition = "opacity 350ms ease-out";
+        el.style.opacity = 0;
+        window.getComputedStyle(el).opacity;
+        el.style.opacity = 0.9;
+        await wait(400);
+    }
+
+    async partner_approach_pair_for_witness() {
+        if (!this.partner.is_present || !this.partner.PartnerTranslateGroup) return;
+
+        const p = this.params;
+        // Stay facing the camera-from-behind look; step "into" the scene.
+        this.partner.set_direction("back");
+
+        let homeScale = p.partnerHomeScale != null ? p.partnerHomeScale : 40;
+        let witnessScale = p.partnerWitnessScale != null ? p.partnerWitnessScale : 30;
+        let liftY = p.partnerWitnessLiftY != null ? p.partnerWitnessLiftY : -90;
+        let gapX = p.partnerWitnessGapX != null ? p.partnerWitnessGapX : 220;
+
+        let fen = getSVGInternalCenter(this.basics.Fennimal);
+        let box = getSVGInternalCenter(this.box.BoxTop);
+        let pairRight = Math.max(fen.x, box.x);
+        let targetX = Math.min(0.88 * this.basics.W, pairRight + gapX);
+
+        // Partner base sits at ~0.9W; measure current visual center then nudge.
+        let partner = getSVGInternalCenter(this.partner.PartnerTranslateGroup);
+        let dx = targetX - partner.x;
+
+        this.partner.PartnerScaleGroup.style.transition =
+            "transform 550ms ease-in-out";
+        this.partner.PartnerTranslateGroup.style.transition =
+            "transform 550ms ease-in-out";
+
+        // Smaller scale + lift = farther into the scene; shift right of the pair.
+        this.partner.PartnerScaleGroup.style.transform = `scale(${witnessScale})`;
+        this.partner.PartnerTranslateGroup.style.transform =
+            `translate(${dx}px, ${liftY}px)`;
+
+        await wait(600);
+        this._partnerWitnessActive = true;
+        this._partnerHomeScale = homeScale;
+    }
+
+    remove_binding_outline() {
+        if (this.bindingOutlineGroup && this.bindingOutlineGroup.parentNode) {
+            this.bindingOutlineGroup.remove();
+        }
+        this.bindingOutlineGroup = null;
+        this._bindingEllipse = null;
+        if (this.basics && this.basics.Fennimal) {
+            this.basics.Fennimal.style.filter = "none";
+        }
+        if (this.box && this.box.BoxTop) {
+            this.box.BoxTop.style.filter = "none";
+        }
     }
 
     async fade_out_shears(ms = 400) {
@@ -7959,6 +8374,11 @@ class JointBoxCleaningTrialController {
         this.basics.Fennimal.style.filter = "drop-shadow(0px 0px 14px gold)";
 
         let fenTarget = this.basics.TargetPoints.Fennimal_body_center || this.basics.Fennimal;
+        this._fenHandoffBaseTransform = this.basics.Fennimal.style.transform || "";
+        let fenStart = getSVGInternalCenter(this.basics.Fennimal);
+        let boxStart = getSVGInternalCenter(this.box.BoxTop);
+        let maxApproach = p.handoffApproachMaxPx != null ? p.handoffApproachMaxPx : 95;
+        let approachDir = fenStart.x < boxStart.x ? 1 : -1;
 
         await new Promise(resolve => {
             this.dragController = MakeObjectDraggableObject(
@@ -7973,7 +8393,22 @@ class JointBoxCleaningTrialController {
                 },
                 {
                     axis: "x",
+                    onMove: (dx) => {
+                        let boxNowX = boxStart.x + dx;
+                        let dist0 = Math.abs(boxStart.x - fenStart.x);
+                        let distNow = Math.abs(boxNowX - fenStart.x);
+                        let progress = dist0 > 1
+                            ? Math.max(0, Math.min(1, 1 - (distNow / dist0)))
+                            : 0;
+                        let approach = progress * maxApproach;
+                        this.basics.Fennimal.style.transition = "none";
+                        this.basics.Fennimal.style.transform =
+                            this._fenHandoffBaseTransform +
+                            ` translate(${approachDir * approach}px, 0px)`;
+                    },
                     onMiss: () => {
+                        this.basics.Fennimal.style.transition = "transform 280ms ease-out";
+                        this.basics.Fennimal.style.transform = this._fenHandoffBaseTransform;
                         if (this.dragController) this.dragController.enable();
                     }
                 }
@@ -7999,17 +8434,90 @@ class JointBoxCleaningTrialController {
         this.box.BoxTop.style.transform += ` translate(${boxDx}px, 0px)`;
         await wait(650);
 
-        // Brief paired tableau, then use the extended celebration before the end photo.
-        await wait(500);
-        await this.basics.perform_success_celebration(null, { extended: true });
-        await wait(400);
+        this.fenHome = getSVGInternalCenter(this.basics.Fennimal);
+        this.boxCenter = getSVGInternalCenter(this.box.BoxTop);
+
+        // Ownership celebration first, then freeze + bind so the outline matches a still pose.
+        await this.play_jump_on_box_celebration();
+
+        this.basics.freeze_character_pose();
+        this.create_or_update_binding_outline();
+        await this.pulse_binding_outline();
+
+        if (this.partner.is_present) {
+            await this.partner_approach_pair_for_witness();
+        }
+
+        // Freeze-frame tableau (no prompt — keep focus on the pair / partner).
+        Interface.Prompt.hide();
+        if (this.partner.is_present) {
+            this.partner.celebrate_success();
+        }
+        let freezeMs = p.freezeTableauMs != null ? p.freezeTableauMs : 1800;
+        await wait(freezeMs);
 
         await this.run_end_photo();
+
+        this.remove_binding_outline();
 
         Interface.Prompt.show_message(this.FenObj.name + " has wandered off...");
         fen = getSVGInternalCenter(this.basics.Fennimal);
         await this.basics.Fennimal_move_relative(-(fen.x + 300), 0, 750);
         await wait(500);
+    }
+
+    async play_jump_on_box_celebration() {
+        const p = this.params;
+        let amount = p.jumpOnBoxAmount != null ? p.jumpOnBoxAmount : 150;
+        let holdMs = p.jumpOnBoxHoldMs != null ? p.jumpOnBoxHoldMs : 450;
+
+        // Walk a bit closer under/onto the box landing zone
+        let fen = getSVGInternalCenter(this.basics.Fennimal);
+        let box = getSVGInternalCenter(this.box.BoxTop);
+        let landX = box.x - 40;
+        await this.basics.Fennimal_move_relative(landX - fen.x, 0, 280);
+
+        let groundTransform = this.basics.Fennimal.style.transform || "";
+
+        AudioCont.play_sound_effect("jump");
+        this.basics.Fennimal.style.transition = "all 220ms ease-out";
+        this.basics.Fennimal.style.transform += ` translateY(-${2 * amount}px)`;
+        await wait(220);
+
+        this.basics.Fennimal.style.transition = "all 120ms ease-in";
+        this.basics.Fennimal.style.transform =
+            groundTransform + ` translateY(-${amount}px)`;
+        await wait(120);
+
+        // Brief "on the box" hold + hearts
+        let center = getSVGInternalCenter(this.basics.Fennimal);
+        for (let i = 0; i < 8; i++) {
+            setTimeout(() => {
+                this.basics.spawn_happy_heart(
+                    center.x + (Math.random() - 0.5) * 120,
+                    center.y - 60 - Math.random() * 50,
+                    this.basics.ItemLayers.Plus2
+                );
+            }, i * 30);
+        }
+        await wait(holdMs);
+
+        // Hop once on top, then jump back to ground
+        await this.basics.Fennimal_jump(70, { ms: 140, resolveMs: 280 });
+
+        AudioCont.play_sound_effect("jump");
+        this.basics.Fennimal.style.transition = "all 200ms ease-out";
+        this.basics.Fennimal.style.transform += " translateY(-40px)";
+        await wait(200);
+        this.basics.Fennimal.style.transition = "all 180ms ease-in";
+        this.basics.Fennimal.style.transform = groundTransform;
+        await wait(220);
+
+        // Settle back beside the box for the freeze / photo pose
+        fen = getSVGInternalCenter(this.basics.Fennimal);
+        box = getSVGInternalCenter(this.box.BoxTop);
+        await this.basics.Fennimal_move_relative((box.x - 140) - fen.x, 0, 300);
+        this.fenHome = getSVGInternalCenter(this.basics.Fennimal);
     }
 
     async pose_fennimal_behind_box_for_photo() {
@@ -8024,6 +8532,36 @@ class JointBoxCleaningTrialController {
         this.fenHome = getSVGInternalCenter(this.basics.Fennimal);
     }
 
+    get_polaroid_photo_svg_rect(bgRect, targetCircle, frameSize) {
+        // Convert the photo rect into the same SVG space as targetCircle.
+        // (getBBox alone is local to the polaroid template and breaks placement/clip.)
+        if (bgRect && bgRect.ownerSVGElement) {
+            let svg = bgRect.ownerSVGElement;
+            let screen = bgRect.getBoundingClientRect();
+            let inv = svg.getScreenCTM().inverse();
+            let tl = svg.createSVGPoint();
+            tl.x = screen.left;
+            tl.y = screen.top;
+            let br = svg.createSVGPoint();
+            br.x = screen.right;
+            br.y = screen.bottom;
+            let p1 = tl.matrixTransform(inv);
+            let p2 = br.matrixTransform(inv);
+            return {
+                x: Math.min(p1.x, p2.x),
+                y: Math.min(p1.y, p2.y),
+                width: Math.abs(p2.x - p1.x),
+                height: Math.abs(p2.y - p1.y)
+            };
+        }
+        return {
+            x: targetCircle.x - frameSize.width / 2,
+            y: targetCircle.y - frameSize.height / 2,
+            width: frameSize.width,
+            height: frameSize.height
+        };
+    }
+
     create_joint_cleaning_polaroid_contents(groupScale, targetCircle) {
         let template = document.getElementById("toybox_" + this.FenObj.toybox);
         if (!template) return null;
@@ -8031,14 +8569,20 @@ class JointBoxCleaningTrialController {
         let contents = create_SVG_group(0, 0);
         groupScale.appendChild(contents);
 
-        // Slight downward bias so the Fennimal+box pair sits in the visual center of the frame.
+        let bgRect = groupScale.getElementsByTagName("rect")[0];
+        let frameSize = bgRect
+            ? bgRect.getBBox()
+            : { width: 500, height: 600 };
+        let photoRect = this.get_polaroid_photo_svg_rect(bgRect, targetCircle, frameSize);
+        let color = this.get_binding_outline_color();
+
+        // Slight downward bias so the Fennimal+box pair sits in the visual center.
         let pairCy = targetCircle.y + 35;
 
-        // Fennimal behind the box — larger so the pair fills more of the frame.
+        // Fennimal + box use the same unclipped placement as the working toybox polaroid.
         let fenIcon = create_Fennimal_SVG_object(this.FenObj, 0.55, false);
         fenIcon.querySelectorAll(".prep_element_hidden").forEach((el) => el.remove());
         fenIcon.style.display = "inherit";
-        // Neutral / frozen pose in the polaroid (no breathing, gaze, or body flair).
         let fenScaleGroup = fenIcon.getElementsByClassName("Fennimal_scale_group")[0];
         let fenBody = fenIcon.getElementsByClassName("Fennimal_body")[0];
         let fenHead = fenIcon.getElementsByClassName("Fennimal_head")[0];
@@ -8051,15 +8595,12 @@ class JointBoxCleaningTrialController {
         contents.appendChild(fenIcon);
 
         let fenBox = fenIcon.getBBox();
-        let bgRect = groupScale.getElementsByTagName("rect")[0];
-        let frameBox = bgRect ? bgRect.getBBox() : { width: 500, height: 600 };
         let fenScale = Math.min(
-            (frameBox.width * 0.88) / Math.max(fenBox.width, 1),
-            (frameBox.height * 0.78) / Math.max(fenBox.height, 1)
+            (frameSize.width * 0.88) / Math.max(fenBox.width, 1),
+            (frameSize.height * 0.78) / Math.max(fenBox.height, 1)
         );
         let fenCx = fenBox.x + fenBox.width / 2;
         let fenCy = fenBox.y + fenBox.height / 2;
-        // Keep scale-group identity; place via outer transform only.
         if (fenScaleGroup) fenScaleGroup.style.transform = "";
         fenIcon.setAttribute(
             "transform",
@@ -8074,19 +8615,83 @@ class JointBoxCleaningTrialController {
             1
         );
         let rawBox = template.getBBox();
-        let scaleFactorW = frameBox.width / Math.max(rawBox.width, 1);
-        let scaleFactorH = (0.62 * frameBox.height) / Math.max(rawBox.height, 1);
+        let scaleFactorW = frameSize.width / Math.max(rawBox.width, 1);
+        let scaleFactorH = (0.62 * frameSize.height) / Math.max(rawBox.height, 1);
         let minScale = Math.min(scaleFactorW, scaleFactorH) * 0.82;
         let scaleGroup = boxIcon.getElementsByClassName("scale_group")[0];
         if (scaleGroup) {
             scaleGroup.style.transform = `scale(${minScale})`;
         }
 
+        // Memory-stamp silhouette behind Fennimal + box.
+        let stamp = create_SVG_outline_of_multiple_groups(fenIcon, boxIcon);
+        stamp.classList.add("binding_ownership_outline");
+        stamp.style.stroke = color;
+        stamp.style.strokeWidth = "14px";
+        stamp.style.filter = `drop-shadow(0px 0px 6px ${color})`;
+        stamp.style.pointerEvents = "none";
+        stamp.querySelectorAll("*").forEach((child) => {
+            child.removeAttribute("fill");
+            child.style.fill = "none";
+            child.removeAttribute("stroke");
+            child.style.stroke = "";
+            child.removeAttribute("stroke-width");
+            child.style.strokeWidth = "";
+        });
+        contents.insertBefore(stamp, fenIcon);
+
+        // Partner witness: back view, bottom-right; clip only the partner to the photo rect.
+        if (this.partner.is_present) {
+            let partnerIcon = WorldState.get_person_icon("partner", "back");
+            if (partnerIcon) {
+                let clipId = "joint_clean_partner_clip_" + Date.now();
+                let defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+                let clipPath = document.createElementNS("http://www.w3.org/2000/svg", "clipPath");
+                clipPath.setAttribute("id", clipId);
+                let clipRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                clipRect.setAttribute("x", photoRect.x);
+                clipRect.setAttribute("y", photoRect.y);
+                clipRect.setAttribute("width", photoRect.width);
+                clipRect.setAttribute("height", photoRect.height);
+                clipPath.appendChild(clipRect);
+                defs.appendChild(clipPath);
+                contents.appendChild(defs);
+
+                let clipped = create_SVG_group(0, 0);
+                clipped.setAttribute("clip-path", `url(#${clipId})`);
+                contents.appendChild(clipped);
+
+                let inset = create_SVG_group(0, 0);
+                clipped.appendChild(inset);
+                inset.appendChild(partnerIcon);
+
+                let pBox = partnerIcon.getBBox();
+                let pCx = pBox.x + pBox.width / 2;
+                // Anchor at upper chest so head stays inside; lower body crops at the photo edge.
+                let pCy = pBox.y + pBox.height * 0.28;
+                // ~2x previous inset size.
+                let insetScale = Math.min(
+                    (photoRect.width * 0.56) / Math.max(pBox.width, 1),
+                    (photoRect.height * 0.84) / Math.max(pBox.height, 1)
+                );
+                let insetX = photoRect.x + photoRect.width * 0.78;
+                // Keep head/shoulders inside the photo; lift so they aren't under the frame.
+                let insetY = photoRect.y + photoRect.height * 0.78;
+                inset.setAttribute(
+                    "transform",
+                    `translate(${insetX}, ${insetY}) scale(${insetScale}) translate(${-pCx}, ${-pCy})`
+                );
+                inset.style.opacity = 1;
+            }
+        }
+
         return contents;
     }
 
     async run_end_photo() {
+        this.remove_binding_outline();
         await this.pose_fennimal_behind_box_for_photo();
+        this.create_or_update_binding_outline();
 
         this.photoSession = new PhotoTrialController(
             this.FenObj,
@@ -8094,7 +8699,6 @@ class JointBoxCleaningTrialController {
             () => {},
             "toybox"
         );
-        // Reuse the live scene (do not rebuild basics/box/partner).
         this.photoSession.basics = this.basics;
         this.photoSession.box = this.box;
         this.photoSession.partner = this.partner;
@@ -8115,10 +8719,319 @@ class JointBoxCleaningTrialController {
             this.photoSession = null;
         }
         if (this.dragController && this.dragController.destroy) this.dragController.destroy();
+        this.remove_binding_outline();
         this.dirt.clean_up();
         this.dust.clean_up();
         this.foliage.clean_up();
         if (this.ShearsGroup) this.ShearsGroup.remove();
+        this.box.clean_up();
+        this.basics.clean_up();
+        if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
+    }
+}
+
+// Closed box (+ partner): optional contents quiz → open → empty close OR take out → photo → put back → close.
+// WorldState is left unchanged (inspection only).
+class CheckBoxContentsTrialController {
+    constructor(FenObj, partner_is_present, returnfunc) {
+        this.FenObj = FenObj;
+        this.returnfunc = returnfunc;
+
+        this.basics = new BasicElementsModule(FenObj);
+        this.box = new BoxModule(FenObj);
+        this.partner = new PartnerModule(partner_is_present);
+
+        this.contents = null;
+        this.toy = null;
+        this.dragController = null;
+        this.photoSession = null;
+        this.toyClearDistance = 400;
+    }
+
+    async start_sequence() {
+        this.basics.create_svg_sublayers();
+        if (this.partner.is_present) {
+            this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        }
+        await this.basics.create_background_mask(true, 500);
+
+        this.contents = WorldState.get_toybox_contents(this.FenObj.toybox);
+
+        const boxScale = 4;
+        const boxX = 0.45 * this.basics.W;
+        const boxY = 0.7 * this.basics.H;
+        await this.box.create_and_appear_box(
+            this.basics.ItemLayers.Main,
+            this.basics.ItemLayers.Plus2,
+            boxX,
+            boxY,
+            boxScale,
+            200
+        );
+        await wait(600);
+
+        if (this.contents) {
+            await this.run_contents_quiz();
+            await this.spawn_contents_toy_in_box(boxScale);
+        }
+
+        await this.open_box();
+        this.box.set_pointer_events_enabled(false);
+
+        if (!this.contents) {
+            await this.run_empty_box_path();
+        } else {
+            await this.run_occupied_box_path();
+        }
+    }
+
+    async run_contents_quiz() {
+        let options = Array.isArray(this.FenObj.toys_asked) ? [...this.FenObj.toys_asked] : [];
+        if (!options.includes(this.contents)) options.push(this.contents);
+        if (options.length === 0) {
+            console.warn("check_box_contents: no toys_asked options; skipping quiz.");
+            return;
+        }
+
+        this.FenObj.toy_errors_made = [];
+        let bar = new ToyChoiceBar(
+            this.basics.ItemLayers.Plus2,
+            this.basics.W,
+            this.basics.H
+        );
+
+        while (true) {
+            Interface.Prompt.show_message("Which toy is in the " + this.box.boxname + "?");
+            let selected = await bar.waitForSelection(shuffleArray([...options]));
+
+            if (selected === this.contents) {
+                AudioCont.play_sound_effect("positive");
+                await bar.hide();
+                let burstCenter = getSVGInternalCenter(this.box.BoxBase);
+                await spawn_confetti_burst(
+                    this.basics.ItemLayers.Plus2,
+                    burstCenter.x,
+                    burstCenter.y,
+                    { awaitPopMs: 700 }
+                );
+                return;
+            }
+
+            AudioCont.play_sound_effect("rejected");
+            this.FenObj.toy_errors_made.push(selected);
+            Interface.Prompt.show_message("Oops, you picked the wrong toy!");
+            await bar.hide();
+            await wait(1000);
+        }
+    }
+
+    async spawn_contents_toy_in_box(boxScale) {
+        this.toy = new StandardToyModule({ toy: this.contents });
+        let boxTarget = getSVGInternalCenter(
+            this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0]
+        );
+        await this.toy.create_and_appear_toy(
+            this.basics.ItemLayers.Plus1,
+            "check_contents",
+            boxTarget.x,
+            boxTarget.y,
+            boxScale,
+            0
+        );
+    }
+
+    async open_box() {
+        if (this.partner.is_present) {
+            Interface.Prompt.show_message(this.partner.partnername + " opens the " + this.box.boxname);
+            await this.partner.move_to_element_and_act(this.box.BoxBase, () => this.box.open_box());
+            await wait(500);
+        } else {
+            await new Promise(resolve => {
+                this.box.wait_for_user_click("open", () => resolve());
+            });
+            await wait(500);
+        }
+    }
+
+    async run_empty_box_path() {
+        Interface.Prompt.show_message("The " + this.box.boxname + " is empty");
+        await wait(1200);
+
+        // Self-timed: participant always closes, even if partner is present.
+        await new Promise(resolve => {
+            this.box.set_pointer_events_enabled(true);
+            this.box.wait_for_user_click("close", () => resolve());
+        });
+        this.returnfunc();
+    }
+
+    async run_occupied_box_path() {
+        await this.drag_toy_out_of_box();
+        await this.run_toy_photo();
+        await this.drag_toy_back_into_box();
+        await this.close_box_and_finish();
+    }
+
+    async drag_toy_out_of_box() {
+        Interface.Prompt.show_message(
+            "Take the " + this.contents + " out of the " + this.box.boxname
+        );
+        AudioCont.play_sound_effect("alert_minor");
+
+        let groundY = getSVGInternalCenter(this.box.BoxBase).y;
+
+        await new Promise(resolve => {
+            const enableDragAway = () => {
+                this.dragController = new MakeObjectDraggableObject(
+                    this.basics.ItemLayers.Main,
+                    this.basics.ItemLayers.Plus2,
+                    this.toy.ToyElement,
+                    this.box.BoxBase,
+                    this.toyClearDistance,
+                    async (DraggedToyElement) => {
+                        Interface.Prompt.hide();
+                        if (this.dragController && this.dragController.destroy) {
+                            this.dragController.destroy();
+                        }
+                        this.dragController = null;
+                        DraggedToyElement.style.pointerEvents = "none";
+                        DraggedToyElement.style.cursor = "auto";
+
+                        let current = getSVGInternalCenter(DraggedToyElement);
+                        if (current.y < groundY) {
+                            let dy = groundY - current.y;
+                            DraggedToyElement.style.transition = "transform 350ms ease-in";
+                            DraggedToyElement.style.transform += ` translate(0px, ${dy}px)`;
+                            await wait(350);
+                        }
+                        // WorldState intentionally unchanged.
+                        resolve();
+                    },
+                    {
+                        validateDrop: () => {
+                            let toyCenter = getSVGInternalCenter(this.toy.ToyElement);
+                            let boxCenter = getSVGInternalCenter(this.box.BoxBase);
+                            return Math.abs(toyCenter.x - boxCenter.x) >= this.toyClearDistance;
+                        },
+                        onMiss: () => {
+                            Interface.Prompt.show_message("Move it farther to the side of the box");
+                            if (this.dragController && this.dragController.enable) {
+                                this.dragController.enable();
+                            }
+                        }
+                    }
+                );
+            };
+            enableDragAway();
+        });
+    }
+
+    create_toy_polaroid_contents(groupScale, targetCircle) {
+        let template = document.getElementById("toy_" + this.contents);
+        if (!template) return null;
+
+        let toyIcon = copy_scale_and_move_object_to_position(
+            template,
+            groupScale,
+            targetCircle.x,
+            targetCircle.y,
+            1
+        );
+        set_toy_color_scheme(toyIcon, this.contents, false);
+        if (typeof ToyChoiceBar !== "undefined" && ToyChoiceBar.make_toy_static) {
+            ToyChoiceBar.make_toy_static(toyIcon, this.contents);
+        }
+
+        let rawBox = template.getBBox();
+        let bgRect = groupScale.getElementsByTagName("rect")[0];
+        let frameBox = bgRect ? bgRect.getBBox() : { width: 500, height: 600 };
+        let scaleFactorW = frameBox.width / Math.max(rawBox.width, 1);
+        let scaleFactorH = (0.75 * frameBox.height) / Math.max(rawBox.height, 1);
+        let minScale = Math.min(scaleFactorW, scaleFactorH) * 0.75;
+
+        let scaleGroup = toyIcon.getElementsByClassName("scale_group")[0];
+        if (scaleGroup) scaleGroup.style.transform = `scale(${minScale})`;
+
+        return toyIcon;
+    }
+
+    async run_toy_photo() {
+        this.photoSession = new PhotoTrialController(
+            this.FenObj,
+            this.partner.is_present,
+            () => {},
+            "toybox"
+        );
+        this.photoSession.basics = this.basics;
+        this.photoSession.box = this.box;
+        this.photoSession.partner = this.partner;
+
+        await this.photoSession.run_embedded_capture_loop({
+            photoTargetElements: [this.toy.ToyElement].filter(Boolean),
+            polaroidContentsFn: (groupScale, targetCircle) =>
+                this.create_toy_polaroid_contents(groupScale, targetCircle),
+            targetLabel: this.contents,
+            introPrompt: "Take a photo of the " + this.contents,
+            successPrompt: "The " + this.contents + " looks good!"
+        });
+
+        this.photoSession = null;
+    }
+
+    async drag_toy_back_into_box() {
+        this.toy.ToyElement.style.pointerEvents = "auto";
+        Interface.Prompt.show_message(
+            "Please place the " + this.contents + " back in the " + this.box.boxname
+        );
+        AudioCont.play_sound_effect("alert_minor");
+
+        await new Promise(resolve => {
+            this.dragController = new MakeObjectDraggableObject(
+                this.basics.ItemLayers.Main,
+                this.basics.ItemLayers.Plus2,
+                this.toy.ToyElement,
+                this.box.BoxBase,
+                200,
+                async (DroppedToyElement) => {
+                    if (this.dragController && this.dragController.destroy) {
+                        this.dragController.destroy();
+                    }
+                    this.dragController = null;
+
+                    let boxTarget = this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0];
+                    await animate_magnetic_drop(
+                        DroppedToyElement,
+                        boxTarget,
+                        this.basics.ItemLayers.Plus1
+                    );
+                    // WorldState intentionally unchanged.
+                    resolve();
+                }
+            );
+        });
+    }
+
+    async close_box_and_finish() {
+        this.box.set_pointer_events_enabled(true);
+
+        if (this.partner.is_present) {
+            Interface.Prompt.show_message(this.partner.partnername + " closes the " + this.box.boxname);
+            await this.partner.move_to_element_and_act(this.box.BoxBase, () => this.box.close_box());
+        } else {
+            await new Promise(resolve => {
+                this.box.wait_for_user_click("close", () => resolve());
+            });
+        }
+        this.returnfunc();
+    }
+
+    clean_up() {
+        if (this.photoSession) {
+            this.photoSession.clean_up_photo_ui();
+            this.photoSession = null;
+        }
+        if (this.dragController && this.dragController.destroy) this.dragController.destroy();
+        if (this.toy) this.toy.clean_up();
         this.box.clean_up();
         this.basics.clean_up();
         if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
@@ -8157,6 +9070,12 @@ class TrialFactory {
 
             case "photo_box":
                 return new PhotoTrialController(FenObj, partner_is_present, returnfunc, "toybox");
+
+            case "photo_Fennimal":
+                return new PhotoTrialController(FenObj, partner_is_present, returnfunc, "fennimal");
+
+            case "check_box_contents":
+                return new CheckBoxContentsTrialController(FenObj, partner_is_present, returnfunc);
 
             case "feed_Fennimal":
                 return new FeedFennimalTrialController(FenObj, partner_is_present, returnfunc);
@@ -8710,6 +9629,7 @@ class PartnerBeliefIndividualBoxesController {
 
         this.include_reality_block_at_end = TaskObj.include_reality_block_at_end === true;
         this.include_practice_trial = TaskObj.include_practice_trial === true;
+        this._realityBlockIntroShown = false;
 
         this.FEATURE_SHAPES = ["circle", "triangle", "square"];
         this.FEATURE_COLORS = [
@@ -8996,15 +9916,18 @@ class PartnerBeliefIndividualBoxesController {
      * The lure source follows lureCycle (A→B→C→A by default).
      * Fails loud if any piece is missing or the three toys are not distinct.
      */
-    _buildBeliefRealityCyclicTriad(trial, trialKind) {
+    _buildBeliefRealityCyclicTriad(trial, trialKind, options = {}) {
+        let silent = options.silent === true;
+        let logError = (msg) => { if (!silent) console.error(msg); };
+
         if (!this.lureCycle || this.lureCycle.codes.length < 2) {
-            console.error("PartnerBeliefIndividualBoxes: lure cycle is not configured.");
+            logError("PartnerBeliefIndividualBoxes: lure cycle is not configured.");
             return null;
         }
 
         let cycleIndex = this.lureCycle.codes.indexOf(trial.target_box_code);
         if (cycleIndex < 0) {
-            console.error(
+            logError(
                 `PartnerBeliefIndividualBoxes: target_box "${trial.target_box_code}" is not in the lure cycle ` +
                 `[${this.lureCycle.codes.join(", ")}].`
             );
@@ -9016,7 +9939,7 @@ class PartnerBeliefIndividualBoxesController {
         let lure_source_box = this.lureCycle.boxes[lureIndex];
 
         if (trialKind !== "belief" && trialKind !== "reality") {
-            console.error(`PartnerBeliefIndividualBoxes: unsupported triad trial kind "${trialKind}".`);
+            logError(`PartnerBeliefIndividualBoxes: unsupported triad trial kind "${trialKind}".`);
             return null;
         }
 
@@ -9032,28 +9955,28 @@ class PartnerBeliefIndividualBoxesController {
         if (lure === false) lure = undefined;
 
         if (belief === undefined) {
-            console.error(
+            logError(
                 `PartnerBeliefIndividualBoxes: missing partner belief for target box "${trial.target_box}" ` +
                 `(question "${trial.question_id}").`
             );
             return null;
         }
         if (reality === undefined) {
-            console.error(
+            logError(
                 `PartnerBeliefIndividualBoxes: missing current contents for target box "${trial.target_box}" ` +
                 `(question "${trial.question_id}").`
             );
             return null;
         }
         if (lure === undefined) {
-            console.error(
+            logError(
                 `PartnerBeliefIndividualBoxes: missing ${lure_source_type} for lure-source box "${lure_source_box}" ` +
                 `(code "${lure_source_box_code}", question "${trial.question_id}").`
             );
             return null;
         }
         if (belief === reality || belief === lure || reality === lure) {
-            console.error(
+            logError(
                 `PartnerBeliefIndividualBoxes: belief/reality/lure are not three distinct toys for ` +
                 `question "${trial.question_id}" (box "${trial.target_box}"): ` +
                 `belief=${belief}, reality=${reality}, lure=${lure} (from ${lure_source_box_code}).`
@@ -9082,6 +10005,96 @@ class PartnerBeliefIndividualBoxesController {
         };
     }
 
+    /**
+     * Belief/reality 3AFC needs partner belief ≠ current contents (and a distinct cyclic lure).
+     * In the full experiment that state comes from shared then private toy_to_box play.
+     * When WorldState is still empty and Experiment_Code is "test", seed a valid false-belief layout.
+     */
+    _ensureWorldStateSupportsTriads() {
+        let kinds = ["belief"];
+        if (this.include_reality_block_at_end) kinds.push("reality");
+
+        let allValid = this.questions.every(q =>
+            kinds.every(kind => this._buildBeliefRealityCyclicTriad(q, kind, { silent: true }))
+        );
+        if (allValid) return;
+
+        let anyFilled = this.questions.some(q => {
+            let belief = WorldState.get_partner_belief_in_box_contents(q.target_box);
+            let reality = WorldState.get_toybox_contents(q.target_box);
+            return belief !== undefined || (reality !== false && reality !== undefined);
+        });
+
+        if (anyFilled) {
+            console.error(
+                "PartnerBeliefIndividualBoxes: WorldState has box belief/contents but they do not form " +
+                "valid cyclic belief/reality/lure triads. Trials will be skipped. " +
+                "Ensure partner saw the initial put-away, then contents changed while partner was away."
+            );
+            return;
+        }
+
+        // Auto-seed only for the local "test" experiment code — never in real runs.
+        let expCode = this.expCont && this.expCont.stimuli
+            ? this.expCont.stimuli.get_experiment_code()
+            : null;
+        if (expCode !== "test") {
+            console.error(
+                "PartnerBeliefIndividualBoxes: WorldState has no box beliefs/contents for the asked boxes. " +
+                "Trials will be skipped. (Auto-seed is only enabled when Experiment_Code is \"test\".)"
+            );
+            return;
+        }
+
+        if (!this._seedFalseBeliefWorldState()) return;
+
+        let seededOk = this.questions.every(q =>
+            kinds.every(kind => this._buildBeliefRealityCyclicTriad(q, kind, { silent: true }))
+        );
+        if (!seededOk) {
+            console.error("PartnerBeliefIndividualBoxes: auto-seeded WorldState still cannot build valid triads.");
+        }
+    }
+
+    _seedFalseBeliefWorldState() {
+        let uniqueBoxes = [];
+        this.questions.forEach(q => {
+            if (!uniqueBoxes.includes(q.target_box)) uniqueBoxes.push(q.target_box);
+        });
+        let n = uniqueBoxes.length;
+        if (n < 2) {
+            console.error("PartnerBeliefIndividualBoxes: need at least 2 boxes to seed false-belief WorldState.");
+            return false;
+        }
+
+        let mappedToys = Object.values((this.expCont.stimuli.get_Feature_maps() || {}).toy || {});
+        let svgToys = Array.from(document.getElementsByClassName("toy"))
+            .map(t => (t.id || "").split("_")[1])
+            .filter(Boolean);
+        let toyPool = [...new Set([...mappedToys, ...svgToys])];
+
+        // Cyclic lure needs belief_i, reality_i, belief_{i+1} (and likewise for realities) all distinct,
+        // so we need two disjoint toy sets of size n (partner-seen vs actual).
+        if (toyPool.length < 2 * n) {
+            console.error(
+                `PartnerBeliefIndividualBoxes: cannot auto-seed false-belief WorldState — ` +
+                `need ${2 * n} distinct toys for ${n} boxes, found ${toyPool.length}.`
+            );
+            return false;
+        }
+
+        console.warn(
+            "PartnerBeliefIndividualBoxes: WorldState had no box beliefs/contents; " +
+            "auto-seeding a false-belief layout for this session (partner beliefs ≠ current contents)."
+        );
+
+        for (let i = 0; i < n; i++) {
+            WorldState.change_partner_belief_in_box_contents(uniqueBoxes[i], toyPool[i]);
+            WorldState.change_toybox_contents(uniqueBoxes[i], toyPool[n + i]);
+        }
+        return true;
+    }
+
     async start_sequence() {
         this.ParentLayer.style.display = "inherit";
 
@@ -9090,6 +10103,8 @@ class PartnerBeliefIndividualBoxesController {
             if (Interface.Locator && Interface.Locator.change_locator_name) Interface.Locator.change_locator_name("Warehouse");
             Interface.Prompt.hide();
         }
+
+        this._ensureWorldStateSupportsTriads();
 
         this.ItemLayers = {
             Neg1: create_SVG_group(0, 0),
@@ -9110,7 +10125,12 @@ class PartnerBeliefIndividualBoxesController {
 
         for (let i = 0; i < this.trialQueue.length; i++) {
             this.overall_presentation_index = i + 1;
-            await this.run_trial(this.trialQueue[i]);
+            let trial = this.trialQueue[i];
+            if (!this._realityBlockIntroShown && trial.section === "reality") {
+                await this.run_reality_block_intro();
+                this._realityBlockIntroShown = true;
+            }
+            await this.run_trial(trial);
         }
 
         await this.finish_task();
@@ -9128,6 +10148,10 @@ class PartnerBeliefIndividualBoxesController {
             clearInterval(this.bubble_float_interval);
             this.bubble_float_interval = null;
         }
+        if (this.box_qmark_float_interval) {
+            clearInterval(this.box_qmark_float_interval);
+            this.box_qmark_float_interval = null;
+        }
         [this.ItemLayers.Neg1, this.ItemLayers.Main, this.ItemLayers.Plus1].forEach(layer => {
             while (layer.firstChild) layer.removeChild(layer.firstChild);
         });
@@ -9142,6 +10166,7 @@ class PartnerBeliefIndividualBoxesController {
         this.BoxElement = null;
         this.CurtainGroup = null;
         this.CentralTargetGroup = null;
+        this.BoxQuestionMarkGroup = null;
     }
 
     setup_background_and_table(smaller = true) {
@@ -9220,7 +10245,7 @@ class PartnerBeliefIndividualBoxesController {
         return BoxObj;
     }
 
-    create_curtain_with_reveal_circle() {
+    create_curtain_with_reveal_circle({ armed = true } = {}) {
         this.CurtainGroup = create_SVG_group(0, 0, "pb_curtain", undefined);
         this.ItemLayers.Plus1.appendChild(this.CurtainGroup);
 
@@ -9256,9 +10281,30 @@ class PartnerBeliefIndividualBoxesController {
         circle.setAttribute("stroke", "gold");
         circle.setAttribute("stroke-width", "7");
         circle.style.filter = "drop-shadow(0px 0px 12px gold)";
-        circle.style.cursor = "pointer";
+        // Not clickable until enable_curtain_reveal() — prevents queued early clicks
+        // (e.g. during partner walk-in) from auto-resolving once the trial is ready.
+        circle.style.pointerEvents = "none";
+        circle.style.cursor = "default";
         this.CurtainGroup.appendChild(circle);
         this.RevealCircle = circle;
+
+        if (armed) return this.enable_curtain_reveal();
+        return null;
+    }
+
+    enable_curtain_reveal() {
+        let circle = this.RevealCircle;
+        if (!circle) {
+            return Promise.resolve({
+                reveal_click_elapsed_perf_ms: this._elapsedPerfMs(),
+                reveal_click_elapsed_date_ms: this._elapsedDateMs(),
+                reveal_click_perf: performance.now(),
+                input_type: this.last_input_type || "unknown"
+            });
+        }
+
+        circle.style.pointerEvents = "all";
+        circle.style.cursor = "pointer";
 
         return new Promise(resolve => {
             circle.onpointerdown = (evt) => {
@@ -9579,7 +10625,7 @@ class PartnerBeliefIndividualBoxesController {
      * Reveal box/target (optional) + radial options on the same frame; resolve on first pointerdown.
      * mode: "toys" | "features"
      */
-    show_radial_options_and_wait(options, { mode = "toys", showBox = false, showCentralTarget = false } = {}) {
+    show_radial_options_and_wait(options, { mode = "toys", showBox = false, showCentralTarget = false, showQuestionMark = false } = {}) {
         return new Promise(resolve => {
             let n = options.length;
             let baseAngle = Math.random() * Math.PI * 2;
@@ -9642,6 +10688,9 @@ class PartnerBeliefIndividualBoxesController {
                 if (showCentralTarget && this.CentralTargetGroup) {
                     this.CentralTargetGroup.style.opacity = 1;
                 }
+                if (showQuestionMark) {
+                    this.show_box_question_mark();
+                }
                 this.radialUIGroup.style.opacity = 1;
 
                 this._responseOnsetPerf = performance.now();
@@ -9662,6 +10711,136 @@ class PartnerBeliefIndividualBoxesController {
             await this.run_belief_trial(trial);
         } else if (trial.trial_kind === "reality") {
             await this.run_reality_trial(trial);
+        }
+    }
+
+    async run_reality_block_intro() {
+        await this.fade_black(1, 300);
+        this.clear_scene_contents();
+        this.setup_background_and_table(true);
+
+        await this.setup_partner_at_offscreen();
+        this.set_partner_direction("left");
+        this.partner_x = 0.85 * this.W;
+        this.partner_y = 0.65 * this.H;
+        this.PartnerTranslateGroup.style.transition = "none";
+        this.PartnerScaleGroup.style.transition = "none";
+        this.PartnerTranslateGroup.style.transform = `translate(${this.partner_x}px, ${this.partner_y}px)`;
+        this.PartnerScaleGroup.style.transform = "scale(24)";
+        this.PartnerTranslateGroup.style.opacity = 1;
+        window.getComputedStyle(this.PartnerTranslateGroup).transform;
+
+        await this.fade_black(0, 350);
+        await wait(500);
+        await this.animate_partner_exit();
+        await wait(300);
+
+        await this.show_reality_block_instructions_overlay();
+    }
+
+    show_reality_block_instructions_overlay() {
+        return new Promise(resolve => {
+            let overlay = create_SVG_group(0, 0, undefined, "pb_reality_block_intro");
+            // Above the black fade rect so the continue control stays clickable.
+            this.ItemLayers.Plus2.appendChild(overlay);
+
+            let dim = create_SVG_rect(0, 0, this.W, this.H);
+            dim.setAttribute("fill", "#111");
+            dim.style.opacity = 0.82;
+            dim.style.pointerEvents = "all";
+            overlay.appendChild(dim);
+
+            let panel = create_SVG_rect(0.12 * this.W, 0.22 * this.H, 0.76 * this.W, 0.42 * this.H);
+            panel.setAttribute("rx", 24);
+            panel.setAttribute("fill", "#f7f1e4");
+            panel.setAttribute("stroke", "#b89f5d");
+            panel.setAttribute("stroke-width", "6");
+            overlay.appendChild(panel);
+
+            let body = create_SVG_text_in_foreign_element(
+                `${this.partnername} has left.<br><br>` +
+                `The next questions are about which toys are <b>actually</b> currently in the boxes — ` +
+                `not what ${this.partnername} believes.`,
+                0.16 * this.W,
+                0.28 * this.H,
+                0.68 * this.W,
+                0.28 * this.H,
+                "instruction_element_text"
+            );
+            body.style.fontSize = "42px";
+            body.style.textAlign = "center";
+            overlay.appendChild(body);
+
+            let continueButton = create_SVG_buttonElement(
+                0.5 * this.W,
+                0.78 * this.H,
+                400,
+                75,
+                "Continue",
+                40
+            );
+            overlay.appendChild(continueButton);
+            continueButton.style.cursor = "pointer";
+            continueButton.onpointerdown = () => {
+                continueButton.onpointerdown = null;
+                overlay.remove();
+                resolve();
+            };
+        });
+    }
+
+    /**
+     * Same gold "?" used in the partner thought bubble, anchored above the target box.
+     */
+    show_box_question_mark() {
+        this.hide_box_question_mark();
+
+        this.BoxQuestionMarkGroup = create_SVG_group(0, 0, undefined, "pb_box_question_mark");
+        // Sit above the curtain so it remains visible as a box-focused cue.
+        this.ItemLayers.Plus1.appendChild(this.BoxQuestionMarkGroup);
+
+        let text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", "0");
+        text.setAttribute("y", "0");
+        text.setAttribute("font-family", "Arial, sans-serif");
+        text.setAttribute("font-weight", "bold");
+        text.setAttribute("font-size", "95");
+        text.setAttribute("fill", "gold");
+        text.setAttribute("stroke", "#b8860b");
+        text.setAttribute("stroke-width", "2");
+        text.setAttribute("text-anchor", "middle");
+        text.setAttribute("dominant-baseline", "middle");
+        text.textContent = "?";
+        this.BoxQuestionMarkGroup.appendChild(text);
+
+        let x = this.box_center_x;
+        let y = this.box_center_y;
+        this.BoxQuestionMarkGroup.style.pointerEvents = "none";
+        this.BoxQuestionMarkGroup.style.transformOrigin = "0px 0px";
+        this.BoxQuestionMarkGroup.style.transform = `translate(${x}px, ${y}px) scale(0)`;
+        this.BoxQuestionMarkGroup.style.transition = "transform 400ms cubic-bezier(0.34, 1.56, 0.64, 1)";
+        window.getComputedStyle(this.BoxQuestionMarkGroup).transform;
+        this.BoxQuestionMarkGroup.style.transform = `translate(${x}px, ${y}px) scale(1.35)`;
+
+        this.box_qmark_float_interval = setInterval(() => {
+            if (!this.BoxQuestionMarkGroup) return;
+            this.BoxQuestionMarkGroup.style.transition = "transform 1000ms ease-in-out";
+            this.BoxQuestionMarkGroup.style.transform = `translate(${x}px, ${y - 12}px) scale(1.35)`;
+            setTimeout(() => {
+                if (!this.BoxQuestionMarkGroup) return;
+                this.BoxQuestionMarkGroup.style.transform = `translate(${x}px, ${y + 8}px) scale(1.35)`;
+            }, 1000);
+        }, 2000);
+    }
+
+    hide_box_question_mark() {
+        if (this.box_qmark_float_interval) {
+            clearInterval(this.box_qmark_float_interval);
+            this.box_qmark_float_interval = null;
+        }
+        if (this.BoxQuestionMarkGroup) {
+            this.BoxQuestionMarkGroup.remove();
+            this.BoxQuestionMarkGroup = null;
         }
     }
 
@@ -9744,7 +10923,9 @@ class PartnerBeliefIndividualBoxesController {
         }
 
         this.place_target_box(trial.target_box);
-        let revealPromise = this.create_curtain_with_reveal_circle();
+        // Curtain is visible during partner walk-in, but reveal is armed only after arrival
+        // so an early click cannot queue-resolve and auto-lift the curtain.
+        this.create_curtain_with_reveal_circle({ armed: false });
 
         await this.setup_partner_at_offscreen();
         await this.fade_black(0, 350);
@@ -9752,7 +10933,7 @@ class PartnerBeliefIndividualBoxesController {
 
         let printed_box_name = GenParam.get_box_printed_name(trial.target_box);
         Interface.Prompt.show_message("Click on the circle to start the question");
-        await revealPromise;
+        await this.enable_curtain_reveal();
 
         Interface.Prompt.show_message(
             `What does ${this.partnername} believe is in the ${printed_box_name}? Answer as quickly and accurately as you can.`
@@ -9807,15 +10988,17 @@ class PartnerBeliefIndividualBoxesController {
         await revealPromise;
 
         Interface.Prompt.show_message(
-            `Which toy is currently in the ${printed_box_name}? Answer as quickly and accurately as you can.`
+            `What is really in the ${printed_box_name} right now? Answer as quickly and accurately as you can.`
         );
 
         let response = await this.show_radial_options_and_wait(triad.answer_options, {
             mode: "toys",
-            showBox: true
+            showBox: true,
+            showQuestionMark: true
         });
 
         Interface.Prompt.hide();
+        this.hide_box_question_mark();
         AudioCont.play_sound_effect("button_click");
 
         let is_correct = (response.selected_id === triad.reality_answer);
@@ -9849,6 +11032,7 @@ class PartnerBeliefIndividualBoxesController {
 
     clean_up() {
         if (this.bubble_float_interval) clearInterval(this.bubble_float_interval);
+        if (this.box_qmark_float_interval) clearInterval(this.box_qmark_float_interval);
         if (this.ItemLayers) {
             Object.values(this.ItemLayers).forEach(layer => {
                 if (layer && layer.parentNode) layer.remove();

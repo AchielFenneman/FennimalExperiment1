@@ -587,6 +587,22 @@ html, body {
     100% {stroke:red}
 
 }
+
+/* Soft ownership binding silhouette (joint box cleaning) */
+.binding_ownership_outline {
+    animation: binding_ownership_pulse 1400ms ease-in-out infinite;
+    stroke-width: 22px;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    fill: none;
+    pointer-events: none;
+    opacity: 0.8;
+}
+@keyframes binding_ownership_pulse {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 0.92; }
+}
+
 .focus_on_SVG_fill  {
     animation: focus_on_SVG_fill 900ms ease-in-out infinite;
     opacity: 0.66;
@@ -604,6 +620,15 @@ html, body {
     0% {transform:scale(3.75)}
     50% {transform:scale(4)}
     100% {transform:scale(3.75)}
+}
+
+/* Nudges a charge-hint arrow toward the pull direction */
+.charge_hint_arrow_pulse_right {
+    animation: charge_hint_arrow_pulse_right 900ms ease-in-out infinite;
+}
+@keyframes charge_hint_arrow_pulse_right {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(18px); }
 }
 
 

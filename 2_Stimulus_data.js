@@ -16,8 +16,8 @@ let StimulusSettings = function () {
     const All_Fennimal_Sets = {
         test: {
             "A1": { head: "A1", head_group: "A", head_cluster: "A", region: "A", food_preference: "A", toy: "A", toybox: "A", hat: "A" },
-            "A2": { head: "A2", head_group: "A", head_cluster: "A", region: "B", hat: "B",  toy: "B", toybox: "B"},
-            "A3": { head: "A3", head_group: "A", head_cluster: "A", region: "C", hat: "C",  toy: "C", toybox: "A"},
+            "A2": { head: "A2", head_group: "A", head_cluster: "A", region: "B", hat: "B", toy: "B", toybox: "B" },
+            "A3": { head: "A3", head_group: "A", head_cluster: "A", region: "C", hat: "C", toy: "C", toybox: "A" },
         },
 
         mentalizing: {
@@ -35,10 +35,25 @@ let StimulusSettings = function () {
     // ----------------------------------------------------
     let All_Experiment_Structures = {
         test: [
+            // Starts here for UI testing. Controller auto-seeds false-belief WorldState when
+            // boxes are empty (partner beliefs ≠ current contents). In the full mentalizing
+            // structure this state is created by shared then private toy_to_box play.
             {
-                type: "phone_room",
+                type: "partner_belief_individual_boxes",
+                include_practice_trial: true,
+                num_belief_blocks: 1,
+                include_reality_block_at_end: true,
+                bonus_stars_per_correct_answer: 4,
+                questions: [
+                    { question_id: "belief_A", target_box: "A" },
+                    { question_id: "belief_B", target_box: "B" },
+                    { question_id: "belief_C", target_box: "C" }
+                ]
+            },
+            {
+                type: "jump_to_trial",
                 interaction_type: "joint_box_cleaning",
-                Fennimals_encountered: ["A1", "A2"],
+                Fennimals_encountered: ["A1"],
                 ask_box: true,
                 boxes_asked: ["A", "B"],
                 partner_behavior: "present",
@@ -50,11 +65,25 @@ let StimulusSettings = function () {
             {
                 type: "Fennimal_attribute_sorting_task",
                 Fennimals_encountered: ["A1"],
-                attribute_order: ["region", "head", "toy", "toybox"],
+                attribute_order: ["head", "toy", "toybox"],
                 presentation: "single",
                 maximum_earnable_stars: 6
             },
 
+            
+            {
+                type: "phone_room",
+                interaction_type: "check_box_contents",
+                Fennimals_encountered: ["A1"],
+                ask_box: true,
+                boxes_asked: ["A", "B"],
+                partner_behavior: "present",
+                hint_type: ["icon"],
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                skip_instructions: true
+            },
+            
             
            
             {
@@ -86,18 +115,7 @@ let StimulusSettings = function () {
             },
 
 
-            {
-                type: "partner_belief_individual_boxes",
-                include_practice_trial: true,
-                num_belief_blocks: 2,
-                include_reality_block_at_end: true,
-                bonus_stars_per_correct_answer: 4,
-                questions: [
-                    { question_id: "belief_A", target_box: "A" },
-                    { question_id: "belief_B", target_box: "B" },
-                    { question_id: "belief_C", target_box: "C" }
-                ]
-            },
+            
 
             
 
@@ -166,12 +184,16 @@ let StimulusSettings = function () {
                         interaction_type: "toy_to_box"
                     },
                     {
+                        Fennimals_encountered: ["S1", "S2", "S3"],
+                        interaction_type: "check_box_contents"
+                    },
+                    {
                         trials: [
                             { Fennimal: "S1", interaction_type: "joint_box_cleaning" },
                             { Fennimal: "S2", interaction_type: "photo_box" },
                             { Fennimal: "S3", interaction_type: "photo_box" },
-                            { Fennimal: "S2", interaction_type: "feed_Fennimal" },
-                            { Fennimal: "S3", interaction_type: "feed_Fennimal" }
+                            { Fennimal: "S2", interaction_type: "photo_Fennimal" },
+                            { Fennimal: "S3", interaction_type: "photo_Fennimal" }
                         ]
                     }
                 ]
@@ -222,12 +244,16 @@ let StimulusSettings = function () {
                         interaction_type: "toy_to_box"
                     },
                     {
+                        Fennimals_encountered: ["P1", "P2", "P3"],
+                        interaction_type: "check_box_contents"
+                    },
+                    {
                         trials: [
                             { Fennimal: "P2", interaction_type: "joint_box_cleaning" },
                             { Fennimal: "P1", interaction_type: "photo_box" },
                             { Fennimal: "P3", interaction_type: "photo_box" },
-                            { Fennimal: "P1", interaction_type: "feed_Fennimal" },
-                            { Fennimal: "P3", interaction_type: "feed_Fennimal" }
+                            { Fennimal: "P1", interaction_type: "photo_Fennimal" },
+                            { Fennimal: "P3", interaction_type: "photo_Fennimal" }
                         ]
                     }
                 ]
@@ -256,7 +282,7 @@ let StimulusSettings = function () {
             {
                 type: "Fennimal_attribute_sorting_task",
                 Fennimals_encountered: ["S1", "S2", "S3", "P1", "P2", "P3"],
-                attribute_order: ["location", "head", "toy", "toybox"],
+                attribute_order: ["head", "toy", "toybox"],
                 presentation: "single",
                 maximum_earnable_stars: 6
             },

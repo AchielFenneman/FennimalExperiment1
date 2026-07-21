@@ -381,7 +381,7 @@ GENERALPARAM = function () {
         },
         globe: {
             ColorScheme: {
-                light_color: "#e99598",
+                light_color: "#bdb94a",
                 dark_color: "#602ead"
             },
             AlternateColorScheme: {
@@ -571,13 +571,19 @@ GENERALPARAM = function () {
         partnerTurnPause: 220
     }
 
-    // Photo trial (photo_box now; photo_fennimal later via same controller)
+    // Photo trial (photo_box / photo_Fennimal via same controller)
     this.PhotoTrial = {
         boxScaleMin: 2.5,
         boxScaleMax: 4,
         boxYMin: 0.45,
         boxYMax: 0.75,
         boxXMargin: 80,
+        // Tighter jitter than the box — stay near a natural standing pose
+        fennimalScaleMin: 1.6,
+        fennimalScaleMax: 1.9,
+        fennimalYMin: 0.78,
+        fennimalYMax: 0.86,
+        fennimalXMargin: 80,
         partnerAvoidGap: 100,
         lensWidth: 420,
         lensHeight: 480,
@@ -643,13 +649,27 @@ GENERALPARAM = function () {
         foliageHitsPerRound: 1,
         // Resting spot while waiting (closer to box = further right)
         fennimalRestOffsetX: -650,
-        encodingPauseMs: 1400,
+        // Ownership encoding / freeze after clean + before photo
+        encodingPauseMs: 2200,
+        freezeTableauMs: 1800,
+        // Mutual handoff: how far Fennimal leans toward the approaching box
+        handoffApproachMaxPx: 95,
+        // Jump onto closed box, then back down
+        jumpOnBoxAmount: 150,
+        jumpOnBoxHoldMs: 450,
         dropDistance: 220,
         shearsOffsetX: 90,
         shearsOffsetY: -80,
         shearsScale: 2.2,
         shearsCloseMs: 200,
-        shearsOpenMs: 360
+        shearsOpenMs: 360,
+        // Partner "steps into scene" after handoff (still facing back)
+        partnerHomeScale: 40,
+        partnerWitnessScale: 30,
+        partnerWitnessLiftY: -90,
+        partnerWitnessGapX: 220,
+        // Shared Fennimal+box silhouette outline
+        bindingOutlineStrokeWidth: 22
     }
 }
 

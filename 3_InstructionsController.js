@@ -1452,7 +1452,7 @@ class InstructionsController {
         // Phone-room hints are interaction-type aware.
         // TODO: Mirror this interaction-type branching in on_call and hint_and_search
         // trial instruction setup when those block types gain support for
-        // Fennimal_toy / toy_to_box / photo_box / feed_Fennimal.
+        // Fennimal_toy / toy_to_box / photo_box / photo_Fennimal / check_box_contents / feed_Fennimal.
         switch (trialObj.interaction_type) {
             case "Fennimal_toy":
             case "basic_intro":
@@ -1475,6 +1475,21 @@ class InstructionsController {
                     ...baseConfig,
                     type: "box",
                     mainText: "Go take a photo of the box to check if its still in good shape"
+                };
+
+            case "photo_Fennimal":
+                return {
+                    ...baseConfig,
+                    type: "fennimal",
+                    slumped: false,
+                    mainText: `Please take a photo of ${displayName}`
+                };
+
+            case "check_box_contents":
+                return {
+                    ...baseConfig,
+                    type: "box",
+                    mainText: "Check what's inside the box"
                 };
 
             case "feed_Fennimal":
