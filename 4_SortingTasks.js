@@ -661,6 +661,7 @@ class FennimalSortingTargetSceneBox {
             let tboxClone = toyboxSource.cloneNode(true);
             tboxClone.style.display = "inherit";
             cleanSVGElements(tboxClone);
+            apply_toybox_decoration_visibility_to_element(tboxClone, this.fenObj.toybox);
             this.toyboxGroup.appendChild(tboxClone);
         }
         this.sceneSvg.appendChild(this.toyboxGroup);
@@ -840,6 +841,7 @@ class FennimalSortingCard {
                 sourceElem = document.getElementById("toybox_" + cleanId) || document.getElementById(cleanId);
                 if (sourceElem) {
                     clone = sourceElem.cloneNode(true);
+                    apply_toybox_decoration_visibility_to_element(clone, cleanId);
                     mode = "toybox";
                 }
             } else if (this.attribute === "Fennimal") {

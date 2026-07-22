@@ -669,6 +669,41 @@ GENERALPARAM = function () {
         partnerWitnessLiftY: -90,
         partnerWitnessGapX: 220,
         // Shared Fennimal+box silhouette outline
+        bindingOutlineStrokeWidth: 22,
+        // Soft-lock safety (idle = no scrub progress, not total turn time)
+        scrubIdleHintMs: 12000,
+        scrubIdleFailsafeMs: 25000,
+        // Keep dirt off the plant side (left of box)
+        dirtAvoidLeftFraction: 0.35
+    }
+
+    // Joint Fennimal + box decoration (memory binding, no toy)
+    this.JointBoxDecoration = {
+        fennimalX: 0.28,
+        fennimalY: 0.82,
+        fennimalScale: 1.75,
+        boxX: 0.55,
+        boxY: 0.72,
+        boxScale: 4,
+        fennimalRestOffsetX: -650,
+        encodingPauseMs: 2200,
+        freezeTableauMs: 1800,
+        handoffApproachMaxPx: 95,
+        jumpOnBoxAmount: 150,
+        jumpOnBoxHoldMs: 450,
+        dropDistance: 300,
+        // Decoration pile between Fennimal and box (offsets from box center)
+        pileOffsetX: -280,
+        pileOffsetY: 95,
+        pileSpread: 28,
+        decorationLiftY: -90,
+        decorationHeldScale: 2,
+        fennimalApproachPileGap: 90,
+        partnerApproachPileGap: 110,
+        partnerHomeScale: 40,
+        partnerWitnessScale: 30,
+        partnerWitnessLiftY: -90,
+        partnerWitnessGapX: 220,
         bindingOutlineStrokeWidth: 22
     }
 }

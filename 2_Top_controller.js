@@ -857,6 +857,7 @@ class ExperimentController {
             this.dataCont.recordStarsEarned(this.currentDayNum, this.currentPhaseType, earned, maxPossible);
 
             currentTask.clean_up();
+            clear_Fennimals_interaction_layer();
             document.getElementById("Map").style.display = "inherit";
 
             // This naturally calls phaseCompleted(), which will now properly store this rich object!
@@ -903,6 +904,7 @@ class ExperimentController {
                 this.dataCont.recordStarsEarned(this.currentDayNum, "partner_belief_individual_boxes", earned, maxPossible);
 
                 currentTask.clean_up();
+                clear_Fennimals_interaction_layer();
                 document.getElementById("Map").style.display = "inherit";
                 this.phaseCompleted();
             },
@@ -1103,7 +1105,11 @@ class ExperimentController {
 
 
     phaseCompleted() {
-        if (this.currentFennimal) this.currentFennimal.clean_up();
+        if (this.currentFennimal) {
+            try { this.currentFennimal.clean_up(); } catch (err) { console.warn(err); }
+            this.currentFennimal = null;
+        }
+        clear_Fennimals_interaction_layer();
 
         // Legacy star logic for trial-based phases
         let totalBonusStarsEarned = 0, maxBonusStars = 0;
@@ -1269,6 +1275,13 @@ class ExperimentController {
                 fennimalObject.num_in_phase = this.currentInteractionNumInPhase;
             }
 
+            // Never stack a new scene on top of an uncleared previous interaction.
+            if (this.currentFennimal) {
+                try { this.currentFennimal.clean_up(); } catch (err) { console.warn(err); }
+                this.currentFennimal = null;
+            }
+            clear_Fennimals_interaction_layer();
+
             let partnerPresent = false;
             let role = WorldState.get_current_partner_role();
             if (role && role !== "absent") partnerPresent = true;
@@ -1284,7 +1297,12 @@ class ExperimentController {
     }
 
     leavingLocation() {
-        if (this.currentFennimal) this.currentFennimal.clean_up();
+        if (this.currentFennimal) {
+            try { this.currentFennimal.clean_up(); } catch (err) { console.warn(err); }
+            this.currentFennimal = null;
+        }
+        // Belt-and-suspenders: wipe any orphan partner/toy/UI nodes left above the map.
+        clear_Fennimals_interaction_layer();
 
         // FIX: Start the next on_call trial only AFTER they have successfully returned to the map
         if (this.currentPhaseType === "on_call" && this.readyForNextOnCallTrial) {

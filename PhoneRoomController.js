@@ -352,6 +352,8 @@ class PhoneRoomController {
 
             setTimeout(() => {
                 this.clear();
+                // Hide Fennimals_Layer after clearing so orphans cannot cover the map.
+                if (this.parentLayer) this.parentLayer.style.display = "none";
                 this.mapLayer.style.display = "inherit";
                 this.interfaceLayer.style.display = "inherit";
                 if (onComplete) onComplete();

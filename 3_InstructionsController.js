@@ -1507,6 +1507,13 @@ class InstructionsController {
                     mainText: `${displayName}'s box needs a good clean!`
                 };
 
+            case "joint_box_decoration":
+                return {
+                    ...baseConfig,
+                    type: "box",
+                    mainText: `${displayName} wants to decorate their box!`
+                };
+
             default:
                 // Placeholder for other interaction types (broken_toy_in_box, broken_toy_no_box, dirty_toy, fly_swat, etc.).
                 // Keep the slumped Fennimal until type-specific copy/visuals are written.
@@ -1609,6 +1616,7 @@ class InstructionsController {
             GenParam.SVG_height / 2 - 170,
             3
         );
+        apply_toybox_decoration_visibility_to_element(boxIcon, trialObj.toybox);
 
         // Closed box: keep back + front + lid (front is the visible body).
         boxIcon.classList.add("instruction_element_nonbackground");

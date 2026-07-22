@@ -406,6 +406,18 @@ WorldStateObject = function () {
         return history[history.length - 2].toy
     }
 
+    // BOX DECORATIONS (all-or-nothing flag per box; default undecorated)
+    /////////////////////////////////////////////////////////////////
+    let ToyBoxDecorations = {}
+
+    this.get_toybox_is_decorated = function(boxtype){
+        return ToyBoxDecorations[boxtype] === true
+    }
+
+    this.change_toybox_is_decorated = function(boxtype, is_decorated){
+        ToyBoxDecorations[boxtype] = is_decorated === true
+    }
+
     // LOST AND FOUND
     ///////////////////////
     const w = GenParam.SVG_width, h = GenParam.SVG_height

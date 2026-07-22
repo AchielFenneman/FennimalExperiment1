@@ -227,6 +227,22 @@ function create_SVG_circle(center_x, center_y, radius, class_name, id_name) {
     return (Rect)
 }
 
+/**
+ * Tear down any leftover interaction/phone-room/belief DOM under #Fennimals_Layer.
+ * Preserves #Fennimal_Templates_Layer (static SVG assets). Hides the layer so orphans
+ * cannot sit above the map and steal clicks (watchtower / Fennefinder reports).
+ */
+function clear_Fennimals_interaction_layer() {
+    let layer = document.getElementById("Fennimals_Layer");
+    if (!layer) return;
+
+    Array.from(layer.childNodes).forEach(child => {
+        if (child.nodeType === 1 && child.id === "Fennimal_Templates_Layer") return;
+        child.remove();
+    });
+    layer.style.display = "none";
+}
+
 function create_SVG_group(x, y, class_name, id_name) {
     let Group = document.createElementNS("http://www.w3.org/2000/svg", 'g')
     if (x !== undefined) {
@@ -1162,6 +1178,25 @@ function copy_scale_and_move_object_to_position(Elem,Parent, center_x, center_y,
     return MainPosTranslationGroup
 }
 
+/**
+ * Show/hide baked-in `.box_decoration` groups on a toybox clone according to WorldState.
+ * Default (never set / false): decorations hidden.
+ */
+function apply_toybox_decoration_visibility_to_element(rootElem, boxtype) {
+    if (!rootElem) return false;
+    let decorated = false;
+    if (typeof WorldState !== "undefined" && WorldState.get_toybox_is_decorated) {
+        decorated = WorldState.get_toybox_is_decorated(boxtype) === true;
+    }
+    rootElem.querySelectorAll(".box_decoration").forEach((el) => {
+        el.style.transition = "";
+        el.style.opacity = decorated ? "1" : "0";
+        el.style.visibility = decorated ? "visible" : "hidden";
+        el.style.pointerEvents = "none";
+    });
+    return decorated;
+}
+
 function get_all_values_in_array_of_objects(key, Arr){
     let Out = []
     for(let i = 0; i < Arr.length; i++){
@@ -1925,6 +1960,7 @@ class BoxChoiceBar {
             Array.from(RawBox.getElementsByClassName("prep_element_hidden")).forEach(el => {
                 el.style.display = "none";
             });
+            apply_toybox_decoration_visibility_to_element(RawBox, box_id);
             BtnGroup.appendChild(RawBox);
 
             let TBox = RawBox.getBBox();

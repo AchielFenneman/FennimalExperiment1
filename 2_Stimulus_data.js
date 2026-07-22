@@ -35,6 +35,31 @@ let StimulusSettings = function () {
     // ----------------------------------------------------
     let All_Experiment_Structures = {
         test: [
+            {
+                type: "jump_to_trial",
+                interaction_type: "joint_box_decoration",
+                Fennimals_encountered: ["A1"],
+                ask_box: true,
+                boxes_asked: ["A", "B"],
+                partner_behavior: "present",
+                hint_type: ["icon"],
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                skip_instructions: true
+            },
+            {
+                type: "jump_to_trial",
+                interaction_type: "joint_box_cleaning",
+                Fennimals_encountered: ["A1"],
+                ask_box: true,
+                boxes_asked: ["A", "B"],
+                partner_behavior: "present",
+                hint_type: ["icon"],
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                skip_instructions: true
+            },
+
             // Starts here for UI testing. Controller auto-seeds false-belief WorldState when
             // boxes are empty (partner beliefs ≠ current contents). In the full mentalizing
             // structure this state is created by shared then private toy_to_box play.
@@ -50,18 +75,7 @@ let StimulusSettings = function () {
                     { question_id: "belief_C", target_box: "C" }
                 ]
             },
-            {
-                type: "jump_to_trial",
-                interaction_type: "joint_box_cleaning",
-                Fennimals_encountered: ["A1"],
-                ask_box: true,
-                boxes_asked: ["A", "B"],
-                partner_behavior: "present",
-                hint_type: ["icon"],
-                include_Fennefinder: false,
-                return_to_phone_room_after_final_trial: false,
-                skip_instructions: true
-            },
+            
             {
                 type: "Fennimal_attribute_sorting_task",
                 Fennimals_encountered: ["A1"],
@@ -184,18 +198,23 @@ let StimulusSettings = function () {
                         interaction_type: "toy_to_box"
                     },
                     {
-                        Fennimals_encountered: ["S1", "S2", "S3"],
-                        interaction_type: "check_box_contents"
+                        trials: [
+                            { Fennimal: "S1", interaction_type: "joint_box_decoration" },
+                        ]
                     },
                     {
                         trials: [
-                            { Fennimal: "S1", interaction_type: "joint_box_cleaning" },
                             { Fennimal: "S2", interaction_type: "photo_box" },
                             { Fennimal: "S3", interaction_type: "photo_box" },
                             { Fennimal: "S2", interaction_type: "photo_Fennimal" },
                             { Fennimal: "S3", interaction_type: "photo_Fennimal" }
                         ]
-                    }
+                    },
+                    {
+                        trials: [
+                            { Fennimal: "S1", interaction_type: "joint_box_cleaning" },
+                        ]
+                    },
                 ]
             },
 
@@ -244,18 +263,25 @@ let StimulusSettings = function () {
                         interaction_type: "toy_to_box"
                     },
                     {
-                        Fennimals_encountered: ["P1", "P2", "P3"],
-                        interaction_type: "check_box_contents"
+                        trials: [
+                            { Fennimal: "P2", interaction_type: "joint_box_decoration" },
+                         
+                        ]
                     },
                     {
                         trials: [
-                            { Fennimal: "P2", interaction_type: "joint_box_cleaning" },
                             { Fennimal: "P1", interaction_type: "photo_box" },
                             { Fennimal: "P3", interaction_type: "photo_box" },
                             { Fennimal: "P1", interaction_type: "photo_Fennimal" },
                             { Fennimal: "P3", interaction_type: "photo_Fennimal" }
                         ]
-                    }
+                    },
+                    {
+                        trials: [
+                            { Fennimal: "P2", interaction_type: "joint_box_cleaning" },
+                         
+                        ]
+                    },
                 ]
             },
 

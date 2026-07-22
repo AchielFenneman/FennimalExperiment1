@@ -173,6 +173,9 @@ class BasicElementsModule {
         this.ParentLayer.appendChild(FennimalLayer);
         this.ParentLayer.appendChild(ItemLayer);
 
+        // Keep refs so clean_up can remove the whole scene tree (not just mask + fennimal).
+        this.BackgroundLayer = BackgroundLayer;
+        this.FennimalLayer = FennimalLayer;
         this.ItemLayers = {
             Layer: ItemLayer,
             Neg1: ItemLayer_depth_minus_one,
@@ -678,12 +681,32 @@ class BasicElementsModule {
     }
 
     clean_up() {
-        if (this.BackgroundMask) this.BackgroundMask.remove();
-        if (this.Fennimal) this.Fennimal.remove();
-
-        // NEW: Kill the life support!
+        // Kill the life support first so late RAF/pointer callbacks cannot resurrect nodes.
         if (this.gaze_tracker) window.removeEventListener('pointermove', this.gaze_tracker);
         if (this.animation_frame_id) cancelAnimationFrame(this.animation_frame_id);
+        this.gaze_tracker = null;
+        this.animation_frame_id = null;
+
+        // Prefer removing the whole scene trees. Older clean_up only removed the white
+        // mask + Fennimal, which left partner/toy/UI nodes (and empty ItemLayers) sitting
+        // on Fennimals_Layer above the map — matching participant "frozen overlay" reports.
+        if (this.BackgroundLayer && this.BackgroundLayer.parentNode) this.BackgroundLayer.remove();
+        if (this.FennimalLayer && this.FennimalLayer.parentNode) this.FennimalLayer.remove();
+        if (this.ItemLayers && this.ItemLayers.Layer && this.ItemLayers.Layer.parentNode) {
+            this.ItemLayers.Layer.remove();
+        } else {
+            if (this.BackgroundMask && this.BackgroundMask.parentNode) this.BackgroundMask.remove();
+            if (this.Fennimal && this.Fennimal.parentNode) this.Fennimal.remove();
+        }
+
+        this.BackgroundMask = null;
+        this.Fennimal = null;
+        this.BackgroundLayer = null;
+        this.FennimalLayer = null;
+        this.ItemLayers = {};
+        this.TargetPoints = {};
+
+        if (this.ParentLayer) this.ParentLayer.style.display = "none";
     }
 }
 
@@ -692,6 +715,7 @@ class BoxModule {
     BoxTop;
     BoxOutline;
     boxname;
+    boxScale = 1;
 
     constructor(FenObj) {
         this.FenObj = FenObj;
@@ -700,6 +724,7 @@ class BoxModule {
 
     create_and_appear_box(ParentBase, ParentTop, center_x, center_y, scale, fade_in_time) {
         return new Promise(resolve => {
+            this.boxScale = (typeof scale === "number") ? scale : 1;
             this.BoxBase = copy_scale_and_move_object_to_position(document.getElementById("toybox_" + this.FenObj.toybox), ParentBase, center_x, center_y , scale);
             this.BoxBase.getElementsByClassName("front")[0].remove();
             this.BoxBase.getElementsByClassName("lid")[0].remove();
@@ -709,6 +734,9 @@ class BoxModule {
             this.BoxTop.getElementsByClassName("back")[0].remove();
             this.BoxTop.style.opacity = 0;
 
+            // Decorations are baked into the SVG as visible; honour WorldState by default.
+            this.apply_worldstate_decoration_visibility();
+
             window.getComputedStyle(this.BoxBase).opacity;
             this.BoxTop.style.transition = "all " + fade_in_time + "ms ease-in-out";
             this.BoxBase.style.transition = "all " + fade_in_time + "ms ease-in-out";
@@ -717,6 +745,69 @@ class BoxModule {
 
             setTimeout(() => resolve(), fade_in_time);
         });
+    }
+
+    get_decoration_roots(root = null) {
+        let targets = [];
+        if (root) {
+            targets = [root];
+        } else {
+            if (this.BoxTop) targets.push(this.BoxTop);
+            if (this.BoxBase) targets.push(this.BoxBase);
+        }
+        let found = [];
+        targets.forEach((t) => {
+            Array.from(t.querySelectorAll(".box_decoration")).forEach((el) => found.push(el));
+        });
+        return found;
+    }
+
+    get_decoration(letter, root = null) {
+        let cls = "box_decoration_" + letter;
+        let roots = root ? [root] : [this.BoxTop, this.BoxBase].filter(Boolean);
+        for (let i = 0; i < roots.length; i++) {
+            let el = roots[i].querySelector("." + cls);
+            if (el) return el;
+        }
+        return null;
+    }
+
+    set_decoration_visible(letter, visible, root = null) {
+        let el = this.get_decoration(letter, root);
+        if (!el) return;
+        el.style.transition = "";
+        el.style.opacity = visible ? "1" : "0";
+        el.style.visibility = visible ? "visible" : "hidden";
+        el.style.pointerEvents = "none";
+    }
+
+    set_all_decorations_visible(visible, root = null) {
+        ["A", "B", "C", "D"].forEach((letter) => {
+            this.set_decoration_visible(letter, visible, root);
+        });
+    }
+
+    apply_worldstate_decoration_visibility(root = null) {
+        let target = root || this.BoxTop || this.BoxBase;
+        if (!target) return false;
+        let decorated = apply_toybox_decoration_visibility_to_element(target, this.FenObj.toybox);
+        // Keep Base in sync when applying to the live box (not a one-off clone).
+        if (!root && this.BoxBase && this.BoxBase !== target) {
+            apply_toybox_decoration_visibility_to_element(this.BoxBase, this.FenObj.toybox);
+        }
+        return decorated;
+    }
+
+    async fade_decoration(letter, visible, ms = 400) {
+        let el = this.get_decoration(letter);
+        if (!el) return;
+        el.style.visibility = "visible";
+        el.style.pointerEvents = "none";
+        el.style.transition = `opacity ${ms}ms ease-in-out`;
+        window.getComputedStyle(el).opacity;
+        el.style.opacity = visible ? "1" : "0";
+        await wait(ms);
+        if (!visible) el.style.visibility = "hidden";
     }
 
     open_box() {
@@ -3145,7 +3236,10 @@ class GeneralTrialController {
         this.box.clean_up();
         this.toy.clean_up();
         if (this.wrong_toy) this.wrong_toy.clean_up();
-        if (this.partner.PartnerTranslateGroup) this.partner.PartnerTranslateGroup.remove();
+        // Remove the full partner stack (BaseGroup), not only TranslateGroup — a leftover
+        // scale(40) partner in the corner covers watchtower / Fennefinder hit targets.
+        if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
+        else if (this.partner.PartnerTranslateGroup) this.partner.PartnerTranslateGroup.remove();
     }
 }
 
@@ -3487,7 +3581,8 @@ class ToyToBoxTrialController {
         this.box.clean_up();
         this.toy.clean_up();
         if (this.old_toy) this.old_toy.clean_up();
-        if (this.partner.PartnerTranslateGroup) this.partner.PartnerTranslateGroup.remove();
+        if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
+        else if (this.partner.PartnerTranslateGroup) this.partner.PartnerTranslateGroup.remove();
     }
 }
 
@@ -3637,6 +3732,10 @@ class DirtModule {
         const colors = (options.colors && options.colors.length)
             ? options.colors
             : ['#4A3B2C', '#3E2723', '#5D4037', '#4E342E'];
+        // Fraction of usable width to skip on the left (e.g. plant occlusion).
+        let avoidLeft = Math.max(0, Math.min(0.7,
+            typeof options.avoidLeftFraction === "number" ? options.avoidLeftFraction : 0
+        ));
 
         for (let i = 0; i < num_spots; i++) {
             let spot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
@@ -3644,10 +3743,19 @@ class DirtModule {
             spot.setAttribute('r', radius);
 
             spot.setAttribute('fill', colors[Math.floor(Math.random() * colors.length)]);
+            // Light edge so spots stay readable on dark box faces.
+            spot.setAttribute('stroke', 'rgba(255,255,255,0.35)');
+            spot.setAttribute('stroke-width', '2');
 
             let paddingX = targetBBox.width * 0.15;
             let paddingY = targetBBox.height * 0.15;
-            let local_x = targetBBox.x + paddingX + (Math.random() * (targetBBox.width - 2 * paddingX));
+            let usableLeft = targetBBox.x + paddingX;
+            let usableRight = targetBBox.x + targetBBox.width - paddingX;
+            let usableWidth = Math.max(1, usableRight - usableLeft);
+            usableLeft = usableLeft + avoidLeft * usableWidth;
+            usableWidth = Math.max(1, usableRight - usableLeft);
+
+            let local_x = usableLeft + (Math.random() * usableWidth);
             let local_y = targetBBox.y + paddingY + (Math.random() * (targetBBox.height - 2 * paddingY));
 
             spot.setAttribute('cx', local_x);
@@ -3815,20 +3923,182 @@ class DirtModule {
     /**
      * Turn-based sponge: enable scrubbing until `quota` health is cleaned (or all dirt gone).
      * Does not auto-despawn on full clean — caller handles finale.
+     *
+     * safety (optional):
+     *   idleHintMs / idleFailsafeMs — wall-clock idle without scrub progress
+     *   onIdleHint / onIdleFailsafe — optional callbacks
      */
-    start_scrub_turn(quota) {
+    start_scrub_turn(quota, safety = {}) {
         this.scrubMode = "turn";
         this.turnQuota = quota;
         this.turnCleaned = 0;
+        this._scrubStarted = false;
+        this._scrubStartResolve = null;
+        this._idleHintFired = false;
+        this._idleFailsafeFired = false;
+        this._lastProgressAt = Date.now();
+        this._scrubIdleHintMs = safety.idleHintMs != null ? safety.idleHintMs : 12000;
+        this._scrubIdleFailsafeMs = safety.idleFailsafeMs != null ? safety.idleFailsafeMs : 25000;
+        this._onIdleHint = typeof safety.onIdleHint === "function" ? safety.onIdleHint : null;
+        this._onIdleFailsafe = typeof safety.onIdleFailsafe === "function" ? safety.onIdleFailsafe : null;
+        this.clear_scrub_idle_watch();
+        this.stop_dirt_hint_pulse();
         this._rebind_sponge_pointer();
         this._spongeActive = true;
         if (this.SpongeTranslateGroup) {
             this.SpongeTranslateGroup.style.cursor = "grab";
             this.show_sponge_turn_outline();
         }
+        this._scrubIdleWatch = setInterval(() => this._check_scrub_idle_safety(), 400);
         return new Promise(resolve => {
             this._turnResolve = resolve;
         });
+    }
+
+    /** Resolves once the player has actually scrubbed dirt this turn. */
+    wait_for_scrub_start() {
+        if (this._scrubStarted) return Promise.resolve();
+        return new Promise(resolve => {
+            this._scrubStartResolve = resolve;
+        });
+    }
+
+    _notify_scrub_started() {
+        if (this._scrubStarted) return;
+        this._scrubStarted = true;
+        if (this._scrubStartResolve) {
+            let resolve = this._scrubStartResolve;
+            this._scrubStartResolve = null;
+            resolve();
+        }
+    }
+
+    _note_scrub_progress() {
+        this._lastProgressAt = Date.now();
+        // Player found dirt again — stop the idle pulse cue.
+        this.stop_dirt_hint_pulse();
+    }
+
+    clear_scrub_idle_watch() {
+        if (this._scrubIdleWatch) {
+            clearInterval(this._scrubIdleWatch);
+            this._scrubIdleWatch = null;
+        }
+    }
+
+    _check_scrub_idle_safety() {
+        if (this.scrubMode !== "turn" || !this._turnResolve || this._spongeActive === false) {
+            this.clear_scrub_idle_watch();
+            return;
+        }
+        let idleMs = Date.now() - (this._lastProgressAt || Date.now());
+
+        if (!this._idleHintFired && idleMs >= this._scrubIdleHintMs) {
+            this._idleHintFired = true;
+            this.pulse_remaining_dirt_hint();
+            if (this._onIdleHint) this._onIdleHint();
+        }
+
+        if (!this._idleFailsafeFired && idleMs >= this._scrubIdleFailsafeMs) {
+            this._idleFailsafeFired = true;
+            if (this._onIdleFailsafe) this._onIdleFailsafe();
+            this.auto_complete_scrub_turn();
+        }
+    }
+
+    pulse_remaining_dirt_hint() {
+        this.stop_dirt_hint_pulse();
+        let remaining = this.Spots.filter(s => !s.is_cleaned && s.element);
+        if (!remaining.length) return;
+
+        let pulses = 0;
+        this._dirtHintPulse = setInterval(() => {
+            pulses++;
+            remaining.forEach((spot) => {
+                if (spot.is_cleaned || !spot.element) return;
+                let on = pulses % 2 === 1;
+                spot.element.style.transition = "filter 280ms ease, opacity 280ms ease";
+                spot.element.style.filter = on
+                    ? "brightness(1.55) drop-shadow(0px 0px 14px gold)"
+                    : "none";
+                // Nudge nearly-invisible partial spots back into view during the hint.
+                let baseOpacity = Math.max(0.25, Math.min(1, spot.health / 100));
+                spot.element.style.opacity = on ? Math.max(baseOpacity, 0.85) : baseOpacity;
+            });
+            if (pulses >= 8) this.stop_dirt_hint_pulse();
+        }, 320);
+    }
+
+    stop_dirt_hint_pulse() {
+        if (this._dirtHintPulse) {
+            clearInterval(this._dirtHintPulse);
+            this._dirtHintPulse = null;
+        }
+        this.Spots.forEach((spot) => {
+            if (!spot.element || spot.is_cleaned) return;
+            spot.element.style.filter = "none";
+            spot.element.style.opacity = Math.max(0, Math.min(1, spot.health / 100));
+        });
+    }
+
+    /**
+     * Failsafe: instantly clean enough remaining dirt to finish this turn.
+     * Also marks scrub as started so decoration wash-off can still fire.
+     */
+    auto_complete_scrub_turn() {
+        if (this.scrubMode !== "turn" || !this._turnResolve) return;
+
+        this.clear_scrub_idle_watch();
+        this.stop_dirt_hint_pulse();
+        this._notify_scrub_started();
+
+        for (let i = 0; i < this.Spots.length; i++) {
+            if (this.turnCleaned >= this.turnQuota || this.dirt_remaining <= 0) break;
+            let spot = this.Spots[i];
+            if (spot.is_cleaned || !spot.element) continue;
+            this._instant_clean_spot(spot);
+        }
+
+        this._resolve_scrub_turn_if_ready(true);
+    }
+
+    _instant_clean_spot(spot) {
+        let remainingHealth = Math.max(0, spot.health);
+        spot.health = 0;
+        if (!spot.is_cleaned) {
+            spot.is_cleaned = true;
+            this.dirt_remaining = Math.max(0, this.dirt_remaining - 1);
+        }
+        if (this.scrubMode === "turn") {
+            this.turnCleaned += remainingHealth;
+        }
+
+        AudioCont.play_sound_effect("scrub");
+        spot.element.style.transition = "all 280ms ease-out";
+        spot.element.style.filter = "brightness(1.6) drop-shadow(0px 0px 10px gold)";
+        spot.element.style.transform += " scale(0)";
+        spot.element.style.opacity = "0";
+        let el = spot.element;
+        setTimeout(() => {
+            if (el && el.parentNode) el.remove();
+        }, 300);
+    }
+
+    _resolve_scrub_turn_if_ready(force = false) {
+        if (this.scrubMode !== "turn" || !this._turnResolve) return;
+        if (!force && !(this.turnCleaned >= this.turnQuota || this.dirt_remaining <= 0)) return;
+
+        this.clear_scrub_idle_watch();
+        this.stop_dirt_hint_pulse();
+        let resolveTurn = this._turnResolve;
+        this._turnResolve = null;
+        this._spongeActive = false;
+        this.hide_sponge_turn_outline();
+        if (this.SpongeTranslateGroup) {
+            this.SpongeTranslateGroup.onpointermove = null;
+            this.SpongeTranslateGroup.style.cursor = "auto";
+        }
+        resolveTurn();
     }
 
     show_sponge_turn_outline() {
@@ -4035,6 +4305,8 @@ class DirtModule {
 
                     if (this.scrubMode === "turn") {
                         this.turnCleaned += damage;
+                        this._notify_scrub_started();
+                        this._note_scrub_progress();
                     }
 
                     //Fade out the spot dynamically as it gets cleaner
@@ -4089,15 +4361,7 @@ class DirtModule {
 
                     if (this.scrubMode === "turn" && this._turnResolve &&
                         (this.turnCleaned >= this.turnQuota || this.dirt_remaining <= 0)) {
-                        let resolveTurn = this._turnResolve;
-                        this._turnResolve = null;
-                        this._spongeActive = false;
-                        this.hide_sponge_turn_outline();
-                        if (this.SpongeTranslateGroup) {
-                            this.SpongeTranslateGroup.onpointermove = null;
-                            this.SpongeTranslateGroup.style.cursor = "auto";
-                        }
-                        resolveTurn();
+                        this._resolve_scrub_turn_if_ready(true);
                     }
                 }
             }
@@ -4243,6 +4507,8 @@ class DirtModule {
     }
 
     clean_up() {
+        this.clear_scrub_idle_watch();
+        this.stop_dirt_hint_pulse();
         this.Spots.forEach(s => {
             if (s.element) s.element.remove();
         });
@@ -6558,6 +6824,7 @@ class PhotoTrialController {
             if (scaleGroup) {
                 scaleGroup.style.transform = `scale(${minScale})`;
             }
+            apply_toybox_decoration_visibility_to_element(boxIcon, this.FenObj.toybox);
 
             return boxIcon;
         }
@@ -7703,6 +7970,7 @@ class JointBoxCleaningTrialController {
         this.photoSession = null;
         this.bindingOutlineGroup = null;
         this._fenHandoffBaseTransform = null;
+        this._decorationRemovalOrder = null;
     }
 
     async start_sequence() {
@@ -7716,6 +7984,7 @@ class JointBoxCleaningTrialController {
         if (this.FenObj.ask_Fennimal) {
             // Box first (no Fennimal) → identity quiz → Fennimal appears
             await this.spawn_closed_box({ announce: true });
+            this.prepare_decoration_removal_queue();
             await this.run_ask_fennimal_question();
             await this.appear_fennimal_for_trial();
             await this.add_dirt_to_existing_box();
@@ -7732,6 +8001,7 @@ class JointBoxCleaningTrialController {
             Interface.Prompt.show_message("This Fennimal is called " + this.FenObj.name);
             await wait(900);
             await this.spawn_dirty_scene();
+            this.prepare_decoration_removal_queue();
         }
 
         // Fennimal walks left of box (behind / around on x)
@@ -7750,11 +8020,104 @@ class JointBoxCleaningTrialController {
         // Clean reveal + encoding pause
         await this.play_clean_reveal();
 
+        // Persist undecorated state before handoff/photo so polaroids match the live box.
+        this.commit_box_undecorated_to_worldstate();
+
         // Hand box to Fennimal (x-axis drag); box stays on screen at end
         await this.run_box_handoff();
 
         await wait(500);
         this.returnfunc();
+    }
+
+    prepare_decoration_removal_queue() {
+        let decorated = typeof WorldState !== "undefined"
+            && WorldState.get_toybox_is_decorated
+            && WorldState.get_toybox_is_decorated(this.FenObj.toybox);
+        this._decorationRemovalOrder = decorated
+            ? shuffleArray(["A", "B", "C", "D"])
+            : [];
+    }
+
+    commit_box_undecorated_to_worldstate() {
+        if (typeof WorldState === "undefined" || !WorldState.change_toybox_is_decorated) return;
+        // Cleaning always ends with an undecorated box (removed during sponge turns, or never present).
+        WorldState.change_toybox_is_decorated(this.FenObj.toybox, false);
+    }
+
+    async remove_one_decoration_during_sponge_turn() {
+        if (!this._decorationRemovalOrder || this._decorationRemovalOrder.length === 0) return;
+        let letter = this._decorationRemovalOrder.shift();
+        await this.wash_off_decoration(letter);
+    }
+
+    /**
+     * Inverse of decoration placing: pick up (scale to 2x), then drop off-screen.
+     */
+    async wash_off_decoration(letter) {
+        let original = this.box.get_decoration(letter);
+        if (!original) return;
+
+        let slot = getSVGInternalCenter(original);
+        let parentLayer = this.basics.ItemLayers.Plus2;
+        let boxScale = this.box.boxScale != null ? this.box.boxScale : 4;
+        let heldScale = 2;
+
+        // Detach a flying copy so we can animate freely above the box.
+        let wrapper = create_SVG_group(0, 0);
+        let scaleGroup = create_SVG_group(0, 0);
+        let zeroGroup = create_SVG_group(0, 0);
+        let clone = original.cloneNode(true);
+        clone.style.opacity = "1";
+        clone.style.visibility = "visible";
+        clone.style.pointerEvents = "none";
+        clone.style.transition = "";
+        zeroGroup.appendChild(clone);
+        scaleGroup.appendChild(zeroGroup);
+        wrapper.appendChild(scaleGroup);
+        parentLayer.appendChild(wrapper);
+
+        let localBox = clone.getBBox();
+        let localCx = localBox.x + localBox.width / 2;
+        let localCy = localBox.y + localBox.height / 2;
+        zeroGroup.style.transform = `translate(${-localCx}px, ${-localCy}px)`;
+        scaleGroup.style.transform = `scale(${boxScale})`;
+
+        // Pin at the live slot with no transition first (avoids a 0,0 flash).
+        wrapper.style.transition = "none";
+        wrapper.style.transform = `translate(${slot.x}px, ${slot.y}px) scale(1)`;
+        wrapper.style.opacity = "1";
+        window.getComputedStyle(wrapper).transform;
+
+        // Hide the baked-in decoration once the clone is sitting on top of it.
+        this.box.set_decoration_visible(letter, false);
+        await wait(30);
+
+        // 1) Pick up: scale up in place (inverse of the drop-on-box shrink).
+        AudioCont.play_sound_effect("alert_minor");
+        wrapper.style.transition = "transform 280ms ease-out";
+        wrapper.style.transform = `translate(${slot.x}px, ${slot.y}px) scale(${heldScale})`;
+        await wait(300);
+
+        // 2) Fall down off-screen.
+        let fallX = slot.x + (Math.random() - 0.5) * 80;
+        let fallY = this.basics.H + 160;
+        wrapper.style.transition =
+            "transform 650ms cubic-bezier(0.4, 0.0, 0.8, 0.6), opacity 650ms ease-in";
+        wrapper.style.transform =
+            `translate(${fallX}px, ${fallY}px) scale(${heldScale}) rotate(${(Math.random() - 0.5) * 50}deg)`;
+        wrapper.style.opacity = "0";
+        await wait(680);
+
+        if (wrapper.parentNode) wrapper.remove();
+    }
+
+    get_handoff_prompt_message() {
+        return "Hand the clean " + this.box.boxname + " to " + this.FenObj.name + ".";
+    }
+
+    get_encoding_prompt_message() {
+        return "This clean " + this.box.boxname + " belongs to " + this.FenObj.name + "!";
     }
 
     async spawn_closed_box({ announce = false } = {}) {
@@ -7851,7 +8214,10 @@ class JointBoxCleaningTrialController {
             this.box.BoxTop,
             this.basics.ItemLayers.Plus2,
             p.dirtSpots,
-            { colors: this.get_region_dirt_colors() }
+            {
+                colors: this.get_region_dirt_colors(),
+                avoidLeftFraction: p.dirtAvoidLeftFraction != null ? p.dirtAvoidLeftFraction : 0.35
+            }
         );
         this.foliage.spawn_one_plant_left_of(
             this.basics.ItemLayers,
@@ -8113,7 +8479,29 @@ class JointBoxCleaningTrialController {
                 "Please clean the " + this.box.boxname + " with the sponge"
             );
             await this.dirt.raise_sponge_to_active();
-            await this.dirt.start_scrub_turn(quota);
+            // Wash-off only after the player actually starts scrubbing dirt.
+            let scrubPromise = this.dirt.start_scrub_turn(quota, {
+                idleHintMs: p.scrubIdleHintMs != null ? p.scrubIdleHintMs : 12000,
+                idleFailsafeMs: p.scrubIdleFailsafeMs != null ? p.scrubIdleFailsafeMs : 25000,
+                onIdleHint: () => {
+                    Interface.Prompt.show_message(
+                        "Keep scrubbing — look for the remaining dirt on the " + this.box.boxname + "!"
+                    );
+                },
+                onIdleFailsafe: () => {
+                    Interface.Prompt.show_message(
+                        "I'll help finish this bit of dirt!"
+                    );
+                }
+            });
+            let decoPromise = Promise.resolve();
+            if (this._decorationRemovalOrder && this._decorationRemovalOrder.length) {
+                decoPromise = this.dirt.wait_for_scrub_start().then(() =>
+                    this.remove_one_decoration_during_sponge_turn()
+                );
+            }
+            await scrubPromise;
+            await decoPromise;
             await this.dirt.drop_sponge_to_floor(floorY);
             Interface.Prompt.hide();
             await wait(400);
@@ -8214,6 +8602,12 @@ class JointBoxCleaningTrialController {
         this.dirt.Spots = [];
         this.dirt.dirt_remaining = 0;
 
+        // Ensure any remaining baked decorations are gone before the reveal.
+        if (this._decorationRemovalOrder && this._decorationRemovalOrder.length) {
+            this.box.set_all_decorations_visible(false);
+            this._decorationRemovalOrder = [];
+        }
+
         // Keep partner in the corner during handoff so they don't block the drag path.
         if (this.partner.is_present) {
             await this.partner.return_to_start();
@@ -8240,9 +8634,7 @@ class JointBoxCleaningTrialController {
         this.box.BoxTop.style.transform = baseT;
         this.box.BoxTop.style.filter = "none";
 
-        Interface.Prompt.show_message(
-            "This clean " + this.box.boxname + " belongs to " + this.FenObj.name + "!"
-        );
+        Interface.Prompt.show_message(this.get_encoding_prompt_message());
         await wait(p.encodingPauseMs);
     }
 
@@ -8364,9 +8756,7 @@ class JointBoxCleaningTrialController {
 
     async run_box_handoff() {
         const p = this.params;
-        Interface.Prompt.show_message(
-            "Hand the clean " + this.box.boxname + " to " + this.FenObj.name + "."
-        );
+        Interface.Prompt.show_message(this.get_handoff_prompt_message());
         AudioCont.play_sound_effect("alert_minor");
 
         // Pulse Fennimal as drop target
@@ -8622,6 +9012,7 @@ class JointBoxCleaningTrialController {
         if (scaleGroup) {
             scaleGroup.style.transform = `scale(${minScale})`;
         }
+        this.box.apply_worldstate_decoration_visibility(boxIcon);
 
         // Memory-stamp silhouette behind Fennimal + box.
         let stamp = create_SVG_outline_of_multiple_groups(fenIcon, boxIcon);
@@ -8727,6 +9118,404 @@ class JointBoxCleaningTrialController {
         this.box.clean_up();
         this.basics.clean_up();
         if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
+    }
+}
+
+// Bind Fennimal ↔ toybox via joint decoration: ask_Fennimal → place decorations in turns → handoff → photo.
+// Extends the cleaning controller to reuse ask-bar / handoff / celebration / photo ending.
+class JointBoxDecorationTrialController extends JointBoxCleaningTrialController {
+    constructor(FenObj, partner_is_present, returnfunc) {
+        super(FenObj, partner_is_present, returnfunc);
+        this.params = GenParam.JointBoxDecoration;
+        this.pilePieces = {};
+        this._decoDragController = null;
+        this._decorationLetters = ["A", "B", "C", "D"];
+    }
+
+    get_handoff_prompt_message() {
+        return "Hand the decorated " + this.box.boxname + " to " + this.FenObj.name + ".";
+    }
+
+    get_encoding_prompt_message() {
+        return "This decorated " + this.box.boxname + " belongs to " + this.FenObj.name + "!";
+    }
+
+    async start_sequence() {
+        const p = this.params;
+        this.basics.create_svg_sublayers();
+        if (this.partner.is_present) {
+            this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        }
+        await this.basics.create_background_mask(true, 500);
+
+        if (this.FenObj.ask_Fennimal) {
+            await this.spawn_closed_box({ announce: true });
+            // Always treat as undecorated for this interaction (even if WorldState was true).
+            this.box.set_all_decorations_visible(false);
+            await this.run_ask_fennimal_question();
+            await this.appear_fennimal_for_trial();
+        } else {
+            await this.basics.create_and_appear_Fennimal(
+                this.basics.ItemLayers.Main,
+                p.fennimalX * this.basics.W,
+                p.fennimalY * this.basics.H,
+                p.fennimalScale,
+                250
+            );
+            AudioCont.play_sound_effect("alert");
+            Interface.Prompt.show_message("This Fennimal is called " + this.FenObj.name);
+            await wait(900);
+            await this.spawn_closed_box({ announce: false });
+            this.box.set_all_decorations_visible(false);
+        }
+
+        await this.move_fennimal_beside_box();
+
+        Interface.Prompt.show_message(
+            this.FenObj.name + " would like to decorate their " + this.box.boxname + "!"
+        );
+        await wait(1600);
+
+        await this.spawn_decoration_pile();
+        await this.run_decoration_turns();
+        await this.play_decoration_reveal();
+
+        if (typeof WorldState !== "undefined" && WorldState.change_toybox_is_decorated) {
+            WorldState.change_toybox_is_decorated(this.FenObj.toybox, true);
+        }
+
+        await this.run_box_handoff();
+        await wait(500);
+        this.returnfunc();
+    }
+
+    build_turn_plan(letters) {
+        if (this.partner.is_present) {
+            return [
+                { actor: "participant", letter: letters[0] },
+                { actor: "fennimal", letter: letters[1] },
+                { actor: "partner", letter: letters[2] },
+                { actor: "participant", letter: letters[3] }
+            ];
+        }
+        return [
+            { actor: "participant", letter: letters[0] },
+            { actor: "fennimal", letter: letters[1] },
+            { actor: "participant", letter: letters[2] },
+            { actor: "fennimal", letter: letters[3] }
+        ];
+    }
+
+    get_pile_base_position() {
+        const p = this.params;
+        return {
+            x: this.boxCenter.x + (p.pileOffsetX != null ? p.pileOffsetX : -280),
+            y: this.boxCenter.y + (p.pileOffsetY != null ? p.pileOffsetY : 20)
+        };
+    }
+
+    create_detached_decoration(letter, startX, startY) {
+        let original = this.box.get_decoration(letter);
+        if (!original) {
+            console.warn("joint_box_decoration: missing decoration " + letter);
+            return null;
+        }
+
+        // Slot position on the live box (used for magnetic snap later).
+        let slotCenter = getSVGInternalCenter(original);
+        this.box.set_decoration_visible(letter, false);
+
+        let wrapper = create_SVG_group(0, 0);
+        let scaleGroup = create_SVG_group(0, 0);
+        let zeroGroup = create_SVG_group(0, 0);
+        let clone = original.cloneNode(true);
+        clone.style.opacity = "1";
+        clone.style.visibility = "visible";
+        clone.style.pointerEvents = "auto";
+        clone.style.transition = "";
+        zeroGroup.appendChild(clone);
+        scaleGroup.appendChild(zeroGroup);
+        wrapper.appendChild(scaleGroup);
+        this.basics.ItemLayers.Plus2.appendChild(wrapper);
+
+        // Match the box's on-screen scale; center the clone locally.
+        let localBox = clone.getBBox();
+        let localCx = localBox.x + localBox.width / 2;
+        let localCy = localBox.y + localBox.height / 2;
+        zeroGroup.style.transform = `translate(${-localCx}px, ${-localCy}px)`;
+        let scale = this.box.boxScale != null ? this.box.boxScale : 4;
+        scaleGroup.style.transform = `scale(${scale})`;
+        wrapper.style.transform = `translate(${startX}px, ${startY}px)`;
+        wrapper.style.opacity = "0";
+        wrapper.style.pointerEvents = "none";
+
+        return {
+            letter,
+            original,
+            clone,
+            wrapper,
+            scaleGroup,
+            zeroGroup,
+            slotCenter,
+            pileX: startX,
+            pileY: startY,
+            baseTransform: `translate(${startX}px, ${startY}px)`
+        };
+    }
+
+    async spawn_decoration_pile() {
+        const p = this.params;
+        let base = this.get_pile_base_position();
+        let spread = p.pileSpread != null ? p.pileSpread : 28;
+        let letters = shuffleArray([...this._decorationLetters]);
+        this._turnPlan = this.build_turn_plan(letters);
+
+        // Stable pile order (visual stack), independent of turn assignment.
+        let pileOrder = shuffleArray([...this._decorationLetters]);
+        for (let i = 0; i < pileOrder.length; i++) {
+            let letter = pileOrder[i];
+            let ox = (Math.random() - 0.5) * spread;
+            let oy = (Math.random() - 0.5) * spread * 0.6 - i * 4;
+            let piece = this.create_detached_decoration(letter, base.x + ox, base.y + oy);
+            if (!piece) continue;
+            this.pilePieces[letter] = piece;
+            piece.wrapper.style.transition = "opacity 350ms ease-out, transform 450ms ease-out";
+            window.getComputedStyle(piece.wrapper).opacity;
+            piece.wrapper.style.opacity = "1";
+            await wait(120);
+        }
+        await wait(400);
+        await this.flash_attention(
+            this.pilePieces[pileOrder[0]] ? this.pilePieces[pileOrder[0]].wrapper : null
+        );
+    }
+
+    async run_decoration_turns() {
+        for (let i = 0; i < this._turnPlan.length; i++) {
+            let turn = this._turnPlan[i];
+            let piece = this.pilePieces[turn.letter];
+            if (!piece) continue;
+            if (turn.actor === "participant") {
+                await this.participant_decoration_turn(piece);
+            } else if (turn.actor === "fennimal") {
+                await this.fennimal_decoration_turn(piece);
+            } else if (turn.actor === "partner") {
+                await this.partner_decoration_turn(piece);
+            }
+            await wait(250);
+        }
+    }
+
+    async lift_piece(piece, ms = 300) {
+        const p = this.params;
+        let lift = p.decorationLiftY != null ? p.decorationLiftY : -90;
+        let held = p.decorationHeldScale != null ? p.decorationHeldScale : 2;
+        piece.heldScale = held;
+        piece.wrapper.style.transition = `transform ${ms}ms ease-out`;
+        piece.wrapper.style.transform =
+            `translate(${piece.pileX}px, ${piece.pileY + lift}px) scale(${held})`;
+        await wait(ms);
+        piece.liftTransform =
+            `translate(${piece.pileX}px, ${piece.pileY + lift}px) scale(${held})`;
+    }
+
+    async move_piece_to(piece, x, y, ms = 400, scale = null) {
+        let s = scale != null ? scale : (piece.heldScale != null ? piece.heldScale : 1);
+        piece.wrapper.style.transition = `transform ${ms}ms ease-in-out`;
+        piece.wrapper.style.transform = `translate(${x}px, ${y}px) scale(${s})`;
+        await wait(ms);
+    }
+
+    async snap_piece_onto_box(piece) {
+        // Re-measure slot in case anything shifted (box is still fixed during decoration).
+        if (piece.original) {
+            piece.slotCenter = getSVGInternalCenter(piece.original);
+        }
+        // Drop onto the box: shrink from held size back to normal box scale.
+        await this.move_piece_to(piece, piece.slotCenter.x, piece.slotCenter.y, 350, 1);
+        piece.heldScale = 1;
+        piece.wrapper.style.transition = "opacity 280ms ease-in";
+        piece.wrapper.style.opacity = "0";
+        await this.box.fade_decoration(piece.letter, true, 280);
+        await wait(50);
+        if (piece.wrapper && piece.wrapper.parentNode) piece.wrapper.remove();
+        delete this.pilePieces[piece.letter];
+        AudioCont.play_sound_effect("positive");
+    }
+
+    async return_piece_to_pile(piece) {
+        piece.heldScale = 1;
+        piece.wrapper.style.transition = "transform 300ms ease-in-out";
+        piece.wrapper.style.transform = piece.baseTransform;
+        await wait(320);
+    }
+
+    async participant_decoration_turn(piece) {
+        const p = this.params;
+        Interface.Prompt.show_message(
+            "Place this decoration on the " + this.box.boxname + "!"
+        );
+        AudioCont.play_sound_effect("alert_minor");
+
+        await this.lift_piece(piece);
+        // Bring this piece visually to the front of the pile.
+        if (piece.wrapper.parentNode) {
+            piece.wrapper.parentNode.appendChild(piece.wrapper);
+        }
+
+        let dropTarget =
+            (this.box.BoxTop &&
+                this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0]) ||
+            this.box.BoxTop;
+        let dropDistance = p.dropDistance != null ? p.dropDistance : 150;
+
+        piece.wrapper.style.pointerEvents = "auto";
+
+        await new Promise((resolve) => {
+            this._decoDragController = MakeObjectDraggableObject(
+                this.basics.ItemLayers.Plus2,
+                this.basics.ItemLayers.Questions,
+                piece.wrapper,
+                dropTarget,
+                dropDistance,
+                async () => {
+                    if (this._decoDragController && this._decoDragController.destroy) {
+                        this._decoDragController.destroy();
+                    }
+                    this._decoDragController = null;
+                    Interface.Prompt.hide();
+                    await this.snap_piece_onto_box(piece);
+                    resolve();
+                },
+                {
+                    onMiss: () => {
+                        // MakeObjectDraggableObject already snapped the drag group back;
+                        // re-enable for another attempt.
+                        if (this._decoDragController) this._decoDragController.enable();
+                    }
+                }
+            );
+        });
+    }
+
+    async fennimal_decoration_turn(piece) {
+        const p = this.params;
+        Interface.Prompt.hide();
+        Interface.Prompt.show_message(
+            this.FenObj.name + " adds a decoration to the " + this.box.boxname + "!"
+        );
+
+        let fen = getSVGInternalCenter(this.basics.Fennimal);
+        let pile = getSVGInternalCenter(piece.wrapper);
+        let gap = p.fennimalApproachPileGap != null ? p.fennimalApproachPileGap : 90;
+        let approachX = pile.x - gap;
+        await this.basics.Fennimal_move_relative(approachX - fen.x, 0, 400);
+
+        await this.lift_piece(piece, 280);
+
+        // Walk toward the box together with the decoration.
+        let fenNow = getSVGInternalCenter(this.basics.Fennimal);
+        let boxApproachX = this.boxCenter.x - 120;
+        let fenDx = boxApproachX - fenNow.x;
+        let decoTargetX = piece.slotCenter.x;
+        let decoTargetY = piece.slotCenter.y;
+
+        this.basics.Fennimal_move_relative(fenDx, 0, 500);
+        await this.move_piece_to(piece, decoTargetX, decoTargetY - 40, 500);
+        await this.snap_piece_onto_box(piece);
+
+        let homeX = this.fenHome ? this.fenHome.x : fen.x;
+        let back = getSVGInternalCenter(this.basics.Fennimal);
+        await this.basics.Fennimal_move_relative(homeX - back.x, 0, 400);
+        Interface.Prompt.hide();
+    }
+
+    async partner_decoration_turn(piece) {
+        if (!this.partner.is_present) return;
+        const p = this.params;
+        Interface.Prompt.hide();
+        Interface.Prompt.show_message(
+            this.partner.partnername + " adds a decoration to the " + this.box.boxname + "!"
+        );
+
+        let partner = getSVGInternalCenter(this.partner.PartnerTranslateGroup);
+        let pile = getSVGInternalCenter(piece.wrapper);
+        let gap = p.partnerApproachPileGap != null ? p.partnerApproachPileGap : 110;
+        // Approach from the right; stop a bit short of the pile.
+        let approachX = pile.x + gap;
+        let dx = approachX - partner.x;
+        this.partner.PartnerTranslateGroup.style.transition = "transform 450ms ease-in-out";
+        this.partner.PartnerTranslateGroup.style.transform =
+            (this.partner.PartnerTranslateGroup.style.transform || "") + ` translateX(${dx}px)`;
+        await wait(450);
+
+        await this.lift_piece(piece, 280);
+
+        // Move left toward the box with the decoration, then snap the piece on.
+        let partnerNow = getSVGInternalCenter(this.partner.PartnerTranslateGroup);
+        let nearBoxX = this.boxCenter.x + 80;
+        let partnerDx = nearBoxX - partnerNow.x;
+        this.partner.PartnerTranslateGroup.style.transition = "transform 500ms ease-in-out";
+        this.partner.PartnerTranslateGroup.style.transform =
+            (this.partner.PartnerTranslateGroup.style.transform || "") +
+            ` translateX(${partnerDx}px)`;
+        await this.move_piece_to(piece, piece.slotCenter.x, piece.slotCenter.y - 40, 500);
+        await this.snap_piece_onto_box(piece);
+
+        await this.partner.return_to_start();
+        Interface.Prompt.hide();
+    }
+
+    async play_decoration_reveal() {
+        const p = this.params;
+
+        if (this.partner.is_present) {
+            await this.partner.return_to_start();
+            this.partner.set_direction("back");
+        }
+        let fen = getSVGInternalCenter(this.basics.Fennimal);
+        let restOffset = p.fennimalRestOffsetX != null ? p.fennimalRestOffsetX : -150;
+        let leftX = Math.max(120, this.boxCenter.x + restOffset);
+        await this.basics.Fennimal_move_relative(leftX - fen.x, 0, 400);
+        this.fenHome = getSVGInternalCenter(this.basics.Fennimal);
+
+        let baseT = this.box.BoxTop.style.transform || "";
+        this.box.BoxTop.style.transition = "transform 350ms ease-out, filter 350ms ease-out";
+        this.box.BoxTop.style.filter = "brightness(1.25) drop-shadow(0px 0px 18px gold)";
+        this.box.BoxTop.style.transform = baseT + " scale(1.06)";
+
+        AudioCont.play_sound_effect("positive");
+        Interface.Prompt.show_message(
+            "Yay! The " + this.box.boxname + " looks wonderful!"
+        );
+        let c = getSVGInternalCenter(this.box.BoxTop);
+        spawn_confetti_burst(this.basics.ItemLayers.Plus2, c.x, c.y, { awaitPopMs: 700 });
+        await wait(900);
+
+        this.box.BoxTop.style.transform = baseT;
+        this.box.BoxTop.style.filter = "none";
+
+        Interface.Prompt.show_message(this.get_encoding_prompt_message());
+        await wait(p.encodingPauseMs);
+    }
+
+    clear_pile_pieces() {
+        Object.keys(this.pilePieces).forEach((key) => {
+            let piece = this.pilePieces[key];
+            if (piece && piece.wrapper && piece.wrapper.parentNode) {
+                piece.wrapper.remove();
+            }
+        });
+        this.pilePieces = {};
+    }
+
+    clean_up() {
+        if (this._decoDragController && this._decoDragController.destroy) {
+            this._decoDragController.destroy();
+            this._decoDragController = null;
+        }
+        this.clear_pile_pieces();
+        super.clean_up();
     }
 }
 
@@ -9083,6 +9872,9 @@ class TrialFactory {
             case "joint_box_cleaning":
                 return new JointBoxCleaningTrialController(FenObj, partner_is_present, returnfunc);
 
+            case "joint_box_decoration":
+                return new JointBoxDecorationTrialController(FenObj, partner_is_present, returnfunc);
+
             case "broken_toy_in_box":
                 return new BrokenToyInBoxTrialController(FenObj, partner_is_present, returnfunc);
 
@@ -9335,6 +10127,7 @@ class PartnerBeliefMultipleController {
             let target_y = table_y - 10;
 
             let BoxObj = copy_scale_and_move_object_to_position(document.getElementById("toybox_" + box_id), this.ItemLayers.Main, target_x, target_y, 2.5);
+            apply_toybox_decoration_visibility_to_element(BoxObj, box_id);
             let trash = Array.from(BoxObj.getElementsByClassName("alignment_field"));
             trash.forEach(t => t.remove());
 
@@ -9592,6 +10385,7 @@ class PartnerBeliefMultipleController {
         this.ItemLayers.Main.remove();
         this.ItemLayers.Plus1.remove();
         this.ItemLayers.Plus2.remove();
+        if (this.ParentLayer) this.ParentLayer.style.display = "none";
     }
 }
 
@@ -10238,6 +11032,7 @@ class PartnerBeliefIndividualBoxesController {
             this.box_center_y,
             2.5
         );
+        apply_toybox_decoration_visibility_to_element(BoxObj, boxId);
         Array.from(BoxObj.getElementsByClassName("alignment_field")).forEach(t => t.remove());
         BoxObj.style.opacity = 0;
         BoxObj.style.pointerEvents = "none";
@@ -11038,6 +11833,7 @@ class PartnerBeliefIndividualBoxesController {
                 if (layer && layer.parentNode) layer.remove();
             });
         }
+        if (this.ParentLayer) this.ParentLayer.style.display = "none";
         Interface.Prompt.hide();
     }
 }

@@ -158,6 +158,7 @@ ItemsCollectionFromWarehouseController = function(TaskData, outputfunc){
                 let BoxGroup = create_SVG_group(0,0,undefined,undefined);
                 MainContainer.appendChild(BoxGroup)
                 let BoxObj = copy_scale_and_move_object_to_position(document.getElementById("toybox_" + Settings.Boxes[boxnum]), BoxGroup,pos_on_table[boxnum], CP.y - 0.06* GenParam.SVG_height, 2.5 )
+                apply_toybox_decoration_visibility_to_element(BoxObj, Settings.Boxes[boxnum]);
 
                 InteractionElements.Boxes[Settings.Boxes[boxnum]] = BoxGroup
                 InteractionElements.Boxes[Settings.Boxes[boxnum]].style.transition = "all " + (0.25 * step_speed) + "ms ease-in-out"
