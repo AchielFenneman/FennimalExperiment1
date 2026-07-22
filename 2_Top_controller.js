@@ -1465,3 +1465,5 @@ class ExperimentController {
             });
     }
 }
+
+console.log("Heads included")

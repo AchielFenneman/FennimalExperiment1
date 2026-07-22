@@ -329,7 +329,7 @@ let StimulusSettings = function () {
     const All_Forced_Head_Lists = {
         test: ["roller", "brush", "tube", "palette"],
         mentalizing_network: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant",  "shark", "blockhead", "parrot", "stocking"],
-        mentalizing: ["astro", "cupcake", "tube", "tv", "jacko", "elephant", "blockhead", "parrot"],
+        mentalizing: ["astro", "cupcake", "tube", "tv", "jackolantnern", "elephant", "blockhead", "parrot"],
     };
 
     const All_Allowed_Head_Groups_List = { test: false, mentalizing_1: false };
