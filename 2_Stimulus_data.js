@@ -1,6 +1,6 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["mentalizing"];
+    this.Experiment_Code = ["test"];
 
     const All_Instructions_At_Start = {
         test: [],
@@ -38,6 +38,14 @@ let StimulusSettings = function () {
     // ----------------------------------------------------
     let All_Experiment_Structures = {
         test: [
+            {
+                type: "jump_to_trial",
+                interaction_type: "Fennimal_toy",
+                Fennimals_encountered: ["S1", "S2"],
+                partner_behavior: "absent",
+                hint_type: ["icon"],
+                include_Fennefinder: true
+            },
            
             // Starts here for UI testing. Controller auto-seeds false-belief WorldState when
             // boxes are empty (partner beliefs ≠ current contents). In the full mentalizing
@@ -868,5 +876,3 @@ let StimulusTransformer = function (StimTemplate) {
         });
     };
 };
-
-console.log("Updated")

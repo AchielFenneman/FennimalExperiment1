@@ -361,8 +361,8 @@ GENERALPARAM = function () {
         },
         car: {
             ColorScheme: {
-                light_color: "#a9efac",
-                dark_color: "#457834"
+                light_color: "#575959",
+                dark_color: "#c96457"
             },
             AlternateColorScheme: {
                 light_color: "#8080ff",
@@ -372,7 +372,7 @@ GENERALPARAM = function () {
         bubblewand: {
             ColorScheme: {
                 light_color: "#b5bbe3",
-                dark_color: "#7581d0"
+                dark_color: "#b970d4"
             },
             AlternateColorScheme: {
                 light_color: "#ffcc00",
