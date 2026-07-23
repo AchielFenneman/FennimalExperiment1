@@ -1481,4 +1481,4 @@ class ExperimentController {
     }
 }
 
-console.log("Load completed")
+console.log("Ready loading")
