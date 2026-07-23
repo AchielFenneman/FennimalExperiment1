@@ -882,7 +882,10 @@ class ExperimentController {
                 delete this.currentPhaseData.PartnerBeliefAnswers;
 
                 let experimentalAnswers = this.currentPhaseData.answers.filter(a =>
-                    a.trial_kind === "belief" || a.trial_kind === "reality"
+                    a.trial_kind === "belief" ||
+                    a.trial_kind === "reality" ||
+                    a.trial_kind === "memory_probe_box_to_fennimal" ||
+                    a.trial_kind === "memory_probe_fennimal_to_toy"
                 );
                 let bonusPerCorrect = this.currentPhaseData.bonus_stars_per_correct_answer || 0;
                 let earned = experimentalAnswers.reduce(
@@ -898,6 +901,13 @@ class ExperimentController {
                 let maxPossible = (this.currentPhaseData.bonus_stars_per_correct_answer || 0) * nQuestions * nBlocks;
                 if (this.currentPhaseData.include_reality_block_at_end === true) {
                     maxPossible += (this.currentPhaseData.bonus_stars_per_correct_answer || 0) * nQuestions;
+                }
+                if (this.currentPhaseData.include_memory_probe_at_end === true) {
+                    let nProbeTrials = experimentalAnswers.filter(a =>
+                        a.trial_kind === "memory_probe_box_to_fennimal" ||
+                        a.trial_kind === "memory_probe_fennimal_to_toy"
+                    ).length;
+                    maxPossible += bonusPerCorrect * nProbeTrials;
                 }
 
                 this.currentPhaseData.bonus_stars_earned = earned;
@@ -1286,6 +1296,11 @@ class ExperimentController {
             let role = WorldState.get_current_partner_role();
             if (role && role !== "absent") partnerPresent = true;
 
+            // Seconds since experiment start (coarse; stamped at interaction onset).
+            fennimalObject.time_since_start = Math.round(
+                (Date.now() - this.experimentStartTime) / 1000
+            );
+
             this.currentFennimal = TrialFactory.build(
                 fennimalObject.interaction_type,
                 fennimalObject,
@@ -1466,4 +1481,4 @@ class ExperimentController {
     }
 }
 
-console.log("Heads included")
+console.log("EXPERIMENT READY")

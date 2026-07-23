@@ -15,9 +15,12 @@ let StimulusSettings = function () {
     // ----------------------------------------------------
     const All_Fennimal_Sets = {
         test: {
-            "A1": { head: "A1", head_group: "A", head_cluster: "A", region: "A", food_preference: "A", toy: "A", toybox: "A", hat: "A" },
-            "A2": { head: "A2", head_group: "A", head_cluster: "A", region: "B", hat: "B", toy: "B", toybox: "B" },
-            "A3": { head: "A3", head_group: "A", head_cluster: "A", region: "C", hat: "C", toy: "C", toybox: "A" },
+            "S1": { head: "A", region: "A", toy: "A", toybox: "A" },
+            "S2": { head: "B", region: "B", toy: "B", toybox: "B" },
+            "S3": { head: "C", region: "C", toy: "C", toybox: "C" },
+            "P1": { head: "D", region: "D", toy: "D", toybox: "A" },
+            "P2": { head: "E", region: "E", toy: "E", toybox: "B" },
+            "P3": { head: "F", region: "F", toy: "F", toybox: "C" }
         },
 
         mentalizing: {
@@ -35,39 +38,17 @@ let StimulusSettings = function () {
     // ----------------------------------------------------
     let All_Experiment_Structures = {
         test: [
-            {
-                type: "jump_to_trial",
-                interaction_type: "joint_box_decoration",
-                Fennimals_encountered: ["A1"],
-                ask_box: true,
-                boxes_asked: ["A", "B"],
-                partner_behavior: "present",
-                hint_type: ["icon"],
-                include_Fennefinder: false,
-                return_to_phone_room_after_final_trial: false,
-                skip_instructions: true
-            },
-            {
-                type: "jump_to_trial",
-                interaction_type: "joint_box_cleaning",
-                Fennimals_encountered: ["A1"],
-                ask_box: true,
-                boxes_asked: ["A", "B"],
-                partner_behavior: "present",
-                hint_type: ["icon"],
-                include_Fennefinder: false,
-                return_to_phone_room_after_final_trial: false,
-                skip_instructions: true
-            },
-
+           
             // Starts here for UI testing. Controller auto-seeds false-belief WorldState when
             // boxes are empty (partner beliefs ≠ current contents). In the full mentalizing
             // structure this state is created by shared then private toy_to_box play.
             {
                 type: "partner_belief_individual_boxes",
-                include_practice_trial: true,
+                include_practice_trial: false,
                 num_belief_blocks: 1,
-                include_reality_block_at_end: true,
+                include_reality_block_at_end: false,
+                include_memory_probe_at_end: true,
+                memory_probe_isi_ms: 1000,
                 bonus_stars_per_correct_answer: 4,
                 questions: [
                     { question_id: "belief_A", target_box: "A" },
@@ -78,7 +59,7 @@ let StimulusSettings = function () {
             
             {
                 type: "Fennimal_attribute_sorting_task",
-                Fennimals_encountered: ["A1"],
+                Fennimals_encountered: ["S1"],
                 attribute_order: ["head", "toy", "toybox"],
                 presentation: "single",
                 maximum_earnable_stars: 6
@@ -88,7 +69,7 @@ let StimulusSettings = function () {
             {
                 type: "phone_room",
                 interaction_type: "check_box_contents",
-                Fennimals_encountered: ["A1"],
+                Fennimals_encountered: ["S1"],
                 ask_box: true,
                 boxes_asked: ["A", "B"],
                 partner_behavior: "present",
@@ -107,21 +88,21 @@ let StimulusSettings = function () {
                 return_to_phone_room_after_final_trial: false,
                 ask_Fennimal: true,
                 // fennimals_asked defaults to all Fennimals in this phase (union of subblocks)
-                // fennimals_asked: ["A1", "A2", "A3"],
+                // fennimals_asked: ["S1", "S2", "S3"],
                 trial_subblocks: [
                     {
                         trials: [
-                            { Fennimal: "A1", interaction_type: "joint_box_cleaning" },
-                            { Fennimal: "A1", interaction_type: "photo_box" },
-                            { Fennimal: "A2", interaction_type: "feed_Fennimal" }
+                            { Fennimal: "S1", interaction_type: "joint_box_cleaning" },
+                            { Fennimal: "S1", interaction_type: "photo_box" },
+                            { Fennimal: "S2", interaction_type: "feed_Fennimal" }
                         ]
                     },
                     {
-                        Fennimals_encountered: ["A1"],
+                        Fennimals_encountered: ["S1"],
                         interaction_type: "Fennimal_toy"
                     },
                     {
-                        Fennimals_encountered: ["A1"],
+                        Fennimals_encountered: ["S1"],
                         interaction_type: "toy_to_box"
                     },
                     
@@ -138,7 +119,7 @@ let StimulusSettings = function () {
             {
                 type: "jump_to_trial",
                 interaction_type: "dirty_and_broken_toy",
-                Fennimals_encountered: ["A1", "A2"],
+                Fennimals_encountered: ["S1", "S2"],
                 partner_behavior: "absent",
                 hint_type: ["icon"],
                 include_Fennefinder: true
@@ -146,7 +127,7 @@ let StimulusSettings = function () {
             {
                 type: "free_exploration",
                 interaction_type: ["basic_intro"],
-                Fennimals_encountered: ["A1", "A2"],
+                Fennimals_encountered: ["S1", "S2"],
                 partner_behavior: "active",
                 hint_type: ["icon"],
                 include_Fennefinder: true, //"low_power_mode"
@@ -156,7 +137,7 @@ let StimulusSettings = function () {
             {
                 type: "pseudoday",
                 information: "new_Fennimals_spotted",
-                displayed_icons: ["A1", "A2"],
+                displayed_icons: ["S1", "S2"],
                 title: "Some Fennimals need a little love",
                 display_text: "There are some Fennimals on the island who seem a bit down..."
             },
@@ -294,9 +275,11 @@ let StimulusSettings = function () {
             {
                 type: "partner_belief_individual_boxes",
                 include_practice_trial: true,
-                num_belief_blocks: 2,
+                num_belief_blocks: 1,
                 include_reality_block_at_end: true,
+                include_memory_probe_at_end: true,
                 bonus_stars_per_correct_answer: 1,
+                memory_probe_isi_ms: 1000,
                 questions: [
                     { question_id: "belief_A", target_box: "A" },
                     { question_id: "belief_B", target_box: "B" },
@@ -304,14 +287,7 @@ let StimulusSettings = function () {
                 ]
             },
 
-            // BLOCK 6: Attribute sorting (single-Fennimal presentation)
-            {
-                type: "Fennimal_attribute_sorting_task",
-                Fennimals_encountered: ["S1", "S2", "S3", "P1", "P2", "P3"],
-                attribute_order: ["head", "toy", "toybox"],
-                presentation: "single",
-                maximum_earnable_stars: 6
-            },
+
 
         ]
     };
@@ -327,7 +303,7 @@ let StimulusSettings = function () {
     const All_Allowed_Head_Lists = { test: false, mentalizing_1: false };
     const All_Banned_Head_Lists = { test: false, mentalizing_1: false };
     const All_Forced_Head_Lists = {
-        test: ["roller", "brush", "tube", "palette"],
+        test: ["astro", "cupcake", "tube", "tv", "jackolantnern", "elephant", "blockhead", "parrot"],
         mentalizing_network: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant",  "shark", "blockhead", "parrot", "stocking"],
         mentalizing: ["astro", "cupcake", "tube", "tv", "jackolantnern", "elephant", "blockhead", "parrot"],
     };
@@ -851,6 +827,13 @@ let StimulusTransformer = function (StimTemplate) {
                 max_stars += block.bonus_stars_per_correct_answer * nQuestions * nBlocks;
                 if (block.include_reality_block_at_end === true) {
                     max_stars += block.bonus_stars_per_correct_answer * nQuestions;
+                }
+                if (block.include_memory_probe_at_end === true) {
+                    // One box→Fennimal and one Fennimal→toy probe per Fennimal in the set.
+                    let nFennimals = (typeof FennimalObjArr !== "undefined" && Array.isArray(FennimalObjArr))
+                        ? FennimalObjArr.length
+                        : 0;
+                    max_stars += block.bonus_stars_per_correct_answer * nFennimals * 2;
                 }
             }
 

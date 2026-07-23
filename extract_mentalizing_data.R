@@ -297,6 +297,11 @@ extract_belief_phase <- function(participants) {
       num_belief_blocks = block$num_belief_blocks %||% NA_integer_,
       include_practice_trial = block$include_practice_trial %||% NA,
       include_reality_block_at_end = block$include_reality_block_at_end %||% NA,
+      include_memory_probe_at_end = block$include_memory_probe_at_end %||% NA,
+      memory_probe_block_order = {
+        ord <- block$memory_probe_block_order %||% NULL
+        if (is.null(ord)) NA_character_ else paste(unlist(ord), collapse = ",")
+      },
       bonus_stars_earned = block$bonus_stars_earned %||% NA_real_,
       bonus_stars_per_correct_answer = block$bonus_stars_per_correct_answer %||% NA_real_,
       n_trials = length(answers_to_trials(block$answers %||% list()))
@@ -345,6 +350,7 @@ extract_belief_trials <- function(participants) {
         selected = scalar_chr(json_field(trial, "selected", NA_character_)),
         match_rule = scalar_chr(json_field(trial, "match_rule", NA_character_)),
         target_box = scalar_chr(json_field(trial, "target_box", NA_character_)),
+        target_fennimal = scalar_chr(json_field(trial, "target_fennimal", NA_character_)),
         target_shape = scalar_chr(json_field(target, "shape", NA_character_)),
         target_color_id = scalar_chr(json_field(target, "color_id", NA_character_))
       )

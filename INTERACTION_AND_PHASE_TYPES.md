@@ -183,9 +183,11 @@ One-box-at-a-time DV task with curtain reveal, radial forced-choice options, and
 | `questions` | Array of `{ question_id, target_box }` (stimulus codes). `question_id` is mandatory and unique. Do **not** set `answer_options` |
 | `lure_cycle` | Optional box-code cycle for the lure (default = unique `target_box` values in `questions` order, e.g. A→B→C→A) |
 | `num_belief_blocks` | How many shuffled belief blocks (default `1`). Deprecated alias: `num_repeated_blocks` |
-| `include_reality_block_at_end` | If `true`, after all belief blocks run one shuffled reality-memory block (no partner) |
+| `include_reality_block_at_end` | If `true`, after all belief blocks run one shuffled reality-memory block (no partner). Includes the existing reality-block intro overlay |
 | `include_practice_trial` | If `true`, prepend shape-match and color-match practice trials |
-| `bonus_stars_per_correct_answer` | Silent stars per correct belief/reality answer |
+| `include_memory_probe_at_end` | If `true`, after reality (or after belief if no reality block) run a solo memory-probe section (no partner, no distractors) |
+| `memory_probe_isi_ms` | Pause after each memory-probe response before the next trial (default `1000`) |
+| `bonus_stars_per_correct_answer` | Silent stars per correct belief/reality/memory-probe answer |
 
 **Answer options (fixed rule `belief_reality_cyclic_lure`):** for each question the controller auto-builds a shuffled 3AFC triad from `WorldState`:
 
@@ -194,7 +196,14 @@ One-box-at-a-time DV task with curtain reveal, radial forced-choice options, and
 
 Thus, with A→B→C→A, A’s lure comes from B, B’s from C, and C’s from A; only the source type changes by trial kind. Fails loud if any piece is missing or the three toys are not distinct. Logged fields include `lure_source_box`, `lure_source_box_code`, `lure_source_type`, `lure_answer`, and `option_roles`.
 
-**Trial structure:** optional practice → for each belief block: (distractor → belief)×N → optional final reality block: (distractor → reality)×N. Distractors alternate shape/color matching with orthogonal features. Question presentation order is shuffled within each block.
+**Trial structure:** optional practice → for each belief block: (distractor → belief)×N → optional final reality block: (distractor → reality)×N → optional memory probes. Distractors alternate shape/color matching with orthogonal features. Question presentation order is shuffled within each block.
+
+**Memory probes** (when `include_memory_probe_at_end`): two homogeneous blocks, order counterbalanced between participants (`memory_probe_block_order` on the phase):
+
+1. **Box→Fennimal** (`memory_probe_box_to_fennimal`): one trial per Fennimal; empty closed box cue; radial colored heads; foils exclude co-box mates.
+2. **Fennimal→toy** (`memory_probe_fennimal_to_toy`): one trial per Fennimal; full-body Fennimal cue; radial toys; foils = one same-wave + one other-wave toy (S vs P).
+
+No distractors between probes (ISI instead). Solo intro overlay before the first probe. Logged answer rows match belief/reality density (`trial_kind`, ids, `block_index`, `trial_index`, target, `options` with roles, `selected`, `correct`, `reaction_time_ms`).
 
 Controller: `PartnerBeliefIndividualBoxesController`.
 

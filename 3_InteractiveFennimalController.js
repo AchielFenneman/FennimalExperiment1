@@ -10423,7 +10423,12 @@ class PartnerBeliefIndividualBoxesController {
 
         this.include_reality_block_at_end = TaskObj.include_reality_block_at_end === true;
         this.include_practice_trial = TaskObj.include_practice_trial === true;
+        this.include_memory_probe_at_end = TaskObj.include_memory_probe_at_end === true;
+        this.memory_probe_isi_ms = (typeof TaskObj.memory_probe_isi_ms === "number" && TaskObj.memory_probe_isi_ms >= 0)
+            ? TaskObj.memory_probe_isi_ms
+            : 1000;
         this._realityBlockIntroShown = false;
+        this._memoryProbeIntroShown = false;
 
         this.FEATURE_SHAPES = ["circle", "triangle", "square"];
         this.FEATURE_COLORS = [
@@ -10656,7 +10661,211 @@ class PartnerBeliefIndividualBoxesController {
             });
         }
 
+        if (this.include_memory_probe_at_end) {
+            this._appendMemoryProbeSection(queue);
+        }
+
         return queue;
+    }
+
+    _getProbeFennimals() {
+        if (!this.expCont || !this.expCont.stimuli) return [];
+        let fens = this.expCont.stimuli.get_Fennimals_in_array("all");
+        return Array.isArray(fens) ? fens : [];
+    }
+
+    _waveForFennimal(fen) {
+        let id = (fen && fen.id) ? String(fen.id) : "";
+        if (id.startsWith("S")) return "S";
+        if (id.startsWith("P")) return "P";
+        return "default";
+    }
+
+    _appendMemoryProbeSection(queue) {
+        let fennimals = this._getProbeFennimals();
+        if (fennimals.length === 0) {
+            console.error("PartnerBeliefIndividualBoxes: memory probes requested but no Fennimals are available.");
+            return;
+        }
+
+        let boxToFen = this._makeBoxToFennimalProbeTrials(fennimals);
+        let fenToToy = this._makeFennimalToToyProbeTrials(fennimals);
+
+        let blockOrder = (Math.random() < 0.5)
+            ? ["box_to_fennimal", "fennimal_to_toy"]
+            : ["fennimal_to_toy", "box_to_fennimal"];
+        this.TaskObj.memory_probe_block_order = blockOrder;
+
+        blockOrder.forEach((probeType, blockOrd) => {
+            let blockIndex = blockOrd + 1;
+            let trials = (probeType === "box_to_fennimal") ? boxToFen : fenToToy;
+            shuffleArray(trials).forEach((trial, i) => {
+                queue.push({
+                    ...trial,
+                    section: "memory_probe",
+                    is_practice: false,
+                    block_index: blockIndex,
+                    position_in_block: i + 1
+                });
+            });
+        });
+    }
+
+    /**
+     * Pick `n` items from `eligible`, preferring those with the lowest counts so far.
+     * Ties broken at random. Updates `counts` in place.
+     */
+    _pickBalancedItems(eligible, counts, n) {
+        let picked = [];
+        let remaining = [...eligible];
+        for (let i = 0; i < n; i++) {
+            if (remaining.length === 0) break;
+            let minCount = Math.min(...remaining.map((id) => counts[id] || 0));
+            let tied = remaining.filter((id) => (counts[id] || 0) === minCount);
+            let choice = shuffleArray(tied)[0];
+            picked.push(choice);
+            counts[choice] = (counts[choice] || 0) + 1;
+            remaining = remaining.filter((id) => id !== choice);
+        }
+        return picked;
+    }
+
+    _makeBoxToFennimalProbeTrials(fennimals) {
+        // Build eligible foil pools first, then assign foils with balanced exposure
+        // (greedy lowest-count; process trials in random order).
+        let specs = fennimals.map((fen) => {
+            let foilPool = fennimals.filter((other) =>
+                other.id !== fen.id && other.toybox !== fen.toybox
+            );
+            if (foilPool.length < 2) {
+                console.error(
+                    `PartnerBeliefIndividualBoxes: not enough non-co-box Fennimals for box→Fennimal probe "${fen.id}".`
+                );
+                foilPool = fennimals.filter((other) => other.id !== fen.id);
+            }
+            return { fen, eligibleIds: foilPool.map((f) => f.id) };
+        });
+
+        let foilCounts = {};
+        fennimals.forEach((f) => { foilCounts[f.id] = 0; });
+        let foilsByTarget = {};
+        shuffleArray([...specs]).forEach((spec) => {
+            foilsByTarget[spec.fen.id] = this._pickBalancedItems(spec.eligibleIds, foilCounts, 2);
+        });
+
+        return specs.map(({ fen }) => {
+            let correctId = fen.id;
+            let foilIds = foilsByTarget[fen.id] || [];
+            if (foilIds.length < 2) {
+                console.error(
+                    `PartnerBeliefIndividualBoxes: need 2 foils for box→Fennimal probe "${fen.id}", got ${foilIds.length}.`
+                );
+                return null;
+            }
+            let option_roles = {};
+            option_roles[correctId] = "correct";
+            foilIds.forEach((id) => { option_roles[id] = "foil"; });
+
+            return {
+                trial_kind: "memory_probe_box_to_fennimal",
+                question_id: `probe_box_${fen.id}`,
+                trial_instance_id: `probe_box_${fen.id}`,
+                target_box: fen.toybox,
+                target_fennimal: fen.id,
+                correct_option_id: correctId,
+                answer_options: shuffleArray([correctId, foilIds[0], foilIds[1]]),
+                option_roles
+            };
+        }).filter(Boolean);
+    }
+
+    _makeFennimalToToyProbeTrials(fennimals) {
+        let byWave = {};
+        fennimals.forEach((fen) => {
+            let wave = this._waveForFennimal(fen);
+            if (!byWave[wave]) byWave[wave] = [];
+            byWave[wave].push(fen);
+        });
+        let waveKeys = Object.keys(byWave);
+        let hasTwoWaves = waveKeys.length >= 2;
+
+        let foilToyCounts = {};
+        fennimals.forEach((f) => { foilToyCounts[f.toy] = 0; });
+
+        // Assign foils in random trial order so count-balancing is not ID-order biased.
+        let foilsByTarget = {};
+        shuffleArray([...fennimals]).forEach((fen) => {
+            let correctToy = fen.toy;
+            let ownWave = this._waveForFennimal(fen);
+            let sameWaveFoilToy = null;
+            let otherWaveFoilToy = null;
+            let usedWaveRoles = false;
+
+            if (hasTwoWaves) {
+                let sameWaveToys = [...new Set(
+                    byWave[ownWave]
+                        .filter((f) => f.id !== fen.id && f.toy !== correctToy)
+                        .map((f) => f.toy)
+                )];
+                let otherWave = waveKeys.find((w) => w !== ownWave);
+                let otherWaveToys = [...new Set(byWave[otherWave].map((f) => f.toy))]
+                    .filter((t) => t !== correctToy);
+
+                sameWaveFoilToy = this._pickBalancedItems(sameWaveToys, foilToyCounts, 1)[0];
+                otherWaveToys = otherWaveToys.filter((t) => t !== sameWaveFoilToy);
+                otherWaveFoilToy = this._pickBalancedItems(otherWaveToys, foilToyCounts, 1)[0];
+                usedWaveRoles = !!(sameWaveFoilToy && otherWaveFoilToy);
+            }
+
+            if (!usedWaveRoles) {
+                let otherToys = [...new Set(
+                    fennimals.filter((f) => f.toy !== correctToy).map((f) => f.toy)
+                )];
+                // Avoid double-counting if a partial wave pick already incremented counts.
+                let picked = this._pickBalancedItems(otherToys, foilToyCounts, 2);
+                sameWaveFoilToy = picked[0];
+                otherWaveFoilToy = picked[1];
+            }
+
+            foilsByTarget[fen.id] = {
+                sameWaveFoilToy,
+                otherWaveFoilToy,
+                usedWaveRoles
+            };
+        });
+
+        return fennimals.map((fen) => {
+            let correctToy = fen.toy;
+            let assigned = foilsByTarget[fen.id] || {};
+            let sameWaveFoilToy = assigned.sameWaveFoilToy;
+            let otherWaveFoilToy = assigned.otherWaveFoilToy;
+            let option_roles = {};
+            option_roles[correctToy] = "correct";
+
+            if (assigned.usedWaveRoles) {
+                option_roles[sameWaveFoilToy] = "same_wave_foil";
+                option_roles[otherWaveFoilToy] = "other_wave_foil";
+            } else {
+                if (sameWaveFoilToy) option_roles[sameWaveFoilToy] = "foil";
+                if (otherWaveFoilToy) option_roles[otherWaveFoilToy] = "foil";
+            }
+
+            if (!sameWaveFoilToy || !otherWaveFoilToy || sameWaveFoilToy === otherWaveFoilToy) {
+                console.error(
+                    `PartnerBeliefIndividualBoxes: could not build distinct toy triad for Fennimal→toy probe "${fen.id}".`
+                );
+            }
+
+            return {
+                trial_kind: "memory_probe_fennimal_to_toy",
+                question_id: `probe_toy_${fen.id}`,
+                trial_instance_id: `probe_toy_${fen.id}`,
+                target_fennimal: fen.id,
+                correct_option_id: correctToy,
+                answer_options: shuffleArray([correctToy, sameWaveFoilToy, otherWaveFoilToy]),
+                option_roles
+            };
+        });
     }
 
     _nextDistractorRule() {
@@ -10924,6 +11133,10 @@ class PartnerBeliefIndividualBoxesController {
                 await this.run_reality_block_intro();
                 this._realityBlockIntroShown = true;
             }
+            if (!this._memoryProbeIntroShown && trial.section === "memory_probe") {
+                await this.run_memory_probe_intro();
+                this._memoryProbeIntroShown = true;
+            }
             await this.run_trial(trial);
         }
 
@@ -10960,6 +11173,7 @@ class PartnerBeliefIndividualBoxesController {
         this.BoxElement = null;
         this.CurtainGroup = null;
         this.CentralTargetGroup = null;
+        this.CentralFennimalElement = null;
         this.BoxQuestionMarkGroup = null;
     }
 
@@ -11418,7 +11632,7 @@ class PartnerBeliefIndividualBoxesController {
 
     /**
      * Reveal box/target (optional) + radial options on the same frame; resolve on first pointerdown.
-     * mode: "toys" | "features"
+     * mode: "toys" | "features" | "heads"
      */
     show_radial_options_and_wait(options, { mode = "toys", showBox = false, showCentralTarget = false, showQuestionMark = false } = {}) {
         return new Promise(resolve => {
@@ -11467,6 +11681,8 @@ class PartnerBeliefIndividualBoxesController {
 
                 if (mode === "features") {
                     this._create_feature_choice_button(this.radialUIGroup, opt, bx, by, handleSelect);
+                } else if (mode === "heads") {
+                    this._create_head_choice_button(this.radialUIGroup, option_id, bx, by, handleSelect);
                 } else {
                     this._create_toy_choice_button(this.radialUIGroup, opt, bx, by, handleSelect);
                 }
@@ -11482,6 +11698,9 @@ class PartnerBeliefIndividualBoxesController {
                 }
                 if (showCentralTarget && this.CentralTargetGroup) {
                     this.CentralTargetGroup.style.opacity = 1;
+                }
+                if (showCentralTarget && this.CentralFennimalElement) {
+                    this.CentralFennimalElement.style.opacity = 1;
                 }
                 if (showQuestionMark) {
                     this.show_box_question_mark();
@@ -11506,6 +11725,10 @@ class PartnerBeliefIndividualBoxesController {
             await this.run_belief_trial(trial);
         } else if (trial.trial_kind === "reality") {
             await this.run_reality_trial(trial);
+        } else if (trial.trial_kind === "memory_probe_box_to_fennimal") {
+            await this.run_box_to_fennimal_probe_trial(trial);
+        } else if (trial.trial_kind === "memory_probe_fennimal_to_toy") {
+            await this.run_fennimal_to_toy_probe_trial(trial);
         }
     }
 
@@ -11582,6 +11805,151 @@ class PartnerBeliefIndividualBoxesController {
                 resolve();
             };
         });
+    }
+
+    async run_memory_probe_intro() {
+        await this.fade_black(1, 300);
+        this.clear_scene_contents();
+        this.setup_background_and_table(true);
+        await this.fade_black(0, 350);
+        await this.show_memory_probe_instructions_overlay();
+    }
+
+    show_memory_probe_instructions_overlay() {
+        return new Promise(resolve => {
+            let overlay = create_SVG_group(0, 0, undefined, "pb_memory_probe_intro");
+            this.ItemLayers.Plus2.appendChild(overlay);
+
+            let dim = create_SVG_rect(0, 0, this.W, this.H);
+            dim.setAttribute("fill", "#111");
+            dim.style.opacity = 0.82;
+            dim.style.pointerEvents = "all";
+            overlay.appendChild(dim);
+
+            let panel = create_SVG_rect(0.12 * this.W, 0.22 * this.H, 0.76 * this.W, 0.42 * this.H);
+            panel.setAttribute("rx", 24);
+            panel.setAttribute("fill", "#f7f1e4");
+            panel.setAttribute("stroke", "#b89f5d");
+            panel.setAttribute("stroke-width", "6");
+            overlay.appendChild(panel);
+
+            let body = create_SVG_text_in_foreign_element(
+                `We will now ask you about the Fennimals and their toys and boxes.<br><br>` +
+                `Answer as quickly and accurately as you can.`,
+                0.16 * this.W,
+                0.28 * this.H,
+                0.68 * this.W,
+                0.28 * this.H,
+                "instruction_element_text"
+            );
+            body.style.fontSize = "42px";
+            body.style.textAlign = "center";
+            overlay.appendChild(body);
+
+            let continueButton = create_SVG_buttonElement(
+                0.5 * this.W,
+                0.78 * this.H,
+                400,
+                75,
+                "Continue",
+                40
+            );
+            overlay.appendChild(continueButton);
+            continueButton.style.cursor = "pointer";
+            continueButton.onpointerdown = () => {
+                continueButton.onpointerdown = null;
+                overlay.remove();
+                resolve();
+            };
+        });
+    }
+
+    _fenObjById(fenId) {
+        let fens = this._getProbeFennimals();
+        return fens.find((f) => f.id === fenId) || null;
+    }
+
+    _create_head_choice_button(parent, fenId, btn_x, btn_y, onSelect) {
+        let BtnGroup = create_SVG_group(0, 0);
+        parent.appendChild(BtnGroup);
+
+        let btn_bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        btn_bg.setAttribute("x", btn_x);
+        btn_bg.setAttribute("y", btn_y);
+        btn_bg.setAttribute("width", this.btn_size);
+        btn_bg.setAttribute("height", this.btn_size);
+        btn_bg.setAttribute("rx", 15);
+        btn_bg.setAttribute("fill", "#d8c381");
+        btn_bg.setAttribute("stroke", "#b89f5d");
+        btn_bg.setAttribute("stroke-width", "3");
+        BtnGroup.appendChild(btn_bg);
+        this._add_focus_outline_to_button(BtnGroup, btn_bg);
+
+        let fenObj = this._fenObjById(fenId);
+        if (fenObj) {
+            let head = create_Fennimal_SVG_object_head_only(fenObj, false);
+            head.style.display = "inherit";
+            BtnGroup.appendChild(head);
+
+            let HBox = head.getBBox();
+            let max_dim = Math.max(HBox.width, HBox.height) || 100;
+            let scale = (this.btn_size * 0.8) / max_dim;
+            let raw_cx = HBox.x + (HBox.width / 2);
+            let raw_cy = HBox.y + (HBox.height / 2);
+            let target_cx = btn_x + (this.btn_size / 2);
+            let target_cy = btn_y + (this.btn_size / 2);
+            head.style.transformOrigin = `${raw_cx}px ${raw_cy}px`;
+            head.style.transform = `translate(${target_cx - raw_cx}px, ${target_cy - raw_cy}px) scale(${scale})`;
+        }
+
+        let click_catcher = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        click_catcher.setAttribute("x", btn_x);
+        click_catcher.setAttribute("y", btn_y);
+        click_catcher.setAttribute("width", this.btn_size);
+        click_catcher.setAttribute("height", this.btn_size);
+        click_catcher.setAttribute("fill", "transparent");
+        click_catcher.style.cursor = "pointer";
+        BtnGroup.appendChild(click_catcher);
+
+        click_catcher.onpointerenter = () => {
+            btn_bg.setAttribute("fill", "#ebd89b");
+            btn_bg.setAttribute("stroke", "gold");
+        };
+        click_catcher.onpointerleave = () => {
+            btn_bg.setAttribute("fill", "#d8c381");
+            btn_bg.setAttribute("stroke", "#b89f5d");
+        };
+        click_catcher.onpointerdown = (evt) => onSelect(fenId, evt, BtnGroup);
+
+        return BtnGroup;
+    }
+
+    place_central_fennimal(fenObj) {
+        if (!fenObj) return null;
+
+        let fen = create_Fennimal_SVG_object(fenObj, GenParam.Fennimal_head_size, false);
+        fen.style.opacity = 0;
+        fen.style.pointerEvents = "none";
+        this.ItemLayers.Main.appendChild(fen);
+
+        let scale = 1.15;
+        let scaleGroup = fen.getElementsByClassName("Fennimal_scale_group")[0];
+        if (scaleGroup) {
+            scaleGroup.style.transformOrigin = "50% 100%";
+            scaleGroup.style.transformBox = "fill-box";
+            scaleGroup.style.transform = `scale(${scale})`;
+        }
+
+        // Center the full Fennimal bbox on the radial-option origin (same point
+        // the three choice buttons orbit), not on the feet.
+        let BBox = fen.getBBox();
+        let fenCx = BBox.x + 0.5 * BBox.width;
+        let fenCy = BBox.y + 0.5 * BBox.height;
+        fen.style.transform = `translate(${this.box_center_x - fenCx}px, ${this.box_center_y - fenCy}px)`;
+
+        this.CentralFennimalElement = fen;
+        this.CentralTargetGroup = fen;
+        return fen;
     }
 
     /**
@@ -11817,6 +12185,102 @@ class PartnerBeliefIndividualBoxesController {
         });
 
         await wait(400);
+    }
+
+    async run_box_to_fennimal_probe_trial(trial) {
+        this.place_target_box(trial.target_box);
+        let revealPromise = this.create_curtain_with_reveal_circle();
+        await this.fade_black(0, 350);
+
+        Interface.Prompt.show_message("Click on the circle to start the question");
+        await revealPromise;
+
+        Interface.Prompt.show_message(
+            "Which Fennimal keeps its toy in this box? Answer as quickly and accurately as you can."
+        );
+
+        let response = await this.show_radial_options_and_wait(trial.answer_options, {
+            mode: "heads",
+            showBox: true
+        });
+
+        Interface.Prompt.hide();
+        AudioCont.play_sound_effect("button_click");
+
+        let is_correct = (response.selected_id === trial.correct_option_id);
+
+        this.ParticipantAnswers.push({
+            trial_kind: "memory_probe_box_to_fennimal",
+            question_id: trial.question_id,
+            block_index: trial.block_index,
+            trial_index: this.overall_presentation_index,
+            target_box: trial.target_box,
+            target_fennimal: trial.target_fennimal,
+            options: this._buildStoredOptions(
+                response.option_layout,
+                trial.answer_options.map((fenId) => ({
+                    id: fenId,
+                    role: (trial.option_roles && trial.option_roles[fenId]) || "unknown"
+                }))
+            ),
+            selected: response.selected_id,
+            correct: is_correct,
+            reaction_time_ms: response.reaction_time_ms
+        });
+
+        await wait(this.memory_probe_isi_ms);
+    }
+
+    async run_fennimal_to_toy_probe_trial(trial) {
+        let fenObj = this._fenObjById(trial.target_fennimal);
+        if (!fenObj) {
+            console.error(
+                `PartnerBeliefIndividualBoxes: missing Fennimal "${trial.target_fennimal}" for Fennimal→toy probe.`
+            );
+            await this.fade_black(0, 200);
+            return;
+        }
+
+        this.place_central_fennimal(fenObj);
+        let revealPromise = this.create_curtain_with_reveal_circle();
+        await this.fade_black(0, 350);
+
+        Interface.Prompt.show_message("Click on the circle to start the question");
+        await revealPromise;
+
+        Interface.Prompt.show_message(
+            "Which toy belongs to this Fennimal? Answer as quickly and accurately as you can."
+        );
+
+        let response = await this.show_radial_options_and_wait(trial.answer_options, {
+            mode: "toys",
+            showCentralTarget: true
+        });
+
+        Interface.Prompt.hide();
+        AudioCont.play_sound_effect("button_click");
+
+        let is_correct = (response.selected_id === trial.correct_option_id);
+
+        this.ParticipantAnswers.push({
+            trial_kind: "memory_probe_fennimal_to_toy",
+            question_id: trial.question_id,
+            block_index: trial.block_index,
+            trial_index: this.overall_presentation_index,
+            target_fennimal: trial.target_fennimal,
+            options: this._buildStoredOptions(
+                response.option_layout,
+                trial.answer_options.map((toyId) => ({
+                    id: toyId,
+                    role: (trial.option_roles && trial.option_roles[toyId]) || "unknown"
+                }))
+            ),
+            selected: response.selected_id,
+            correct: is_correct,
+            reaction_time_ms: response.reaction_time_ms
+        });
+
+        await wait(this.memory_probe_isi_ms);
     }
 
     async finish_task() {
