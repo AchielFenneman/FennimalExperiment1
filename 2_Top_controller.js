@@ -881,34 +881,21 @@ class ExperimentController {
                 this.currentPhaseData.answers = this.currentPhaseData.PartnerBeliefAnswers;
                 delete this.currentPhaseData.PartnerBeliefAnswers;
 
-                let experimentalAnswers = this.currentPhaseData.answers.filter(a =>
+                // All answered trial kinds earn stars (practice, distractors, belief/reality, probes).
+                let starEligibleAnswers = this.currentPhaseData.answers.filter(a =>
+                    a.trial_kind === "practice" ||
+                    a.trial_kind === "distractor" ||
                     a.trial_kind === "belief" ||
                     a.trial_kind === "reality" ||
                     a.trial_kind === "memory_probe_box_to_fennimal" ||
                     a.trial_kind === "memory_probe_fennimal_to_toy"
                 );
                 let bonusPerCorrect = this.currentPhaseData.bonus_stars_per_correct_answer || 0;
-                let earned = experimentalAnswers.reduce(
+                let earned = starEligibleAnswers.reduce(
                     (sum, ans) => sum + (ans.correct ? bonusPerCorrect : 0),
                     0
                 );
-                let nBlocks = (typeof this.currentPhaseData.num_belief_blocks === "number" && this.currentPhaseData.num_belief_blocks > 0)
-                    ? this.currentPhaseData.num_belief_blocks
-                    : ((typeof this.currentPhaseData.num_repeated_blocks === "number" && this.currentPhaseData.num_repeated_blocks > 0)
-                        ? this.currentPhaseData.num_repeated_blocks
-                        : 1);
-                let nQuestions = (this.currentPhaseData.questions || []).length;
-                let maxPossible = (this.currentPhaseData.bonus_stars_per_correct_answer || 0) * nQuestions * nBlocks;
-                if (this.currentPhaseData.include_reality_block_at_end === true) {
-                    maxPossible += (this.currentPhaseData.bonus_stars_per_correct_answer || 0) * nQuestions;
-                }
-                if (this.currentPhaseData.include_memory_probe_at_end === true) {
-                    let nProbeTrials = experimentalAnswers.filter(a =>
-                        a.trial_kind === "memory_probe_box_to_fennimal" ||
-                        a.trial_kind === "memory_probe_fennimal_to_toy"
-                    ).length;
-                    maxPossible += bonusPerCorrect * nProbeTrials;
-                }
+                let maxPossible = bonusPerCorrect * starEligibleAnswers.length;
 
                 this.currentPhaseData.bonus_stars_earned = earned;
                 this.dataCont.recordStarsEarned(this.currentDayNum, "partner_belief_individual_boxes", earned, maxPossible);
@@ -1480,5 +1467,3 @@ class ExperimentController {
             });
     }
 }
-
-console.log("Ready loading")

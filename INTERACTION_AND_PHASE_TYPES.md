@@ -187,7 +187,7 @@ One-box-at-a-time DV task with curtain reveal, radial forced-choice options, and
 | `include_practice_trial` | If `true`, prepend shape-match and color-match practice trials |
 | `include_memory_probe_at_end` | If `true`, after reality (or after belief if no reality block) run a solo memory-probe section (no partner, no distractors) |
 | `memory_probe_isi_ms` | Pause after each memory-probe response before the next trial (default `1000`) |
-| `bonus_stars_per_correct_answer` | Silent stars per correct belief/reality/memory-probe answer |
+| `bonus_stars_per_correct_answer` | Silent stars per correct practice/distractor/belief/reality/memory-probe answer |
 
 **Answer options (fixed rule `belief_reality_cyclic_lure`):** for each question the controller auto-builds a shuffled 3AFC triad from `WorldState`:
 

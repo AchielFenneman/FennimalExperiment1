@@ -171,6 +171,18 @@ get_stored_block <- function(participant, position) {
   blocks[[idx]]
 }
 
+# Prefer type lookup over positional indexing — phase order can change
+# (e.g. sorting removed; belief is now last in mentalizing).
+get_stored_block_by_type <- function(participant, block_type) {
+  blocks <- participant$storedData %||% list()
+  for (block in blocks) {
+    if (identical(block$type %||% NULL, block_type)) {
+      return(block)
+    }
+  }
+  NULL
+}
+
 collapse_chr <- function(x, sep = ";") {
   if (is.null(x) || length(x) == 0) {
     return(NA_character_)
@@ -273,21 +285,9 @@ flatten_trial_options <- function(options) {
 
 extract_belief_phase <- function(participants) {
   map_dfr(participants, function(p) {
-    block <- get_stored_block(p, -2)
+    block <- get_stored_block_by_type(p, belief_block_type)
     if (is.null(block)) {
       return(tibble(pid = p$pid))
-    }
-
-    if (!identical(block$type, belief_block_type)) {
-      warning(
-        sprintf(
-          "Participant %s: expected penultimate block '%s', got '%s'",
-          p$pid,
-          belief_block_type,
-          block$type %||% "<missing>"
-        ),
-        call. = FALSE
-      )
     }
 
     tibble(
@@ -311,7 +311,10 @@ extract_belief_phase <- function(participants) {
 
 extract_belief_questions <- function(participants) {
   map_dfr(participants, function(p) {
-    block <- get_stored_block(p, -2)
+    block <- get_stored_block_by_type(p, belief_block_type)
+    if (is.null(block)) {
+      return(tibble(pid = p$pid))
+    }
     questions <- as_record_list(block$questions %||% list())
     if (length(questions) == 0) {
       return(tibble(pid = p$pid))
@@ -323,7 +326,7 @@ extract_belief_questions <- function(participants) {
 
 extract_belief_trials <- function(participants) {
   map_dfr(participants, function(p) {
-    block <- get_stored_block(p, -2)
+    block <- get_stored_block_by_type(p, belief_block_type)
     if (is.null(block)) {
       return(tibble(pid = p$pid))
     }
@@ -367,21 +370,10 @@ extract_belief_trials <- function(participants) {
 
 extract_sorting_phase <- function(participants) {
   map_dfr(participants, function(p) {
-    block <- get_stored_block(p, -1)
+    block <- get_stored_block_by_type(p, sorting_block_type)
     if (is.null(block)) {
+      # Sorting is optional (removed from current mentalizing structure).
       return(tibble(pid = p$pid))
-    }
-
-    if (!identical(block$type, sorting_block_type)) {
-      warning(
-        sprintf(
-          "Participant %s: expected last block '%s', got '%s'",
-          p$pid,
-          sorting_block_type,
-          block$type %||% "<missing>"
-        ),
-        call. = FALSE
-      )
     }
 
     tibble(
@@ -400,7 +392,10 @@ extract_sorting_phase <- function(participants) {
 
 extract_sorting_errors <- function(participants) {
   map_dfr(participants, function(p) {
-    block <- get_stored_block(p, -1)
+    block <- get_stored_block_by_type(p, sorting_block_type)
+    if (is.null(block)) {
+      return(tibble())
+    }
     errors <- as_record_list(block$Errors %||% list())
     if (length(errors) == 0) {
       return(tibble())

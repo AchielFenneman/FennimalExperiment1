@@ -828,20 +828,25 @@ let StimulusTransformer = function (StimTemplate) {
             }
 
             if (block.type === "partner_belief_individual_boxes" && typeof block.bonus_stars_per_correct_answer === "number") {
+                let bonus = block.bonus_stars_per_correct_answer;
                 let nBlocks = (typeof block.num_belief_blocks === "number" && block.num_belief_blocks > 0)
                     ? block.num_belief_blocks
                     : ((typeof block.num_repeated_blocks === "number" && block.num_repeated_blocks > 0) ? block.num_repeated_blocks : 1);
                 let nQuestions = (block.questions || []).length;
-                max_stars += block.bonus_stars_per_correct_answer * nQuestions * nBlocks;
-                if (block.include_reality_block_at_end === true) {
-                    max_stars += block.bonus_stars_per_correct_answer * nQuestions;
+                let nBeliefTrials = nQuestions * nBlocks;
+                let nRealityTrials = (block.include_reality_block_at_end === true) ? nQuestions : 0;
+                // Belief/reality each earn stars; each is preceded by a distractor that also earns stars.
+                max_stars += bonus * (nBeliefTrials + nRealityTrials) * 2;
+                if (block.include_practice_trial === true) {
+                    // Shape-match + color-match practice.
+                    max_stars += bonus * 2;
                 }
                 if (block.include_memory_probe_at_end === true) {
                     // One box→Fennimal and one Fennimal→toy probe per Fennimal in the set.
                     let nFennimals = (typeof FennimalObjArr !== "undefined" && Array.isArray(FennimalObjArr))
                         ? FennimalObjArr.length
                         : 0;
-                    max_stars += block.bonus_stars_per_correct_answer * nFennimals * 2;
+                    max_stars += bonus * nFennimals * 2;
                 }
             }
 
@@ -876,3 +881,5 @@ let StimulusTransformer = function (StimTemplate) {
         });
     };
 };
+
+console.log("Correction applied")
