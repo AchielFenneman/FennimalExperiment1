@@ -868,3 +868,5 @@ let StimulusTransformer = function (StimTemplate) {
         });
     };
 };
+
+console.log("Updated")
