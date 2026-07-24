@@ -69,101 +69,12 @@ let StimulusSettings = function () {
                     }
                 ]
             },
+            
            
             // Starts here for UI testing. Controller auto-seeds false-belief WorldState when
             // boxes are empty (partner beliefs ≠ current contents). In the full mentalizing
             // structure this state is created by shared then private toy_to_box play.
-            {
-                type: "partner_belief_individual_boxes",
-                include_practice_trial: false,
-                num_belief_blocks: 1,
-                include_reality_block_at_end: false,
-                include_memory_probe_at_end: true,
-                memory_probe_isi_ms: 1000,
-                bonus_stars_per_correct_answer: 4,
-                questions: [
-                    { question_id: "belief_A", target_box: "A" },
-                    { question_id: "belief_B", target_box: "B" },
-                    { question_id: "belief_C", target_box: "C" }
-                ]
-            },
-            
-            {
-                type: "Fennimal_attribute_sorting_task",
-                Fennimals_encountered: ["S1"],
-                attribute_order: ["head", "toy", "toybox"],
-                presentation: "single",
-                maximum_earnable_stars: 6
-            },
-
-            
-            {
-                type: "phone_room",
-                interaction_type: "check_box_contents",
-                Fennimals_encountered: ["S1"],
-                ask_box: true,
-                boxes_asked: ["A", "B"],
-                partner_behavior: "present",
-                hint_type: ["icon"],
-                include_Fennefinder: false,
-                return_to_phone_room_after_final_trial: false,
-                skip_instructions: true
-            },
-            
-            
            
-            {
-                type: "free_exploration",
-                partner_behavior: "active",
-                include_Fennefinder: false,
-                return_to_phone_room_after_final_trial: false,
-                ask_Fennimal: true,
-                // fennimals_asked defaults to all Fennimals in this phase (union of subblocks)
-                // fennimals_asked: ["S1", "S2", "S3"],
-                trial_subblocks: [
-                    {
-                        trials: [
-                            { Fennimal: "S1", interaction_type: "joint_box_cleaning" },
-                            { Fennimal: "S1", interaction_type: "photo_box" },
-                            { Fennimal: "S2", interaction_type: "feed_Fennimal" }
-                        ]
-                    },
-                    {
-                        Fennimals_encountered: ["S1"],
-                        interaction_type: "Fennimal_toy"
-                    },
-                    {
-                        Fennimals_encountered: ["S1"],
-                        interaction_type: "toy_to_box"
-                    },
-                    
-                ]
-            },
-
-
-            
-
-            
-
-            
-
-            {
-                type: "free_exploration",
-                interaction_type: ["basic_intro"],
-                Fennimals_encountered: ["S1", "S2"],
-                partner_behavior: "active",
-                hint_type: ["icon"],
-                include_Fennefinder: true, //"low_power_mode"
-                force_climbing_tower_first: false
-            },
-
-            {
-                type: "pseudoday",
-                information: "new_Fennimals_spotted",
-                displayed_icons: ["S1", "S2"],
-                title: "Some Fennimals need a little love",
-                display_text: "There are some Fennimals on the island who seem a bit down..."
-            },
         ],
 
 
@@ -467,10 +378,10 @@ let StimulusSettings = function () {
     const All_Allowed_Head_Lists = { test: false, mentalizing_1: false };
     const All_Banned_Head_Lists = { test: false, mentalizing_1: false };
     const All_Forced_Head_Lists = {
-        test: ["astro", "cupcake", "tube", "tv", "jackolantnern", "elephant", "blockhead", "parrot"],
-        
-        mentalizing: ["astro", "cupcake", "tube", "tv", "jackolantnern", "elephant", "blockhead", "parrot"],
-        mentalizing_AB: ["astro", "cupcake", "tube", "tv", "jackolantnern", "elephant", "blockhead", "parrot"],
+        test: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
+
+        mentalizing: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
+        mentalizing_AB: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
     };
 
     const All_Allowed_Head_Groups_List = { test: false, mentalizing_1: false };
@@ -530,7 +441,8 @@ let StimulusTransformer = function (StimTemplate) {
             for (let i = 0; i < SVGHeads.length; i++) {
                 if (SVGHeads[i].nodeType !== Node.ELEMENT_NODE) continue;
 
-                let name = SVGHeads[i].id.split("_")[2];
+                // Use replace (not split("_")[2]) so multi-underscore ids stay intact.
+                let name = SVGHeads[i].id.replace(/^Fennimal_head_/, "");
                 const defined_names = SVGHeads[i].getAttribute("name");
 
                 if (defined_names === null) {
@@ -687,7 +599,28 @@ let StimulusTransformer = function (StimTemplate) {
                 let AvailableArr = shuffleArray(get_all_allowed_heads_in_SVG());
                 let RequestedHeadCodes = [...new Set(Object.values(StimTemplate.Fennimal_Dictionary).map(f => f.head))];
 
+                if (AvailableArr.length < RequestedHeadCodes.length) {
+                    let missingForced = StimTemplate.forced_heads.filter(
+                        h => !AvailableArr.some(a => a.name === h)
+                    );
+                    console.error(
+                        "ERROR: forced_heads list does not yield enough SVG heads.",
+                        {
+                            requested: RequestedHeadCodes.length,
+                            available: AvailableArr.length,
+                            forced_heads: StimTemplate.forced_heads,
+                            missing_from_svg: missingForced
+                        }
+                    );
+                }
+
                 RequestedHeadCodes.forEach((code, i) => {
+                    if (!AvailableArr[i] || !AvailableArr[i].name) {
+                        console.error(
+                            `ERROR: No SVG head available for head code "${code}" (forced_heads index ${i}).`
+                        );
+                        return;
+                    }
                     MatchedHeads[code] = AvailableArr[i].name;
                 });
             } else {
@@ -879,6 +812,12 @@ let StimulusTransformer = function (StimTemplate) {
 
             // Head & Name
             FenObj.head = Map.head[req.head];
+            if (!FenObj.head) {
+                console.error(
+                    `ERROR: Fennimal "${fenID}" head code "${req.head}" did not resolve to an SVG head id.`,
+                    { MapHead: Map.head, req }
+                );
+            }
 
             if (StimTemplate.name_is_determined_as === "head") {
                 if (All_Names[FenObj.head] && All_Names[FenObj.head].length > 0) {

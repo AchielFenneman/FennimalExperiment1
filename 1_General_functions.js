@@ -820,7 +820,14 @@ function create_Fennimal_SVG_object(FenObj, head_scale_factor, outline_only) {
     BodyGroup.appendChild(BodyScaleGroup);
     ScaleGroup.appendChild(BodyGroup);
 
-    let BodySVG = document.getElementById("Fennimal_body_" + FenObj.body).cloneNode(true);
+    let BodyTemplate = document.getElementById("Fennimal_body_" + FenObj.body);
+    if (!BodyTemplate) {
+        throw new Error(
+            `Missing SVG body template #Fennimal_body_${FenObj.body} for Fennimal id="${FenObj && FenObj.id}".`
+        );
+    }
+    let BodySVG = BodyTemplate.cloneNode(true);
+    BodySVG.removeAttribute("id");
     //set_Fennimal_color_classes(BodySVG);
     BodySVG.style.display = "inherit";
     BodyScaleGroup.appendChild(BodySVG);
@@ -900,7 +907,16 @@ function create_Fennimal_SVG_object(FenObj, head_scale_factor, outline_only) {
     HeadTiltGroup.appendChild(HeadScaleGroup);
     ScaleGroup.appendChild(HeadGroup);
 
-    let HeadSVG = document.getElementById("Fennimal_head_" + FenObj.head).cloneNode(true);
+    let headId = "Fennimal_head_" + FenObj.head;
+    let HeadTemplate = document.getElementById(headId);
+    if (!HeadTemplate) {
+        throw new Error(
+            `Missing SVG head template #${headId} for Fennimal id="${FenObj && FenObj.id}" name="${FenObj && FenObj.name}". ` +
+            `Check FenObj.head and that SVGREDUCER did not remove this template.`
+        );
+    }
+    let HeadSVG = HeadTemplate.cloneNode(true);
+    HeadSVG.removeAttribute("id"); // avoid duplicate ids with the template in #All_Heads
     HeadSVG.style.display = "inherit";
     set_Fennimal_color_classes(HeadSVG); // Your dynamic color fix
     HeadScaleGroup.appendChild(HeadSVG);
@@ -1010,7 +1026,16 @@ function create_Fennimal_SVG_object_head_only(FenObj, outline_only) {
     ScaleGroup.appendChild(HeadGroup)
 
     //Now we can find and copy the SVG code for the head
-    let HeadSVG = document.getElementById("Fennimal_head_" + FenObj.head).cloneNode(true)
+    let headId = "Fennimal_head_" + FenObj.head
+    let HeadTemplate = document.getElementById(headId)
+    if (!HeadTemplate) {
+        throw new Error(
+            `Missing SVG head template #${headId} for Fennimal id="${FenObj && FenObj.id}" name="${FenObj && FenObj.name}". ` +
+            `Check FenObj.head and that SVGREDUCER did not remove this template.`
+        )
+    }
+    let HeadSVG = HeadTemplate.cloneNode(true)
+    HeadSVG.removeAttribute("id") // avoid duplicate ids with the template in #All_Heads
     HeadSVG.style.display = "inherit"
     HeadScaleGroup.appendChild(HeadSVG)
 

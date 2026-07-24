@@ -66,7 +66,17 @@
             const snap = await getDoc(doc(db, collection_name, doc_id));
             return snap.exists() ? snap.data() : null;
         } catch (e) {
-            console.error("Error reading from Firebase: ", e);
+            // Common during setup if rules allow write but not get — caller falls back to localStorage.
+            let code = e && e.code ? String(e.code) : "";
+            if (code.includes("permission-denied")) {
+                console.warn(
+                    "Firebase read blocked by security rules for",
+                    collection_name + "/" + doc_id,
+                    "— using local fallback if available. Allow 'get' (not necessarily 'list') for session restore."
+                );
+            } else {
+                console.error("Error reading from Firebase: ", e);
+            }
             return null;
         }
     };

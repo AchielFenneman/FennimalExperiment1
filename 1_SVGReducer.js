@@ -97,17 +97,25 @@ SVGREDUCER = function (Stimuli) {
 
     //Find all HEADS not used during the experiment
     function remove_unused_heads() {
-        let AllHeadsInSVG = document.getElementsByClassName("Fennimal_head")
+        // Only consider templates under #All_Heads — live Fennimal wrappers also use
+        // class "Fennimal_head" and must not be treated as removable assets.
+        let HeadsLayer = document.getElementById("All_Heads")
+        let AllHeadsInSVG = HeadsLayer
+            ? HeadsLayer.querySelectorAll(":scope > .Fennimal_head, :scope > [id^='Fennimal_head_']")
+            : document.querySelectorAll("#All_Heads [id^='Fennimal_head_']")
         let ALl_head_Ids = []
         for (let i = 0; i < AllHeadsInSVG.length; i++) {
-            ALl_head_Ids.push(AllHeadsInSVG[i].id.replace("Fennimal_head_", ""))
+            let id = AllHeadsInSVG[i].id || ""
+            if (!id.startsWith("Fennimal_head_")) continue
+            ALl_head_Ids.push(id.replace(/^Fennimal_head_/, ""))
         }
 
         let Heads_in_exp = Stimuli.get_all_x_encountered_during_experiment("head")
-        let Unused_heads = ALl_head_Ids.filter(x => !Heads_in_exp.includes(x))
+        let Unused_heads = ALl_head_Ids.filter(x => x && !Heads_in_exp.includes(x))
 
         for (let i = 0; i < Unused_heads.length; i++) {
-            document.getElementById("Fennimal_head_" + Unused_heads[i]).remove()
+            let el = document.getElementById("Fennimal_head_" + Unused_heads[i])
+            if (el) el.remove()
         }
 
 
