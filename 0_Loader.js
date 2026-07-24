@@ -1,6 +1,21 @@
 //Defining global variables here.
 let GenParam, AudioCont, Interface, WorldState, topController;
 
+// Auto cache-bust so GitHub Pages / browsers do not keep stale SVGs after a deploy.
+// No need to bump this by hand — each page load requests a unique asset URL.
+function assetUrl(path) {
+    let sep = String(path).indexOf("?") >= 0 ? "&" : "?";
+    return path + sep + "v=" + Date.now();
+}
+
+async function fetchAssetText(path) {
+    let response = await fetch(assetUrl(path), { cache: "no-store" });
+    if (!response.ok) {
+        throw new Error("Failed to load asset " + path + " (" + response.status + ")");
+    }
+    return response.text();
+}
+
 //Defining extraction and loading functions
 // Transforms the heads SVG data into an array of strings (one string per head)
 async function extract_all_SVG_heads_to_array() {
@@ -9,8 +24,7 @@ async function extract_all_SVG_heads_to_array() {
     HiddenDiv.style.display = "none"
     document.body.appendChild(HiddenDiv)
 
-    const response = await fetch("./SVG/Heads.svg")
-    const string = await response.text()
+    const string = await fetchAssetText("./SVG/Heads.svg")
     HiddenDiv.innerHTML = string
 
     //Now transforming all elements to an array of strings (one element per head)
@@ -40,8 +54,7 @@ async function extract_all_SVG_bodies_to_array() {
     HiddenDiv.style.display = "none"
     document.body.appendChild(HiddenDiv)
 
-    const response = await fetch("./SVG/Bodies.svg")
-    const string = await response.text()
+    const string = await fetchAssetText("./SVG/Bodies.svg")
     HiddenDiv.innerHTML = string
 
     //Finding all bodies
@@ -74,8 +87,7 @@ async function extract_SVG_elements_by_type(path, source_class_name, new_layer_i
     HiddenDiv.style.display = "none"
     document.body.appendChild(HiddenDiv)
 
-    const response = await fetch(path)
-    const string = await response.text()
+    const string = await fetchAssetText(path)
     HiddenDiv.innerHTML = string
 
     //Creating a new layer in the host
@@ -96,8 +108,7 @@ async function extract_player_SVG(){
     HiddenDiv.style.display = "none"
     document.body.appendChild(HiddenDiv)
 
-    const response = await fetch("./SVG/Player.svg")
-    const string = await response.text()
+    const string = await fetchAssetText("./SVG/Player.svg")
     HiddenDiv.innerHTML  = string
 
     // Finding the target position in the main SVG
@@ -144,7 +155,7 @@ async function attempt_raster_swap_for_regions(regions_array) {
 
                     // 2. Create the SVG image tag
                     let svgImg = document.createElementNS("http://www.w3.org/2000/svg", 'image');
-                    svgImg.setAttribute("href", `./Regions/${region}.png`);
+                    svgImg.setAttribute("href", assetUrl(`./Regions/${region}.png`));
                     svgImg.setAttribute("width", "1920"); // Assuming your master SVG viewbox is 1920x1080
                     svgImg.setAttribute("height", "1080");
                     svgImg.setAttribute("x", "0");
@@ -165,7 +176,7 @@ async function attempt_raster_swap_for_regions(regions_array) {
             };
 
             // Trigger the network request to check for the file
-            img.src = `./Regions/${region}.png`;
+            img.src = assetUrl(`./Regions/${region}.png`);
         });
     });
 
@@ -302,8 +313,7 @@ ImageLoader = function(Array_of_visited_regions_and_locations, LocationHolderEle
 async function loadMainElements(){
     try {
         //1. Loading main map elements
-        const response = await fetch('./SVG/Main.svg')
-        const SVG_main_string = await response.text()
+        const SVG_main_string = await fetchAssetText('./SVG/Main.svg')
         document.getElementById("Scannimals_container_div").innerHTML = SVG_main_string;
         document.getElementById("Scannimals_container_div").getElementsByTagName("svg")[0].id = "Scannimals_Task_SVG"
 

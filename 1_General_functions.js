@@ -1133,13 +1133,16 @@ function set_location_background_image(imgElem, regionName, locationName) {
     let primary = `./Locations/${region}_${loc.toLowerCase()}.png`;
     let fallback = `./Locations/${region}_${capitalize_first_letter_in_string(loc.toLowerCase())}.png`;
 
-    imgElem.setAttribute("href", primary);
+    // assetUrl is defined in 0_Loader.js; fall back to raw path if unavailable.
+    let withBust = (path) => (typeof assetUrl === "function" ? assetUrl(path) : path);
+
+    imgElem.setAttribute("href", withBust(primary));
     if (primary === fallback) return;
 
     let onError = () => {
         imgElem.removeEventListener("error", onError);
         console.warn(`Location image not found: ${primary}; retrying ${fallback}`);
-        imgElem.setAttribute("href", fallback);
+        imgElem.setAttribute("href", withBust(fallback));
     };
     imgElem.addEventListener("error", onError);
 }
