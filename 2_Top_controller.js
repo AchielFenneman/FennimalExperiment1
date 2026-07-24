@@ -920,7 +920,9 @@ class ExperimentController {
         this.imageLoader = new ImageLoader(this.stimuli.get_all_locations_visited_during_experiment_with_regions(), document.getElementById("All_Locations"));
         this.atCheckCont = new AttentionCheckController(this.experimentStartTime, 20);
         this.dataCont = new DataController(this.stimuli, this.atCheckCont, this.experimentStartTime);
-        this.svgReducer = new SVGREDUCER(this.stimuli);
+        // SVGREDUCER runs in finalizeSession AFTER optional assignment restore.
+        // Otherwise a fresh randomization can delete heads that the restored session still needs.
+        this.svgReducer = null;
         this.trialGenerator = new TrialGenerator(this.stimuli);
 
         WorldState.rebuild_state_from_available_locations(this.stimuli.get_all_locations_visited_during_experiment_with_regions());
@@ -964,6 +966,9 @@ class ExperimentController {
                 this.stimuli.get_all_locations_visited_during_experiment_with_regions()
             );
         }
+
+        // Prune unused SVG assets only after the final Fennimal assignment is known.
+        this.svgReducer = new SVGREDUCER(this.stimuli);
 
         this.installRefreshGuard();
     }
