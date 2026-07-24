@@ -423,4 +423,4 @@ class PhoneRoomController {
 }
 
 console.log("%c SCRIPTS - LOADED PHONE ROOM CONTROLLER", "color:darkgreen");
-console.log("LOAD COMPLETE")
+console.log("Go!")

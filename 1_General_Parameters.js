@@ -1,13 +1,16 @@
 GENERALPARAM = function () {
 
-    // When true: assign box colors via the hue-space algorithm, fill BoxColorSchemes, and paint box SVG templates.
+    // When true: assign box colors via the hue-space algorithm OR curated sets (see use_curated_color_sets).
     // Toy recoloring is controlled separately by use_color_algorithm_for_toy_colors.
     // When false/undefined: keep baked box SVG fills and the predefined ToyData ColorSchemes.
     this.use_color_algorithm_to_pick_colors = true;
 
-    // When true (and use_color_algorithm_to_pick_colors): also overwrite ToyData ColorSchemes from the algorithm.
-    // When false: keep the predefined ToyData palettes (pilot default while box colors are tested).
+    // When true (and use_color_algorithm_to_pick_colors): also overwrite ToyData ColorSchemes.
     this.use_color_algorithm_for_toy_colors = true;
+
+    // Pilot path: pick a curated candidate pool and assign with region-aware bans
+    // (shared boxes ban the union of their regions' hues; muted region hues OK elsewhere).
+    this.use_curated_color_sets = true;
 
     // Hue families aligned with RegionData.color_description (+ gray). Used by the color algorithm.
     // `cluster` groups perceptually similar families — boxes may take at most one hue per cluster.
@@ -22,6 +25,13 @@ GENERALPARAM = function () {
         red:      { angle: 5,   cluster: "warm",    light_color: "#ff6b6b", dark_color: "#9a0000", toy_light_color: "#d4a4a4", toy_dark_color: "#7a3838" },
         teal:     { angle: 170, cluster: "cool",    light_color: "#6bb8ae", dark_color: "#0d4a40", toy_light_color: "#a8c4c0", toy_dark_color: "#3d5c58" },
         gray:     { angle: null, cluster: "neutral", light_color: "#d4d4d4", dark_color: "#555555", toy_light_color: "#d0d0d0", toy_dark_color: "#666666" },
+        // Extra candy families used by curated toy candidates (not region identities).
+        orange:   { angle: 30,  cluster: "warm",    light_color: "#ffb074", dark_color: "#c44e00", toy_light_color: "#ffb074", toy_dark_color: "#c44e00" },
+        magenta:  { angle: 320, cluster: "cool",    light_color: "#f0a0e8", dark_color: "#a01080", toy_light_color: "#f0a0e8", toy_dark_color: "#a01080" },
+        pink:     { angle: 340, cluster: "warm",    light_color: "#ffb0c8", dark_color: "#c02060", toy_light_color: "#ffb0c8", toy_dark_color: "#c02060" },
+        cyan:     { angle: 190, cluster: "cool",    light_color: "#7ee8f0", dark_color: "#007888", toy_light_color: "#7ee8f0", toy_dark_color: "#007888" },
+        coral:    { angle: 15,  cluster: "warm",    light_color: "#ff9a7a", dark_color: "#b83218", toy_light_color: "#ff9a7a", toy_dark_color: "#b83218" },
+        lime:     { angle: 90,  cluster: "cool",    light_color: "#c8f060", dark_color: "#4a7800", toy_light_color: "#c8f060", toy_dark_color: "#4a7800" },
     };
 
     // Boxes must be at least this many degrees apart on the hue wheel (gray is always "far").
@@ -30,6 +40,34 @@ GENERALPARAM = function () {
     this.ColorAlgorithmMinToyDualToneDistance = 90;
     // Toy identity hues (primary or secondary) should stay at least this far from other toys' hues.
     this.ColorAlgorithmMinToyPairwiseDistance = 50;
+
+    // Near-miss hues banned alongside a region's own color_description (boxes + toys).
+    // Jungle: teal/cyan/lime; North: teal/cyan; Village: lavender + warm candy; Desert: coral/sand.
+    this.ColorAdjacentHueBans = {
+        green: ["teal", "cyan", "lime"],
+        blue: ["teal", "cyan"],
+        red: ["lavender", "orange", "magenta", "pink", "coral"],
+        yellow: ["coral", "sand"],
+    };
+
+    // Once a box takes a hue, these near-misses cannot be used by another box in the same run
+    // (stops sand+brown, teal+blue, etc. looking like near-duplicates on the table).
+    this.ColorBoxPairwiseNearMisses = {
+        brown: ["sand", "yellow"],
+        sand: ["brown", "yellow"],
+        yellow: ["sand", "brown"],
+        teal: ["blue", "green", "cyan"],
+        blue: ["teal"],
+        green: ["teal", "lime"],
+        red: ["coral", "orange", "pink"],
+        coral: ["red", "orange"],
+        lavender: ["magenta", "pink"],
+        magenta: ["lavender", "pink"],
+        pink: ["lavender", "magenta", "red"],
+        cyan: ["teal", "blue"],
+        lime: ["green", "teal"],
+        orange: ["red", "coral", "yellow"],
+    };
 
     // Box accent materials (box_color_accent). Assigned uniquely across boxes in an experiment.
     this.ColorAccentMaterials = {
@@ -40,9 +78,128 @@ GENERALPARAM = function () {
         neutral: { accent_color: "#6e6e6e" },
     };
 
-    // Filled at runtime when use_color_algorithm_to_pick_colors is true.
+    // Filled at runtime when color assignment runs.
     // { [boxId]: { light_color, dark_color, accent_color, hue_family, accent_material } }
     this.BoxColorSchemes = {};
+
+    // Curated candidate pools for the pilot. Assignment is region-aware:
+    // - box banned hues = union of region hues for every Fennimal using that box
+    // - toy banned hues = own region hue (+ own box hue after boxes are assigned)
+    // - chroma "muted" region hues (blue/green/red/yellow) may be used only when not banned
+    this.CuratedColorSets = [
+        {
+            id: "set_teal_lavender",
+            label: "Teal & lavender boxes / candy toys",
+            box_candidates: [
+                { id: "teal_punchy", hue_family: "teal", chroma: "punchy", light_color: "#5ecfc0", dark_color: "#0a3d38", accent_material: "gold", accent_color: "#d4aa00" },
+                { id: "lavender_punchy", hue_family: "lavender", chroma: "punchy", light_color: "#e0a8ff", dark_color: "#6a0a9a", accent_material: "silver", accent_color: "#b0b8c0" },
+                { id: "brown_punchy", hue_family: "brown", chroma: "punchy", light_color: "#d2b48c", dark_color: "#3a1c0a", accent_material: "copper", accent_color: "#b87333" },
+                { id: "gray_punchy", hue_family: "gray", chroma: "punchy", light_color: "#e0e0e0", dark_color: "#3a3a3a", accent_material: "neutral", accent_color: "#6e6e6e" },
+                { id: "blue_muted", hue_family: "blue", chroma: "muted", light_color: "#a8b4d0", dark_color: "#3a4a6a", accent_material: "silver", accent_color: "#b0b8c0" },
+                { id: "yellow_muted", hue_family: "yellow", chroma: "muted", light_color: "#e8dfa0", dark_color: "#6a6428", accent_material: "wood", accent_color: "#8b6914" },
+            ],
+            toy_candidates: [
+                { id: "orange_pink", primary_hue: "orange", secondary_hue: "pink", chroma: "punchy", light_color: "#ffb8d0", dark_color: "#c44e00" },
+                { id: "magenta_cyan", primary_hue: "magenta", secondary_hue: "cyan", chroma: "punchy", light_color: "#7ee8f0", dark_color: "#a01080" },
+                { id: "coral_lime", primary_hue: "coral", secondary_hue: "lime", chroma: "punchy", light_color: "#c8f060", dark_color: "#b83218" },
+                { id: "cyan_orange", primary_hue: "cyan", secondary_hue: "orange", chroma: "punchy", light_color: "#ffb074", dark_color: "#007888" },
+                { id: "pink_teal", primary_hue: "pink", secondary_hue: "teal", chroma: "punchy", light_color: "#7ecfc0", dark_color: "#c02060" },
+                { id: "red_muted", primary_hue: "red", secondary_hue: "sand", chroma: "muted", light_color: "#e8d5c0", dark_color: "#8a4040" },
+                { id: "green_muted", primary_hue: "green", secondary_hue: "lavender", chroma: "muted", light_color: "#d4c0e0", dark_color: "#4a6a48" },
+                // Village-safe (cyan/lime/teal/brown/yellow/gray)
+                { id: "cyan_lime", primary_hue: "cyan", secondary_hue: "lime", chroma: "punchy", light_color: "#c8f060", dark_color: "#007888" },
+                { id: "teal_yellow", primary_hue: "teal", secondary_hue: "yellow", chroma: "punchy", light_color: "#f5e84a", dark_color: "#0d4a40" },
+                { id: "lime_brown", primary_hue: "lime", secondary_hue: "brown", chroma: "punchy", light_color: "#d2b48c", dark_color: "#4a7800" },
+                // Jungle-safe (warm candy + neutrals; no teal/cyan/lime/green)
+                { id: "magenta_sand", primary_hue: "magenta", secondary_hue: "sand", chroma: "punchy", light_color: "#efe0c4", dark_color: "#a01080" },
+                { id: "coral_brown", primary_hue: "coral", secondary_hue: "brown", chroma: "punchy", light_color: "#d2b48c", dark_color: "#b83218" },
+            ],
+        },
+        {
+            id: "set_brown_sand",
+            label: "Brown & sand boxes / jewel toys",
+            box_candidates: [
+                { id: "brown_punchy", hue_family: "brown", chroma: "punchy", light_color: "#c9a882", dark_color: "#2e1608", accent_material: "copper", accent_color: "#b87333" },
+                { id: "sand_punchy", hue_family: "sand", chroma: "punchy", light_color: "#f0e2c4", dark_color: "#7a5a28", accent_material: "wood", accent_color: "#8b6914" },
+                { id: "teal_punchy", hue_family: "teal", chroma: "punchy", light_color: "#6bb8ae", dark_color: "#0d4a40", accent_material: "gold", accent_color: "#d4aa00" },
+                { id: "lavender_punchy", hue_family: "lavender", chroma: "punchy", light_color: "#d9a8f0", dark_color: "#5a0878", accent_material: "silver", accent_color: "#b0b8c0" },
+                { id: "green_muted", hue_family: "green", chroma: "muted", light_color: "#b8c8a8", dark_color: "#3a4e34", accent_material: "wood", accent_color: "#8b6914" },
+                { id: "red_muted", hue_family: "red", chroma: "muted", light_color: "#d8a8a8", dark_color: "#6a3030", accent_material: "copper", accent_color: "#b87333" },
+            ],
+            toy_candidates: [
+                { id: "magenta_lime", primary_hue: "magenta", secondary_hue: "lime", chroma: "punchy", light_color: "#c8f060", dark_color: "#a01080" },
+                { id: "cyan_coral", primary_hue: "cyan", secondary_hue: "coral", chroma: "punchy", light_color: "#ff9a7a", dark_color: "#007888" },
+                { id: "orange_lavender", primary_hue: "orange", secondary_hue: "lavender", chroma: "punchy", light_color: "#e0a8ff", dark_color: "#c44e00" },
+                { id: "pink_cyan", primary_hue: "pink", secondary_hue: "cyan", chroma: "punchy", light_color: "#7ee8f0", dark_color: "#c02060" },
+                { id: "coral_teal", primary_hue: "coral", secondary_hue: "teal", chroma: "punchy", light_color: "#6bb8ae", dark_color: "#b83218" },
+                { id: "blue_muted", primary_hue: "blue", secondary_hue: "sand", chroma: "muted", light_color: "#e0d5c0", dark_color: "#405068" },
+                { id: "yellow_muted", primary_hue: "yellow", secondary_hue: "magenta", chroma: "muted", light_color: "#e8b0e0", dark_color: "#7a7530" },
+                // Village-safe
+                { id: "cyan_lime", primary_hue: "cyan", secondary_hue: "lime", chroma: "punchy", light_color: "#b8f070", dark_color: "#006878" },
+                { id: "green_teal", primary_hue: "green", secondary_hue: "teal", chroma: "punchy", light_color: "#6bb8ae", dark_color: "#235412" },
+                { id: "lime_gray", primary_hue: "lime", secondary_hue: "gray", chroma: "punchy", light_color: "#d8d8d8", dark_color: "#4a7800" },
+                // Jungle-safe
+                { id: "pink_brown", primary_hue: "pink", secondary_hue: "brown", chroma: "punchy", light_color: "#d2b48c", dark_color: "#c02060" },
+                { id: "orange_yellow", primary_hue: "orange", secondary_hue: "yellow", chroma: "punchy", light_color: "#f5e84a", dark_color: "#c44e00" },
+            ],
+        },
+        {
+            id: "set_gray_teal",
+            label: "Gray & teal boxes / warm candy toys",
+            box_candidates: [
+                { id: "gray_punchy", hue_family: "gray", chroma: "punchy", light_color: "#ececec", dark_color: "#2e2e2e", accent_material: "silver", accent_color: "#b0b8c0" },
+                { id: "teal_punchy", hue_family: "teal", chroma: "punchy", light_color: "#4ec4b4", dark_color: "#083830", accent_material: "copper", accent_color: "#b87333" },
+                { id: "lavender_punchy", hue_family: "lavender", chroma: "punchy", light_color: "#e8b3ff", dark_color: "#700a98", accent_material: "gold", accent_color: "#d4aa00" },
+                { id: "brown_punchy", hue_family: "brown", chroma: "punchy", light_color: "#c4a882", dark_color: "#3d220f", accent_material: "wood", accent_color: "#8b6914" },
+                { id: "yellow_muted", hue_family: "yellow", chroma: "muted", light_color: "#e0d898", dark_color: "#5c5820", accent_material: "gold", accent_color: "#d4aa00" },
+                { id: "blue_muted", hue_family: "blue", chroma: "muted", light_color: "#a0b0c8", dark_color: "#344868", accent_material: "silver", accent_color: "#b0b8c0" },
+            ],
+            toy_candidates: [
+                { id: "orange_magenta", primary_hue: "orange", secondary_hue: "magenta", chroma: "punchy", light_color: "#f0a0e8", dark_color: "#c44e00" },
+                { id: "coral_pink", primary_hue: "coral", secondary_hue: "pink", chroma: "punchy", light_color: "#ffb0c8", dark_color: "#b83218" },
+                { id: "lime_orange", primary_hue: "lime", secondary_hue: "orange", chroma: "punchy", light_color: "#ffb074", dark_color: "#4a7800" },
+                { id: "pink_lime", primary_hue: "pink", secondary_hue: "lime", chroma: "punchy", light_color: "#c8f060", dark_color: "#c02060" },
+                { id: "magenta_coral", primary_hue: "magenta", secondary_hue: "coral", chroma: "punchy", light_color: "#ff9a7a", dark_color: "#a01080" },
+                { id: "green_muted", primary_hue: "green", secondary_hue: "pink", chroma: "muted", light_color: "#ffb0c8", dark_color: "#4a6040" },
+                { id: "red_muted", primary_hue: "red", secondary_hue: "cyan", chroma: "muted", light_color: "#90d8e0", dark_color: "#7a3838" },
+                // Village-safe
+                { id: "cyan_lime", primary_hue: "cyan", secondary_hue: "lime", chroma: "punchy", light_color: "#c0f050", dark_color: "#005868" },
+                { id: "teal_brown", primary_hue: "teal", secondary_hue: "brown", chroma: "punchy", light_color: "#c4a882", dark_color: "#0d4a40" },
+                { id: "blue_lime", primary_hue: "blue", secondary_hue: "lime", chroma: "punchy", light_color: "#c8f060", dark_color: "#0020ac" },
+                // Jungle-safe
+                { id: "orange_sand", primary_hue: "orange", secondary_hue: "sand", chroma: "punchy", light_color: "#efe0c4", dark_color: "#c44e00" },
+                { id: "pink_yellow", primary_hue: "pink", secondary_hue: "yellow", chroma: "punchy", light_color: "#f5e84a", dark_color: "#c02060" },
+            ],
+        },
+        {
+            id: "set_wood_lavender",
+            label: "Wood-brown & lavender boxes / cool candy toys",
+            box_candidates: [
+                { id: "brown_punchy", hue_family: "brown", chroma: "punchy", light_color: "#d4b896", dark_color: "#2a1408", accent_material: "wood", accent_color: "#8b6914" },
+                { id: "lavender_punchy", hue_family: "lavender", chroma: "punchy", light_color: "#f0c0ff", dark_color: "#5c0a88", accent_material: "gold", accent_color: "#d4aa00" },
+                { id: "teal_punchy", hue_family: "teal", chroma: "punchy", light_color: "#70d0c4", dark_color: "#0a4038", accent_material: "copper", accent_color: "#b87333" },
+                { id: "sand_punchy", hue_family: "sand", chroma: "punchy", light_color: "#efe0c4", dark_color: "#8a6a3a", accent_material: "neutral", accent_color: "#6e6e6e" },
+                { id: "red_muted", hue_family: "red", chroma: "muted", light_color: "#d0a0a0", dark_color: "#5c2c2c", accent_material: "copper", accent_color: "#b87333" },
+                { id: "green_muted", hue_family: "green", chroma: "muted", light_color: "#b0c4a0", dark_color: "#384e30", accent_material: "wood", accent_color: "#8b6914" },
+            ],
+            toy_candidates: [
+                { id: "cyan_pink", primary_hue: "cyan", secondary_hue: "pink", chroma: "punchy", light_color: "#ffb0c8", dark_color: "#007888" },
+                { id: "lime_magenta", primary_hue: "lime", secondary_hue: "magenta", chroma: "punchy", light_color: "#f0a0e8", dark_color: "#4a7800" },
+                { id: "orange_cyan", primary_hue: "orange", secondary_hue: "cyan", chroma: "punchy", light_color: "#7ee8f0", dark_color: "#c44e00" },
+                { id: "magenta_lime", primary_hue: "magenta", secondary_hue: "lime", chroma: "punchy", light_color: "#c8f060", dark_color: "#a01080" },
+                { id: "pink_teal", primary_hue: "pink", secondary_hue: "teal", chroma: "punchy", light_color: "#5ecfc0", dark_color: "#c02060" },
+                { id: "blue_muted", primary_hue: "blue", secondary_hue: "coral", chroma: "muted", light_color: "#ff9a7a", dark_color: "#3d4f7a" },
+                { id: "yellow_muted", primary_hue: "yellow", secondary_hue: "cyan", chroma: "muted", light_color: "#90d8e0", dark_color: "#6a6420" },
+                // Village-safe
+                { id: "cyan_lime", primary_hue: "cyan", secondary_hue: "lime", chroma: "punchy", light_color: "#d0f868", dark_color: "#006070" },
+                { id: "green_yellow", primary_hue: "green", secondary_hue: "yellow", chroma: "punchy", light_color: "#f5e84a", dark_color: "#235412" },
+                { id: "teal_gray", primary_hue: "teal", secondary_hue: "gray", chroma: "punchy", light_color: "#d8d8d8", dark_color: "#0d4a40" },
+                // Jungle-safe
+                { id: "magenta_brown", primary_hue: "magenta", secondary_hue: "brown", chroma: "punchy", light_color: "#d2b48c", dark_color: "#a01080" },
+                { id: "coral_sand", primary_hue: "coral", secondary_hue: "sand", chroma: "punchy", light_color: "#efe0c4", dark_color: "#b83218" },
+            ],
+        },
+    ];
 
     //Defines the sequence of the starting instructions
 

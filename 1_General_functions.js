@@ -1373,6 +1373,30 @@ function get_region_hue_family(region_name) {
     return null;
 }
 
+/** Expand a list of region/item hues with ColorAdjacentHueBans (e.g. green → teal). */
+function expand_banned_hues_with_adjacents(hue_list) {
+    let out = new Set();
+    (hue_list || []).forEach((h) => {
+        if (!h) return;
+        out.add(h);
+        let adj = (GenParam.ColorAdjacentHueBans && GenParam.ColorAdjacentHueBans[h]) || [];
+        adj.forEach((a) => out.add(a));
+    });
+    return [...out];
+}
+
+/** Hues that should not co-occur as two different boxes (sand↔brown, etc.). */
+function expand_box_pairwise_near_misses(hue_list) {
+    let out = new Set();
+    (hue_list || []).forEach((h) => {
+        if (!h) return;
+        out.add(h);
+        let near = (GenParam.ColorBoxPairwiseNearMisses && GenParam.ColorBoxPairwiseNearMisses[h]) || [];
+        near.forEach((n) => out.add(n));
+    });
+    return [...out];
+}
+
 function hue_family_angular_distance(hue_a, hue_b) {
     if (hue_a === hue_b) return 0;
     let pa = GenParam.ColorHuePalettes[hue_a];
@@ -1382,6 +1406,206 @@ function hue_family_angular_distance(hue_a, hue_b) {
     if (pa.angle === null || pb.angle === null) return 180;
     let d = Math.abs(pa.angle - pb.angle) % 360;
     return d > 180 ? 360 - d : d;
+}
+
+/**
+ * Curated-set assignment for the pilot.
+ * Picks one CuratedColorSet, then assigns box/toy colors with region-aware bans:
+ * - box banned hues = union of region hues for every Fennimal using that box
+ *   (+ adjacent near-misses from ColorAdjacentHueBans, e.g. green→teal)
+ *   (+ already-assigned box hues and ColorBoxPairwiseNearMisses, e.g. brown→sand)
+ * - toy banned hues = own region hue (+ adjacents) + own box hue (after boxes assigned)
+ * - a candidate whose hue_family / primary_hue / secondary_hue is banned is skipped
+ */
+function pick_and_apply_curated_color_set(fennimalArr) {
+    const sets = GenParam.CuratedColorSets;
+    if (!Array.isArray(sets) || sets.length === 0) {
+        throw new Error("pick_and_apply_curated_color_set: GenParam.CuratedColorSets is empty");
+    }
+
+    const box_regions = {}; // boxId -> Set of hue families
+    const box_toys = {};
+    const toy_region = {};
+    const toy_box = {};
+    const used_regions = [];
+
+    fennimalArr.forEach((fen) => {
+        if (fen.region) used_regions.push(fen.region);
+        let region_hue = get_region_hue_family(fen.region);
+        if (fen.toybox) {
+            if (!box_regions[fen.toybox]) box_regions[fen.toybox] = new Set();
+            if (!box_toys[fen.toybox]) box_toys[fen.toybox] = new Set();
+            if (region_hue) box_regions[fen.toybox].add(region_hue);
+            if (fen.toy) box_toys[fen.toybox].add(fen.toy);
+        }
+        if (fen.toy) {
+            toy_region[fen.toy] = region_hue;
+            toy_box[fen.toy] = fen.toybox || null;
+        }
+    });
+
+    const boxes = Object.keys(box_regions);
+    const toys = Object.keys(toy_region);
+    const set = sets[Math.floor(Math.random() * sets.length)];
+
+    function candidate_ok_for_bans(candidate, banned) {
+        let hues = [];
+        if (candidate.hue_family) hues.push(candidate.hue_family);
+        if (candidate.primary_hue) hues.push(candidate.primary_hue);
+        if (candidate.secondary_hue) hues.push(candidate.secondary_hue);
+        return hues.every((h) => !banned.includes(h));
+    }
+
+    function pick_candidate(pool, banned, used_ids, prefer_punchy) {
+        let available = pool.filter((c) => !used_ids.has(c.id) && candidate_ok_for_bans(c, banned));
+        if (!available.length) {
+            // Last resort: ignore chroma preference but still honour bans.
+            available = pool.filter((c) => !used_ids.has(c.id) && candidate_ok_for_bans(c, banned));
+        }
+        if (!available.length) {
+            // Absolute fallback: any unused candidate (should be rare with large pools).
+            available = pool.filter((c) => !used_ids.has(c.id));
+            console.warn("pick_and_apply_curated_color_set: no ban-safe candidates; relaxing bans", banned);
+        }
+        if (!available.length) return null;
+
+        let preferred = prefer_punchy
+            ? available.filter((c) => c.chroma === "punchy")
+            : available.slice();
+        if (!preferred.length) preferred = available;
+        // Prefer free (non-region) hues slightly when prefer_punchy.
+        if (prefer_punchy) {
+            let freeish = preferred.filter((c) =>
+                !["blue", "green", "red", "yellow"].includes(c.hue_family || c.primary_hue)
+            );
+            if (freeish.length) preferred = freeish;
+        }
+        return preferred[Math.floor(Math.random() * preferred.length)];
+    }
+
+    // Boxes: hardest bans first (shared boxes with 2 region hues).
+    let box_order = boxes.slice().sort((a, b) => box_regions[b].size - box_regions[a].size);
+    const used_box_cand = new Set();
+    const box_hues = {};
+    const used_box_hue_list = [];
+    GenParam.BoxColorSchemes = {};
+
+    box_order.forEach((box_id) => {
+        let banned = expand_banned_hues_with_adjacents([...box_regions[box_id]]);
+        // Keep boxes visually distinct from each other (no sand+brown, teal+blue, …).
+        banned = [...new Set([
+            ...banned,
+            ...expand_box_pairwise_near_misses(used_box_hue_list),
+        ])];
+        let cand = pick_candidate(set.box_candidates, banned, used_box_cand, true);
+        if (!cand) {
+            // Soften only the pairwise near-misses; keep region bans.
+            banned = expand_banned_hues_with_adjacents([...box_regions[box_id]]);
+            banned = [...new Set([...banned, ...used_box_hue_list])];
+            cand = pick_candidate(set.box_candidates, banned, used_box_cand, true);
+            if (cand) {
+                console.warn(
+                    "pick_and_apply_curated_color_set: relaxed box pairwise near-misses for '" +
+                    box_id + "' (still avoiding duplicate hues)"
+                );
+            }
+        }
+        if (!cand) {
+            throw new Error(
+                "pick_and_apply_curated_color_set: could not assign box '" + box_id +
+                "' from set '" + set.id + "' (banned: " + banned.join(",") + ")"
+            );
+        }
+        used_box_cand.add(cand.id);
+        box_hues[box_id] = cand.hue_family;
+        used_box_hue_list.push(cand.hue_family);
+        GenParam.BoxColorSchemes[box_id] = {
+            hue_family: cand.hue_family,
+            accent_material: cand.accent_material,
+            light_color: cand.light_color,
+            dark_color: cand.dark_color,
+            accent_color: cand.accent_color,
+            chroma: cand.chroma,
+            candidate_id: cand.id,
+        };
+    });
+
+    // Toys: avoid own region (+ adjacents) + own box hue; keep candidates unique.
+    let toy_order = toys.slice().sort((a, b) => {
+        let ba = [toy_region[a], box_hues[toy_box[a]]].filter(Boolean).length;
+        let bb = [toy_region[b], box_hues[toy_box[b]]].filter(Boolean).length;
+        return bb - ba;
+    });
+    const used_toy_cand = new Set();
+    const toy_assignments = {};
+
+    toy_order.forEach((toy_id) => {
+        let banned_core = [];
+        if (toy_region[toy_id]) banned_core.push(toy_region[toy_id]);
+        if (toy_box[toy_id] && box_hues[toy_box[toy_id]]) banned_core.push(box_hues[toy_box[toy_id]]);
+        let banned = expand_banned_hues_with_adjacents(banned_core);
+
+        let cand = pick_candidate(set.toy_candidates, banned, used_toy_cand, true);
+        if (!cand) {
+            throw new Error(
+                "pick_and_apply_curated_color_set: could not assign toy '" + toy_id +
+                "' from set '" + set.id + "' (banned: " + banned.join(",") + ")"
+            );
+        }
+        used_toy_cand.add(cand.id);
+        toy_assignments[toy_id] = cand;
+
+        if (GenParam.use_color_algorithm_for_toy_colors === true) {
+            if (GenParam.ToyData[toy_id]) {
+                GenParam.ToyData[toy_id].ColorScheme = {
+                    light_color: cand.light_color,
+                    dark_color: cand.dark_color,
+                };
+            } else {
+                console.warn("pick_and_apply_curated_color_set: no ToyData for toy '" + toy_id + "'");
+            }
+        }
+    });
+
+    return {
+        algorithm: "curated_set_v1",
+        set_id: set.id,
+        set_label: set.label,
+        used_regions: [...new Set(used_regions)],
+        boxes: boxes.reduce((acc, b) => {
+            let scheme = GenParam.BoxColorSchemes[b];
+            acc[b] = {
+                hue_family: scheme.hue_family,
+                accent_material: scheme.accent_material,
+                light_color: scheme.light_color,
+                dark_color: scheme.dark_color,
+                accent_color: scheme.accent_color,
+                chroma: scheme.chroma,
+                candidate_id: scheme.candidate_id,
+                banned_hues: expand_banned_hues_with_adjacents([...box_regions[b]]),
+                regions_using_box: [...box_regions[b]],
+                toys_in_box: [...(box_toys[b] || [])],
+            };
+            return acc;
+        }, {}),
+        toys: toys.reduce((acc, t) => {
+            let cand = toy_assignments[t];
+            let banned_core = [toy_region[t], toy_box[t] ? box_hues[toy_box[t]] : null].filter(Boolean);
+            acc[t] = {
+                primary_hue: cand.primary_hue,
+                secondary_hue: cand.secondary_hue,
+                light_color: cand.light_color,
+                dark_color: cand.dark_color,
+                chroma: cand.chroma,
+                candidate_id: cand.id,
+                own_region_hue: toy_region[t],
+                own_box: toy_box[t],
+                own_box_hue: toy_box[t] ? box_hues[toy_box[t]] : null,
+                banned_hues: expand_banned_hues_with_adjacents(banned_core),
+            };
+            return acc;
+        }, {}),
+    };
 }
 
 /**
