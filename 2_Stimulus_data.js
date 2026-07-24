@@ -335,7 +335,7 @@ let StimulusSettings = function () {
                         Fennimals_encountered: ["S1", "S2"],
                         interaction_type: "Fennimal_toy"
                     },
-                    {
+                    
                     {
                         Fennimals_encountered: ["S1", "S2"],
                         interaction_type: "toy_to_box"
