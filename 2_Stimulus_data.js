@@ -1,11 +1,12 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["mentalizing"];
+    this.Experiment_Code = ["mentalizing_AB"];
 
     const All_Instructions_At_Start = {
         test: [],
         mentalizing_network: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
         mentalizing: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
+        mentalizing_AB: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
     };
 
     // ----------------------------------------------------
@@ -30,6 +31,12 @@ let StimulusSettings = function () {
             "P1": { head: "D", region: "D", toy: "D", toybox: "A" },
             "P2": { head: "E", region: "E", toy: "E", toybox: "B" },
             "P3": { head: "F", region: "F", toy: "F", toybox: "C" }
+        },
+        mentalizing_AB: {
+            "S1": { head: "A", region: "A", toy: "A", toybox: "A" },
+            "S2": { head: "B", region: "B", toy: "B", toybox: "B" },
+            "P1": { head: "D", region: "D", toy: "D", toybox: "A" },
+            "P2": { head: "E", region: "E", toy: "E", toybox: "B" },
         },
     };
 
@@ -297,23 +304,165 @@ let StimulusSettings = function () {
 
 
 
+        ],
+        mentalizing_AB: [
+
+            // BLOCK 1: Introduction to shared Fennimals
+            {
+                type: "free_exploration",
+                interaction_type: ["Fennimal_toy"],
+                Fennimals_encountered: ["S1", "S2"],
+                partner_behavior: "active",
+                include_Fennefinder: true,
+                force_climbing_tower_first: true
+            },
+
+            // BLOCK 2: Main shared block (toy_to_box first, then mixed joint/photo/feed)
+            {
+                type: "phone_room",
+                partner_behavior: "active",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                ask_Fennimal: true,
+                ask_toy: true,
+                ask_box: true,
+                trial_subblocks: [
+                    {
+                        Fennimals_encountered: ["S1", "S2"],
+                        interaction_type: "broken_toy_no_box"
+                    },
+                    {
+                        Fennimals_encountered: ["S1", "S2"],
+                        interaction_type: "Fennimal_toy"
+                    },
+                    {
+                    {
+                        Fennimals_encountered: ["S1", "S2"],
+                        interaction_type: "toy_to_box"
+                    },
+                    {
+                        trials: [
+                            { Fennimal: "S1", interaction_type: "joint_box_decoration" },
+                        ]
+                    },
+                    {
+                        trials: [
+                            { Fennimal: "S2", interaction_type: "photo_box" },
+                            { Fennimal: "S2", interaction_type: "photo_Fennimal" },
+                        ]
+                    },
+                    {
+                        trials: [
+                            { Fennimal: "S1", interaction_type: "joint_box_cleaning" },
+                        ]
+                    },
+                ]
+            },
+
+            {
+                type: "pseudoday",
+                information: "partner_leaves"
+            },
+            {
+                type: "pseudoday",
+                information: "new_Fennimals_spotted",
+                displayed_icons: ["P1", "P2"],
+                title: "Get to know some more Fennimals on the island",
+                display_text: "While %PARTNERNAME% is away, there are some Fennimals on the island who would love to get to know you! Unfortunately, we ran out of boxes to store the toys in, so we will have to reuse some of the boxes."
+            },
+
+            // BLOCK 3: Introduction to private Fennimals
+            {
+                type: "free_exploration",
+                interaction_type: ["Fennimal_toy"],
+                Fennimals_encountered: ["P1", "P2"],
+                partner_behavior: "absent",
+                include_Fennefinder: true,
+                force_climbing_tower_first: true
+            },
+
+            // BLOCK 4: Main private block (toy_to_box first, then mixed joint/photo/feed)
+            {
+                type: "phone_room",
+                partner_behavior: "absent",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                ask_Fennimal: true,
+                ask_toy: true,
+                ask_box: true,
+                trial_subblocks: [
+                    {
+                        Fennimals_encountered: ["P1", "P2"],
+                        interaction_type: "broken_toy_no_box"
+                    },
+                    {
+                        Fennimals_encountered: ["P1", "P2"],
+                        interaction_type: "Fennimal_toy"
+                    },
+                    {
+                        Fennimals_encountered: ["P1", "P2"],
+                        interaction_type: "toy_to_box"
+                    },
+                    {
+                        trials: [
+                            { Fennimal: "P2", interaction_type: "joint_box_decoration" },
+                         
+                        ]
+                    },
+                    {
+                        trials: [
+                            { Fennimal: "P1", interaction_type: "photo_box" },
+                            { Fennimal: "P1", interaction_type: "photo_Fennimal" },
+                        ]
+                    },
+                    {
+                        trials: [
+                            { Fennimal: "P2", interaction_type: "joint_box_cleaning" },
+                         
+                        ]
+                    },
+                ]
+            },
+
+            {
+                type: "pseudoday",
+                information: "partner_returns"
+            },
+
+            // BLOCK 5: Partner belief (individual boxes)
+            {
+                type: "partner_belief_individual_boxes",
+                include_practice_trial: true,
+                num_belief_blocks: 1,
+                include_reality_block_at_end: true,
+                include_memory_probe_at_end: true,
+                bonus_stars_per_correct_answer: 1,
+                memory_probe_isi_ms: 1000,
+                questions: [
+                    { question_id: "belief_A", target_box: "A" },
+                    { question_id: "belief_B", target_box: "B" },
+                ]
+            },
+
+
+
         ]
     };
 
     const All_Questionnaire_Page_sets = {
         test: [],
-        mentalizing_1: ["demographics_questionnaire"],
-        mentalizing_1B: ["demographics_questionnaire"],
-        mentalizing_2: ["demographics_questionnaire"],
+      
         mentalizing: ["demographics_questionnaire"],
+        mentalizing_AB: ["demographics_questionnaire"],
     };
 
     const All_Allowed_Head_Lists = { test: false, mentalizing_1: false };
     const All_Banned_Head_Lists = { test: false, mentalizing_1: false };
     const All_Forced_Head_Lists = {
         test: ["astro", "cupcake", "tube", "tv", "jackolantnern", "elephant", "blockhead", "parrot"],
-        mentalizing_network: ["astro", "cupcake", "carrot", "pencil", "tv", "skull", "elephant",  "shark", "blockhead", "parrot", "stocking"],
+        
         mentalizing: ["astro", "cupcake", "tube", "tv", "jackolantnern", "elephant", "blockhead", "parrot"],
+        mentalizing_AB: ["astro", "cupcake", "tube", "tv", "jackolantnern", "elephant", "blockhead", "parrot"],
     };
 
     const All_Allowed_Head_Groups_List = { test: false, mentalizing_1: false };
@@ -881,5 +1030,3 @@ let StimulusTransformer = function (StimTemplate) {
         });
     };
 };
-
-console.log("Correction applied")
