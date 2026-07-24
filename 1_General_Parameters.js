@@ -1,9 +1,13 @@
 GENERALPARAM = function () {
 
-    // When true: assign toy/box colors via the hue-space algorithm (avoids region/box/toy clashes),
-    // overwrite ToyData ColorSchemes for used toys, fill BoxColorSchemes, and paint SVG templates once.
+    // When true: assign box colors via the hue-space algorithm, fill BoxColorSchemes, and paint box SVG templates.
+    // Toy recoloring is controlled separately by use_color_algorithm_for_toy_colors.
     // When false/undefined: keep baked box SVG fills and the predefined ToyData ColorSchemes.
     this.use_color_algorithm_to_pick_colors = true;
+
+    // When true (and use_color_algorithm_to_pick_colors): also overwrite ToyData ColorSchemes from the algorithm.
+    // When false: keep the predefined ToyData palettes (pilot default while box colors are tested).
+    this.use_color_algorithm_for_toy_colors = false;
 
     // Hue families aligned with RegionData.color_description (+ gray). Used by the color algorithm.
     // `cluster` groups perceptually similar families — boxes may take at most one hue per cluster.
@@ -16,7 +20,7 @@ GENERALPARAM = function () {
         sand:     { angle: 40,  cluster: "warm",    light_color: "#efe0c4", dark_color: "#8a6a3a", toy_light_color: "#e0d5c5", toy_dark_color: "#8a7a60" },
         lavender: { angle: 310, cluster: "cool",    light_color: "#e8b3ff", dark_color: "#890fbd", toy_light_color: "#cbb8d4", toy_dark_color: "#6a5080" },
         red:      { angle: 5,   cluster: "warm",    light_color: "#ff6b6b", dark_color: "#9a0000", toy_light_color: "#d4a4a4", toy_dark_color: "#7a3838" },
-        teal:     { angle: 170, cluster: "cool",    light_color: "#7eefe0", dark_color: "#025e4c", toy_light_color: "#a8c4c0", toy_dark_color: "#3d5c58" },
+        teal:     { angle: 170, cluster: "cool",    light_color: "#6bb8ae", dark_color: "#0d4a40", toy_light_color: "#a8c4c0", toy_dark_color: "#3d5c58" },
         gray:     { angle: null, cluster: "neutral", light_color: "#d4d4d4", dark_color: "#555555", toy_light_color: "#d0d0d0", toy_dark_color: "#666666" },
     };
 

@@ -870,14 +870,19 @@ let StimulusTransformer = function (StimTemplate) {
     // ----------------------------------------------------
     // ITEM COLOR ASSIGNMENT (toys + boxes)
     // ----------------------------------------------------
-    // When the algorithm flag is on: reassign ToyData / BoxColorSchemes from hue-space rules.
+    // When the algorithm flag is on: reassign BoxColorSchemes (and optionally ToyData) from hue-space rules.
     // Either way: paint toy SVG templates once from ToyData so clones inherit fills.
     // Box templates are only painted when the algorithm ran (otherwise keep baked SVG fills).
     let colorAssignmentOverview = null;
     if (GenParam.use_color_algorithm_to_pick_colors === true) {
         colorAssignmentOverview = assign_experiment_item_colors(FennimalObjArr);
         paint_all_box_color_templates();
-        console.log("%c Color algorithm assigned item palettes", "color:teal", colorAssignmentOverview);
+        console.log(
+            "%c Color algorithm assigned item palettes"
+                + (GenParam.use_color_algorithm_for_toy_colors === true ? " (boxes + toys)" : " (boxes only; toys keep ToyData defaults)"),
+            "color:teal",
+            colorAssignmentOverview
+        );
     }
     paint_all_toy_color_templates();
 

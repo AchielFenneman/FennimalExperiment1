@@ -1313,7 +1313,8 @@ function apply_saved_color_assignment(overview) {
         }
     }
 
-    if (overview.toys && typeof overview.toys === "object") {
+    if (overview.toys && typeof overview.toys === "object"
+        && GenParam.use_color_algorithm_for_toy_colors === true) {
         for (let toy_id in overview.toys) {
             let toy = overview.toys[toy_id];
             if (!GenParam.ToyData[toy_id]) {
@@ -1658,13 +1659,15 @@ function assign_experiment_item_colors(fennimalArr) {
 
         let dark = toy_palette_colors(primary);
         let light = toy_palette_colors(secondary);
-        if (GenParam.ToyData[toy_id]) {
-            GenParam.ToyData[toy_id].ColorScheme = {
-                light_color: light.light_color,
-                dark_color: dark.dark_color,
-            };
-        } else {
-            console.warn("assign_experiment_item_colors: no ToyData for toy '" + toy_id + "'");
+        if (GenParam.use_color_algorithm_for_toy_colors === true) {
+            if (GenParam.ToyData[toy_id]) {
+                GenParam.ToyData[toy_id].ColorScheme = {
+                    light_color: light.light_color,
+                    dark_color: dark.dark_color,
+                };
+            } else {
+                console.warn("assign_experiment_item_colors: no ToyData for toy '" + toy_id + "'");
+            }
         }
     });
 
