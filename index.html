@@ -32,7 +32,7 @@
 <script type="module">
     // 1. Import the Firebase tools directly from Google's servers
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-    import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
     // 2. PASTE YOUR CONFIG OBJECT HERE (From the Firebase Console)
     const firebaseConfig = {
@@ -44,19 +44,149 @@
         appId: "1:416848310750:web:1fd80297bf7b6389472d4f"
     };
 
-    // 3. Initialize Firebase and create a global save function!
+    // 3. Initialize Firebase and create global helpers for Top_controller.js
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // We attach this to the 'window' so your Top_controller.js can easily call it
-    window.saveToFirebase = async function(experiment_name, prolific_id, experiment_data) {
+    window.SESSION_CLAIM_COLLECTION = "fennimals_claims";
+
+    window.saveToFirebase = async function(collection_name, doc_id, experiment_data) {
         try {
-            // It creates a unique folder for the experiment, and puts the participant inside it!
-            const docRef = doc(db, experiment_name, prolific_id);
+            const docRef = doc(db, collection_name, doc_id);
             await setDoc(docRef, experiment_data, { merge: true });
+            return true;
         } catch (e) {
             console.error("Error saving to Firebase: ", e);
+            return false;
         }
+    };
+
+    window.getFromFirebase = async function(collection_name, doc_id) {
+        try {
+            const snap = await getDoc(doc(db, collection_name, doc_id));
+            return snap.exists() ? snap.data() : null;
+        } catch (e) {
+            console.error("Error reading from Firebase: ", e);
+            return null;
+        }
+    };
+
+    function getPidFromUrl() {
+        try {
+            let pid = new URL(window.location.href).searchParams.get("PROLIFIC_PID");
+            return pid ? pid.substring(0, 10) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function makeSessionId() {
+        return Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 10);
+    }
+
+    function localSessionKey(pid) {
+        return "fennimals_session_v1_" + pid;
+    }
+
+    /**
+     * Soft-lock / session continuity (Layer 1).
+     * Looks up fennimals_claims/{pid} before stimuli are built.
+     * Modes: anonymous | new | continue_assignment | blocked_completed
+     */
+    window.resolveParticipantSessionClaim = async function() {
+        const pid = getPidFromUrl();
+        let forceNew = false;
+        try {
+            forceNew = new URL(window.location.href).searchParams.get("FORCE_NEW_SESSION") === "1";
+        } catch (e) { /* ignore */ }
+
+        if (!pid) {
+            return { mode: "anonymous", pid: null, sessionId: String(Date.now()) };
+        }
+
+        let claim = await window.getFromFirebase(window.SESSION_CLAIM_COLLECTION, pid);
+
+        // Fallback if Firestore reads are restricted: reuse local session metadata.
+        if (!claim && !forceNew) {
+            try {
+                let localRaw = localStorage.getItem(localSessionKey(pid));
+                let local = localRaw ? JSON.parse(localRaw) : null;
+                if (local && local.sessionId && local.expCode) {
+                    claim = {
+                        activeSessionId: local.sessionId,
+                        expCode: local.expCode,
+                        attemptDocId: pid + "__" + local.sessionId,
+                        experimentCompleted: local.experimentCompleted === true,
+                        localAssignment: local.assignment || null,
+                        localRestartCount: local.sessionRestartCount || 0
+                    };
+                }
+            } catch (e) { /* ignore */ }
+        }
+
+        if (!forceNew && claim && claim.experimentCompleted === true) {
+            return {
+                mode: "blocked_completed",
+                pid: pid,
+                message: "It looks like you have already completed this study. Please return the task on Prolific if it is still listed. Thank you!"
+            };
+        }
+
+        if (!forceNew && claim && claim.activeSessionId && claim.expCode) {
+            let attemptDocId = claim.attemptDocId || (pid + "__" + claim.activeSessionId);
+            let attempt = await window.getFromFirebase(claim.expCode, attemptDocId);
+
+            let localAssignment = claim.localAssignment || null;
+            let localRestartCount = claim.localRestartCount || 0;
+            if (!localAssignment) {
+                try {
+                    let localRaw = localStorage.getItem(localSessionKey(pid));
+                    let local = localRaw ? JSON.parse(localRaw) : null;
+                    if (local && local.assignment) localAssignment = local.assignment;
+                    if (local && local.sessionRestartCount) localRestartCount = local.sessionRestartCount;
+                } catch (e) { /* ignore */ }
+            }
+
+            let assignment = null;
+            if (attempt) {
+                assignment = {
+                    fennimals: attempt.fennimals || null,
+                    featureMap: attempt.featureMap || null,
+                    colorAssignment: attempt.colorAssignment || null
+                };
+            } else if (localAssignment) {
+                assignment = localAssignment;
+            }
+
+            let priorRestartCount = (attempt && attempt.sessionRestartCount) || localRestartCount || 0;
+
+            try {
+                localStorage.setItem(localSessionKey(pid), JSON.stringify({
+                    expCode: claim.expCode,
+                    sessionId: claim.activeSessionId,
+                    experimentCompleted: false,
+                    assignment: assignment,
+                    sessionRestartCount: priorRestartCount
+                }));
+            } catch (e) { /* private mode / quota */ }
+
+            return {
+                mode: "continue_assignment",
+                pid: pid,
+                expCode: claim.expCode,
+                sessionId: claim.activeSessionId,
+                attemptDocId: attemptDocId,
+                assignment: assignment,
+                priorRestartCount: priorRestartCount
+            };
+        }
+
+        return {
+            mode: "new",
+            pid: pid,
+            sessionId: makeSessionId(),
+            forceNew: forceNew
+        };
     };
 </script>
 

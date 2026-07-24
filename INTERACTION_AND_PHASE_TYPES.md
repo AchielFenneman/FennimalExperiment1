@@ -56,14 +56,18 @@ Each subblock is **either** cartesian **or** an explicit trial list — never bo
   interaction_type: "toy_to_box"
 }
 
+// box_room is special: cartesian form still yields ONE multi-Fennimal trial
+{
+  Fennimals_encountered: ["S1", "S2"],
+  interaction_type: "box_room"
+}
+
 // Explicit trials (non-cartesian)
 {
   trials: [
     { Fennimal: "S1", interaction_type: "joint_box_cleaning" },
-    { Fennimal: "S2", interaction_type: "photo_box" },
-    { Fennimal: "S3", interaction_type: "photo_box" },
-    { Fennimal: "S2", interaction_type: "feed_Fennimal" },
-    { Fennimal: "S3", interaction_type: "feed_Fennimal" }
+    { Fennimals: ["S1", "S2"], interaction_type: "box_room" },
+    { Fennimal: "S2", interaction_type: "photo_box" }
   ]
 }
 ```
@@ -263,6 +267,33 @@ If the box already holds a **different** toy: opening reveals it → participant
 
 **Needs:** `toy`, `toybox`.
 
+#### `box_room` → `BoxRoomTrialController`
+Multi-Fennimal warehouse sort (one trial for the whole set — **not** cartesian-expanded per Fennimal). Home warehouse background, low table with boxes in random order, correct toys in a top row, optional toy bin on the left.
+
+**Stimulus forms (both create a single trial)**
+```js
+// Cartesian / subblock — one trial for the full Fennimal list
+{ Fennimals_encountered: ["S1", "S2"], interaction_type: "box_room" }
+
+// Explicit trial list
+{ Fennimals: ["S1", "S2"], interaction_type: "box_room" }
+// or single: { Fennimal: "S1", interaction_type: "box_room" }
+```
+
+Carrier FenObj (first id) is used for map / phone-room travel. Full set is stored on `FenObj.box_room_fennimals` / `box_room_fennimal_ids`.
+
+**Throws at trial generation** if the set has duplicate `toy` or duplicate `toybox` values.
+
+**Sequence**
+1. Open all boxes (partner slides one-by-one if present; else click).
+2. Wrong contents → become recyclable; WorldState + partner belief cleared to empty.
+3. Correct contents already in box (safety) → animate to either side of the top row; same clear.
+4. If any wrong toys: drag to toy bin (magnetic near bin X → snap L/R above bin → fall between bin back/front mesh into stacked Y). Bin stays visible.
+5. For each box in random order: highlight matching top-row toy; only that toy / that box is a valid drop; WorldState + partner belief updated on drop (box stays open).
+6. Close all boxes → “Good work! All the toys are now safe!” → complete.
+
+**Needs on each FenObj in the set:** `toy`, `toybox`. No Fennimals drawn on screen.
+
 ---
 
 ### Photo & feed
@@ -457,6 +488,7 @@ Exact help per trial varies (open box, cut foliage, swat flies, hand off food ba
 |---|---|
 | `Fennimal_toy`, `basic_intro` | Happy Fennimal |
 | `toy_to_box` | Toy |
+| `box_room` | Toybox (warehouse sort) |
 | `photo_box` | Toybox |
 | `feed_Fennimal` | Slumped Fennimal (hungry) |
 | `joint_box_cleaning` | Toybox hint |
@@ -487,6 +519,7 @@ Full knobs live in `1_General_Parameters.js`.
 basic_intro
 Fennimal_toy
 toy_to_box
+box_room
 photo_box
 feed_Fennimal
 joint_box_cleaning

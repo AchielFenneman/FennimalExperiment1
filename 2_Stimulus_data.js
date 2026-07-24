@@ -1,6 +1,6 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["mentalizing_AB"];
+    this.Experiment_Code = ["test"];
 
     const All_Instructions_At_Start = {
         test: [],
@@ -18,10 +18,10 @@ let StimulusSettings = function () {
         test: {
             "S1": { head: "A", region: "A", toy: "A", toybox: "A" },
             "S2": { head: "B", region: "B", toy: "B", toybox: "B" },
-            "S3": { head: "C", region: "C", toy: "C", toybox: "C" },
+          
             "P1": { head: "D", region: "D", toy: "D", toybox: "A" },
             "P2": { head: "E", region: "E", toy: "E", toybox: "B" },
-            "P3": { head: "F", region: "F", toy: "F", toybox: "C" }
+        
         },
 
         mentalizing: {
@@ -45,13 +45,29 @@ let StimulusSettings = function () {
     // ----------------------------------------------------
     let All_Experiment_Structures = {
         test: [
+
+            
+            
             {
-                type: "jump_to_trial",
-                interaction_type: "Fennimal_toy",
-                Fennimals_encountered: ["S1", "S2"],
-                partner_behavior: "absent",
-                hint_type: ["icon"],
-                include_Fennefinder: true
+                type: "phone_room",
+                partner_behavior: "active",
+                trial_subblocks: [
+                    {
+                        Fennimals_encountered: ["S1", "S2"],
+                        interaction_type: "box_room"
+                    }
+                ]
+            },
+
+            {
+                type: "phone_room",
+                partner_behavior: "passive",
+                trial_subblocks: [
+                    {
+                        Fennimals_encountered: ["P1", "P2"],
+                        interaction_type: "box_room"
+                    }
+                ]
             },
            
             // Starts here for UI testing. Controller auto-seeds false-belief WorldState when
@@ -131,14 +147,6 @@ let StimulusSettings = function () {
 
             
 
-            {
-                type: "jump_to_trial",
-                interaction_type: "dirty_and_broken_toy",
-                Fennimals_encountered: ["S1", "S2"],
-                partner_behavior: "absent",
-                hint_type: ["icon"],
-                include_Fennefinder: true
-            },
             {
                 type: "free_exploration",
                 interaction_type: ["basic_intro"],
@@ -338,7 +346,7 @@ let StimulusSettings = function () {
                     
                     {
                         Fennimals_encountered: ["S1", "S2"],
-                        interaction_type: "toy_to_box"
+                        interaction_type: "box_room"
                     },
                     {
                         trials: [
@@ -401,7 +409,7 @@ let StimulusSettings = function () {
                     },
                     {
                         Fennimals_encountered: ["P1", "P2"],
-                        interaction_type: "toy_to_box"
+                        interaction_type: "box_room"
                     },
                     {
                         trials: [
@@ -471,7 +479,10 @@ let StimulusSettings = function () {
     // ----------------------------------------------------
     // INITIALIZATION LOGIC
     // ----------------------------------------------------
-    if (this.Experiment_Code.length > 0) {
+    // Layer 1: if a prior incomplete session claimed an expCode, keep it on refresh.
+    if (window.__FORCE_EXPERIMENT_CODE__) {
+        this.Experiment_Code = window.__FORCE_EXPERIMENT_CODE__;
+    } else if (this.Experiment_Code.length > 0) {
         this.Experiment_Code = shuffleArray(this.Experiment_Code)[0];
     }
     console.log("%c Starting experiment with code " + this.Experiment_Code, "color:blue");
@@ -491,7 +502,7 @@ let StimulusSettings = function () {
     this.banned_head_groups = All_Banned_Head_Groups_List[this.Experiment_Code] || false;
 
     this.use_region_preferred_body_types = true;
-    this.preferred_region_sample_order = [["Jungle", "Village", "North", "Desert","Beach", "Mountains", "Flowerfields", "Swamp"]] // [["Jungle", "Village", "North", "Desert"], ["Beach", "Mountains", "Flowerfields", "Swamp"]];
+    this.preferred_region_sample_order = [["Jungle", "Village", "North", "Desert"], ["Beach", "Mountains", "Flowerfields", "Swamp"]]; // [["Jungle", "Village", "North", "Desert","Beach", "Mountains", "Flowerfields", "Swamp"]] // [["Jungle", "Village", "North", "Desert"], ["Beach", "Mountains", "Flowerfields", "Swamp"]];
     this.use_constract_color_for_head = false;
     this.name_is_determined_as = "head";
 
@@ -918,9 +929,61 @@ let StimulusTransformer = function (StimTemplate) {
     const FennimalObjArr = create_Fennimals_from_stimulus_template(StimTemplate.Fennimal_Dictionary, FeatureMap);
 
     // ----------------------------------------------------
+    // ITEM COLOR ASSIGNMENT (toys + boxes)
+    // ----------------------------------------------------
+    // When the algorithm flag is on: reassign ToyData / BoxColorSchemes from hue-space rules.
+    // Either way: paint toy SVG templates once from ToyData so clones inherit fills.
+    // Box templates are only painted when the algorithm ran (otherwise keep baked SVG fills).
+    let colorAssignmentOverview = null;
+    if (GenParam.use_color_algorithm_to_pick_colors === true) {
+        colorAssignmentOverview = assign_experiment_item_colors(FennimalObjArr);
+        paint_all_box_color_templates();
+        console.log("%c Color algorithm assigned item palettes", "color:teal", colorAssignmentOverview);
+    }
+    paint_all_toy_color_templates();
+
+    // ----------------------------------------------------
     // GETTERS & PUBLIC METHODS
     // ----------------------------------------------------
     this.get_experiment_code = () => JSON.parse(JSON.stringify(Experiment_Code));
+
+    this.get_color_assignment_overview = () => (
+        colorAssignmentOverview ? JSON.parse(JSON.stringify(colorAssignmentOverview)) : null
+    );
+
+    this.get_feature_map = () => JSON.parse(JSON.stringify(FeatureMapConstant));
+
+    /**
+     * Layer 1: replace the freshly randomized world with a saved assignment.
+     * Returns false if the payload looks unusable (caller keeps the fresh randomization).
+     */
+    this.hydrate_assignment = function (savedFennimals, savedFeatureMap, savedColorOverview) {
+        if (!Array.isArray(savedFennimals) || savedFennimals.length === 0) {
+            console.warn("hydrate_assignment: missing fennimals");
+            return false;
+        }
+
+        if (savedFeatureMap && typeof savedFeatureMap === "object") {
+            FeatureMap = JSON.parse(JSON.stringify(savedFeatureMap));
+            FeatureMapConstant = JSON.parse(JSON.stringify(savedFeatureMap));
+        } else {
+            console.warn("hydrate_assignment: missing featureMap; fennimal templates restored without code map");
+        }
+
+        // Replace array contents in place so any held references stay valid.
+        FennimalObjArr.length = 0;
+        JSON.parse(JSON.stringify(savedFennimals)).forEach((fen) => FennimalObjArr.push(fen));
+
+        if (savedColorOverview && GenParam.use_color_algorithm_to_pick_colors === true) {
+            apply_saved_color_assignment(savedColorOverview);
+            paint_all_box_color_templates();
+            paint_all_toy_color_templates();
+            colorAssignmentOverview = JSON.parse(JSON.stringify(savedColorOverview));
+        }
+
+        console.log("%c Restored saved stimulus assignment for this session", "color:teal");
+        return true;
+    };
 
     this.get_all_Fennimals_objects_in_array = () => JSON.parse(JSON.stringify(FennimalObjArr));
 

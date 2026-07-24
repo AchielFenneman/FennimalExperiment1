@@ -6,17 +6,26 @@ class DataController {
         this.stimuli = stimuli;
         this.attentionCheckController = attentionCheckController;
         this.startTime = startTime;
+        this.attemptDocId = null;
+        this.didRestoreAssignment = false;
+        this.refreshGuardArmed = false;
 
         this.experimentData = {
             expCode: this.stimuli.get_experiment_code(),
             startDate: new Date().toString(),
             browser: getBrowser(),
             pid: false,
+            sessionId: null,
+            attemptDocId: null,
+            featureMap: null,
+            assignmentRestored: false,
+            sessionRestartCount: 0,
             timeStamps: [],
             storedData: [],
             questionnaire: [],
             paymentData: null,
             fennimals: [],
+            colorAssignment: null,
             avatar: null,
             attentionData: null,
             totalDuration: 0,
@@ -36,10 +45,135 @@ class DataController {
 
         // Delegated to StimulusTransformer for modularity
         this.experimentData.fennimals = this.stimuli.get_clean_Fennimal_templates();
+
+        // Overview of algorithm-picked toy/box colors (null when flag is off)
+        if (typeof this.stimuli.get_color_assignment_overview === "function") {
+            this.experimentData.colorAssignment = this.stimuli.get_color_assignment_overview();
+        }
+
+        if (typeof this.stimuli.get_feature_map === "function") {
+            this.experimentData.featureMap = this.stimuli.get_feature_map();
+        }
+    }
+
+    getExpFolderName() {
+        let expString = Array.isArray(this.experimentData.expCode)
+            ? this.experimentData.expCode[0]
+            : this.experimentData.expCode;
+        return expString || "Default_Experiment";
+    }
+
+    /**
+     * Layer 1: bind this browser boot to a session claim / attempt doc.
+     * On refresh of an incomplete session, restores the same stimulus assignment
+     * but restarts progress from the beginning.
+     */
+    async finalizeSession(earlySession) {
+        earlySession = earlySession || { mode: "anonymous" };
+        let pid = this.experimentData.pid;
+        let folder = this.getExpFolderName();
+
+        if (earlySession.mode === "anonymous" || !pid) {
+            this.experimentData.sessionId = earlySession.sessionId || String(this.startTime);
+            this.attemptDocId = "NO_PID_" + this.experimentData.sessionId;
+            this.experimentData.attemptDocId = this.attemptDocId;
+            return;
+        }
+
+        if (earlySession.mode === "continue_assignment") {
+            this.experimentData.sessionId = earlySession.sessionId;
+            this.attemptDocId = earlySession.attemptDocId || (pid + "__" + earlySession.sessionId);
+            this.experimentData.attemptDocId = this.attemptDocId;
+            this.experimentData.sessionRestartCount = (earlySession.priorRestartCount || 0) + 1;
+            this.experimentData.progressResetReason = "layer1_same_assignment_restart";
+
+            if (earlySession.assignment && earlySession.assignment.fennimals
+                && typeof this.stimuli.hydrate_assignment === "function") {
+                let ok = this.stimuli.hydrate_assignment(
+                    earlySession.assignment.fennimals,
+                    earlySession.assignment.featureMap,
+                    earlySession.assignment.colorAssignment
+                );
+                if (ok) {
+                    this.experimentData.fennimals = this.stimuli.get_clean_Fennimal_templates();
+                    this.experimentData.colorAssignment = this.stimuli.get_color_assignment_overview();
+                    this.experimentData.featureMap = this.stimuli.get_feature_map();
+                    this.experimentData.assignmentRestored = true;
+                    this.didRestoreAssignment = true;
+                } else {
+                    console.warn("Session continue: hydrate failed; keeping fresh randomization in the same attempt doc");
+                    this.experimentData.assignmentRestored = false;
+                }
+            }
+        } else {
+            // New claim for this PID
+            this.experimentData.sessionId = earlySession.sessionId;
+            this.attemptDocId = pid + "__" + earlySession.sessionId;
+            this.experimentData.attemptDocId = this.attemptDocId;
+            this.experimentData.sessionRestartCount = 0;
+            this.experimentData.assignmentRestored = false;
+
+            try {
+                localStorage.setItem(
+                    "fennimals_session_v1_" + pid,
+                    JSON.stringify({ expCode: folder, sessionId: earlySession.sessionId })
+                );
+            } catch (e) { /* ignore */ }
+        }
+
+        if (!this.experimentData.featureMap && typeof this.stimuli.get_feature_map === "function") {
+            this.experimentData.featureMap = this.stimuli.get_feature_map();
+        }
+
+        // Clear in-memory progress for assignment-restore restarts (Layer 1).
+        // First Firebase save replaces storedData on the attempt doc.
+        this.experimentData.storedData = [];
+        this.experimentData.questionnaire = [];
+        this.experimentData.paymentData = null;
+        this.experimentData.experimentCompleted = false;
+        this.paymentInfo = [];
+
+        await this.writeSessionClaim(false);
+        await this.storeAllData(false);
+    }
+
+    async writeSessionClaim(experimentCompleted) {
+        if (!this.experimentData.pid || !window.saveToFirebase || !window.SESSION_CLAIM_COLLECTION) {
+            return false;
+        }
+
+        let payload = {
+            pid: this.experimentData.pid,
+            expCode: this.getExpFolderName(),
+            activeSessionId: this.experimentData.sessionId,
+            attemptDocId: this.attemptDocId,
+            experimentCompleted: experimentCompleted === true,
+            updatedAt: new Date().toISOString()
+        };
+
+        try {
+            localStorage.setItem(
+                "fennimals_session_v1_" + this.experimentData.pid,
+                JSON.stringify({
+                    expCode: payload.expCode,
+                    sessionId: payload.activeSessionId,
+                    experimentCompleted: payload.experimentCompleted,
+                    sessionRestartCount: this.experimentData.sessionRestartCount || 0,
+                    assignment: {
+                        fennimals: this.experimentData.fennimals,
+                        featureMap: this.experimentData.featureMap,
+                        colorAssignment: this.experimentData.colorAssignment
+                    }
+                })
+            );
+        } catch (e) { /* ignore */ }
+
+        return window.saveToFirebase(window.SESSION_CLAIM_COLLECTION, this.experimentData.pid, payload);
     }
 
     recordConsentGiven() {
         this.experimentData.consentGivenTime = Date.now() - this.startTime;
+        this.refreshGuardArmed = true;
     }
 
     recordTimestamp(eventString) {
@@ -101,6 +235,7 @@ class DataController {
 
         if (bool_experiment_completed === true) {
             this.experimentData.experimentCompleted = true;
+            this.refreshGuardArmed = false;
         }
 
         // FIX 4: Actively sync duration and attention checks on every partial save!
@@ -109,17 +244,22 @@ class DataController {
             this.experimentData.attentionData = this.attentionCheckController.get_attention_rep();
         }
 
-        // FIX 1: Safely handle expCode whether it is an array ["mentalizing"] or a string "mentalizing"
-        let expString = Array.isArray(this.experimentData.expCode) ? this.experimentData.expCode[0] : this.experimentData.expCode;
-        let folder_name = expString || "Default_Experiment";
+        let folder_name = this.getExpFolderName();
+        let doc_name = this.attemptDocId
+            || (this.experimentData.pid
+                ? (this.experimentData.pid + "__" + (this.experimentData.sessionId || this.startTime))
+                : ("NO_PID_" + this.startTime));
 
-        let doc_name = this.experimentData.pid ? this.experimentData.pid : "NO_PID_" + this.startTime;
+        this.experimentData.attemptDocId = doc_name;
 
-        if (window.saveToFirebase) {
-            return window.saveToFirebase(folder_name, doc_name, this.experimentData);
-        } else {
-            return Promise.resolve(true);
+        let savePromise = window.saveToFirebase
+            ? window.saveToFirebase(folder_name, doc_name, this.experimentData)
+            : Promise.resolve(true);
+
+        if (bool_experiment_completed === true && this.experimentData.pid) {
+            return Promise.resolve(savePromise).then(() => this.writeSessionClaim(true));
         }
+        return savePromise;
     }
 
     storeCardDataWhenIncludedInGeneralInstructions(cardData) {
@@ -322,17 +462,43 @@ class TrialGenerator {
                         `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}].trials[${trialIndex}] must be an object.`
                     );
                 }
-                if (!trialSpec.Fennimal) {
-                    throw new Error(
-                        `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}].trials[${trialIndex}] ` +
-                        `is missing required field "Fennimal".`
-                    );
-                }
                 if (trialSpec.interaction_type === undefined || trialSpec.interaction_type === null) {
                     throw new Error(
                         `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}].trials[${trialIndex}] ` +
                         `is missing required field "interaction_type".`
                     );
+                }
+
+                let isBoxRoom = trialSpec.interaction_type === "box_room";
+                let hasSingle = trialSpec.Fennimal !== undefined && trialSpec.Fennimal !== null;
+                let hasMulti = Array.isArray(trialSpec.Fennimals) && trialSpec.Fennimals.length > 0;
+
+                if (isBoxRoom) {
+                    if (!hasSingle && !hasMulti) {
+                        throw new Error(
+                            `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}].trials[${trialIndex}] ` +
+                            `is box_room and must define "Fennimal" or non-empty "Fennimals".`
+                        );
+                    }
+                    if (hasSingle && hasMulti) {
+                        throw new Error(
+                            `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}].trials[${trialIndex}] ` +
+                            `is box_room and sets both "Fennimal" and "Fennimals". Use one or the other.`
+                        );
+                    }
+                } else {
+                    if (!hasSingle) {
+                        throw new Error(
+                            `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}].trials[${trialIndex}] ` +
+                            `is missing required field "Fennimal".`
+                        );
+                    }
+                    if (hasMulti) {
+                        throw new Error(
+                            `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}].trials[${trialIndex}] ` +
+                            `sets "Fennimals", which is only allowed for interaction_type "box_room".`
+                        );
+                    }
                 }
             });
             return;
@@ -381,6 +547,14 @@ class TrialGenerator {
         let trials = [];
 
         trialSpecs.forEach((trialSpec, trialIndex) => {
+            if (trialSpec.interaction_type === "box_room") {
+                let ids = Array.isArray(trialSpec.Fennimals) && trialSpec.Fennimals.length > 0
+                    ? trialSpec.Fennimals
+                    : [trialSpec.Fennimal];
+                trials.push(this.buildBoxRoomTrial(ids, phaseData, `explicit trials[${trialIndex}]`));
+                return;
+            }
+
             let fenArr = this.stimuli.get_Fennimals_in_array([trialSpec.Fennimal]);
             if (!fenArr || fenArr.length === 0) {
                 throw new Error(
@@ -398,6 +572,72 @@ class TrialGenerator {
         return trials;
     }
 
+    /**
+     * box_room is one multi-Fennimal warehouse trial (never cartesian-expanded per Fennimal).
+     * Carrier FenObj (first id) is used for map placement / phone-room travel; full set is on box_room_fennimals.
+     */
+    buildBoxRoomTrial(fennimalIds, phaseData, contextLabel = "box_room") {
+        let fenArr = this.stimuli.get_Fennimals_in_array(fennimalIds);
+        if (!fenArr || fenArr.length === 0) {
+            throw new Error(
+                `TrialGenerator: no Fennimals found for box_room ids ${JSON.stringify(fennimalIds)} ` +
+                `(phase type "${phaseData.type}", ${contextLabel}).`
+            );
+        }
+        if (Array.isArray(fennimalIds) && fenArr.length !== fennimalIds.length) {
+            let foundIds = fenArr.map(f => f.id);
+            let missing = fennimalIds.filter(id => !foundIds.includes(id));
+            if (missing.length > 0) {
+                throw new Error(
+                    `TrialGenerator: unknown Fennimal id(s) ${JSON.stringify(missing)} in box_room ` +
+                    `(phase type "${phaseData.type}", ${contextLabel}).`
+                );
+            }
+        }
+
+        this.validateBoxRoomFennimalSet(fenArr, phaseData, contextLabel);
+
+        let carrier = JSON.parse(JSON.stringify(fenArr[0]));
+        carrier.interaction_type = "box_room";
+        carrier.box_room_fennimals = JSON.parse(JSON.stringify(fenArr));
+        carrier.box_room_fennimal_ids = fenArr.map(f => f.id);
+        this.applyPhaseHintTypeIfNeeded(carrier, phaseData);
+        return carrier;
+    }
+
+    validateBoxRoomFennimalSet(fenArr, phaseData, contextLabel) {
+        let toys = {};
+        let boxes = {};
+        fenArr.forEach((fen) => {
+            if (!fen.toy) {
+                throw new Error(
+                    `TrialGenerator: box_room Fennimal "${fen.id}" has no toy ` +
+                    `(phase type "${phaseData.type}", ${contextLabel}).`
+                );
+            }
+            if (!fen.toybox) {
+                throw new Error(
+                    `TrialGenerator: box_room Fennimal "${fen.id}" has no toybox ` +
+                    `(phase type "${phaseData.type}", ${contextLabel}).`
+                );
+            }
+            if (toys[fen.toy]) {
+                throw new Error(
+                    `TrialGenerator: box_room has duplicate toy "${fen.toy}" ` +
+                    `(Fennimals "${toys[fen.toy]}" and "${fen.id}"; phase type "${phaseData.type}", ${contextLabel}).`
+                );
+            }
+            if (boxes[fen.toybox]) {
+                throw new Error(
+                    `TrialGenerator: box_room has duplicate toybox "${fen.toybox}" ` +
+                    `(Fennimals "${boxes[fen.toybox]}" and "${fen.id}"; phase type "${phaseData.type}", ${contextLabel}).`
+                );
+            }
+            toys[fen.toy] = fen.id;
+            boxes[fen.toybox] = fen.id;
+        });
+    }
+
     generateCartesianMainTrials(fennimalsEncountered, interactionType, phaseData) {
         let interactionTypesArr = Array.isArray(interactionType) ? interactionType : [interactionType];
         const baseFennimalSet = this.stimuli.get_Fennimals_in_array(fennimalsEncountered);
@@ -411,9 +651,22 @@ class TrialGenerator {
 
         let mainTrials = [];
         for (let i = 0; i < interactionTypesArr.length; i++) {
+            let type = interactionTypesArr[i];
+            if (type === "box_room") {
+                // One warehouse trial for the whole Fennimal set — do not cartesian-expand.
+                mainTrials.push(
+                    this.buildBoxRoomTrial(
+                        fennimalsEncountered,
+                        phaseData,
+                        `cartesian interaction_type "box_room"`
+                    )
+                );
+                continue;
+            }
+
             let newSet = set_property_to_all_elem_in_arr(
                 "interaction_type",
-                interactionTypesArr[i],
+                type,
                 JSON.parse(JSON.stringify(baseFennimalSet))
             );
             newSet.forEach(trial => this.applyPhaseHintTypeIfNeeded(trial, phaseData));
@@ -520,7 +773,12 @@ class TrialGenerator {
             phaseData.trial_subblocks.forEach((subblock) => {
                 if (Array.isArray(subblock.trials)) {
                     subblock.trials.forEach((trialSpec) => {
-                        if (trialSpec && trialSpec.Fennimal) idSet.add(trialSpec.Fennimal);
+                        if (!trialSpec) return;
+                        if (Array.isArray(trialSpec.Fennimals)) {
+                            trialSpec.Fennimals.forEach((id) => idSet.add(id));
+                        } else if (trialSpec.Fennimal) {
+                            idSet.add(trialSpec.Fennimal);
+                        }
                     });
                 } else if (Array.isArray(subblock.Fennimals_encountered)) {
                     subblock.Fennimals_encountered.forEach((id) => idSet.add(id));
@@ -692,9 +950,58 @@ class ExperimentController {
         this.remainingQuestionnairePages = [];
     }
 
+    /**
+     * Layer 1: apply claim/assignment continuity after construction, before startExperiment.
+     */
+    async finalizeSession(earlySession) {
+        await this.dataCont.finalizeSession(earlySession);
+
+        if (this.dataCont.didRestoreAssignment) {
+            this.ensureLocationImagesLoaded(
+                this.stimuli.get_all_locations_visited_during_experiment_with_regions()
+            );
+            WorldState.rebuild_state_from_available_locations(
+                this.stimuli.get_all_locations_visited_during_experiment_with_regions()
+            );
+        }
+
+        this.installRefreshGuard();
+    }
+
+    ensureLocationImagesLoaded(arrayOfVisitedRegionsAndLocations) {
+        let holder = document.getElementById("All_Locations");
+        if (!holder || !arrayOfVisitedRegionsAndLocations) return;
+
+        for (let i = 0; i < arrayOfVisitedRegionsAndLocations.length; i++) {
+            let locationName = arrayOfVisitedRegionsAndLocations[i][0];
+            let regionName = arrayOfVisitedRegionsAndLocations[i][1];
+            if (document.getElementById("location_" + locationName)) continue;
+
+            let NewGroup = create_SVG_group(0, 0, "location", "location_" + locationName);
+            let Img = document.createElementNS("http://www.w3.org/2000/svg", "image");
+            set_location_background_image(Img, regionName, locationName);
+            Img.setAttribute("width", "100%");
+            Img.setAttribute("height", "100%");
+            Img.setAttribute("preserveAspectRatio", "none");
+            NewGroup.appendChild(Img);
+            holder.appendChild(NewGroup);
+        }
+    }
+
+    installRefreshGuard() {
+        window.addEventListener("beforeunload", (event) => {
+            if (!this.dataCont || !this.dataCont.refreshGuardArmed) return;
+            if (this.dataCont.experimentData.experimentCompleted) return;
+            event.preventDefault();
+            event.returnValue = "";
+        });
+    }
+
     startExperiment() {
         this.checkIfPhoneBoothIsNeeded();
         this.checkIfPhoneRoomAssetIsNeeded();
+        // Arm even when the instruction list has no consent page (e.g. test configs).
+        if (this.dataCont) this.dataCont.refreshGuardArmed = true;
         this.showNextGeneralInstructionsPage();
         this.mapCont.disable_map_interactions();
     }
@@ -1040,10 +1347,55 @@ class ExperimentController {
 
     phoneRoomHintClosed() {
         this.phoneRoomCont.exitRoomBeforeMap(() => {
+            // box_room is a warehouse overlay at Home — skip map autotravel entirely.
+            if (this.currentTrial && this.currentTrial.interaction_type === "box_room") {
+                this.startPhoneRoomBoxRoomTrial();
+                return;
+            }
+
             this.mapCont.autoTravelToTrialLocation(this.currentTrial, () => {
                 this.mapCont.enter_location(this.currentTrial.location, this.currentTrial.region);
             });
         });
+    }
+
+    /**
+     * Start box_room directly after the phone-room hint (no travel / enter_location).
+     * exitRoomBeforeMap hides Fennimals_Layer; re-show it so the warehouse UI can draw.
+     */
+    startPhoneRoomBoxRoomTrial() {
+        let fenObj = this.currentTrial;
+        if (!fenObj) return;
+
+        if (fenObj.visited === false || fenObj.visited === undefined) {
+            this.currentInteractionNumInPhase++;
+            fenObj.num_in_phase = this.currentInteractionNumInPhase;
+        }
+
+        if (this.currentFennimal) {
+            try { this.currentFennimal.clean_up(); } catch (err) { console.warn(err); }
+            this.currentFennimal = null;
+        }
+        clear_Fennimals_interaction_layer();
+
+        let interactionLayer = document.getElementById("Fennimals_Layer");
+        if (interactionLayer) interactionLayer.style.display = "inherit";
+
+        let partnerPresent = false;
+        let role = WorldState.get_current_partner_role();
+        if (role && role !== "absent") partnerPresent = true;
+
+        fenObj.time_since_start = Math.round(
+            (Date.now() - this.experimentStartTime) / 1000
+        );
+
+        this.currentFennimal = TrialFactory.build(
+            fenObj.interaction_type,
+            fenObj,
+            partnerPresent,
+            () => this.fennimalInteractionCompleted(fenObj)
+        );
+        if (this.currentFennimal) this.currentFennimal.start_sequence();
     }
 
     shouldReturnToPhoneRoomAfterCurrentTrial() {
@@ -1369,6 +1721,21 @@ class ExperimentController {
                 // The return leg is part of the trial lifecycle unless this is the final trial
                 // and final-return has explicitly been disabled.
                 setTimeout(() => {
+                    // box_room never left Home / never autotraveled — skip the return walk.
+                    if (fenObj.interaction_type === "box_room") {
+                        if (this.currentFennimal) {
+                            try { this.currentFennimal.clean_up(); } catch (err) { console.warn(err); }
+                            this.currentFennimal = null;
+                        }
+                        clear_Fennimals_interaction_layer();
+                        if (this.shouldReturnToPhoneRoomAfterCurrentTrial()) {
+                            this.phoneRoomReturnCompleted();
+                        } else {
+                            this.phaseCompleted();
+                        }
+                        return;
+                    }
+
                     if (this.shouldReturnToPhoneRoomAfterCurrentTrial()) {
                         this.completePhoneRoomTrialAndReturnHome(fenObj);
                     } else {

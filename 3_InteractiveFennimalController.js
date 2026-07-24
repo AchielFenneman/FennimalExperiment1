@@ -9827,6 +9827,625 @@ class CheckBoxContentsTrialController {
     }
 }
 
+// Warehouse multi-box sort: open boxes → recycle wrong contents → place each Fennimal's toy → close.
+// FenObj is a carrier (map travel); FenObj.box_room_fennimals holds the full set.
+class BoxRoomTrialController {
+    constructor(FenObj, partner_is_present, returnfunc) {
+        this.FenObj = FenObj;
+        this.returnfunc = returnfunc;
+
+        this.fennimals = (Array.isArray(FenObj.box_room_fennimals) && FenObj.box_room_fennimals.length > 0)
+            ? FenObj.box_room_fennimals
+            : [FenObj];
+
+        this.validateUniqueToysAndBoxes();
+
+        this.basics = new BasicElementsModule(FenObj);
+        this.partner = new PartnerModule(partner_is_present);
+
+        this.boxScale = 3.2;
+        this.toyScale = 3.2;
+        this.tableY = 0.72 * this.basics.H;
+        this.topRowY = 0.28 * this.basics.H;
+        this.binProximityX = 220;
+        this.placeDropDistance = 200;
+
+        this.boxEntries = [];
+        this.topRowToys = []; // { fen, module, startX, startY, fromBox }
+        this.recycleToys = []; // { toyName, module, dragController }
+        this.binBack = null;
+        this.binFront = null;
+        this.binCenter = null;
+        this.binStackCount = 0;
+        this.activeDragController = null;
+        this.TableGroup = null;
+        this.Background = null;
+        this.BackgroundOverlay = null;
+        this.FloorStrip = null;
+    }
+
+    validateUniqueToysAndBoxes() {
+        let toys = {};
+        let boxes = {};
+        this.fennimals.forEach((fen) => {
+            if (toys[fen.toy]) {
+                throw new Error(
+                    `box_room: duplicate toy "${fen.toy}" for Fennimals "${toys[fen.toy]}" and "${fen.id}".`
+                );
+            }
+            if (boxes[fen.toybox]) {
+                throw new Error(
+                    `box_room: duplicate toybox "${fen.toybox}" for Fennimals "${boxes[fen.toybox]}" and "${fen.id}".`
+                );
+            }
+            toys[fen.toy] = fen.id;
+            boxes[fen.toybox] = fen.id;
+        });
+    }
+
+    async start_sequence() {
+        this.basics.create_svg_sublayers();
+        if (this.partner.is_present) {
+            this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        }
+
+        if (Interface.Locator && Interface.Locator.change_locator_name) {
+            Interface.Locator.change_locator_name("Warehouse");
+        }
+
+        await this.setup_warehouse_background();
+        this.draw_table();
+        this.maybe_create_toy_bin();
+        await this.place_boxes_on_table();
+        await this.spawn_initial_top_row_toys();
+        await wait(500);
+
+        await this.open_all_boxes();
+        await this.recycle_wrong_contents_if_needed();
+        await this.place_all_toys_into_boxes();
+        await this.close_all_boxes();
+
+        Interface.Prompt.show_message("Good work! All the toys are now safe!");
+        await wait(1800);
+        this.returnfunc();
+    }
+
+    async setup_warehouse_background() {
+        let whiteMask = create_SVG_rect(0, 0, this.basics.W, this.basics.H);
+        whiteMask.setAttribute("fill", "white");
+        whiteMask.style.opacity = 0;
+        this.basics.ItemLayers.Neg1.appendChild(whiteMask);
+
+        this.Background = document.createElementNS("http://www.w3.org/2000/svg", "image");
+        this.Background.setAttribute("href", "./Locations/Home_lostfound.png");
+        this.Background.setAttribute("width", "100%");
+        this.Background.setAttribute("height", "100%");
+        this.Background.setAttribute("preserveAspectRatio", "none");
+        this.Background.style.opacity = 0;
+        this.Background.style.transition = "opacity 500ms ease-in-out";
+        this.basics.ItemLayers.Neg1.appendChild(this.Background);
+
+        // Dark floor strip under the overlay (image has no floor of its own).
+        let floorH = 0.1 * this.basics.H;
+        this.FloorStrip = create_SVG_rect(0, this.basics.H - floorH, this.basics.W, floorH);
+        this.FloorStrip.setAttribute("fill", "#3E2723");
+        this.FloorStrip.style.opacity = 0;
+        this.FloorStrip.style.pointerEvents = "none";
+        this.FloorStrip.style.transition = "opacity 500ms ease-in-out";
+        this.basics.ItemLayers.Neg1.appendChild(this.FloorStrip);
+
+        // Soften the photo + floor so table / toys / bin read clearly on top.
+        this.BackgroundOverlay = create_SVG_rect(0, 0, this.basics.W, this.basics.H);
+        this.BackgroundOverlay.setAttribute("fill", "white");
+        this.BackgroundOverlay.style.opacity = 0;
+        this.BackgroundOverlay.style.pointerEvents = "none";
+        this.BackgroundOverlay.style.transition = "opacity 500ms ease-in-out";
+        this.basics.ItemLayers.Neg1.appendChild(this.BackgroundOverlay);
+
+        window.getComputedStyle(this.Background).opacity;
+        whiteMask.style.transition = "opacity 500ms ease-in-out";
+        whiteMask.style.opacity = 1;
+        this.Background.style.opacity = 1;
+        this.FloorStrip.style.opacity = 1;
+        this.BackgroundOverlay.style.opacity = 0.5;
+        await wait(550);
+    }
+
+    draw_table() {
+        this.TableGroup = create_SVG_group(0, 0);
+        this.basics.ItemLayers.Neg1.appendChild(this.TableGroup);
+
+        let table_w = 0.82 * this.basics.W;
+        let table_h = 70;
+        let table_x = (this.basics.W - table_w) / 2;
+        let table_y = this.tableY;
+
+        const leg_width = 30;
+        const leg_height = 220;
+        const leg_positions = [
+            table_x + 0.05 * table_w,
+            table_x + 0.95 * table_w - leg_width,
+            table_x + 0.25 * table_w,
+            table_x + 0.75 * table_w - leg_width
+        ];
+
+        leg_positions.forEach((lx) => {
+            let leg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            leg.setAttribute("x", lx);
+            leg.setAttribute("y", table_y + 30);
+            leg.setAttribute("width", leg_width);
+            leg.setAttribute("height", leg_height);
+            leg.setAttribute("fill", "#4E342E");
+            this.TableGroup.appendChild(leg);
+        });
+
+        let top = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        top.setAttribute("x", table_x);
+        top.setAttribute("y", table_y);
+        top.setAttribute("width", table_w);
+        top.setAttribute("height", table_h);
+        top.setAttribute("rx", 15);
+        top.setAttribute("fill", "#795548");
+        this.TableGroup.appendChild(top);
+
+        let lip = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        lip.setAttribute("x", table_x);
+        lip.setAttribute("y", table_y + table_h - 10);
+        lip.setAttribute("width", table_w);
+        lip.setAttribute("height", 10);
+        lip.setAttribute("fill", "#3E2723");
+        this.TableGroup.appendChild(lip);
+    }
+
+    anyBoxNeedsRecycling() {
+        return this.fennimals.some((fen) => {
+            let contents = WorldState.get_toybox_contents(fen.toybox);
+            return !!(contents && contents !== fen.toy);
+        });
+    }
+
+    maybe_create_toy_bin() {
+        if (!this.anyBoxNeedsRecycling()) return;
+
+        let template = document.getElementById("toy_bin");
+        if (!template) {
+            console.error("box_room: #toy_bin not found in SVG assets");
+            return;
+        }
+
+        let binX = 0.1 * this.basics.W;
+        let binY = this.tableY + 50;
+        let scale = this.boxScale;
+
+        // Back mesh on Main (under fallen toys); front mesh on Plus1 (over fallen toys).
+        this.binBack = copy_scale_and_move_object_to_position(
+            template,
+            this.basics.ItemLayers.Main,
+            binX,
+            binY,
+            scale,
+            "box_room_toy_bin_back"
+        );
+        let frontOnBack = this.binBack.querySelector(".toy_bin_front");
+        if (frontOnBack) frontOnBack.remove();
+        this.binBack.style.pointerEvents = "none";
+
+        this.binFront = copy_scale_and_move_object_to_position(
+            template,
+            this.basics.ItemLayers.Plus1,
+            binX,
+            binY,
+            scale,
+            "box_room_toy_bin_front"
+        );
+        let backOnFront = this.binFront.querySelector(".toy_bin_back");
+        if (backOnFront) backOnFront.remove();
+        this.binFront.style.pointerEvents = "none";
+
+        this.binCenter = getSVGInternalCenter(this.binBack);
+        this.binAboveLeft = { x: this.binCenter.x - 45, y: this.binCenter.y - 200 };
+        this.binAboveRight = { x: this.binCenter.x + 45, y: this.binCenter.y - 200 };
+    }
+
+    async place_boxes_on_table() {
+        let ordered = shuffleArray([...this.fennimals]);
+        let n = ordered.length;
+        let usableW = 0.7 * this.basics.W;
+        let left = (this.basics.W - usableW) / 2;
+        // Keep clear of the toy bin on the left.
+        if (this.binCenter) {
+            left = Math.max(left, this.binCenter.x + 200);
+            usableW = this.basics.W - left - 0.08 * this.basics.W;
+        }
+        let spacing = usableW / (n + 1);
+        let boxY = this.tableY - 8;
+
+        for (let i = 0; i < ordered.length; i++) {
+            let fen = ordered[i];
+            let boxX = left + spacing * (i + 1);
+            let box = new BoxModule(fen);
+            await box.create_and_appear_box(
+                this.basics.ItemLayers.Main,
+                this.basics.ItemLayers.Plus2,
+                boxX,
+                boxY,
+                this.boxScale,
+                180
+            );
+            box.set_pointer_events_enabled(false);
+
+            let contents = WorldState.get_toybox_contents(fen.toybox);
+            this.boxEntries.push({
+                fen,
+                box,
+                boxX,
+                boxY,
+                contents,
+                contentsIsCorrect: !!(contents && contents === fen.toy),
+                contentsIsWrong: !!(contents && contents !== fen.toy),
+                contentsToyModule: null
+            });
+            await wait(80);
+        }
+    }
+
+    async spawn_initial_top_row_toys() {
+        // Place each free toy directly above its (already shuffled) box.
+        // Toys already correctly inside their box join the top row only after that box opens.
+        for (let entry of this.boxEntries) {
+            if (entry.contentsIsCorrect) continue;
+
+            let toyMod = new StandardToyModule(entry.fen);
+            await toyMod.create_and_appear_toy(
+                this.basics.ItemLayers.Plus1,
+                "box_room_top_" + entry.fen.id,
+                entry.boxX,
+                this.topRowY,
+                this.toyScale,
+                150
+            );
+            toyMod.ToyElement.style.pointerEvents = "none";
+            this.topRowToys.push({
+                fen: entry.fen,
+                module: toyMod,
+                startX: entry.boxX,
+                startY: this.topRowY,
+                fromBox: false
+            });
+        }
+    }
+
+    async animateToyToPoint(toyElement, targetX, targetY, ms = 450) {
+        let current = getSVGInternalCenter(toyElement);
+        let dx = targetX - current.x;
+        let dy = targetY - current.y;
+        toyElement.style.transition = `transform ${ms}ms ease-in-out`;
+        toyElement.style.transform += ` translate(${dx}px, ${dy}px)`;
+        await wait(ms);
+    }
+
+    clearBoxWorldState(toybox) {
+        WorldState.clear_toybox_contents(toybox);
+        if (this.partner.is_present) {
+            WorldState.change_partner_belief_in_box_contents(toybox, false);
+        }
+    }
+
+    async open_all_boxes() {
+        Interface.Prompt.show_message(
+            this.partner.is_present
+                ? (this.partner.partnername + " will open the boxes")
+                : "Open all the boxes"
+        );
+        await wait(700);
+
+        for (let entry of this.boxEntries) {
+            await this.open_one_box(entry);
+        }
+    }
+
+    async open_one_box(entry) {
+        entry.box.set_pointer_events_enabled(true);
+
+        if (entry.contentsIsWrong) {
+            entry.contentsToyModule = new StandardToyModule({ toy: entry.contents });
+            let boxTarget = getSVGInternalCenter(
+                entry.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0]
+            );
+            await entry.contentsToyModule.create_and_appear_toy(
+                this.basics.ItemLayers.Plus1,
+                "box_room_old_" + entry.fen.id,
+                boxTarget.x,
+                boxTarget.y,
+                this.boxScale,
+                0
+            );
+        } else if (entry.contentsIsCorrect) {
+            // Safety path: correct toy is already inside — reveal under lid, then move to top row.
+            entry.contentsToyModule = new StandardToyModule(entry.fen);
+            let boxTarget = getSVGInternalCenter(
+                entry.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0]
+            );
+            await entry.contentsToyModule.create_and_appear_toy(
+                this.basics.ItemLayers.Plus1,
+                "box_room_correct_from_box_" + entry.fen.id,
+                boxTarget.x,
+                boxTarget.y,
+                this.boxScale,
+                0
+            );
+        }
+
+        if (this.partner.is_present) {
+            Interface.Prompt.show_message(
+                this.partner.partnername + " opens the " + entry.box.boxname
+            );
+            await this.partner.move_to_element_and_act(entry.box.BoxBase, () => entry.box.open_box());
+            await wait(350);
+        } else {
+            await new Promise((resolve) => {
+                entry.box.wait_for_user_click("open", () => resolve());
+            });
+            await wait(250);
+        }
+
+        entry.box.set_pointer_events_enabled(false);
+
+        if (entry.contentsIsCorrect && entry.contentsToyModule) {
+            // Lift the correct toy to sit above its own box (same X as the shuffled table slot).
+            await this.animateToyToPoint(
+                entry.contentsToyModule.ToyElement,
+                entry.boxX,
+                this.topRowY,
+                500
+            );
+            entry.contentsToyModule.ToyElement.style.pointerEvents = "none";
+            this.topRowToys.push({
+                fen: entry.fen,
+                module: entry.contentsToyModule,
+                startX: entry.boxX,
+                startY: this.topRowY,
+                fromBox: true
+            });
+            entry.contentsToyModule = null;
+            this.clearBoxWorldState(entry.fen.toybox);
+            entry.contents = false;
+            entry.contentsIsCorrect = false;
+        } else if (entry.contentsIsWrong && entry.contentsToyModule) {
+            this.recycleToys.push({
+                toyName: entry.contents,
+                module: entry.contentsToyModule,
+                dragController: null,
+                fen: entry.fen
+            });
+            entry.contentsToyModule = null;
+            this.clearBoxWorldState(entry.fen.toybox);
+            entry.contents = false;
+            entry.contentsIsWrong = false;
+        }
+    }
+
+    async recycle_wrong_contents_if_needed() {
+        if (this.recycleToys.length === 0) return;
+
+        if (!this.binCenter) {
+            this.maybe_create_toy_bin();
+        }
+
+        Interface.Prompt.show_message("Drag the old toys into the toy bin");
+        AudioCont.play_sound_effect("alert_minor");
+
+        await new Promise((resolve) => {
+            let remaining = this.recycleToys.length;
+
+            const onOneRecycled = () => {
+                remaining--;
+                if (remaining <= 0) {
+                    Interface.Prompt.hide();
+                    resolve();
+                } else {
+                    Interface.Prompt.show_message("Drag the old toys into the toy bin");
+                }
+            };
+
+            this.recycleToys.forEach((rec) => {
+                rec.module.ToyElement.style.pointerEvents = "auto";
+                rec.dragController = new MakeObjectDraggableObject(
+                    this.basics.ItemLayers.Main,
+                    this.basics.ItemLayers.Plus2,
+                    rec.module.ToyElement,
+                    this.binBack || this.binFront,
+                    this.binProximityX,
+                    async (DraggedToyElement) => {
+                        if (rec.dragController && rec.dragController.destroy) {
+                            rec.dragController.destroy();
+                        }
+                        rec.dragController = null;
+                        DraggedToyElement.style.pointerEvents = "none";
+                        DraggedToyElement.style.cursor = "auto";
+                        await this.animateToyIntoBin(DraggedToyElement);
+                        onOneRecycled();
+                    },
+                    {
+                        validateDrop: () => {
+                            if (!this.binCenter) return false;
+                            let toyCenter = getSVGInternalCenter(rec.module.ToyElement);
+                            return Math.abs(toyCenter.x - this.binCenter.x) <= this.binProximityX;
+                        },
+                        onMiss: () => {
+                            Interface.Prompt.show_message("Drop the toy near the toy bin");
+                            if (rec.dragController && rec.dragController.enable) {
+                                rec.dragController.enable();
+                            }
+                        }
+                    }
+                );
+            });
+        });
+    }
+
+    async animateToyIntoBin(toyElement) {
+        let stackIndex = this.binStackCount;
+        this.binStackCount++;
+
+        let above = (stackIndex % 2 === 0) ? this.binAboveLeft : this.binAboveRight;
+        let finalX = this.binCenter.x + ((stackIndex % 2 === 0) ? -35 : 35);
+        let finalY = this.binCenter.y + 55 - stackIndex * 22;
+
+        // Between bin back (Main) and bin front (Plus1) so the mesh occludes the fall.
+        this.basics.ItemLayers.Main.appendChild(toyElement);
+        await this.animateToyToPoint(toyElement, above.x, above.y, 280);
+        toyElement.style.transition = "transform 400ms ease-in";
+        let cur = getSVGInternalCenter(toyElement);
+        toyElement.style.transform += ` translate(${finalX - cur.x}px, ${finalY - cur.y}px)`;
+        await wait(420);
+    }
+
+    async place_all_toys_into_boxes() {
+        let order = shuffleArray([...this.boxEntries]);
+
+        for (let entry of order) {
+            let topToy = this.topRowToys.find((t) => t.fen.id === entry.fen.id);
+            if (!topToy) {
+                console.error("box_room: missing top-row toy for Fennimal " + entry.fen.id);
+                continue;
+            }
+            await this.place_one_toy(entry, topToy);
+        }
+    }
+
+    // Same pattern as BoxModule.wait_for_user_click: Base + Top so the full box pulses.
+    highlightBox(box) {
+        if (!box || !box.BoxBase || !box.BoxTop) return null;
+        let outline = create_SVG_outline_of_multiple_groups(box.BoxBase, box.BoxTop);
+        box.BoxBase.parentNode.insertBefore(outline, box.BoxBase);
+        outline.classList.add("focus_on_SVG_outline");
+        outline.style.pointerEvents = "none";
+        return outline;
+    }
+
+    async place_one_toy(entry, topToy) {
+        let toyName = entry.fen.toy;
+        let boxName = entry.box.boxname;
+
+        Interface.Prompt.show_message(
+            "Please place the " + toyName + " into the " + boxName + "."
+        );
+        AudioCont.play_sound_effect("alert_minor");
+
+        // Toy outline comes from MakeObjectDraggableObject (hides while dragging, like toy_to_box).
+        // Box uses Base+Top outline so the full open box highlights, not just the back.
+        let boxOutline = this.highlightBox(entry.box);
+        entry.box.set_pointer_events_enabled(false);
+        topToy.module.ToyElement.style.pointerEvents = "auto";
+
+        // Refresh home position after any prior transforms so miss-snap returns here.
+        let home = getSVGInternalCenter(topToy.module.ToyElement);
+        topToy.startX = home.x;
+        topToy.startY = home.y;
+
+        await new Promise((resolve) => {
+            this.activeDragController = new MakeObjectDraggableObject(
+                this.basics.ItemLayers.Main,
+                this.basics.ItemLayers.Plus2,
+                topToy.module.ToyElement,
+                entry.box.BoxBase,
+                this.placeDropDistance,
+                async (DroppedToyElement) => {
+                    if (this.activeDragController && this.activeDragController.destroy) {
+                        this.activeDragController.destroy();
+                    }
+                    this.activeDragController = null;
+                    if (boxOutline) boxOutline.remove();
+
+                    let boxTarget = entry.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0];
+                    await animate_magnetic_drop(
+                        DroppedToyElement,
+                        boxTarget,
+                        this.basics.ItemLayers.Plus1
+                    );
+
+                    WorldState.change_toybox_contents(entry.fen.toybox, entry.fen.toy);
+                    if (this.partner.is_present) {
+                        WorldState.change_partner_belief_in_box_contents(entry.fen.toybox, entry.fen.toy);
+                    }
+                    resolve();
+                },
+                {
+                    validateDrop: (dist) => dist < this.placeDropDistance,
+                    onStart: () => {
+                        if (boxOutline) boxOutline.classList.remove("focus_on_SVG_outline");
+                    },
+                    onMiss: () => {
+                        Interface.Prompt.show_message(
+                            "Please place the " + toyName + " into the " + boxName + "."
+                        );
+                        if (boxOutline) boxOutline.classList.add("focus_on_SVG_outline");
+                        if (this.activeDragController && this.activeDragController.enable) {
+                            this.activeDragController.enable();
+                        }
+                    }
+                }
+            );
+        });
+    }
+
+    async close_all_boxes() {
+        Interface.Prompt.show_message(
+            this.partner.is_present
+                ? (this.partner.partnername + " will close the boxes")
+                : "Close all the boxes"
+        );
+        await wait(600);
+
+        for (let entry of this.boxEntries) {
+            entry.box.set_pointer_events_enabled(true);
+            if (this.partner.is_present) {
+                Interface.Prompt.show_message(
+                    this.partner.partnername + " closes the " + entry.box.boxname
+                );
+                await this.partner.move_to_element_and_act(
+                    entry.box.BoxBase,
+                    () => entry.box.close_box()
+                );
+                await wait(250);
+            } else {
+                await new Promise((resolve) => {
+                    entry.box.wait_for_user_click("close", () => resolve());
+                });
+                await wait(150);
+            }
+            entry.box.set_pointer_events_enabled(false);
+        }
+    }
+
+    clean_up() {
+        if (this.activeDragController && this.activeDragController.destroy) {
+            this.activeDragController.destroy();
+            this.activeDragController = null;
+        }
+        this.recycleToys.forEach((rec) => {
+            if (rec.dragController && rec.dragController.destroy) rec.dragController.destroy();
+            if (rec.module) rec.module.clean_up();
+        });
+        this.topRowToys.forEach((t) => {
+            if (t.module) t.module.clean_up();
+        });
+        this.boxEntries.forEach((entry) => {
+            if (entry.contentsToyModule) entry.contentsToyModule.clean_up();
+            if (entry.box) entry.box.clean_up();
+        });
+        if (this.binBack) this.binBack.remove();
+        if (this.binFront) this.binFront.remove();
+        if (this.TableGroup) this.TableGroup.remove();
+        if (this.Background) this.Background.remove();
+        if (this.BackgroundOverlay) this.BackgroundOverlay.remove();
+        if (this.FloorStrip) this.FloorStrip.remove();
+        this.basics.clean_up();
+        if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
+    }
+}
+
 class TrialFactory {
     // The "static" keyword lets us call this function directly on the class
     static build(interaction_type, FenObj, partner_is_present, returnfunc) {
@@ -9856,6 +10475,9 @@ class TrialFactory {
 
             case "toy_to_box":
                 return new ToyToBoxTrialController(FenObj, partner_is_present, returnfunc);
+
+            case "box_room":
+                return new BoxRoomTrialController(FenObj, partner_is_present, returnfunc);
 
             case "photo_box":
                 return new PhotoTrialController(FenObj, partner_is_present, returnfunc, "toybox");

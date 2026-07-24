@@ -1,5 +1,45 @@
 GENERALPARAM = function () {
 
+    // When true: assign toy/box colors via the hue-space algorithm (avoids region/box/toy clashes),
+    // overwrite ToyData ColorSchemes for used toys, fill BoxColorSchemes, and paint SVG templates once.
+    // When false/undefined: keep baked box SVG fills and the predefined ToyData ColorSchemes.
+    this.use_color_algorithm_to_pick_colors = true;
+
+    // Hue families aligned with RegionData.color_description (+ gray). Used by the color algorithm.
+    // `cluster` groups perceptually similar families — boxes may take at most one hue per cluster.
+    // Box colors use light_color/dark_color (punchier). Toys use the muted toy_* variants.
+    this.ColorHuePalettes = {
+        blue:     { angle: 220, cluster: "cool",    light_color: "#8ea4f8", dark_color: "#0020ac", toy_light_color: "#9aa8c8", toy_dark_color: "#3d4f7a" },
+        green:    { angle: 110, cluster: "cool",    light_color: "#b5e092", dark_color: "#235412", toy_light_color: "#b0c49a", toy_dark_color: "#4a5e3a" },
+        yellow:   { angle: 58,  cluster: "warm",    light_color: "#f5e84a", dark_color: "#757500", toy_light_color: "#d4ce8e", toy_dark_color: "#7a7538" },
+        brown:    { angle: 25,  cluster: "warm",    light_color: "#c4a882", dark_color: "#3d220f", toy_light_color: "#c4b5a5", toy_dark_color: "#5c4535" },
+        sand:     { angle: 40,  cluster: "warm",    light_color: "#efe0c4", dark_color: "#8a6a3a", toy_light_color: "#e0d5c5", toy_dark_color: "#8a7a60" },
+        lavender: { angle: 310, cluster: "cool",    light_color: "#e8b3ff", dark_color: "#890fbd", toy_light_color: "#cbb8d4", toy_dark_color: "#6a5080" },
+        red:      { angle: 5,   cluster: "warm",    light_color: "#ff6b6b", dark_color: "#9a0000", toy_light_color: "#d4a4a4", toy_dark_color: "#7a3838" },
+        teal:     { angle: 170, cluster: "cool",    light_color: "#7eefe0", dark_color: "#025e4c", toy_light_color: "#a8c4c0", toy_dark_color: "#3d5c58" },
+        gray:     { angle: null, cluster: "neutral", light_color: "#d4d4d4", dark_color: "#555555", toy_light_color: "#d0d0d0", toy_dark_color: "#666666" },
+    };
+
+    // Boxes must be at least this many degrees apart on the hue wheel (gray is always "far").
+    this.ColorAlgorithmMinBoxHueDistance = 75;
+    // Toy light vs dark channels should be at least this far apart (dual-tone, not monochrome).
+    this.ColorAlgorithmMinToyDualToneDistance = 90;
+    // Toy identity hues (primary or secondary) should stay at least this far from other toys' hues.
+    this.ColorAlgorithmMinToyPairwiseDistance = 50;
+
+    // Box accent materials (box_color_accent). Assigned uniquely across boxes in an experiment.
+    this.ColorAccentMaterials = {
+        gold:    { accent_color: "#d4aa00" },
+        silver:  { accent_color: "#b0b8c0" },
+        copper:  { accent_color: "#b87333" },
+        wood:    { accent_color: "#8b6914" },
+        neutral: { accent_color: "#6e6e6e" },
+    };
+
+    // Filled at runtime when use_color_algorithm_to_pick_colors is true.
+    // { [boxId]: { light_color, dark_color, accent_color, hue_family, accent_material } }
+    this.BoxColorSchemes = {};
+
     //Defines the sequence of the starting instructions
 
     this.GeneralInstructions = {

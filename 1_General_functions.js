@@ -1208,6 +1208,7 @@ function get_all_values_in_array_of_objects(key, Arr){
 }
 
 function set_toy_color_scheme(ToySVG, toy_type, use_alternate_color){
+    if (!ToySVG || !GenParam.ToyData[toy_type]) return;
     let LightElem = ToySVG.getElementsByClassName("item_col_light")
     for(let i =0;i<LightElem.length;i++){
         if(use_alternate_color === true){
@@ -1225,6 +1226,450 @@ function set_toy_color_scheme(ToySVG, toy_type, use_alternate_color){
             DarkElem[i].style.fill = GenParam.ToyData[toy_type].ColorScheme.dark_color
         }
     }
+}
+
+function set_box_color_scheme(BoxSVG, box_type){
+    if (!BoxSVG || !GenParam.BoxColorSchemes || !GenParam.BoxColorSchemes[box_type]) return;
+    let scheme = GenParam.BoxColorSchemes[box_type];
+
+    let LightElem = BoxSVG.getElementsByClassName("box_color_light");
+    for (let i = 0; i < LightElem.length; i++) {
+        LightElem[i].style.fill = scheme.light_color;
+    }
+    let DarkElem = BoxSVG.getElementsByClassName("box_color_dark");
+    for (let i = 0; i < DarkElem.length; i++) {
+        DarkElem[i].style.fill = scheme.dark_color;
+    }
+    let AccentElem = BoxSVG.getElementsByClassName("box_color_accent");
+    for (let i = 0; i < AccentElem.length; i++) {
+        AccentElem[i].style.fill = scheme.accent_color;
+    }
+}
+
+/** Paint every loaded toy_* template from current ToyData ColorSchemes (call once at experiment start). */
+function paint_all_toy_color_templates() {
+    if (!GenParam || !GenParam.ToyData) return;
+    for (let toy_id in GenParam.ToyData) {
+        let template = document.getElementById("toy_" + toy_id);
+        if (template) set_toy_color_scheme(template, toy_id, false);
+    }
+}
+
+/** Paint every box template that has an entry in BoxColorSchemes (call once after color assignment). */
+function paint_all_box_color_templates() {
+    if (!GenParam || !GenParam.BoxColorSchemes) return;
+    for (let box_id in GenParam.BoxColorSchemes) {
+        let template = document.getElementById("toybox_" + box_id);
+        if (template) set_box_color_scheme(template, box_id);
+    }
+}
+
+/**
+ * Re-apply a previously saved colorAssignment overview (Layer 1 session restore).
+ * Expects the object returned by assign_experiment_item_colors().
+ */
+function apply_saved_color_assignment(overview) {
+    if (!overview || !GenParam) return false;
+
+    if (overview.boxes && typeof overview.boxes === "object") {
+        GenParam.BoxColorSchemes = {};
+        for (let box_id in overview.boxes) {
+            let box = overview.boxes[box_id];
+            GenParam.BoxColorSchemes[box_id] = {
+                hue_family: box.hue_family,
+                accent_material: box.accent_material,
+                light_color: box.light_color,
+                dark_color: box.dark_color,
+                accent_color: box.accent_color
+            };
+        }
+    }
+
+    if (overview.toys && typeof overview.toys === "object") {
+        for (let toy_id in overview.toys) {
+            let toy = overview.toys[toy_id];
+            if (!GenParam.ToyData[toy_id]) {
+                console.warn("apply_saved_color_assignment: no ToyData for toy '" + toy_id + "'");
+                continue;
+            }
+            GenParam.ToyData[toy_id].ColorScheme = {
+                light_color: toy.light_color,
+                dark_color: toy.dark_color
+            };
+        }
+    }
+
+    return true;
+}
+
+function get_region_hue_family(region_name) {
+    if (!region_name || !GenParam.RegionData[region_name]) return null;
+    let desc = GenParam.RegionData[region_name].color_description;
+    if (desc && GenParam.ColorHuePalettes[desc]) return desc;
+    if (region_name === "Home") return "gray";
+    return null;
+}
+
+function hue_family_angular_distance(hue_a, hue_b) {
+    if (hue_a === hue_b) return 0;
+    let pa = GenParam.ColorHuePalettes[hue_a];
+    let pb = GenParam.ColorHuePalettes[hue_b];
+    if (!pa || !pb) return 180;
+    // Gray is treated as maximally distinct from chromatic hues.
+    if (pa.angle === null || pb.angle === null) return 180;
+    let d = Math.abs(pa.angle - pb.angle) % 360;
+    return d > 180 ? 360 - d : d;
+}
+
+/**
+ * Assign box + toy colors for this experiment's Fennimals.
+ * Overwrites ToyData[toy].ColorScheme for used toys and fills GenParam.BoxColorSchemes.
+ * Returns a serializable overview for DataController.
+ *
+ * Priorities: (1) boxes distinct (2) toys distinct (3) toy ≠ co-occurring box
+ *             (4) box ≠ regions that use it (5) toy ≠ own region (hard).
+ */
+function assign_experiment_item_colors(fennimalArr) {
+    const chromatic_hues = Object.keys(GenParam.ColorHuePalettes).filter(
+        (h) => GenParam.ColorHuePalettes[h].angle !== null
+    );
+    const all_assignable_hues = chromatic_hues.concat(["gray"]);
+    const accent_materials = Object.keys(GenParam.ColorAccentMaterials);
+
+    const box_regions = {}; // boxId -> Set of hue families
+    const box_toys = {};
+    const toy_region = {};
+    const toy_box = {};
+    const used_regions = [];
+
+    fennimalArr.forEach((fen) => {
+        if (fen.region) used_regions.push(fen.region);
+        let region_hue = get_region_hue_family(fen.region);
+        if (fen.toybox) {
+            if (!box_regions[fen.toybox]) box_regions[fen.toybox] = new Set();
+            if (!box_toys[fen.toybox]) box_toys[fen.toybox] = new Set();
+            if (region_hue) box_regions[fen.toybox].add(region_hue);
+            if (fen.toy) box_toys[fen.toybox].add(fen.toy);
+        }
+        if (fen.toy) {
+            toy_region[fen.toy] = region_hue;
+            toy_box[fen.toy] = fen.toybox || null;
+        }
+    });
+
+    const blocked_hues = [...new Set(
+        used_regions.map(get_region_hue_family).filter(Boolean)
+    )];
+    const free_hues = all_assignable_hues.filter((h) => !blocked_hues.includes(h));
+    // Prefer free hues, but gray is always available as a fallback identity.
+    if (!free_hues.includes("gray")) free_hues.push("gray");
+
+    const boxes = Object.keys(box_regions);
+    const toys = Object.keys(toy_region);
+
+    function min_distance_to_set(hue, other_hues) {
+        if (!other_hues.length) return 180;
+        return Math.min(...other_hues.map((o) => hue_family_angular_distance(hue, o)));
+    }
+
+    function best_hue_from_candidates(candidates, avoid_hues, already_assigned) {
+        let pool = candidates.length ? candidates : all_assignable_hues;
+        // Soft preference: drop hard-avoid hues if anything remains.
+        let filtered = pool.filter((h) => !avoid_hues.includes(h));
+        if (!filtered.length) filtered = pool.slice();
+
+        let best = null;
+        let best_score = -1;
+        // Shuffle ties for participant-level variation.
+        shuffleArray(filtered).forEach((h) => {
+            let score = min_distance_to_set(h, already_assigned.concat(avoid_hues));
+            // Prefer free hues slightly when scores tie.
+            if (free_hues.includes(h)) score += 0.5;
+            if (score > best_score) {
+                best_score = score;
+                best = h;
+            }
+        });
+        return best || "gray";
+    }
+
+    // --- Step 1: box dominant hues (P1 + P4) ---
+    // Prefer free hues, but also allow blocked hues that are not forbidden for *this* box
+    // (so a warm-only free pool can still pair with blue/teal/etc. from unused-on-this-box regions).
+    // Reject same perceptual cluster twice (e.g. sand+red) and pairs below min angular distance.
+    const MIN_BOX_HUE_DIST = GenParam.ColorAlgorithmMinBoxHueDistance || 75;
+
+    function box_hue_cluster(hue) {
+        let p = GenParam.ColorHuePalettes[hue];
+        return (p && p.cluster) ? p.cluster : "other";
+    }
+
+    function score_box_assignment(assignment) {
+        let hues = Object.values(assignment);
+        let min_pair = 180;
+        let sum_pair = 0;
+        let free_count = 0;
+        let clusters = {};
+
+        for (let i = 0; i < hues.length; i++) {
+            if (free_hues.includes(hues[i])) free_count++;
+            let c = box_hue_cluster(hues[i]);
+            // Neutral (gray) may repeat; warm/cool may not.
+            if (c !== "neutral") {
+                clusters[c] = (clusters[c] || 0) + 1;
+                if (clusters[c] > 1) {
+                    return { valid: false, min_pair: -1, sum_pair: -1, free_count: 0 };
+                }
+            }
+            for (let j = i + 1; j < hues.length; j++) {
+                let d = hue_family_angular_distance(hues[i], hues[j]);
+                min_pair = Math.min(min_pair, d);
+                sum_pair += d;
+            }
+        }
+        if (hues.length < 2) min_pair = 180;
+        if (min_pair < MIN_BOX_HUE_DIST) {
+            return { valid: false, min_pair: min_pair, sum_pair: sum_pair, free_count: free_count };
+        }
+        return { valid: true, min_pair: min_pair, sum_pair: sum_pair, free_count: free_count };
+    }
+
+    function is_better_box_score(sc, best) {
+        if (!sc.valid) return false;
+        if (!best.valid) return true;
+        if (sc.min_pair !== best.min_pair) return sc.min_pair > best.min_pair;
+        if (sc.free_count !== best.free_count) return sc.free_count > best.free_count;
+        return sc.sum_pair > best.sum_pair;
+    }
+
+    function enumerate_box_assignments() {
+        let candidate_lists = boxes.map((b) => {
+            let forbidden = [...box_regions[b]];
+            // Union of free + any assignable hue not forbidden for this box (cool blocked hues OK).
+            let list = all_assignable_hues.filter((h) => !forbidden.includes(h));
+            if (!list.length) list = ["gray"];
+            // Stable preference: shuffle within free vs non-free so ties vary, but both are searched.
+            let preferred = shuffleArray(list.filter((h) => free_hues.includes(h)));
+            let other = shuffleArray(list.filter((h) => !free_hues.includes(h)));
+            return preferred.concat(other);
+        });
+
+        let best_assignment = null;
+        let best_score = { valid: false, min_pair: -1, sum_pair: -1, free_count: -1 };
+
+        function recurse(idx, current) {
+            if (idx === boxes.length) {
+                let sc = score_box_assignment(current);
+                if (is_better_box_score(sc, best_score)) {
+                    best_score = sc;
+                    best_assignment = Object.assign({}, current);
+                }
+                return;
+            }
+            let box = boxes[idx];
+            candidate_lists[idx].forEach((hue) => {
+                current[box] = hue;
+                recurse(idx + 1, current);
+            });
+        }
+
+        if (boxes.length === 0) return {};
+        recurse(0, {});
+
+        // Last resort if nothing met the distance/cluster rules: fall back to prior max-distance pick.
+        if (!best_assignment) {
+            let loose_best = null;
+            let loose_score = { min_pair: -1, sum_pair: -1 };
+            function loose_recurse(idx, current) {
+                if (idx === boxes.length) {
+                    let hues = Object.values(current);
+                    let min_pair = 180;
+                    let sum_pair = 0;
+                    for (let i = 0; i < hues.length; i++) {
+                        for (let j = i + 1; j < hues.length; j++) {
+                            let d = hue_family_angular_distance(hues[i], hues[j]);
+                            min_pair = Math.min(min_pair, d);
+                            sum_pair += d;
+                        }
+                    }
+                    if (hues.length < 2) min_pair = 180;
+                    if (min_pair > loose_score.min_pair ||
+                        (min_pair === loose_score.min_pair && sum_pair > loose_score.sum_pair)) {
+                        loose_score = { min_pair, sum_pair };
+                        loose_best = Object.assign({}, current);
+                    }
+                    return;
+                }
+                candidate_lists[idx].forEach((hue) => {
+                    current[boxes[idx]] = hue;
+                    loose_recurse(idx + 1, current);
+                });
+            }
+            loose_recurse(0, {});
+            console.warn("Color algorithm: no box assignment met min distance/cluster rules; using max-distance fallback.");
+            return loose_best || {};
+        }
+        return best_assignment;
+    }
+
+    const box_hues = enumerate_box_assignments();
+
+    // --- Box accents: unique materials ---
+    const box_accents = {};
+    const accent_pool = shuffleArray(accent_materials.slice());
+    boxes.forEach((b, i) => {
+        box_accents[b] = accent_pool[i % accent_pool.length];
+    });
+
+    // Write BoxColorSchemes
+    GenParam.BoxColorSchemes = {};
+    boxes.forEach((b) => {
+        let hue = box_hues[b] || "gray";
+        let palette = GenParam.ColorHuePalettes[hue];
+        let accent_key = box_accents[b];
+        GenParam.BoxColorSchemes[b] = {
+            hue_family: hue,
+            accent_material: accent_key,
+            light_color: palette.light_color,
+            dark_color: palette.dark_color,
+            accent_color: GenParam.ColorAccentMaterials[accent_key].accent_color,
+        };
+    });
+
+    // --- Step 2: toys (P2 + P3 + P5 hard) ---
+    // Each toy gets a dual-tone pair: dark = primary identity hue, light = a second hue
+    // far from the primary (and still avoiding own region / own box).
+    // Toy fills use muted toy_* palette entries so they read softer than boxes.
+    const MIN_TOY_DUAL = GenParam.ColorAlgorithmMinToyDualToneDistance || 90;
+    const MIN_TOY_PAIR = GenParam.ColorAlgorithmMinToyPairwiseDistance || 50;
+    const toy_hues = {};
+    const toy_secondary_hues = {};
+    // Track every hue already used on any toy (primary or secondary) to avoid teal-on-teal clashes.
+    const assigned_toy_hues = [];
+
+    function toy_palette_colors(hue) {
+        let p = GenParam.ColorHuePalettes[hue];
+        return {
+            light_color: p.toy_light_color || p.light_color,
+            dark_color: p.toy_dark_color || p.dark_color,
+        };
+    }
+
+    // Least-flexible first: fewer candidate hues after hard constraints.
+    let toy_order = toys.slice().sort((a, b) => {
+        let forbid_a = [toy_region[a], box_hues[toy_box[a]]].filter(Boolean);
+        let forbid_b = [toy_region[b], box_hues[toy_box[b]]].filter(Boolean);
+        let cand_a = all_assignable_hues.filter((h) => !forbid_a.includes(h)).length;
+        let cand_b = all_assignable_hues.filter((h) => !forbid_b.includes(h)).length;
+        return cand_a - cand_b;
+    });
+
+    function pick_toy_secondary_hue(primary_hue, hard_avoid, used_hues) {
+        let avoid = hard_avoid.concat([primary_hue]);
+        let candidates = all_assignable_hues.filter((h) => !avoid.includes(h));
+        if (!candidates.length) {
+            candidates = all_assignable_hues.filter((h) => h !== primary_hue);
+        }
+
+        let best = null;
+        let best_score = -1;
+        shuffleArray(candidates).forEach((h) => {
+            let d_primary = hue_family_angular_distance(h, primary_hue);
+            if (d_primary < MIN_TOY_DUAL && candidates.some(
+                (c) => hue_family_angular_distance(c, primary_hue) >= MIN_TOY_DUAL
+            )) {
+                return;
+            }
+            // Prefer hues not already used on other toys (and not near them).
+            let d_others = min_distance_to_set(h, used_hues);
+            if (d_others < MIN_TOY_PAIR && candidates.some(
+                (c) => !avoid.includes(c) && min_distance_to_set(c, used_hues) >= MIN_TOY_PAIR
+                    && hue_family_angular_distance(c, primary_hue) >= MIN_TOY_DUAL
+            )) {
+                return;
+            }
+            let score = d_primary + d_others;
+            let p_cluster = GenParam.ColorHuePalettes[primary_hue]
+                ? GenParam.ColorHuePalettes[primary_hue].cluster : null;
+            let h_cluster = GenParam.ColorHuePalettes[h]
+                ? GenParam.ColorHuePalettes[h].cluster : null;
+            if (p_cluster && h_cluster && p_cluster !== h_cluster) score += 25;
+            if (used_hues.includes(h)) score -= 80;
+            if (score > best_score) {
+                best_score = score;
+                best = h;
+            }
+        });
+        return best || (primary_hue === "gray" ? "yellow" : "gray");
+    }
+
+    toy_order.forEach((toy_id) => {
+        let hard_avoid = [];
+        if (toy_region[toy_id]) hard_avoid.push(toy_region[toy_id]); // P5
+        if (toy_box[toy_id] && box_hues[toy_box[toy_id]]) hard_avoid.push(box_hues[toy_box[toy_id]]); // P3
+
+        let candidates = all_assignable_hues.filter((h) => !hard_avoid.includes(h));
+        // Prefer hues far from already-assigned toy hues (primary + secondary of others).
+        let primary = best_hue_from_candidates(candidates, hard_avoid, assigned_toy_hues);
+        if (hard_avoid.includes(primary)) {
+            primary = all_assignable_hues.find((h) => !hard_avoid.includes(h)) || "gray";
+        }
+        // Soft-reject primaries that collide with an already-used toy hue when alternatives exist.
+        if (assigned_toy_hues.includes(primary) || min_distance_to_set(primary, assigned_toy_hues) < MIN_TOY_PAIR) {
+            let alt = shuffleArray(candidates.slice()).find((h) =>
+                !assigned_toy_hues.includes(h) && min_distance_to_set(h, assigned_toy_hues) >= MIN_TOY_PAIR
+            );
+            if (alt) primary = alt;
+        }
+
+        let secondary = pick_toy_secondary_hue(primary, hard_avoid, assigned_toy_hues);
+
+        toy_hues[toy_id] = primary;
+        toy_secondary_hues[toy_id] = secondary;
+        assigned_toy_hues.push(primary, secondary);
+
+        let dark = toy_palette_colors(primary);
+        let light = toy_palette_colors(secondary);
+        if (GenParam.ToyData[toy_id]) {
+            GenParam.ToyData[toy_id].ColorScheme = {
+                light_color: light.light_color,
+                dark_color: dark.dark_color,
+            };
+        } else {
+            console.warn("assign_experiment_item_colors: no ToyData for toy '" + toy_id + "'");
+        }
+    });
+
+    return {
+        algorithm: "hue_space_v1",
+        used_regions: [...new Set(used_regions)],
+        blocked_hues: blocked_hues.slice(),
+        free_hues: free_hues.slice(),
+        boxes: boxes.reduce((acc, b) => {
+            acc[b] = {
+                hue_family: GenParam.BoxColorSchemes[b].hue_family,
+                accent_material: GenParam.BoxColorSchemes[b].accent_material,
+                light_color: GenParam.BoxColorSchemes[b].light_color,
+                dark_color: GenParam.BoxColorSchemes[b].dark_color,
+                accent_color: GenParam.BoxColorSchemes[b].accent_color,
+                regions_using_box: [...box_regions[b]],
+                toys_in_box: [...(box_toys[b] || [])],
+            };
+            return acc;
+        }, {}),
+        toys: toys.reduce((acc, t) => {
+            acc[t] = {
+                primary_hue: toy_hues[t],
+                secondary_hue: toy_secondary_hues[t],
+                light_color: GenParam.ToyData[t] ? GenParam.ToyData[t].ColorScheme.light_color : null,
+                dark_color: GenParam.ToyData[t] ? GenParam.ToyData[t].ColorScheme.dark_color : null,
+                own_region_hue: toy_region[t],
+                own_box: toy_box[t],
+                own_box_hue: toy_box[t] ? box_hues[toy_box[t]] : null,
+            };
+            return acc;
+        }, {}),
+    };
 }
 
 //Randomization functions

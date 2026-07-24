@@ -1514,6 +1514,16 @@ class InstructionsController {
                     mainText: `${displayName} wants to decorate their box!`
                 };
 
+            case "box_room":
+                return {
+                    ...baseConfig,
+                    type: "boxes",
+                    mainText: "Lets store the toys in a safe space",
+                    locationText: "We're heading to the warehouse",
+                    regionText: "at Home.",
+                    instructionText: "Close this message to continue."
+                };
+
             default:
                 // Placeholder for other interaction types (broken_toy_in_box, broken_toy_no_box, dirty_toy, fly_swat, etc.).
                 // Keep the slumped Fennimal until type-specific copy/visuals are written.
@@ -1536,6 +1546,9 @@ class InstructionsController {
                 break;
             case "box":
                 this.createPhoneRoomBoxHintVisual(hintConfig.trialObj);
+                break;
+            case "boxes":
+                this.createPhoneRoomMultiBoxHintVisual(hintConfig.trialObj);
                 break;
             default:
                 this.createPhoneRoomPlaceholderHintVisual(hintConfig);
@@ -1625,6 +1638,49 @@ class InstructionsController {
         boxIcon.style.opacity = 0;
 
         this.phoneRoomHintSequentialElements.push(boxIcon);
+    }
+
+    // box_room: show every toybox in the trial side-by-side.
+    createPhoneRoomMultiBoxHintVisual(trialObj) {
+        let fens = (Array.isArray(trialObj.box_room_fennimals) && trialObj.box_room_fennimals.length > 0)
+            ? trialObj.box_room_fennimals
+            : [trialObj];
+
+        let group = create_SVG_group(0, 0, "instruction_element_nonbackground", undefined);
+        group.classList.add("phone_room_hint_sequential");
+        group.style.display = "none";
+        group.style.opacity = 0;
+        this.currentInstructionsSVG.appendChild(group);
+
+        let n = fens.length;
+        let scale = n >= 3 ? 2.3 : 2.7;
+        let spacing = n >= 3 ? 320 : 380;
+        let centerX = GenParam.SVG_width / 2;
+        let centerY = GenParam.SVG_height / 2 - 170;
+        let startX = centerX - ((n - 1) * spacing) / 2;
+
+        fens.forEach((fen, i) => {
+            if (!fen || !fen.toybox) return;
+            let boxTemplate = document.getElementById("toybox_" + fen.toybox);
+            if (!boxTemplate) return;
+
+            let boxIcon = copy_scale_and_move_object_to_position(
+                boxTemplate,
+                group,
+                startX + i * spacing,
+                centerY,
+                scale
+            );
+            apply_toybox_decoration_visibility_to_element(boxIcon, fen.toybox);
+        });
+
+        if (group.childNodes.length === 0) {
+            group.remove();
+            this.createPhoneRoomPlaceholderHintVisual({ type: "box" });
+            return;
+        }
+
+        this.phoneRoomHintSequentialElements.push(group);
     }
 
     makePhoneRoomToyStatic(toyIcon, toyId) {

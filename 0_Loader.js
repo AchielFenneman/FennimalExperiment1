@@ -174,7 +174,7 @@ async function attempt_raster_swap_for_regions(regions_array) {
 }
 
 //This sets all the global variables
-function set_all_global_variables(){
+async function set_all_global_variables(){
     //Loading SVG Elements
     //SVG_loader = new SVG_LOADER()
 
@@ -189,9 +189,90 @@ function set_all_global_variables(){
 
     WorldState = new WorldStateObject()
 
-    // MINIMAL FIXES: Updated to prevent naming collision and use camelCase initialization
-    topController = new ExperimentController()
-    topController.startExperiment()
+    // Module scripts are deferred; wait briefly so Firebase helpers are on window.
+    await waitForFirebaseSessionHelpers();
+
+    // Layer 1: resolve PID claim before building / randomizing the experiment world
+    let earlySession = { mode: "anonymous", sessionId: String(Date.now()) };
+    if (typeof window.resolveParticipantSessionClaim === "function") {
+        try {
+            earlySession = await window.resolveParticipantSessionClaim();
+        } catch (err) {
+            console.warn("Session claim lookup failed; continuing as new session", err);
+            let pid = null;
+            try {
+                let raw = new URL(window.location.href).searchParams.get("PROLIFIC_PID");
+                pid = raw ? raw.substring(0, 10) : null;
+            } catch (e) { /* ignore */ }
+            earlySession = { mode: "new", pid: pid, sessionId: String(Date.now()) };
+        }
+    }
+
+    if (earlySession.mode === "blocked_completed") {
+        showParticipantBlockedScreen(earlySession.message);
+        return;
+    }
+
+    if (earlySession.expCode) {
+        window.__FORCE_EXPERIMENT_CODE__ = earlySession.expCode;
+    }
+
+    topController = new ExperimentController();
+    await topController.finalizeSession(earlySession);
+    topController.startExperiment();
+}
+
+async function waitForFirebaseSessionHelpers(timeoutMs = 8000) {
+    let start = Date.now();
+    while (typeof window.resolveParticipantSessionClaim !== "function") {
+        if (Date.now() - start > timeoutMs) {
+            console.warn("Firebase session helpers not ready; session lock may be inactive this load");
+            return false;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 40));
+    }
+    return true;
+}
+
+function showParticipantBlockedScreen(message) {
+    let overlay = document.createElement("div");
+    overlay.id = "session_blocked_overlay";
+    overlay.style.cssText = [
+        "position:fixed",
+        "inset:0",
+        "z-index:99999",
+        "display:flex",
+        "align-items:center",
+        "justify-content:center",
+        "padding:32px",
+        "box-sizing:border-box",
+        "background:#f7f4ef",
+        "font-family:'Source Sans 3', 'PT Sans', sans-serif",
+        "color:#1f2a33"
+    ].join(";");
+
+    let card = document.createElement("div");
+    card.style.cssText = [
+        "max-width:640px",
+        "width:100%",
+        "background:#fff",
+        "border:1px solid #d7d2c8",
+        "padding:36px 40px",
+        "line-height:1.5"
+    ].join(";");
+
+    let title = document.createElement("h1");
+    title.textContent = "Study already completed";
+    title.style.cssText = "margin:0 0 16px 0;font-size:28px;font-weight:700;";
+
+    let body = document.createElement("p");
+    body.textContent = message || "You have already completed this study.";
+    body.style.cssText = "margin:0;font-size:18px;";
+
+    card.appendChild(title);
+    card.appendChild(body);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
 }
 
 //This object loads all the location images to their correct place (called after stimulus determination)
@@ -200,6 +281,8 @@ ImageLoader = function(Array_of_visited_regions_and_locations, LocationHolderEle
     for(let i = 0; i < Array_of_visited_regions_and_locations.length; i++){
         let locationName = Array_of_visited_regions_and_locations[i][0];
         let regionName = Array_of_visited_regions_and_locations[i][1];
+        if (document.getElementById("location_" + locationName)) continue;
+
         let NewGroup = create_SVG_group(0,0,"location","location_" + locationName )
         let Img = document.createElementNS("http://www.w3.org/2000/svg", 'image')
         set_location_background_image(Img, regionName, locationName)
@@ -238,7 +321,7 @@ async function loadMainElements(){
 
 
         //Setting all globals
-        set_all_global_variables()
+        await set_all_global_variables()
 
     }
     catch (ex) {
