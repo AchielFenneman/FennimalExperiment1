@@ -1,6 +1,6 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["test"];
+    this.Experiment_Code = ["mentalizing_AB"];
 
     const All_Instructions_At_Start = {
         test: [],

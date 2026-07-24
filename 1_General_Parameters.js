@@ -7,7 +7,7 @@ GENERALPARAM = function () {
 
     // When true (and use_color_algorithm_to_pick_colors): also overwrite ToyData ColorSchemes from the algorithm.
     // When false: keep the predefined ToyData palettes (pilot default while box colors are tested).
-    this.use_color_algorithm_for_toy_colors = false;
+    this.use_color_algorithm_for_toy_colors = true;
 
     // Hue families aligned with RegionData.color_description (+ gray). Used by the color algorithm.
     // `cluster` groups perceptually similar families — boxes may take at most one hue per cluster.
