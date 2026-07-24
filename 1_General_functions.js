@@ -1331,6 +1331,40 @@ function apply_saved_color_assignment(overview) {
     return true;
 }
 
+/**
+ * Clean assignment snapshots omit region-derived ColorSchemes. Rebuild them for runtime SVG painting.
+ */
+function ensure_fennimal_runtime_color_scheme(fenObj, useContrastColorForHead) {
+    if (!fenObj) return fenObj;
+    if (fenObj.ColorScheme && fenObj.ColorScheme.Head && fenObj.ColorScheme.Body) return fenObj;
+    if (!fenObj.region || !GenParam || !GenParam.RegionData || !GenParam.RegionData[fenObj.region]) {
+        console.warn("ensure_fennimal_runtime_color_scheme: cannot rebuild colors for", fenObj && fenObj.id);
+        return fenObj;
+    }
+
+    let region = GenParam.RegionData[fenObj.region];
+    let locColors = region.Fennimal_location_colors;
+    let headTertiary = useContrastColorForHead === true
+        ? region.contrast_color
+        : locColors.tertiary_color;
+
+    fenObj.ColorScheme = {
+        Head: {
+            primary_color: locColors.primary_color,
+            secondary_color: locColors.secondary_color,
+            tertiary_color: headTertiary,
+            eye_color: locColors.eye_color
+        },
+        Body: {
+            primary_color: locColors.primary_color,
+            secondary_color: locColors.secondary_color,
+            tertiary_color: locColors.tertiary_color
+        }
+    };
+    if (!fenObj.color_scheme_origin) fenObj.color_scheme_origin = "region";
+    return fenObj;
+}
+
 function get_region_hue_family(region_name) {
     if (!region_name || !GenParam.RegionData[region_name]) return null;
     let desc = GenParam.RegionData[region_name].color_description;

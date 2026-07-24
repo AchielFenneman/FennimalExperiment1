@@ -918,6 +918,11 @@ let StimulusTransformer = function (StimTemplate) {
         FennimalObjArr.length = 0;
         JSON.parse(JSON.stringify(savedFennimals)).forEach((fen) => FennimalObjArr.push(fen));
 
+        // Clean Firebase/local snapshots strip region ColorSchemes; map/trial rendering needs them.
+        FennimalObjArr.forEach((fen) =>
+            ensure_fennimal_runtime_color_scheme(fen, StimTemplate.use_constract_color_for_head)
+        );
+
         if (savedColorOverview && GenParam.use_color_algorithm_to_pick_colors === true) {
             apply_saved_color_assignment(savedColorOverview);
             paint_all_box_color_templates();
