@@ -103,6 +103,9 @@ class AudioControllerObject {
             garden_shear_snip: "garden_shears_snip.mp3",
             travel: "travel.mp3",
 
+            scanning: "scanning.mp3",
+            scanner_return: "scanner_return.mp3",
+
         };
 
         // 3. MEMORY MANAGEMENT
@@ -194,6 +197,8 @@ class AudioControllerObject {
         let audio = this.ActiveSoundCache[effect];
         this.LastPlayedTimestamps[effect] = Date.now();
         audio.loop = true;
+        audio.volume = 1.0;
+        if (effect === "scanning") audio.volume = 0.35;
         audio.play().catch(e => console.warn("Audio blocked:", e));
     }
 

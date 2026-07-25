@@ -565,6 +565,9 @@ class TrialGenerator {
 
             let trial = JSON.parse(JSON.stringify(fenArr[0]));
             trial.interaction_type = trialSpec.interaction_type;
+            if (trialSpec.interaction_type === "scan_box_inventory") {
+                trial.skip_phone_room_autotravel = true;
+            }
             this.applyPhaseHintTypeIfNeeded(trial, phaseData);
             trials.push(trial);
         });
@@ -601,6 +604,7 @@ class TrialGenerator {
         carrier.interaction_type = "box_room";
         carrier.box_room_fennimals = JSON.parse(JSON.stringify(fenArr));
         carrier.box_room_fennimal_ids = fenArr.map(f => f.id);
+        carrier.skip_phone_room_autotravel = true;
         this.applyPhaseHintTypeIfNeeded(carrier, phaseData);
         return carrier;
     }
@@ -669,7 +673,12 @@ class TrialGenerator {
                 type,
                 JSON.parse(JSON.stringify(baseFennimalSet))
             );
-            newSet.forEach(trial => this.applyPhaseHintTypeIfNeeded(trial, phaseData));
+            newSet.forEach(trial => {
+                this.applyPhaseHintTypeIfNeeded(trial, phaseData);
+                if (type === "scan_box_inventory") {
+                    trial.skip_phone_room_autotravel = true;
+                }
+            });
             mainTrials.push(...newSet);
         }
 
@@ -1351,24 +1360,38 @@ class ExperimentController {
     }
 
     phoneRoomHintClosed() {
-        this.phoneRoomCont.exitRoomBeforeMap(() => {
-            // box_room is a warehouse overlay at Home — skip map autotravel entirely.
-            if (this.currentTrial && this.currentTrial.interaction_type === "box_room") {
-                this.startPhoneRoomBoxRoomTrial();
-                return;
-            }
+        // Capture before any async phone-room teardown.
+        let trial = this.currentTrial;
+        let skipTravel = this.isHomeOverlayPhoneRoomTrial(trial);
 
+        if (skipTravel) {
+            // Stay at Home narratively: tear down the phone UI without revealing the map
+            // (exitRoomBeforeMap would flash the map and look like travel is starting).
+            this.phoneRoomCont.exitRoomKeepInteractionLayer(() => {
+                this.startPhoneRoomHomeOverlayTrial();
+            });
+            return;
+        }
+
+        this.phoneRoomCont.exitRoomBeforeMap(() => {
             this.mapCont.autoTravelToTrialLocation(this.currentTrial, () => {
                 this.mapCont.enter_location(this.currentTrial.location, this.currentTrial.region);
             });
         });
     }
 
+    isHomeOverlayPhoneRoomTrial(trial) {
+        if (!trial) return false;
+        if (trial.skip_phone_room_autotravel === true) return true;
+        let type = trial.interaction_type;
+        return type === "box_room" || type === "scan_box_inventory";
+    }
+
     /**
-     * Start box_room directly after the phone-room hint (no travel / enter_location).
+     * Start a Home overlay trial after the phone-room hint (no travel / enter_location).
      * exitRoomBeforeMap hides Fennimals_Layer; re-show it so the warehouse UI can draw.
      */
-    startPhoneRoomBoxRoomTrial() {
+    startPhoneRoomHomeOverlayTrial() {
         let fenObj = this.currentTrial;
         if (!fenObj) return;
 
@@ -1726,8 +1749,8 @@ class ExperimentController {
                 // The return leg is part of the trial lifecycle unless this is the final trial
                 // and final-return has explicitly been disabled.
                 setTimeout(() => {
-                    // box_room never left Home / never autotraveled — skip the return walk.
-                    if (fenObj.interaction_type === "box_room") {
+                    // Home overlays never left Home / never autotraveled — skip the return walk.
+                    if (this.isHomeOverlayPhoneRoomTrial(fenObj)) {
                         if (this.currentFennimal) {
                             try { this.currentFennimal.clean_up(); } catch (err) { console.warn(err); }
                             this.currentFennimal = null;

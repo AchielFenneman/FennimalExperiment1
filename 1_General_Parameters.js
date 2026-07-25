@@ -1,6 +1,6 @@
 GENERALPARAM = function () {
 
-    // When true: assign box colors via the hue-space algorithm OR curated sets (see use_curated_color_sets).
+    // When true: run hybrid box coloring (baked baseline + conflict swaps) and/or toy algorithm.
     // Toy recoloring is controlled separately by use_color_algorithm_for_toy_colors.
     // When false/undefined: keep baked box SVG fills and the predefined ToyData ColorSchemes.
     this.use_color_algorithm_to_pick_colors = true;
@@ -8,9 +8,49 @@ GENERALPARAM = function () {
     // When true (and use_color_algorithm_to_pick_colors): also overwrite ToyData ColorSchemes.
     this.use_color_algorithm_for_toy_colors = true;
 
-    // Pilot path: pick a curated candidate pool and assign with region-aware bans
-    // (shared boxes ban the union of their regions' hues; muted region hues OK elsewhere).
-    this.use_curated_color_sets = true;
+    // Legacy pilot path (full algorithmic/curated recolor of every box). Prefer hybrid baseline instead.
+    this.use_curated_color_sets = false;
+
+    // Baked box identity hues (match the default SVG looks).
+    this.BoxBaselineHue = {
+        container: "green",
+        chest: "blue",
+        crate: "yellow",
+        picknick: "brown",
+    };
+
+    // If a box appears in any of these regions, its baked colors clash → algorithmic light/mid swap.
+    this.BoxRegionColorConflicts = {
+        container: ["Jungle", "Swamp"],
+        chest: ["North", "Swamp"],
+        crate: ["Desert"],
+        picknick: ["Mountains", "Beach"],
+    };
+
+    // Preferred hues for conflict swaps: light/mid, memorable (avoid muddy darks).
+    // Gray is intentionally omitted — last-resort fallback only in the assigner.
+    this.BoxSwapPreferredHues = [
+        "lavender", "coral", "pink", "magenta", "cyan", "lime", "orange", "sand"
+    ];
+
+    // Light + mid dual-tones for swapped boxes only (accents stay baked in the SVG).
+    this.BoxSwapPalettes = {
+        lavender: { light_color: "#e8c4ff", mid_color: "#b070d0" },
+        coral:    { light_color: "#ffb498", mid_color: "#e06848" },
+        pink:     { light_color: "#ffc0d4", mid_color: "#d05080" },
+        magenta:  { light_color: "#f0b0e8", mid_color: "#c040a0" },
+        cyan:     { light_color: "#9ee8f0", mid_color: "#20a0b0" },
+        lime:     { light_color: "#d4f080", mid_color: "#78a020" },
+        orange:   { light_color: "#ffc090", mid_color: "#d06820" },
+        sand:     { light_color: "#f2e6d0", mid_color: "#c4a060" },
+        gray:     { light_color: "#e8e8e8", mid_color: "#888888" },
+        red:      { light_color: "#ffb0b0", mid_color: "#d04040" },
+        teal:     { light_color: "#9fd8d0", mid_color: "#3a9088" },
+        yellow:   { light_color: "#f5ec8a", mid_color: "#c0b020" },
+        blue:     { light_color: "#b0c4f8", mid_color: "#4060c0" },
+        green:    { light_color: "#c8e0a0", mid_color: "#609040" },
+        brown:    { light_color: "#e0c8a8", mid_color: "#a07848" },
+    };
 
     // Hue families aligned with RegionData.color_description (+ gray). Used by the color algorithm.
     // `cluster` groups perceptually similar families — boxes may take at most one hue per cluster.
@@ -78,9 +118,11 @@ GENERALPARAM = function () {
         neutral: { accent_color: "#6e6e6e" },
     };
 
-    // Filled at runtime when color assignment runs.
-    // { [boxId]: { light_color, dark_color, accent_color, hue_family, accent_material } }
+    // Filled at runtime: only conflict-swapped boxes (baseline boxes keep baked SVG fills).
+    // { [boxId]: { light_color, dark_color, hue_family, recolor_accents, source } }
     this.BoxColorSchemes = {};
+    // Effective identity hue per box in this run (baseline or swap) — used for toy bans.
+    this.BoxEffectiveHues = {};
 
     // Curated candidate pools for the pilot. Assignment is region-aware:
     // - box banned hues = union of region hues for every Fennimal using that box
@@ -906,6 +948,40 @@ GENERALPARAM = function () {
         partnerWitnessLiftY: -90,
         partnerWitnessGapX: 220,
         bindingOutlineStrokeWidth: 22
+    }
+
+    // Scan box for inventory (scan_box_inventory)
+    this.ScanBoxInventory = {
+        boxScale: 3.2,
+        scannerScale: 3.4,
+        tableY: 0.72,
+        boxX: 0.22,
+        scannerX: 0.72,
+        // Lift scanner center above tableY so the feet rest on the tabletop (not the floor).
+        scannerLift: 220,
+        tableWidth: 0.32,
+        dropDistance: 200,
+        introPromptMs: 1000,
+        outroPromptMs: 2800,
+        outroFadeMs: 250,
+        scanDurationMs: 25000,
+        shieldFadeMs: 280,
+        nozzleReturnMs: 300,
+        snapMs: 280,
+        startButtonOnBg: "#1a2332",
+        startButtonOnText: "#9ec5ff",
+        startButtonOffBg: "#ececec",
+        startButtonOffText: "#8a8a8a",
+        laserOutputIdle: "#800000",
+        laserOutputActive: "#ff1a1a",
+        laserBeamColor: "#ff3333",
+        laserBeamGlow: "#ff8888",
+        laserBeamLength: 285,
+        // Fan of beams from the nozzle output (degrees from vertical).
+        laserBeamAnglesDeg: [-12, -6, 0, 6, 12],
+        // Tip wiggle around each beam's base angle (origin stays fixed).
+        laserBeamWiggleDeg: 2.5,
+        laserBeamWiggleHz: 2.8
     }
 }
 

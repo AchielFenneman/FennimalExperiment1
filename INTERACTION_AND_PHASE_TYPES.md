@@ -268,7 +268,7 @@ If the box already holds a **different** toy: opening reveals it → participant
 **Needs:** `toy`, `toybox`.
 
 #### `box_room` → `BoxRoomTrialController`
-Multi-Fennimal warehouse sort (one trial for the whole set — **not** cartesian-expanded per Fennimal). Home warehouse background, low table with boxes in random order, correct toys in a top row, optional toy bin on the left.
+Multi-Fennimal warehouse sort (one trial for the whole set — **not** cartesian-expanded per Fennimal). One box per screen: each Fennimal gets a full open → recycle → place → close cycle before a fade-to-black transition to the next. Home warehouse background + low table persist across screens.
 
 **Stimulus forms (both create a single trial)**
 ```js
@@ -280,17 +280,19 @@ Multi-Fennimal warehouse sort (one trial for the whole set — **not** cartesian
 // or single: { Fennimal: "S1", interaction_type: "box_room" }
 ```
 
-Carrier FenObj (first id) is used for map / phone-room travel. Full set is stored on `FenObj.box_room_fennimals` / `box_room_fennimal_ids`.
+Carrier FenObj (first id) is used for map / phone-room travel. Full set is stored on `FenObj.box_room_fennimals` / `box_room_fennimal_ids`. Presentation order (shuffled at runtime) is stored on `FenObj.box_room_order` (array of Fennimal ids).
 
 **Throws at trial generation** if the set has duplicate `toy` or duplicate `toybox` values.
 
-**Sequence**
-1. Open all boxes (partner slides one-by-one if present; else click).
-2. Wrong contents → become recyclable; WorldState + partner belief cleared to empty.
-3. Correct contents already in box (safety) → animate to either side of the top row; same clear.
-4. If any wrong toys: drag to toy bin (magnetic near bin X → snap L/R above bin → fall between bin back/front mesh into stacked Y). Bin stays visible.
-5. For each box in random order: highlight matching top-row toy; only that toy / that box is a valid drop; WorldState + partner belief updated on drop (box stays open).
-6. Close all boxes → “Good work! All the toys are now safe!” → complete.
+**Per-box sequence** (boxes in shuffled `box_room_order`; only the current box + its toy are on screen)
+1. Open the box (partner walks in and opens if present; else click).
+2. Wrong contents → recyclable; WorldState + partner belief cleared to empty. Toy bin appears only on screens that need recycling.
+3. Correct contents already in box (safety) → animate to the top row; same clear.
+4. If wrong toy present: drag to toy bin (magnetic near bin X → snap L/R above bin → fall between bin back/front mesh).
+5. Place the matching top-row toy into the open box; WorldState + partner belief updated on drop.
+6. Close the box (partner walks in if present; else click).
+7. Confirmation: “The [toy] is now safely in the [box name]!”
+8. If more boxes remain: fade to black (600ms ease-in-out), set up the next box under black, fade in.
 
 **Needs on each FenObj in the set:** `toy`, `toybox`. No Fennimals drawn on screen.
 

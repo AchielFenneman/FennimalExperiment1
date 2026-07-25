@@ -1,18 +1,30 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["mentalizing_AB"];
+    this.Experiment_Code = ["mentalizing_AC"];
 
     const All_Instructions_At_Start = {
         test: [],
         mentalizing_network: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
         mentalizing: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
         mentalizing_AB: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
+        mentalizing_AC: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
     };
 
     // ----------------------------------------------------
     // DICTIONARY OF FENNIMAL TEMPLATES
     // Key: The unique Fennimal ID
     // Value: The required and optional properties
+    //
+    // ID convention (mentalizing / partner-belief experiments):
+    // IDs are NOT entirely arbitrary. Prefix + index encode structure that
+    // downstream tasks rely on — do not rename casually when authoring new
+    // experiment codes that reuse these pipelines:
+    //   - "S*" / "P*" → shared vs private information wave (partner-belief
+    //     memory probes: prompt wording, same-wave foils, option roles)
+    //   - Matching toybox codes across S# and P# (e.g. S1+P1 → toybox "A")
+    //     → co-box mates for probes and false-belief box reuse
+    // Experiments without partner / toybox / wave distinctions can use any
+    // IDs; just avoid S/P prefixes if you do not want wave logic to apply.
     // ----------------------------------------------------
     const All_Fennimal_Sets = {
         test: {
@@ -38,6 +50,12 @@ let StimulusSettings = function () {
             "P1": { head: "D", region: "D", toy: "D", toybox: "A" },
             "P2": { head: "E", region: "E", toy: "E", toybox: "B" },
         },
+        mentalizing_AC: {
+            "S1": { head: "A", region: "A", toy: "A", toybox: "A" },
+            "S2": { head: "B", region: "B", toy: "B", toybox: "B" },
+            "P1": { head: "D", region: "D", toy: "D", toybox: "A" },
+            "P2": { head: "E", region: "E", toy: "E", toybox: "B" },
+        },
     };
 
     // ----------------------------------------------------
@@ -45,36 +63,23 @@ let StimulusSettings = function () {
     // ----------------------------------------------------
     let All_Experiment_Structures = {
         test: [
-
-            
-            
+            // Jump straight to the DV for local UI / probe testing.
+            // Controller auto-seeds false-belief WorldState when boxes are empty
+            // (partner beliefs ≠ current contents). Memory probes use the S/P wave
+            // prompts + co-box mate / same-wave foil triad (test set mirrors AB: 4 Fennimals, boxes A/B).
             {
-                type: "phone_room",
-                partner_behavior: "active",
-                trial_subblocks: [
-                    {
-                        Fennimals_encountered: ["S1", "S2"],
-                        interaction_type: "box_room"
-                    }
+                type: "partner_belief_individual_boxes",
+                include_practice_trial: false,
+                num_belief_blocks: 1,
+                include_reality_block_at_end: true,
+                include_memory_probe_at_end: true,
+                bonus_stars_per_correct_answer: 1,
+                memory_probe_isi_ms: 1000,
+                questions: [
+                    { question_id: "belief_A", target_box: "A" },
+                    { question_id: "belief_B", target_box: "B" },
                 ]
             },
-
-            {
-                type: "phone_room",
-                partner_behavior: "passive",
-                trial_subblocks: [
-                    {
-                        Fennimals_encountered: ["P1", "P2"],
-                        interaction_type: "box_room"
-                    }
-                ]
-            },
-            
-           
-            // Starts here for UI testing. Controller auto-seeds false-belief WorldState when
-            // boxes are empty (partner beliefs ≠ current contents). In the full mentalizing
-            // structure this state is created by shared then private toy_to_box play.
-           
         ],
 
 
@@ -206,6 +211,8 @@ let StimulusSettings = function () {
             },
 
             // BLOCK 5: Partner belief (individual boxes)
+            // Memory probes (when enabled): box→Fennimal uses S/P wave prompts +
+            // correct / co_box_mate / same_wave_foil; Fennimal→toy unchanged.
             {
                 type: "partner_belief_individual_boxes",
                 include_practice_trial: true,
@@ -349,6 +356,135 @@ let StimulusSettings = function () {
             },
 
             // BLOCK 5: Partner belief (individual boxes)
+            // Memory probes (when enabled): box→Fennimal uses S/P wave prompts +
+            // correct / co_box_mate / same_wave_foil; Fennimal→toy unchanged.
+            {
+                type: "partner_belief_individual_boxes",
+                include_practice_trial: true,
+                num_belief_blocks: 1,
+                include_reality_block_at_end: true,
+                include_memory_probe_at_end: true,
+                bonus_stars_per_correct_answer: 1,
+                memory_probe_isi_ms: 1000,
+                questions: [
+                    { question_id: "belief_A", target_box: "A" },
+                    { question_id: "belief_B", target_box: "B" },
+                ]
+            },
+
+
+
+        ],
+        mentalizing_AC: [
+
+            // BLOCK 1: Introduction to shared Fennimals
+            {
+                type: "free_exploration",
+                interaction_type: ["Fennimal_toy"],
+                Fennimals_encountered: ["S1", "S2"],
+                partner_behavior: "active",
+                include_Fennefinder: true,
+                force_climbing_tower_first: true
+            },
+
+            // BLOCK 2: Main shared block
+            {
+                type: "phone_room",
+                partner_behavior: "active",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                ask_Fennimal: true,
+                ask_toy: true,
+                ask_box: true,
+                trial_subblocks: [
+                    {
+                        Fennimals_encountered: ["S1", "S2"],
+                        interaction_type: "broken_toy_no_box"
+                    },
+                    {
+                        Fennimals_encountered: ["S1", "S2"],
+                        interaction_type: "Fennimal_toy"
+                    },
+                    
+                    {
+                        Fennimals_encountered: ["S1", "S2"],
+                        interaction_type: "box_room"
+                    },
+                    {
+                        trials: [
+                            { Fennimal: "S1", interaction_type: "joint_box_decoration" },
+                        ]
+                    },
+                    {
+                        trials: [
+                            { Fennimal: "S2", interaction_type: "scan_box_inventory" },
+                            { Fennimal: "S2", interaction_type: "photo_Fennimal" },
+                        ]
+                    },
+                    {
+                        trials: [
+                            { Fennimal: "S1", interaction_type: "joint_box_cleaning" },
+                        ]
+                    },
+                ]
+            },
+
+            {
+                type: "pseudoday",
+                information: "partner_leaves"
+            },
+            {
+                type: "pseudoday",
+                information: "new_Fennimals_spotted",
+                displayed_icons: ["P1", "P2"],
+                title: "Get to know some more Fennimals on the island",
+                display_text: "While %PARTNERNAME% is away, there are some Fennimals on the island who would love to get to know you! Unfortunately, we ran out of boxes to store the toys in, so we will have to reuse some of the boxes."
+            },
+
+            // BLOCK 3: Introduction to private Fennimals
+            {
+                type: "free_exploration",
+                interaction_type: ["Fennimal_toy"],
+                Fennimals_encountered: ["P1", "P2"],
+                partner_behavior: "absent",
+                include_Fennefinder: true,
+                force_climbing_tower_first: true
+            },
+
+            // BLOCK 4: Main private block 
+            {
+                type: "phone_room",
+                partner_behavior: "absent",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                ask_Fennimal: true,
+                ask_toy: true,
+                ask_box: true,
+                trial_subblocks: [
+                    {
+                        Fennimals_encountered: ["P1", "P2"],
+                        interaction_type: "broken_toy_no_box"
+                    },
+                    {
+                        Fennimals_encountered: ["P1", "P2"],
+                        interaction_type: "Fennimal_toy"
+                    },
+                    {
+                        Fennimals_encountered: ["P1", "P2"],
+                        interaction_type: "box_room"
+                    },
+                    
+                ]
+            },
+
+            {
+                type: "pseudoday",
+                information: "partner_returns"
+            },
+
+            // BLOCK 5: Partner belief (individual boxes)
+            // Memory probes (when enabled): box→Fennimal uses S/P wave prompts +
+            // correct / co_box_mate / same_wave_foil; Fennimal→toy unchanged.
             {
                 type: "partner_belief_individual_boxes",
                 include_practice_trial: true,
@@ -373,6 +509,7 @@ let StimulusSettings = function () {
       
         mentalizing: ["demographics_questionnaire"],
         mentalizing_AB: ["demographics_questionnaire"],
+        mentalizing_AC: ["demographics_questionnaire"],
     };
 
     const All_Allowed_Head_Lists = { test: false, mentalizing_1: false };
@@ -382,6 +519,7 @@ let StimulusSettings = function () {
 
         mentalizing: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
         mentalizing_AB: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
+        mentalizing_AC: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
     };
 
     const All_Allowed_Head_Groups_List = { test: false, mentalizing_1: false };
@@ -870,7 +1008,8 @@ let StimulusTransformer = function (StimTemplate) {
     // ----------------------------------------------------
     // ITEM COLOR ASSIGNMENT (toys + boxes)
     // ----------------------------------------------------
-    // Curated sets (pilot) or free-form hue algorithm. Either way paint templates after.
+    // Hybrid (default): keep baked box colors; swap light/mid palette only on region conflicts.
+    // Optional legacy: curated full-box recolor when use_curated_color_sets is true.
     let colorAssignmentOverview = null;
     if (GenParam.use_color_algorithm_to_pick_colors === true) {
         if (GenParam.use_curated_color_sets === true) {
@@ -885,9 +1024,10 @@ let StimulusTransformer = function (StimTemplate) {
         } else {
             colorAssignmentOverview = assign_experiment_item_colors(FennimalObjArr);
             paint_all_box_color_templates();
+            let nSwap = Object.keys(GenParam.BoxColorSchemes || {}).length;
             console.log(
-                "%c Color algorithm assigned item palettes"
-                    + (GenParam.use_color_algorithm_for_toy_colors === true ? " (boxes + toys)" : " (boxes only; toys keep ToyData defaults)"),
+                "%c Hybrid color assignment: " + nSwap + " box swap(s)"
+                    + (GenParam.use_color_algorithm_for_toy_colors === true ? "; toys recolored" : "; toys keep ToyData defaults"),
                 "color:teal",
                 colorAssignmentOverview
             );
@@ -1051,3 +1191,5 @@ let StimulusTransformer = function (StimTemplate) {
         });
     };
 };
+
+console.log("UP AND READY")

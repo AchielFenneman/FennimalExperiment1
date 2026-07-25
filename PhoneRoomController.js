@@ -367,6 +367,40 @@ class PhoneRoomController {
         }
     }
 
+    /**
+     * Tear down the phone-room scene but keep Fennimals_Layer ready for a Home overlay
+     * trial (box_room / scan_box_inventory). Does not reveal the map.
+     */
+    exitRoomKeepInteractionLayer(onComplete) {
+        if (!this.roomGroup) {
+            if (this.parentLayer) this.parentLayer.style.display = "inherit";
+            if (this.mapLayer) this.mapLayer.style.display = "none";
+            if (this.interfaceLayer) this.interfaceLayer.style.display = "inherit";
+            if (onComplete) onComplete();
+            return;
+        }
+
+        const finish = () => {
+            this.roomGroup.style.transition = `opacity ${GenParam.PhoneRoom.roomFadeTime}ms ease-in-out`;
+            this.roomGroup.style.opacity = 0;
+
+            setTimeout(() => {
+                this.clear();
+                if (this.mapLayer) this.mapLayer.style.display = "none";
+                // Keep Interface visible so prompts / locator still show during Home overlays.
+                if (this.interfaceLayer) this.interfaceLayer.style.display = "inherit";
+                if (this.parentLayer) this.parentLayer.style.display = "inherit";
+                if (onComplete) onComplete();
+            }, GenParam.PhoneRoom.roomFadeTime);
+        };
+
+        if (this.partnerGroup) {
+            this.animatePartnerExit(finish);
+        } else {
+            finish();
+        }
+    }
+
     animatePartnerExit(onComplete) {
         if (!this.partnerGroup) {
             onComplete();
@@ -423,4 +457,3 @@ class PhoneRoomController {
 }
 
 console.log("%c SCRIPTS - LOADED PHONE ROOM CONTROLLER", "color:darkgreen");
-console.log("Go!")

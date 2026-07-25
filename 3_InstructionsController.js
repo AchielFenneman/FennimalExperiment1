@@ -1477,6 +1477,16 @@ class InstructionsController {
                     mainText: "Go take a photo of the box to check if its still in good shape"
                 };
 
+            case "scan_box_inventory":
+                return {
+                    ...baseConfig,
+                    type: "box",
+                    mainText: `${GenParam.get_box_printed_name(trialObj.toybox)} needs to be inventoried`,
+                    locationText: "We're heading to the warehouse",
+                    regionText: "at Home.",
+                    instructionText: "Close this message to continue."
+                };
+
             case "photo_Fennimal":
                 return {
                     ...baseConfig,
