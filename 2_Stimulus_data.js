@@ -421,11 +421,7 @@ let StimulusSettings = function () {
                             { Fennimal: "S2", interaction_type: "photo_Fennimal" },
                         ]
                     },
-                    {
-                        trials: [
-                            { Fennimal: "S1", interaction_type: "joint_box_cleaning" },
-                        ]
-                    },
+                
                 ]
             },
 
@@ -1192,4 +1188,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("UP AND READY")
+console("Goodtogo")
