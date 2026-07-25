@@ -515,7 +515,7 @@ let StimulusSettings = function () {
 
         mentalizing: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
         mentalizing_AB: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
-        mentalizing_AC: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
+        mentalizing_AC: ["alien", "donut", "radio", "jackolantern", "rhino",  "eagle", "brush"],
     };
 
     const All_Allowed_Head_Groups_List = { test: false, mentalizing_1: false };
@@ -1188,4 +1188,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console("Goodtogo")
+console.log("GO GO GO")
