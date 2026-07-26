@@ -63,21 +63,19 @@ let StimulusSettings = function () {
     // ----------------------------------------------------
     let All_Experiment_Structures = {
         test: [
-            // Jump straight to the DV for local UI / probe testing.
-            // Controller auto-seeds false-belief WorldState when boxes are empty
-            // (partner beliefs ≠ current contents). Memory probes use the S/P wave
-            // prompts + co-box mate / same-wave foil triad (test set mirrors AB: 4 Fennimals, boxes A/B).
             {
-                type: "partner_belief_individual_boxes",
-                include_practice_trial: false,
-                num_belief_blocks: 1,
-                include_reality_block_at_end: true,
-                include_memory_probe_at_end: true,
-                bonus_stars_per_correct_answer: 1,
-                memory_probe_isi_ms: 1000,
-                questions: [
-                    { question_id: "belief_A", target_box: "A" },
-                    { question_id: "belief_B", target_box: "B" },
+                type: "phone_room",
+                partner_behavior: "present",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                ask_Fennimal: false,
+                ask_toy: false,
+                ask_box: false,
+                trial_subblocks: [
+                    {
+                        Fennimals_encountered: ["S1", "S2"],
+                        interaction_type: "scan_box_inventory"
+                    }
                 ]
             },
         ],
@@ -377,17 +375,17 @@ let StimulusSettings = function () {
         ],
         mentalizing_AC: [
 
-            // BLOCK 1: Introduction to shared Fennimals
+            // BLOCK 1: Introduction to all Fennimals
             {
                 type: "free_exploration",
                 interaction_type: ["Fennimal_toy"],
-                Fennimals_encountered: ["S1", "S2"],
+                Fennimals_encountered: ["S1", "S2", "P1", "P2"],
                 partner_behavior: "active",
                 include_Fennefinder: true,
                 force_climbing_tower_first: true
             },
 
-            // BLOCK 2: Main shared block
+            // BLOCK 2: Main Fennimal -> toy block + box manipulation
             {
                 type: "phone_room",
                 partner_behavior: "active",
@@ -398,11 +396,11 @@ let StimulusSettings = function () {
                 ask_box: true,
                 trial_subblocks: [
                     {
-                        Fennimals_encountered: ["S1", "S2"],
+                        Fennimals_encountered: ["S1", "S2", "P1", "P2"],
                         interaction_type: "broken_toy_no_box"
                     },
                     {
-                        Fennimals_encountered: ["S1", "S2"],
+                        Fennimals_encountered: ["S1", "S2", "P1", "P2"],
                         interaction_type: "Fennimal_toy"
                     },
                     
@@ -413,41 +411,23 @@ let StimulusSettings = function () {
                     {
                         trials: [
                             { Fennimal: "S1", interaction_type: "joint_box_decoration" },
-                        ]
-                    },
-                    {
-                        trials: [
                             { Fennimal: "S2", interaction_type: "scan_box_inventory" },
                             { Fennimal: "S2", interaction_type: "photo_Fennimal" },
                         ]
                     },
-                
+                   
                 ]
             },
+
+            //Partner leaves
 
             {
                 type: "pseudoday",
                 information: "partner_leaves"
             },
-            {
-                type: "pseudoday",
-                information: "new_Fennimals_spotted",
-                displayed_icons: ["P1", "P2"],
-                title: "Get to know some more Fennimals on the island",
-                display_text: "While %PARTNERNAME% is away, there are some Fennimals on the island who would love to get to know you! Unfortunately, we ran out of boxes to store the toys in, so we will have to reuse some of the boxes."
-            },
+            
 
-            // BLOCK 3: Introduction to private Fennimals
-            {
-                type: "free_exploration",
-                interaction_type: ["Fennimal_toy"],
-                Fennimals_encountered: ["P1", "P2"],
-                partner_behavior: "absent",
-                include_Fennefinder: true,
-                force_climbing_tower_first: true
-            },
-
-            // BLOCK 4: Main private block 
+            // BLOCK 3: Boxes swapped 
             {
                 type: "phone_room",
                 partner_behavior: "absent",
@@ -457,14 +437,6 @@ let StimulusSettings = function () {
                 ask_toy: true,
                 ask_box: true,
                 trial_subblocks: [
-                    {
-                        Fennimals_encountered: ["P1", "P2"],
-                        interaction_type: "broken_toy_no_box"
-                    },
-                    {
-                        Fennimals_encountered: ["P1", "P2"],
-                        interaction_type: "Fennimal_toy"
-                    },
                     {
                         Fennimals_encountered: ["P1", "P2"],
                         interaction_type: "box_room"
@@ -1188,4 +1160,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("GO GO GO")
+console.log("ALL SET")

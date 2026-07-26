@@ -308,7 +308,9 @@ WorldStateObject = function () {
         }
     }
 
-    //Returns an SVG element. Person can be "player" or "partner", direction can be front,back,left,right
+    // Returns an SVG element. Person: "player" | "partner".
+    // Direction: front | back | left | right | front_celebrating
+    // (matches SVG ids icon_player_{male|female}_{direction})
     this.get_person_icon = function(person, direction, applied_scale_factor){
         let IconSettings
         if(person === "player"){

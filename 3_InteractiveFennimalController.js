@@ -2667,6 +2667,20 @@ class BrokenToyModule extends BaseToyModule {
         partObj.element.style.transform = `translate(${tx}px, ${ty}px) rotate(${rot}deg)`;
     }
 
+    // Soften (or restore) the whole exploded toy so the Fennimal stays readable during comfort.
+    set_exploded_toy_opacity(opacity, ms = 400) {
+        return new Promise(resolve => {
+            if (!this.ToyElement) {
+                resolve();
+                return;
+            }
+            this.ToyElement.style.transition = `opacity ${ms}ms ease-in-out`;
+            window.getComputedStyle(this.ToyElement).opacity;
+            this.ToyElement.style.opacity = opacity;
+            setTimeout(() => resolve(), ms);
+        });
+    }
+
     enable_dragging(on_part_placed_callback) {
         let totalScale = this.parentScale * this.zoomFactor;
 
@@ -2812,6 +2826,11 @@ class PartnerModule {
 
     constructor(is_present) {
         this.is_present = is_present;
+        this._offsetX = 0;
+        this._offsetY = 0;
+        this._scale = 40;
+        this._facing = "back";
+        this._homeScale = 40;
         if (this.is_present) {
             this.PartnerIcon = WorldState.get_person_icon("partner", "back");
             this.partnername = WorldState.get_partner_icon_settings().name;
@@ -2845,13 +2864,19 @@ class PartnerModule {
         return new Promise(resolve => {
             // Your animation logic remains untouched! It slides the middle layer.
             let basetransform = this.PartnerTranslateGroup.style.transform;
+            let baseX = this._offsetX;
+            let baseY = this._offsetY;
             let dx = getSVGInternalCenter(target_element).x - getSVGInternalCenter(this.PartnerTranslateGroup).x;
 
             this.PartnerTranslateGroup.style.transition = "all 400ms ease-in-out";
             this.PartnerTranslateGroup.style.transform += "translateX(" + dx + "px)";
 
             setTimeout(() => action_callback(), 500);
-            setTimeout(() => { this.PartnerTranslateGroup.style.transform = basetransform }, 600);
+            setTimeout(() => {
+                this._offsetX = baseX;
+                this._offsetY = baseY;
+                this.PartnerTranslateGroup.style.transform = basetransform;
+            }, 600);
             setTimeout(() => resolve(), 1000);
         });
     }
@@ -2872,12 +2897,146 @@ class PartnerModule {
             }
 
             // Setting it to a single translateX (or empty string) safely clears any messy appended transforms from walking
-            this.PartnerTranslateGroup.style.transform = dx ? `translateX(${dx}px)` : "";
+            this._offsetX = dx;
+            this._offsetY = 0;
+            this.PartnerTranslateGroup.style.transform = dx ? `translate(${dx}px, 0px)` : "";
             setTimeout(() => resolve(), 500);
         });
     }
 
-    // Swap facing sprite (back / left / right). Visual-only; no limbs or voice.
+    // Reparent the outer stack (front Partner layer vs behind Neg1 / Main).
+    move_to_layer(parentLayer) {
+        if (!this.is_present || !this.PartnerBaseGroup || !parentLayer) return;
+        parentLayer.appendChild(this.PartnerBaseGroup);
+    }
+
+    set_scale(scale, ms = 0) {
+        if (!this.is_present || !this.PartnerScaleGroup) return;
+        if (ms > 0) {
+            this.PartnerScaleGroup.style.transition = "none";
+            this.PartnerScaleGroup.style.transform = `scale(${this._scale})`;
+            window.getComputedStyle(this.PartnerScaleGroup).transform;
+            this.PartnerScaleGroup.style.transition = `transform ${ms}ms ease-in-out`;
+            window.getComputedStyle(this.PartnerScaleGroup).transform;
+        } else {
+            this.PartnerScaleGroup.style.transition = "none";
+        }
+        this._scale = scale;
+        this.PartnerScaleGroup.style.transform = `scale(${scale})`;
+    }
+
+    set_offset(x, y, ms = 0) {
+        if (!this.is_present || !this.PartnerTranslateGroup) return;
+        if (ms > 0) {
+            this.PartnerTranslateGroup.style.transition = "none";
+            this.PartnerTranslateGroup.style.transform =
+                `translate(${this._offsetX}px, ${this._offsetY}px)`;
+            window.getComputedStyle(this.PartnerTranslateGroup).transform;
+            this.PartnerTranslateGroup.style.transition = `transform ${ms}ms ease-in-out`;
+            window.getComputedStyle(this.PartnerTranslateGroup).transform;
+        } else {
+            this.PartnerTranslateGroup.style.transition = "none";
+        }
+        this._offsetX = x;
+        this._offsetY = y;
+        this.PartnerTranslateGroup.style.transform = `translate(${x}px, ${y}px)`;
+    }
+
+    async animate_offset(x, y, ms = 400) {
+        if (!this.is_present || !this.PartnerTranslateGroup) return;
+        this.set_offset(x, y, ms);
+        await wait(ms);
+    }
+
+    async animate_scale(scale, ms = 400) {
+        if (!this.is_present || !this.PartnerScaleGroup) return;
+        this.set_scale(scale, ms);
+        await wait(ms);
+    }
+
+    // Animate scale + offset together (avoids the enter "stumble").
+    async animate_pose({ x = null, y = null, scale = null, ms = 450 } = {}) {
+        if (!this.is_present || !this.PartnerTranslateGroup || !this.PartnerScaleGroup) return;
+        let targetX = x != null ? x : this._offsetX;
+        let targetY = y != null ? y : this._offsetY;
+        let targetScale = scale != null ? scale : this._scale;
+
+        this.PartnerScaleGroup.style.transition = "none";
+        this.PartnerTranslateGroup.style.transition = "none";
+        this.PartnerScaleGroup.style.transform = `scale(${this._scale})`;
+        this.PartnerTranslateGroup.style.transform =
+            `translate(${this._offsetX}px, ${this._offsetY}px)`;
+        window.getComputedStyle(this.PartnerScaleGroup).transform;
+        window.getComputedStyle(this.PartnerTranslateGroup).transform;
+
+        this.PartnerScaleGroup.style.transition = `transform ${ms}ms ease-in-out`;
+        this.PartnerTranslateGroup.style.transition = `transform ${ms}ms ease-in-out`;
+        window.getComputedStyle(this.PartnerScaleGroup).transform;
+
+        this._scale = targetScale;
+        this._offsetX = targetX;
+        this._offsetY = targetY;
+        this.PartnerScaleGroup.style.transform = `scale(${targetScale})`;
+        this.PartnerTranslateGroup.style.transform =
+            `translate(${targetX}px, ${targetY}px)`;
+        await wait(ms);
+    }
+
+    // Move so the partner's visual center approaches (targetX, targetY).
+    async move_center_to(targetX, targetY, ms = 400) {
+        if (!this.is_present || !this.PartnerTranslateGroup) return;
+        let cur = getSVGInternalCenter(this.PartnerTranslateGroup);
+        let nextX = this._offsetX + (targetX - cur.x);
+        let nextY = this._offsetY + (targetY - cur.y);
+        await this.animate_offset(nextX, nextY, ms);
+    }
+
+    async move_center_x_to(targetX, ms = 400) {
+        if (!this.is_present || !this.PartnerTranslateGroup) return;
+        let cur = getSVGInternalCenter(this.PartnerTranslateGroup);
+        await this.move_center_to(targetX, cur.y, ms);
+    }
+
+    // Restore bottom-right home pose (optional layer / facing / scale).
+    async animate_home({
+        ms = 500,
+        scale = null,
+        direction = null,
+        layer = null
+    } = {}) {
+        if (!this.is_present) return;
+        let homeScale = scale != null ? scale : this._homeScale;
+        if (layer) this.move_to_layer(layer);
+        await this.animate_pose({ x: 0, y: 0, scale: homeScale, ms });
+        if (direction) this.set_direction(direction);
+    }
+
+    jump(amount = 80, timing = {}) {
+        if (!this.is_present || !this.PartnerTranslateGroup) {
+            return Promise.resolve();
+        }
+        const ms = timing.ms != null ? timing.ms : 120;
+        const resolveMs = timing.resolveMs != null ? timing.resolveMs : 240;
+        const baseX = this._offsetX;
+        const baseY = this._offsetY;
+
+        return new Promise(resolve => {
+            AudioCont.play_sound_effect("jump");
+            this.PartnerTranslateGroup.style.transition = `transform ${ms}ms ease-out`;
+            this.PartnerTranslateGroup.style.transform =
+                `translate(${baseX}px, ${baseY - amount}px)`;
+            setTimeout(() => {
+                this.PartnerTranslateGroup.style.transition = `transform ${ms}ms ease-in`;
+                this.PartnerTranslateGroup.style.transform =
+                    `translate(${baseX}px, ${baseY}px)`;
+                this._offsetX = baseX;
+                this._offsetY = baseY;
+            }, ms);
+            setTimeout(() => resolve(), resolveMs);
+        });
+    }
+
+    // Swap facing sprite (back / left / right / front / front_celebrating).
     set_direction(dir) {
         if (!this.is_present || !this.PartnerScaleGroup) return;
         let icon = WorldState.get_person_icon("partner", dir);
@@ -2887,17 +3046,24 @@ class PartnerModule {
         }
         this.PartnerIcon = icon;
         this.PartnerScaleGroup.appendChild(icon);
+        this._facing = dir;
     }
 
     // Light success reaction: bounce / dance in place (no speech).
+    // Skipped while holding the celebrating pose (joint photo ending).
     celebrate_success() {
         return new Promise(async resolve => {
             if (!this.is_present || !this.PartnerTranslateGroup) {
                 resolve();
                 return;
             }
+            if (this._facing === "front_celebrating") {
+                resolve();
+                return;
+            }
 
-            let base = this.PartnerTranslateGroup.style.transform || "";
+            let baseX = this._offsetX;
+            let baseY = this._offsetY;
             this.PartnerTranslateGroup.style.transition = "transform 140ms ease-out";
 
             const hops = [
@@ -2912,11 +3078,11 @@ class PartnerModule {
             for (let i = 0; i < hops.length; i++) {
                 let hop = hops[i];
                 this.PartnerTranslateGroup.style.transform =
-                    `${base} translateY(${hop.y}px) rotate(${hop.r}deg)`;
+                    `translate(${baseX}px, ${baseY + hop.y}px) rotate(${hop.r}deg)`;
                 await wait(140);
             }
 
-            this.PartnerTranslateGroup.style.transform = base;
+            this.set_offset(baseX, baseY, 0);
             resolve();
         });
     }
@@ -5961,7 +6127,9 @@ class BrokenToyInBoxTrialController {
             // 2. NEW: The Comfort Roadblock
             // ----------------------------------------------------
             Interface.Prompt.show_message(`Oh no, ${this.FenObj.name} is upset! Click on ${this.FenObj.name}  to cheer ${this.FenObj.name}  up.`);
+            await this.brokenToyLogic.set_exploded_toy_opacity(0.6);
             await this.basics.trigger_comfort_checkin();
+            await this.brokenToyLogic.set_exploded_toy_opacity(1);
             await wait(500); // Brief pause after the happy jump before giving the next instruction
             // ----------------------------------------------------
 
@@ -6128,7 +6296,9 @@ class BrokenToyNoBoxTrialController extends GeneralTrialController {
         Interface.Prompt.show_message(
             `Oh no, ${this.FenObj.name} is upset! Click on ${this.FenObj.name} to cheer ${this.FenObj.name} up.`
         );
+        await this.brokenToyLogic.set_exploded_toy_opacity(0.6);
         await this.basics.trigger_comfort_checkin();
+        await this.brokenToyLogic.set_exploded_toy_opacity(1);
         await wait(500);
 
         Interface.Prompt.show_message("Please move all the parts to their correct position!");
@@ -6358,7 +6528,9 @@ class DirtyAndBrokenToyTrialController {
 
         // 2. Comfort the sad Fennimal
         Interface.Prompt.show_message(`Oh no, ${this.FenObj.name} is upset! Click on ${this.FenObj.name} to cheer ${this.FenObj.name} up.`);
+        await this.brokenToyLogic.set_exploded_toy_opacity(0.6);
         await this.basics.trigger_comfort_checkin();
+        await this.brokenToyLogic.set_exploded_toy_opacity(1);
         await wait(500);
 
         // 3. Start the Repair
@@ -8520,20 +8692,42 @@ class JointBoxCleaningTrialController {
 
     async partner_bellows_turn() {
         Interface.Prompt.hide();
+        const p = this.params;
+        let homeScale = p.partnerHomeScale != null ? p.partnerHomeScale : 40;
+        let enterScale = p.partnerCleanEnterScale != null ? p.partnerCleanEnterScale : 32;
+        let liftY = p.partnerCleanEnterLiftY != null ? p.partnerCleanEnterLiftY : -60;
+        let approachGap = p.partnerCleanApproachGapX != null ? p.partnerCleanApproachGapX : 140;
+
         let bellows = this.dust.BellowsTranslateGroup;
-        let partnerCenter = getSVGInternalCenter(this.partner.PartnerTranslateGroup);
         let bellowsCenter = bellows
             ? getSVGInternalCenter(bellows)
             : { x: this.boxCenter.x - 200, y: this.boxCenter.y };
-        // Approach bellows from the corner, puff, then return home
-        let approachX = bellowsCenter.x + 140;
-        let dx = approachX - partnerCenter.x;
-        this.partner.PartnerTranslateGroup.style.transition = "transform 450ms ease-in-out";
-        this.partner.PartnerTranslateGroup.style.transform =
-            (this.partner.PartnerTranslateGroup.style.transform || "") + ` translateX(${dx}px)`;
-        await wait(450);
+
+        // Enter a bit into the scene (behind Fennimal/box), then face the bellows.
+        // Measure target first, then animate scale+offset together (no stumble).
+        let cur = getSVGInternalCenter(this.partner.PartnerTranslateGroup);
+        let approachX = bellowsCenter.x + approachGap;
+        let nextX = this.partner._offsetX + (approachX - cur.x);
+        this.partner.move_to_layer(this.basics.ItemLayers.Neg1);
+        await this.partner.animate_pose({
+            x: nextX,
+            y: liftY,
+            scale: enterScale,
+            ms: 500
+        });
+        this.partner.set_direction("left");
+        await wait(120);
+
+        // Jump with each bellows puff, then retreat home (front layer, back pose).
+        this.partner.jump(90, { ms: 120, resolveMs: 240 });
         await this.dust.puff({ amount: this.params.dustPerPuff, waitForRefill: true });
-        await this.partner.return_to_start();
+
+        this.partner.set_direction("back");
+        await this.partner.animate_home({
+            ms: 450,
+            scale: homeScale,
+            layer: this.basics.ItemLayers.Partner
+        });
         await wait(200);
     }
 
@@ -8610,6 +8804,11 @@ class JointBoxCleaningTrialController {
 
         // Keep partner in the corner during handoff so they don't block the drag path.
         if (this.partner.is_present) {
+            this.partner.move_to_layer(this.basics.ItemLayers.Partner);
+            this.partner.set_scale(
+                p.partnerHomeScale != null ? p.partnerHomeScale : 40,
+                400
+            );
             await this.partner.return_to_start();
             this.partner.set_direction("back");
         }
@@ -8692,40 +8891,56 @@ class JointBoxCleaningTrialController {
         await wait(400);
     }
 
-    async partner_approach_pair_for_witness() {
+    async partner_pose_for_photo_celebration() {
         if (!this.partner.is_present || !this.partner.PartnerTranslateGroup) return;
 
         const p = this.params;
-        // Stay facing the camera-from-behind look; step "into" the scene.
-        this.partner.set_direction("back");
-
-        let homeScale = p.partnerHomeScale != null ? p.partnerHomeScale : 40;
-        let witnessScale = p.partnerWitnessScale != null ? p.partnerWitnessScale : 30;
-        let liftY = p.partnerWitnessLiftY != null ? p.partnerWitnessLiftY : -90;
-        let gapX = p.partnerWitnessGapX != null ? p.partnerWitnessGapX : 220;
+        let enterScale = p.partnerPhotoEnterScale != null ? p.partnerPhotoEnterScale : 28;
+        let liftY = p.partnerPhotoEnterLiftY != null ? p.partnerPhotoEnterLiftY : -110;
+        let behindGap = p.partnerPhotoBehindGapX != null ? p.partnerPhotoBehindGapX : 40;
+        let besideGap = p.partnerPhotoBesideGapX != null ? p.partnerPhotoBesideGapX : 130;
+        let side = this.get_partner_photo_beside_side();
+        this._partnerPhotoBesideSide = side;
 
         let fen = getSVGInternalCenter(this.basics.Fennimal);
         let box = getSVGInternalCenter(this.box.BoxTop);
-        let pairRight = Math.max(fen.x, box.x);
-        let targetX = Math.min(0.88 * this.basics.W, pairRight + gapX);
+        let besideX = side === "right"
+            ? fen.x + besideGap
+            : fen.x - besideGap;
 
-        // Partner base sits at ~0.9W; measure current visual center then nudge.
-        let partner = getSVGInternalCenter(this.partner.PartnerTranslateGroup);
-        let dx = targetX - partner.x;
+        // 1) Step straight back into the scene (up + shrink only — no diagonal).
+        this.partner.move_to_layer(this.basics.ItemLayers.Neg1);
+        await this.partner.animate_pose({
+            x: this.partner._offsetX,
+            y: liftY,
+            scale: enterScale,
+            ms: 550
+        });
 
-        this.partner.PartnerScaleGroup.style.transition =
-            "transform 550ms ease-in-out";
-        this.partner.PartnerTranslateGroup.style.transition =
-            "transform 550ms ease-in-out";
+        // 2) Horizontal walk to the beside slot (left of Fennimal by default;
+        //    right side for wide left-extending bodies like North/beaver).
+        this.partner.set_direction("left");
+        await wait(100);
+        if (side === "left" && behindGap != null) {
+            await this.partner.move_center_x_to(box.x + Math.max(behindGap, 120), 350);
+        }
+        await this.partner.move_center_x_to(besideX, 500);
+        this.partner.set_direction("front");
+        await wait(100);
+        this.partner.set_direction("front_celebrating");
+        await wait(200);
+    }
 
-        // Smaller scale + lift = farther into the scene; shift right of the pair.
-        this.partner.PartnerScaleGroup.style.transform = `scale(${witnessScale})`;
-        this.partner.PartnerTranslateGroup.style.transform =
-            `translate(${dx}px, ${liftY}px)`;
-
-        await wait(600);
-        this._partnerWitnessActive = true;
-        this._partnerHomeScale = homeScale;
+    // Default left; North / beaver bodies prefer right so the partner stays visible.
+    get_partner_photo_beside_side() {
+        const p = this.params || {};
+        let rightRegions = p.partnerPhotoRightSideRegions || ["North"];
+        let rightBodies = p.partnerPhotoRightSideBodies || ["beaver"];
+        let region = this.FenObj && this.FenObj.region;
+        let body = this.FenObj && this.FenObj.body;
+        if (region && rightRegions.indexOf(region) >= 0) return "right";
+        if (body && rightBodies.indexOf(body) >= 0) return "right";
+        return "left";
     }
 
     remove_binding_outline() {
@@ -8835,18 +9050,20 @@ class JointBoxCleaningTrialController {
         await this.pulse_binding_outline();
 
         if (this.partner.is_present) {
-            await this.partner_approach_pair_for_witness();
+            await this.partner_pose_for_photo_celebration();
         }
 
         // Freeze-frame tableau (no prompt — keep focus on the pair / partner).
         Interface.Prompt.hide();
-        if (this.partner.is_present) {
-            this.partner.celebrate_success();
-        }
         let freezeMs = p.freezeTableauMs != null ? p.freezeTableauMs : 1800;
         await wait(freezeMs);
 
         await this.run_end_photo();
+
+        if (this.partner.is_present) {
+            this.partner.set_direction("front");
+            await wait(500);
+        }
 
         this.remove_binding_outline();
 
@@ -8963,7 +9180,6 @@ class JointBoxCleaningTrialController {
         let frameSize = bgRect
             ? bgRect.getBBox()
             : { width: 500, height: 600 };
-        let photoRect = this.get_polaroid_photo_svg_rect(bgRect, targetCircle, frameSize);
         let color = this.get_binding_outline_color();
 
         // Slight downward bias so the Fennimal+box pair sits in the visual center.
@@ -9031,48 +9247,27 @@ class JointBoxCleaningTrialController {
         });
         contents.insertBefore(stamp, fenIcon);
 
-        // Partner witness: back view, bottom-right; clip only the partner to the photo rect.
+        // Partner celebrating beside Fennimal (left by default; right for North/beaver), behind the pair.
         if (this.partner.is_present) {
-            let partnerIcon = WorldState.get_person_icon("partner", "back");
+            let partnerIcon = WorldState.get_person_icon("partner", "front_celebrating");
             if (partnerIcon) {
-                let clipId = "joint_clean_partner_clip_" + Date.now();
-                let defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-                let clipPath = document.createElementNS("http://www.w3.org/2000/svg", "clipPath");
-                clipPath.setAttribute("id", clipId);
-                let clipRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                clipRect.setAttribute("x", photoRect.x);
-                clipRect.setAttribute("y", photoRect.y);
-                clipRect.setAttribute("width", photoRect.width);
-                clipRect.setAttribute("height", photoRect.height);
-                clipPath.appendChild(clipRect);
-                defs.appendChild(clipPath);
-                contents.appendChild(defs);
-
-                let clipped = create_SVG_group(0, 0);
-                clipped.setAttribute("clip-path", `url(#${clipId})`);
-                contents.appendChild(clipped);
-
-                let inset = create_SVG_group(0, 0);
-                clipped.appendChild(inset);
-                inset.appendChild(partnerIcon);
-
+                contents.insertBefore(partnerIcon, stamp);
                 let pBox = partnerIcon.getBBox();
                 let pCx = pBox.x + pBox.width / 2;
-                // Anchor at upper chest so head stays inside; lower body crops at the photo edge.
-                let pCy = pBox.y + pBox.height * 0.28;
-                // ~2x previous inset size.
-                let insetScale = Math.min(
-                    (photoRect.width * 0.56) / Math.max(pBox.width, 1),
-                    (photoRect.height * 0.84) / Math.max(pBox.height, 1)
+                let pCy = pBox.y + pBox.height / 2;
+                let partnerScale = Math.min(
+                    (frameSize.width * 0.40) / Math.max(pBox.width, 1),
+                    (frameSize.height * 0.62) / Math.max(pBox.height, 1)
                 );
-                let insetX = photoRect.x + photoRect.width * 0.78;
-                // Keep head/shoulders inside the photo; lift so they aren't under the frame.
-                let insetY = photoRect.y + photoRect.height * 0.78;
-                inset.setAttribute(
+                let side = this._partnerPhotoBesideSide || this.get_partner_photo_beside_side();
+                let partnerX = side === "right"
+                    ? targetCircle.x + frameSize.width * 0.28
+                    : targetCircle.x - frameSize.width * 0.28;
+                let partnerY = pairCy - 20;
+                partnerIcon.setAttribute(
                     "transform",
-                    `translate(${insetX}, ${insetY}) scale(${insetScale}) translate(${-pCx}, ${-pCy})`
+                    `translate(${partnerX}, ${partnerY}) scale(${partnerScale}) translate(${-pCx}, ${-pCy})`
                 );
-                inset.style.opacity = 1;
             }
         }
 
@@ -9082,6 +9277,16 @@ class JointBoxCleaningTrialController {
     async run_end_photo() {
         this.remove_binding_outline();
         await this.pose_fennimal_behind_box_for_photo();
+        // Keep celebrating partner tucked beside the (possibly reposed) Fennimal.
+        if (this.partner.is_present && this.partner._facing === "front_celebrating") {
+            const p = this.params;
+            let besideGap = p.partnerPhotoBesideGapX != null ? p.partnerPhotoBesideGapX : 130;
+            let side = this._partnerPhotoBesideSide || this.get_partner_photo_beside_side();
+            let fen = getSVGInternalCenter(this.basics.Fennimal);
+            let besideX = side === "right" ? fen.x + besideGap : fen.x - besideGap;
+            this.partner.move_to_layer(this.basics.ItemLayers.Neg1);
+            await this.partner.move_center_x_to(besideX, 280);
+        }
         this.create_or_update_binding_outline();
 
         this.photoSession = new PhotoTrialController(
@@ -9438,31 +9643,68 @@ class JointBoxDecorationTrialController extends JointBoxCleaningTrialController 
             this.partner.partnername + " adds a decoration to the " + this.box.boxname + "!"
         );
 
-        let partner = getSVGInternalCenter(this.partner.PartnerTranslateGroup);
-        let pile = getSVGInternalCenter(piece.wrapper);
-        let gap = p.partnerApproachPileGap != null ? p.partnerApproachPileGap : 110;
-        // Approach from the right; stop a bit short of the pile.
-        let approachX = pile.x + gap;
-        let dx = approachX - partner.x;
-        this.partner.PartnerTranslateGroup.style.transition = "transform 450ms ease-in-out";
-        this.partner.PartnerTranslateGroup.style.transform =
-            (this.partner.PartnerTranslateGroup.style.transform || "") + ` translateX(${dx}px)`;
-        await wait(450);
+        let homeScale = p.partnerHomeScale != null ? p.partnerHomeScale : 40;
+        let enterScale = p.partnerDecorEnterScale != null ? p.partnerDecorEnterScale : 26;
+        let liftY = p.partnerDecorEnterLiftY != null ? p.partnerDecorEnterLiftY : -140;
+        let enterShiftX = p.partnerDecorEnterShiftX != null ? p.partnerDecorEnterShiftX : -100;
+        let boxPassGap = p.partnerDecorBoxPassGapX != null ? p.partnerDecorBoxPassGapX : 200;
+        let pileGap = p.partnerDecorPileGapX != null ? p.partnerDecorPileGapX : 110;
+        let placeGap = p.partnerDecorPlaceGapX != null ? p.partnerDecorPlaceGapX : 70;
 
+        let pile = getSVGInternalCenter(piece.wrapper);
+        let boxX = this.boxCenter.x;
+
+        // 1) Enter deeper into the scene, then face left.
+        this.partner.move_to_layer(this.basics.ItemLayers.Partner);
+        await this.partner.animate_pose({
+            x: enterShiftX,
+            y: liftY,
+            scale: enterScale,
+            ms: 600
+        });
+        this.partner.set_direction("left");
+        await wait(120);
+
+        // 2) Walk behind the box (right side first, then left to the pile).
+        this.partner.move_to_layer(this.basics.ItemLayers.Neg1);
+        await this.partner.move_center_x_to(boxX + boxPassGap, 400);
+        await this.partner.move_center_x_to(pile.x + pileGap, 500);
+
+        // 3) Face forward, pick up, slide behind the box to place.
+        this.partner.set_direction("front");
+        await wait(100);
         await this.lift_piece(piece, 280);
 
-        // Move left toward the box with the decoration, then snap the piece on.
-        let partnerNow = getSVGInternalCenter(this.partner.PartnerTranslateGroup);
-        let nearBoxX = this.boxCenter.x + 80;
-        let partnerDx = nearBoxX - partnerNow.x;
-        this.partner.PartnerTranslateGroup.style.transition = "transform 500ms ease-in-out";
-        this.partner.PartnerTranslateGroup.style.transform =
-            (this.partner.PartnerTranslateGroup.style.transform || "") +
-            ` translateX(${partnerDx}px)`;
+        let placeX = boxX + placeGap;
+        let partnerMove = this.partner.move_center_x_to(placeX, 500);
         await this.move_piece_to(piece, piece.slotCenter.x, piece.slotCenter.y - 40, 500);
+        await partnerMove;
         await this.snap_piece_onto_box(piece);
 
-        await this.partner.return_to_start();
+        // 4) Turn right, walk past the box on the right, then exit without a diagonal clip.
+        // Stay on the behind layer until fully home so they don't pop in front of the box.
+        this.partner.set_direction("right");
+        await wait(100);
+        await this.partner.move_center_x_to(boxX + boxPassGap, 400);
+        this.partner.set_direction("front");
+        await wait(80);
+
+        // Horizontal return to home X first (still deep in-scene)...
+        await this.partner.animate_pose({
+            x: 0,
+            y: liftY,
+            scale: enterScale,
+            ms: 400
+        });
+        // ...then grow/lower straight forward to the corner.
+        await this.partner.animate_pose({
+            x: 0,
+            y: 0,
+            scale: homeScale,
+            ms: 500
+        });
+        this.partner.move_to_layer(this.basics.ItemLayers.Partner);
+        this.partner.set_direction("back");
         Interface.Prompt.hide();
     }
 
@@ -9470,6 +9712,11 @@ class JointBoxDecorationTrialController extends JointBoxCleaningTrialController 
         const p = this.params;
 
         if (this.partner.is_present) {
+            this.partner.move_to_layer(this.basics.ItemLayers.Partner);
+            this.partner.set_scale(
+                p.partnerHomeScale != null ? p.partnerHomeScale : 40,
+                400
+            );
             await this.partner.return_to_start();
             this.partner.set_direction("back");
         }
@@ -10527,6 +10774,30 @@ class ScanBoxInventoryTrialController {
         this.BoxCarrier = null;
         this.boxHomeTarget = null;
         this.dragController = null;
+
+        this.crankHandle = null;
+        this.crankPivot = null;
+        this.powerRelease = null;
+        this.powerNeedle = null;
+        this.powerNeedlePivot = null;
+        this.powerIndicator = null;
+        this.indicatorAreas = null;
+        this.releaseOutline = null;
+        this.crankOutline = null;
+
+        this.powerAngle = 0;
+        this.crankVisualAngle = 0;
+        this._crankVisualTarget = 0;
+        this._crankAnimRaf = null;
+        this._powerScanActive = false;
+        this._venting = false;
+        this._scanProgress = 0;
+        this._wasPowerOk = true;
+        this._powerRaf = null;
+        this._partnerSpikeTimeout = null;
+        this._crankPointer = null;
+        this._scanningSfxOn = false;
+        this._startHitProxy = null;
     }
 
     async start_sequence() {
@@ -10696,13 +10967,24 @@ class ScanBoxInventoryTrialController {
         this.startButton = this.Scanner.querySelector(".start_button");
         this.laserNozzle = this.Scanner.querySelector(".scanner_laser_nozzle");
         this.laserOutput = this.Scanner.querySelector(".scanner_laser_nozzle_output");
+        this.crankHandle = this.Scanner.querySelector(".crank_handle");
+        this.crankPivot = this.Scanner.querySelector(".crank_handle_pivot_point");
+        this.powerRelease = this.Scanner.querySelector(".power_release_button");
+        // Meter lives on the shield layer (above the box).
+        this.powerIndicator = this.ShieldHost.querySelector(".power_level_indicator");
+        this.powerNeedle = this.ShieldHost.querySelector(".power_needle");
+        this.powerNeedlePivot = this.ShieldHost.querySelector(".power_needle_pivot_point");
+        this.cache_indicator_areas();
         this.safetyShield = this.ShieldHost.querySelector(".safety_shield");
         this.safetyShieldDown = this.ShieldHost.querySelector(".safety_shield_down");
 
         this.prepare_safety_shield();
+        this.prepare_power_controls_idle();
         this.set_scanner_status("load_box");
         this.set_start_button_state("off");
         this.set_laser_output_active(false);
+        this.set_power_needle_angle(0);
+        this.set_crank_visual_angle(0);
 
         this.Scanner.style.opacity = 0;
         this.ShieldHost.style.opacity = 0;
@@ -10720,7 +11002,11 @@ class ScanBoxInventoryTrialController {
         Array.from(item.children).forEach((child) => {
             if (!child.classList.contains("safety_shield")) child.remove();
         });
+        // Parent pointer-events:none does NOT block SVG descendants from receiving hits.
         this.ShieldHost.style.pointerEvents = "none";
+        this.ShieldHost.querySelectorAll("*").forEach((el) => {
+            el.style.pointerEvents = "none";
+        });
     }
 
     prepare_safety_shield() {
@@ -10734,6 +11020,57 @@ class ScanBoxInventoryTrialController {
             this.safetyShieldDown.style.display = "none";
             this.safetyShieldDown.style.pointerEvents = "none";
         }
+
+        this.set_power_indicator_visible(false);
+    }
+
+    set_power_indicator_visible(visible) {
+        if (!this.powerIndicator) return;
+        let op = this.params.powerIndicatorOpacity != null
+            ? this.params.powerIndicatorOpacity
+            : 0.8;
+        this.powerIndicator.style.opacity = visible ? String(op) : "0";
+        this.powerIndicator.style.display = visible ? "inline" : "none";
+        this.powerIndicator.style.pointerEvents = "none";
+        if (visible) this.update_indicator_area_highlights(this.get_power_band());
+    }
+
+    cache_indicator_areas() {
+        if (!this.powerIndicator) {
+            this.indicatorAreas = null;
+            return;
+        }
+        let low = this.powerIndicator.querySelector(".indicator_area_too_low");
+        let good = this.powerIndicator.querySelector(".indicator_area_good");
+        let high = this.powerIndicator.querySelector(".indicator_area_too_high");
+        this.indicatorAreas = {
+            low: low ? {
+                el: low,
+                activeFill: low.getAttribute("fill") || "#d4aa00"
+            } : null,
+            green: good ? {
+                el: good,
+                activeFill: good.getAttribute("fill") || "#217821"
+            } : null,
+            high: high ? {
+                el: high,
+                activeFill: high.getAttribute("fill") || "#a02c2c"
+            } : null
+        };
+    }
+
+    update_indicator_area_highlights(band) {
+        if (!this.indicatorAreas) return;
+        let inactive = this.params.indicatorInactiveFill || "#d0d0d0";
+        ["low", "green", "high"].forEach((key) => {
+            let entry = this.indicatorAreas[key];
+            if (!entry || !entry.el) return;
+            let fill = (key === band) ? entry.activeFill : inactive;
+            entry.el.setAttribute("fill", fill);
+            entry.el.style.fill = fill;
+            entry.el.setAttribute("opacity", "1");
+            entry.el.style.opacity = "1";
+        });
     }
 
     async spawn_closed_box() {
@@ -10769,12 +11106,13 @@ class ScanBoxInventoryTrialController {
         let map = {
             load_box: ".scanner_text_load_box",
             scanning: ".scanner_text_scanning",
-            done: ".scanner_text_done"
+            done: ".scanner_text_done",
+            error_low: ".scanner_error_low",
+            error_high: ".scanner_error_high"
         };
         this.Scanner.querySelectorAll(".scanner_text").forEach((el) => {
             el.style.display = "none";
         });
-        // Shield host may still hold text nodes if strip failed; hide there too.
         if (this.ShieldHost) {
             this.ShieldHost.querySelectorAll(".scanner_text").forEach((el) => {
                 el.style.display = "none";
@@ -10783,6 +11121,495 @@ class ScanBoxInventoryTrialController {
         let sel = map[status];
         let el = sel ? this.Scanner.querySelector(sel) : null;
         if (el) el.style.display = "";
+    }
+
+    prepare_power_controls_idle() {
+        if (this.crankHandle) {
+            this.crankHandle.style.pointerEvents = "none";
+            this.crankHandle.style.cursor = "auto";
+            this.crankHandle.style.opacity = "0.85";
+        }
+        if (this.powerRelease) {
+            this.powerRelease.style.pointerEvents = "none";
+            this.powerRelease.style.cursor = "auto";
+            this.powerRelease.style.opacity = "0.85";
+        }
+        this.clear_control_outlines();
+    }
+
+    clear_control_outlines() {
+        if (this.releaseOutline) {
+            this.releaseOutline.remove();
+            this.releaseOutline = null;
+        }
+        if (this.crankOutline) {
+            this.crankOutline.remove();
+            this.crankOutline = null;
+        }
+    }
+
+    set_power_needle_angle(deg) {
+        this.powerAngle = deg;
+        if (!this.powerNeedle || !this.powerNeedlePivot) return;
+        let cx = parseFloat(this.powerNeedlePivot.getAttribute("cx"));
+        let cy = parseFloat(this.powerNeedlePivot.getAttribute("cy"));
+        this.powerNeedle.setAttribute("transform", `rotate(${deg} ${cx} ${cy})`);
+    }
+
+    set_crank_visual_angle(deg) {
+        this.crankVisualAngle = deg;
+        if (!this.crankHandle || !this.crankPivot) return;
+        let cx = parseFloat(this.crankPivot.getAttribute("cx"));
+        let cy = parseFloat(this.crankPivot.getAttribute("cy"));
+        let t = `rotate(${deg} ${cx} ${cy})`;
+        this.crankHandle.setAttribute("transform", t);
+        if (this.crankOutline) this.crankOutline.setAttribute("transform", t);
+    }
+
+    /** Queue a smooth crank spin (overlapping spikes extend the target angle). */
+    queue_crank_spin(deltaDeg) {
+        if (!this.crankHandle || !this.crankPivot) {
+            this.crankVisualAngle += deltaDeg;
+            this._crankVisualTarget = this.crankVisualAngle;
+            return;
+        }
+        this._crankVisualTarget = (this._crankVisualTarget != null
+            ? this._crankVisualTarget
+            : this.crankVisualAngle) + deltaDeg;
+        if (this._crankAnimRaf) return;
+
+        let start = this.crankVisualAngle;
+        let startTarget = this._crankVisualTarget;
+        let ms = this.params.crankSpinMs != null ? this.params.crankSpinMs : 240;
+        let t0 = performance.now();
+
+        const tick = (now) => {
+            // If more spikes arrived, restart easing from current angle toward new target.
+            if (this._crankVisualTarget !== startTarget) {
+                start = this.crankVisualAngle;
+                startTarget = this._crankVisualTarget;
+                t0 = now;
+            }
+            let t = Math.min(1, (now - t0) / ms);
+            let eased = 1 - (1 - t) * (1 - t);
+            this.set_crank_visual_angle(start + (startTarget - start) * eased);
+            if (t < 1) {
+                this._crankAnimRaf = requestAnimationFrame(tick);
+            } else {
+                this._crankAnimRaf = null;
+                this.set_crank_visual_angle(this._crankVisualTarget);
+            }
+        };
+        this._crankAnimRaf = requestAnimationFrame(tick);
+    }
+
+    stop_crank_spin_anim() {
+        if (this._crankAnimRaf) {
+            cancelAnimationFrame(this._crankAnimRaf);
+            this._crankAnimRaf = null;
+        }
+        this._crankVisualTarget = this.crankVisualAngle;
+    }
+
+    is_power_in_green() {
+        return Math.abs(this.powerAngle) <= this.params.powerGreenDeg;
+    }
+
+    get_power_band() {
+        if (this.powerAngle > this.params.powerGreenDeg) return "high";
+        if (this.powerAngle < -this.params.powerGreenDeg) return "low";
+        return "green";
+    }
+
+    apply_power_spike(baseDeg, jitterDeg) {
+        let jitter = (Math.random() * 2 - 1) * (jitterDeg || 0);
+        let next = this.powerAngle + baseDeg + jitter;
+        let max = this.params.powerMaxDeg;
+        this.set_power_needle_angle(Math.max(-max, Math.min(max, next)));
+        this.queue_crank_spin(this.params.crankVisualStepDeg);
+    }
+
+    update_power_ui_feedback() {
+        let band = this.get_power_band();
+        this.update_indicator_area_highlights(band);
+        if (band === "green") {
+            this.set_scanner_status("scanning");
+        } else if (band === "high") {
+            this.set_scanner_status("error_high");
+        } else {
+            this.set_scanner_status("error_low");
+        }
+
+        // Outline release when overloaded (player should vent).
+        let releaseInteractive = this.powerRelease
+            && this.powerRelease.style.pointerEvents !== "none";
+        if (band === "high" && this._powerScanActive && releaseInteractive) {
+            if (!this.releaseOutline) {
+                this.releaseOutline = create_SVG_outline_of_group_ID(this.powerRelease);
+                this.releaseOutline.style.pointerEvents = "none";
+                this.releaseOutline.classList.add("focus_on_SVG_outline");
+                this.powerRelease.parentNode.insertBefore(this.releaseOutline, this.powerRelease);
+            }
+        } else if (this.releaseOutline) {
+            this.releaseOutline.remove();
+            this.releaseOutline = null;
+        }
+    }
+
+    set_scanning_sfx(on) {
+        if (on && !this._scanningSfxOn) {
+            AudioCont.start_looping_sound_effect("scanning");
+            this._scanningSfxOn = true;
+        } else if (!on && this._scanningSfxOn) {
+            AudioCont.stop_looping_sound_effect("scanning");
+            this._scanningSfxOn = false;
+        }
+    }
+
+    async pose_partner_for_scan() {
+        if (!this.partner.is_present) return;
+
+        let boxCenter = getSVGInternalCenter(this.BoxCarrier || this.box.BoxBase);
+        let targetX = boxCenter.x + this.params.partnerScanOffsetX;
+        let targetY = boxCenter.y + this.params.partnerScanOffsetY;
+        let scale = this.params.partnerScanScale;
+
+        // 1) Step up from the bottom-right home (still facing back).
+        let cur = getSVGInternalCenter(this.partner.PartnerTranslateGroup);
+        let upOffsetY = this.partner._offsetY + (targetY - cur.y);
+        await this.partner.animate_pose({
+            x: this.partner._offsetX,
+            y: upOffsetY,
+            scale: scale,
+            ms: 840
+        });
+
+        // 2) Face left, then walk horizontally to the crank side.
+        this.partner.set_direction("left");
+        await wait(240);
+        cur = getSVGInternalCenter(this.partner.PartnerTranslateGroup);
+        let walkX = this.partner._offsetX + (targetX - cur.x);
+        await this.partner.animate_offset(walkX, this.partner._offsetY, 1100);
+
+        // 3) Turn right to face the crank.
+        await wait(160);
+        this.partner.set_direction("right");
+    }
+
+    async restore_partner_after_scan() {
+        if (!this.partner.is_present) return;
+        let homeScale = this.partner._homeScale || 40;
+
+        // 1) Face right, walk horizontally back to the right-side column (keep current height).
+        this.partner.set_direction("right");
+        await wait(160);
+        await this.partner.animate_offset(0, this.partner._offsetY, 1100);
+
+        // 2) Face forward, then step down to home (and restore home scale).
+        this.partner.set_direction("front");
+        await wait(160);
+        await this.partner.animate_pose({
+            x: 0,
+            y: 0,
+            scale: homeScale,
+            ms: 840
+        });
+
+        // 3) Turn around to the default back-facing pose.
+        await wait(160);
+        this.partner.set_direction("back");
+    }
+
+    enable_player_crank() {
+        if (!this.crankHandle || !this.crankPivot) return;
+        this.crankHandle.style.pointerEvents = "auto";
+        this.crankHandle.style.cursor = "pointer";
+        this.crankHandle.style.opacity = "1";
+
+        if (!this.crankOutline) {
+            this.crankOutline = create_SVG_outline_of_group_ID(this.crankHandle);
+            this.crankOutline.style.pointerEvents = "none";
+            this.crankOutline.classList.add("focus_on_SVG_outline");
+            this.crankHandle.parentNode.insertBefore(this.crankOutline, this.crankHandle);
+        }
+
+        let pivotScreen = () => getSVGInternalCenter(this.crankPivot);
+        let angleAt = (evt) => {
+            let m = getMousePosition(evt);
+            let p = pivotScreen();
+            return Math.atan2(m.y - p.y, m.x - p.x) * 180 / Math.PI;
+        };
+
+        this._crankPointer = {
+            dragging: false,
+            lastAngle: 0,
+            accum: 0,
+            mask: null
+        };
+
+        this.crankHandle.onpointerdown = (evt) => {
+            if (!this._powerScanActive) return;
+            evt.preventDefault();
+            // Immediate click-crank.
+            this.apply_power_spike(this.params.playerSpikeDeg, this.params.playerSpikeDegJitter);
+            AudioCont.play_sound_effect("button_click");
+
+            let state = this._crankPointer;
+            state.dragging = true;
+            state.lastAngle = angleAt(evt);
+            state.accum = 0;
+
+            let mask = create_SVG_rect(0, 0, this.basics.W, this.basics.H);
+            mask.style.opacity = 0;
+            this.basics.ItemLayers.Questions.appendChild(mask);
+            state.mask = mask;
+
+            const onMove = (e) => {
+                if (!state.dragging) return;
+                let a = angleAt(e);
+                let d = a - state.lastAngle;
+                // Normalize to [-180, 180]
+                while (d > 180) d -= 360;
+                while (d < -180) d += 360;
+                state.lastAngle = a;
+                state.accum += Math.abs(d);
+                let quantum = this.params.crankQuantumDeg;
+                while (state.accum >= quantum) {
+                    state.accum -= quantum;
+                    this.apply_power_spike(this.params.playerSpikeDeg, this.params.playerSpikeDegJitter);
+                    AudioCont.play_sound_effect("button_click");
+                }
+            };
+            const onUp = () => {
+                state.dragging = false;
+                if (state.mask) {
+                    state.mask.remove();
+                    state.mask = null;
+                }
+            };
+            mask.onpointermove = onMove;
+            mask.onpointerup = onUp;
+            mask.onpointercancel = onUp;
+            mask.onpointerleave = onUp;
+        };
+    }
+
+    disable_player_crank() {
+        if (this.crankHandle) {
+            this.crankHandle.onpointerdown = null;
+            this.crankHandle.style.pointerEvents = "none";
+            this.crankHandle.style.cursor = "auto";
+        }
+        if (this._crankPointer && this._crankPointer.mask) {
+            this._crankPointer.mask.remove();
+            this._crankPointer.mask = null;
+        }
+        if (this.crankOutline) {
+            this.crankOutline.remove();
+            this.crankOutline = null;
+        }
+    }
+
+    enable_player_release() {
+        if (!this.powerRelease) return;
+        this.powerRelease.style.pointerEvents = "auto";
+        this.powerRelease.style.cursor = "pointer";
+        this.powerRelease.style.opacity = "1";
+
+        this.powerRelease.onpointerdown = (evt) => {
+            if (!this._powerScanActive) return;
+            evt.preventDefault();
+            this._venting = true;
+            this.powerRelease.style.filter = "brightness(1.15)";
+            if (this.powerRelease.setPointerCapture) {
+                try { this.powerRelease.setPointerCapture(evt.pointerId); } catch (e) { /* ignore */ }
+            }
+        };
+        const stopVent = () => {
+            this._venting = false;
+            if (this.powerRelease) this.powerRelease.style.filter = "";
+        };
+        this.powerRelease.onpointerup = stopVent;
+        this.powerRelease.onpointercancel = stopVent;
+        // Don't stop on leave while captured — pointerup handles release.
+    }
+
+    disable_player_release() {
+        this._venting = false;
+        if (this.powerRelease) {
+            this.powerRelease.onpointerdown = null;
+            this.powerRelease.onpointerup = null;
+            this.powerRelease.onpointercancel = null;
+            this.powerRelease.style.pointerEvents = "none";
+            this.powerRelease.style.cursor = "auto";
+            this.powerRelease.style.filter = "";
+        }
+        if (this.releaseOutline) {
+            this.releaseOutline.remove();
+            this.releaseOutline = null;
+        }
+    }
+
+    schedule_partner_spike() {
+        if (!this._powerScanActive || !this.partner.is_present) return;
+        let base = this.params.partnerSpikeIntervalMs;
+        let jitter = this.params.partnerSpikeIntervalJitterMs;
+        let waitMs = Math.max(120, base + (Math.random() * 2 - 1) * jitter);
+        this._partnerSpikeTimeout = setTimeout(() => {
+            if (!this._powerScanActive) return;
+            // Partner pauses while overloaded — player must vent first.
+            if (this.get_power_band() !== "high") {
+                this.apply_power_spike(this.params.partnerSpikeDeg, this.params.partnerSpikeDegJitter);
+                // Quiet bob on the crank — no jump SFX (would spam every spike).
+                if (this.partner.PartnerTranslateGroup) {
+                    let bob = this.params.partnerBobPx != null ? this.params.partnerBobPx : 7;
+                    let bx = this.partner._offsetX;
+                    let by = this.partner._offsetY;
+                    this.partner.PartnerTranslateGroup.style.transition = "transform 70ms ease-out";
+                    this.partner.PartnerTranslateGroup.style.transform =
+                        `translate(${bx}px, ${by - bob}px)`;
+                    setTimeout(() => {
+                        if (!this.partner.PartnerTranslateGroup) return;
+                        this.partner.PartnerTranslateGroup.style.transition = "transform 90ms ease-in";
+                        this.partner.PartnerTranslateGroup.style.transform =
+                            `translate(${bx}px, ${by}px)`;
+                    }, 75);
+                }
+            }
+            this.schedule_partner_spike();
+        }, waitMs);
+    }
+
+    stop_partner_spikes() {
+        if (this._partnerSpikeTimeout) {
+            clearTimeout(this._partnerSpikeTimeout);
+            this._partnerSpikeTimeout = null;
+        }
+    }
+
+    set_nozzle_progress(progress01) {
+        if (!this.laserNozzle) return;
+        let delta = this.get_nozzle_travel_delta();
+        let t = Math.max(0, Math.min(1, progress01));
+        this.laserNozzle.style.transition = "none";
+        this.laserNozzle.style.transform = `translate(${delta.x * t}px, ${delta.y * t}px)`;
+    }
+
+    run_powered_scan_loop() {
+        return new Promise((resolve) => {
+            this._powerScanActive = true;
+            this._scanProgress = 0;
+            this._wasPowerOk = true;
+            this._venting = false;
+            this.set_power_needle_angle(0);
+            this.stop_crank_spin_anim();
+            this.set_crank_visual_angle(0);
+            this._crankVisualTarget = 0;
+            this.set_nozzle_progress(0);
+
+            // Must start after _powerScanActive is true (schedule_partner_spike guards on it).
+            if (this.partner.is_present) {
+                // First crank promptly so power doesn't just decay from the start.
+                this.apply_power_spike(this.params.partnerSpikeDeg, this.params.partnerSpikeDegJitter);
+                this.schedule_partner_spike();
+            }
+
+            let last = performance.now();
+            let tick = (now) => {
+                if (!this._powerScanActive) return;
+                let dt = Math.min(0.05, (now - last) / 1000);
+                last = now;
+
+                // Natural decay toward low power; vent drains faster.
+                let drain = this.params.powerDecayDegPerSec;
+                if (this._venting) drain += this.params.powerVentDegPerSec;
+                let next = this.powerAngle - drain * dt;
+                let max = this.params.powerMaxDeg;
+                this.set_power_needle_angle(Math.max(-max, Math.min(max, next)));
+
+                let ok = this.is_power_in_green();
+                this.update_power_ui_feedback();
+
+                if (ok && !this._wasPowerOk) {
+                    // Resumed — no SFX
+                }
+                if (!ok && this._wasPowerOk) {
+                    AudioCont.play_sound_effect("rejected");
+                }
+                this._wasPowerOk = ok;
+
+                this.set_laser_output_active(ok);
+                this.set_scanning_sfx(ok);
+                if (this.laserBeamGroup) {
+                    this.laserBeamGroup.style.opacity = ok ? "1" : "0";
+                }
+
+                if (ok) {
+                    this._scanProgress += dt * 1000 / this.params.scanDurationMs;
+                    this.set_nozzle_progress(this._scanProgress);
+                }
+
+                if (this._scanProgress >= 1) {
+                    this._powerScanActive = false;
+                    this.stop_partner_spikes();
+                    this.disable_player_crank();
+                    this.disable_player_release();
+                    this.set_scanning_sfx(false);
+                    this.clear_control_outlines();
+                    resolve();
+                    return;
+                }
+
+                this._powerRaf = requestAnimationFrame(tick);
+            };
+            this._powerRaf = requestAnimationFrame(tick);
+        });
+    }
+
+    async phase_press_start_and_scan() {
+        Interface.Prompt.show_message("Press the button to start scanning");
+        AudioCont.play_sound_effect("alert_minor");
+        await this.wait_for_start_button();
+
+        await this.fade_safety_shield_down(true);
+        await this.pose_partner_for_scan();
+
+        this.set_power_indicator_visible(true);
+
+        if (this.partner.is_present) {
+            Interface.Prompt.show_message(
+                this.partner.partnername
+                    + " is powering the scanner — hold RELEASE when power is too high!"
+            );
+            this.enable_player_release();
+            // Crank visible but partner-operated only.
+            if (this.crankHandle) {
+                this.crankHandle.style.opacity = "1";
+                this.crankHandle.style.pointerEvents = "none";
+            }
+            // Spikes start inside run_powered_scan_loop once _powerScanActive is true.
+        } else {
+            Interface.Prompt.show_message(
+                "Crank to power the scan — keep the needle in the green! Hold RELEASE if it overloads."
+            );
+            this.enable_player_crank();
+            this.enable_player_release();
+        }
+        AudioCont.play_sound_effect("alert_minor");
+
+        this.start_laser_beam_effect();
+        await this.run_powered_scan_loop();
+
+        this.stop_laser_beam_effect();
+        this.set_laser_output_active(false);
+        this.set_power_indicator_visible(false);
+        this.set_scanner_status("done");
+        AudioCont.play_sound_effect("scanner_return");
+        await this.animate_nozzle_to({ x: 0, y: 0 }, this.params.nozzleReturnMs, "ease-in");
+
+        await this.fade_safety_shield_down(false);
+        await this.restore_partner_after_scan();
+        Interface.Prompt.hide();
     }
 
     set_start_button_state(state) {
@@ -11016,6 +11843,7 @@ class ScanBoxInventoryTrialController {
                     this.box.set_pointer_events_enabled(false);
                     if (this.box.BoxBase) this.box.BoxBase.style.cursor = "auto";
                     if (this.box.BoxTop) this.box.BoxTop.style.cursor = "auto";
+                    if (this.BoxCarrier) this.BoxCarrier.style.pointerEvents = "none";
                     await this.snap_element_to_target(dropped, targetEl);
                     resolve();
                 }
@@ -11035,39 +11863,49 @@ class ScanBoxInventoryTrialController {
     wait_for_start_button() {
         return new Promise((resolve) => {
             this.set_start_button_state("on");
-            this.startButton.onpointerdown = () => {
-                this.startButton.onpointerdown = null;
+            // Hit proxy on Questions layer so Plus1/Plus2 content cannot steal the click.
+            let hit = null;
+            if (this.startButton && this.basics.ItemLayers.Questions) {
+                let bb = this.startButton.getBBox();
+                let svg = GenParam.SVGObject;
+                let tl = svg.createSVGPoint();
+                tl.x = bb.x;
+                tl.y = bb.y;
+                let br = svg.createSVGPoint();
+                br.x = bb.x + bb.width;
+                br.y = bb.y + bb.height;
+                let ctm = this.startButton.getScreenCTM();
+                let invRoot = this.basics.ItemLayers.Questions.getScreenCTM().inverse();
+                let p1 = tl.matrixTransform(ctm).matrixTransform(invRoot);
+                let p2 = br.matrixTransform(ctm).matrixTransform(invRoot);
+                let x = Math.min(p1.x, p2.x);
+                let y = Math.min(p1.y, p2.y);
+                let w = Math.abs(p2.x - p1.x);
+                let h = Math.abs(p2.y - p1.y);
+                // Slightly enlarge hit area for easier pressing.
+                let pad = 12;
+                hit = create_SVG_rect(x - pad, y - pad, w + pad * 2, h + pad * 2);
+                hit.style.opacity = 0;
+                hit.style.cursor = "pointer";
+                hit.style.pointerEvents = "auto";
+                this.basics.ItemLayers.Questions.appendChild(hit);
+                this._startHitProxy = hit;
+            }
+
+            const onStart = () => {
+                if (this.startButton) this.startButton.onpointerdown = null;
+                if (hit) {
+                    hit.onpointerdown = null;
+                    hit.remove();
+                }
+                this._startHitProxy = null;
                 AudioCont.play_sound_effect("button_click");
                 this.set_start_button_state("off");
                 resolve();
             };
+            if (this.startButton) this.startButton.onpointerdown = onStart;
+            if (hit) hit.onpointerdown = onStart;
         });
-    }
-
-    async phase_press_start_and_scan() {
-        Interface.Prompt.show_message("Press the button to start scanning");
-        AudioCont.play_sound_effect("alert_minor");
-        await this.wait_for_start_button();
-
-        Interface.Prompt.hide();
-        this.set_scanner_status("scanning");
-        await this.fade_safety_shield_down(true);
-
-        this.set_laser_output_active(true);
-        this.start_laser_beam_effect();
-        AudioCont.start_looping_sound_effect("scanning");
-
-        let delta = this.get_nozzle_travel_delta();
-        await this.animate_nozzle_to(delta, this.params.scanDurationMs, "linear");
-
-        AudioCont.stop_looping_sound_effect("scanning");
-        this.stop_laser_beam_effect();
-        this.set_laser_output_active(false);
-        AudioCont.play_sound_effect("scanner_return");
-        await this.animate_nozzle_to({ x: 0, y: 0 }, this.params.nozzleReturnMs, "ease-in");
-
-        this.set_scanner_status("done");
-        await this.fade_safety_shield_down(false);
     }
 
     async phase_return_box_to_table() {
@@ -11093,7 +11931,18 @@ class ScanBoxInventoryTrialController {
     }
 
     clean_up() {
+        this._powerScanActive = false;
+        this.stop_partner_spikes();
+        this.stop_crank_spin_anim();
+        this.disable_player_crank();
+        this.disable_player_release();
+        this.clear_control_outlines();
+        if (this._powerRaf) {
+            cancelAnimationFrame(this._powerRaf);
+            this._powerRaf = null;
+        }
         this.stop_laser_beam_effect();
+        this.set_scanning_sfx(false);
         AudioCont.stop_looping_sound_effect("scanning");
         if (this.dragController && this.dragController.destroy) {
             this.dragController.destroy();
@@ -11102,6 +11951,10 @@ class ScanBoxInventoryTrialController {
         if (this.startButtonOutline) {
             this.startButtonOutline.remove();
             this.startButtonOutline = null;
+        }
+        if (this._startHitProxy) {
+            this._startHitProxy.remove();
+            this._startHitProxy = null;
         }
         if (this.box) this.box.clean_up();
         if (this.BoxCarrier) this.BoxCarrier.remove();

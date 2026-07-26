@@ -906,11 +906,24 @@ GENERALPARAM = function () {
         shearsScale: 2.2,
         shearsCloseMs: 200,
         shearsOpenMs: 360,
-        // Partner "steps into scene" after handoff (still facing back)
+        // Partner "steps into scene" (cleaning bellows / decorating / photo pose)
         partnerHomeScale: 40,
-        partnerWitnessScale: 30,
-        partnerWitnessLiftY: -90,
-        partnerWitnessGapX: 220,
+        partnerCleanEnterScale: 32,
+        partnerCleanEnterLiftY: -60,
+        partnerCleanApproachGapX: 140,
+        partnerDecorEnterScale: 22,
+        partnerDecorEnterLiftY: -520,
+        partnerDecorEnterShiftX: -230,
+        partnerDecorBoxPassGapX: 200,
+        partnerDecorPileGapX: 110,
+        partnerDecorPlaceGapX: 70,
+        partnerPhotoBehindGapX: 20,
+        partnerPhotoBesideGapX: 190,
+        // Wide left-extending bodies (North/beaver) occlude a left-side partner.
+        partnerPhotoRightSideRegions: ["North"],
+        partnerPhotoRightSideBodies: ["beaver"],
+        partnerPhotoEnterScale: 18,
+        partnerPhotoEnterLiftY: -480,
         // Shared Fennimal+box silhouette outline
         bindingOutlineStrokeWidth: 22,
         // Soft-lock safety (idle = no scrub progress, not total turn time)
@@ -944,9 +957,21 @@ GENERALPARAM = function () {
         fennimalApproachPileGap: 90,
         partnerApproachPileGap: 110,
         partnerHomeScale: 40,
-        partnerWitnessScale: 30,
-        partnerWitnessLiftY: -90,
-        partnerWitnessGapX: 220,
+        partnerCleanEnterScale: 32,
+        partnerCleanEnterLiftY: -60,
+        partnerDecorEnterScale: 22,
+        partnerDecorEnterLiftY: -520,
+        partnerDecorEnterShiftX: -230,
+        partnerDecorBoxPassGapX: 200,
+        partnerDecorPileGapX: 110,
+        partnerDecorPlaceGapX: 70,
+        partnerPhotoBehindGapX: 20,
+        partnerPhotoBesideGapX: 190,
+        // Wide left-extending bodies (North/beaver) occlude a left-side partner.
+        partnerPhotoRightSideRegions: ["North"],
+        partnerPhotoRightSideBodies: ["beaver"],
+        partnerPhotoEnterScale: 18,
+        partnerPhotoEnterLiftY: -480,
         bindingOutlineStrokeWidth: 22
     }
 
@@ -955,8 +980,8 @@ GENERALPARAM = function () {
         boxScale: 3.2,
         scannerScale: 3.4,
         tableY: 0.72,
-        boxX: 0.22,
-        scannerX: 0.72,
+        boxX: 0.16,
+        scannerX: 0.50,
         // Lift scanner center above tableY so the feet rest on the tabletop (not the floor).
         scannerLift: 220,
         tableWidth: 0.32,
@@ -964,6 +989,7 @@ GENERALPARAM = function () {
         introPromptMs: 1000,
         outroPromptMs: 2800,
         outroFadeMs: 250,
+        // Green-time required to finish the nozzle pass (pauses when out of range).
         scanDurationMs: 25000,
         shieldFadeMs: 280,
         nozzleReturnMs: 300,
@@ -977,11 +1003,32 @@ GENERALPARAM = function () {
         laserBeamColor: "#ff3333",
         laserBeamGlow: "#ff8888",
         laserBeamLength: 285,
-        // Fan of beams from the nozzle output (degrees from vertical).
         laserBeamAnglesDeg: [-12, -6, 0, 6, 12],
-        // Tip wiggle around each beam's base angle (origin stays fixed).
         laserBeamWiggleDeg: 2.5,
-        laserBeamWiggleHz: 2.8
+        laserBeamWiggleHz: 2.8,
+
+        // Power needle: 0° = center (up). + = overload (right), - = low (left).
+        powerMaxDeg: 90,
+        powerGreenDeg: 40,
+        powerDecayDegPerSec: 20,
+        powerVentDegPerSec: 110,
+        // Solo crank: ~one spike every 500–750ms keeps the needle near green.
+        playerSpikeDeg: 14,
+        playerSpikeDegJitter: 4,
+        crankQuantumDeg: 50,
+        crankVisualStepDeg: 50,
+        crankSpinMs: 240,
+        // Partner auto-crank: frequent + strong so power regularly overloads without venting.
+        partnerSpikeIntervalMs: 480,
+        partnerSpikeIntervalJitterMs: 300,
+        partnerSpikeDeg: 34,
+        partnerSpikeDegJitter: 8,
+        partnerBobPx: 7,
+        partnerScanScale: 30,
+        partnerScanOffsetX: -430,
+        partnerScanOffsetY: 30,
+        powerIndicatorOpacity: 0.8,
+        indicatorInactiveFill: "#d0d0d0"
     }
 }
 
