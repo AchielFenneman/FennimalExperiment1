@@ -65,7 +65,7 @@ let StimulusSettings = function () {
         test: [
             {
                 type: "phone_room",
-                partner_behavior: "present",
+                partner_behavior: "absent",
                 include_Fennefinder: false,
                 return_to_phone_room_after_final_trial: false,
                 ask_Fennimal: false,
@@ -74,7 +74,7 @@ let StimulusSettings = function () {
                 trial_subblocks: [
                     {
                         Fennimals_encountered: ["S1", "S2"],
-                        interaction_type: "scan_box_inventory"
+                        interaction_type: "box_room"
                     }
                 ]
             },
@@ -487,7 +487,7 @@ let StimulusSettings = function () {
 
         mentalizing: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
         mentalizing_AB: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
-        mentalizing_AC: ["alien", "donut", "radio", "jackolantern", "rhino",  "eagle", "brush"],
+        mentalizing_AC: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"], //["alien", "donut", "radio", "jackolantern", "rhino",  "eagle", "brush"]
     };
 
     const All_Allowed_Head_Groups_List = { test: false, mentalizing_1: false };
@@ -1160,4 +1160,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("ALL SET")
+console.log("P-READY")

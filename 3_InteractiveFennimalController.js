@@ -10214,6 +10214,7 @@ class BoxRoomTrialController {
         }
         this.topRowToy = null;
         if (this.currentEntry) {
+            if (this.currentEntry.placedToyModule) this.currentEntry.placedToyModule.clean_up();
             if (this.currentEntry.contentsToyModule) this.currentEntry.contentsToyModule.clean_up();
             if (this.currentEntry.box) this.currentEntry.box.clean_up();
         }
@@ -10273,7 +10274,8 @@ class BoxRoomTrialController {
             contents,
             contentsIsCorrect: !!(contents && contents === fen.toy),
             contentsIsWrong: !!(contents && contents !== fen.toy),
-            contentsToyModule: null
+            contentsToyModule: null,
+            placedToyModule: null
         };
 
         // Free toy above the box (skip if the correct toy is already inside — revealed on open).
@@ -10306,12 +10308,91 @@ class BoxRoomTrialController {
         await this.recycle_wrong_contents_if_needed();
         await this.place_one_toy(entry);
         await this.close_one_box(entry);
+        await this.run_placement_quiz(entry);
+    }
 
-        Interface.Prompt.show_message(
-            "The " + entry.fen.toy + " is now safely in the " + entry.box.boxname + "!"
+    /**
+     * Attention check after close: which toy was just placed?
+     * Options = all toys in this box_room set; reshuffled each attempt.
+     * Wrong → hide bar, reopen (solo click / partner), lift toy briefly, close, retry.
+     */
+    async run_placement_quiz(entry) {
+        let options = this.fennimals.map((fen) => fen.toy).filter(Boolean);
+        if (entry.fen.toy && !options.includes(entry.fen.toy)) {
+            options.push(entry.fen.toy);
+        }
+        if (options.length === 0) {
+            console.warn("box_room: no toys for placement quiz; skipping.");
+            Interface.Prompt.show_message(
+                "The " + entry.fen.toy + " is now safely in the " + entry.box.boxname + "!"
+            );
+            await wait(1600);
+            Interface.Prompt.hide();
+            return;
+        }
+
+        entry.fen.error_toys = [];
+
+        let bar = new ToyChoiceBar(
+            this.basics.ItemLayers.Questions,
+            this.basics.W,
+            this.basics.H
         );
-        await wait(1600);
-        Interface.Prompt.hide();
+
+        while (true) {
+            Interface.Prompt.show_message("Which toy did you just place in this box?");
+            let selected = await bar.waitForSelection(shuffleArray([...options]));
+
+            if (selected === entry.fen.toy) {
+                AudioCont.play_sound_effect("positive");
+                await bar.hide();
+                let burstCenter = getSVGInternalCenter(entry.box.BoxBase);
+                await spawn_confetti_burst(
+                    this.basics.ItemLayers.Plus2,
+                    burstCenter.x,
+                    burstCenter.y,
+                    { awaitPopMs: 900 }
+                );
+                Interface.Prompt.show_message(
+                    "The " + entry.fen.toy + " is now safely in the " + entry.box.boxname + "!"
+                );
+                await wait(1600);
+                Interface.Prompt.hide();
+                return;
+            }
+
+            AudioCont.play_sound_effect("rejected");
+            entry.fen.error_toys.push(selected);
+            await bar.hide();
+            await this.reveal_placed_toy(entry);
+        }
+    }
+
+    /** Wrong-answer remediation: open → fade toy in → lift → present 1s → lower → hide → close. */
+    async reveal_placed_toy(entry) {
+        let toyMod = entry.placedToyModule;
+        if (!toyMod || !toyMod.ToyElement) {
+            console.warn("box_room: missing placed toy for reveal; reopening without lift.");
+            await this.open_one_box(entry);
+            await wait(1000);
+            await this.close_one_box(entry);
+            return;
+        }
+
+        await this.open_one_box(entry);
+        await this.set_placed_toy_opacity(entry, 1, 0);
+
+        let boxTarget = getSVGInternalCenter(
+            entry.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0]
+        );
+        let presentY = Math.min(this.topRowY + 40, boxTarget.y - 160);
+
+        toyMod.ToyElement.style.pointerEvents = "none";
+        await this.animateToyToPoint(toyMod.ToyElement, entry.boxX, presentY, 450);
+        await wait(1000);
+        await this.animateToyToPoint(toyMod.ToyElement, boxTarget.x, boxTarget.y, 450);
+
+        await this.close_one_box(entry);
     }
 
     async setup_warehouse_background() {
@@ -10682,6 +10763,10 @@ class BoxRoomTrialController {
                     if (this.partner.is_present) {
                         WorldState.change_partner_belief_in_box_contents(entry.fen.toybox, entry.fen.toy);
                     }
+
+                    DroppedToyElement.style.pointerEvents = "none";
+                    entry.placedToyModule = topToy.module;
+                    this.topRowToy = null;
                     resolve();
                 },
                 {
@@ -10701,6 +10786,15 @@ class BoxRoomTrialController {
                 }
             );
         });
+    }
+
+    async set_placed_toy_opacity(entry, opacity, ms = 250) {
+        let el = entry && entry.placedToyModule && entry.placedToyModule.ToyElement;
+        if (!el) return;
+        el.style.transition = `opacity ${ms}ms ease-in-out`;
+        window.getComputedStyle(el).opacity;
+        el.style.opacity = opacity;
+        await wait(ms);
     }
 
     async close_one_box(entry) {
@@ -10728,6 +10822,8 @@ class BoxRoomTrialController {
             await wait(150);
         }
         entry.box.set_pointer_events_enabled(false);
+        // Hide after shut so protruding parts cannot leak the quiz answer.
+        await this.set_placed_toy_opacity(entry, 0, 0);
     }
 
     clean_up() {
