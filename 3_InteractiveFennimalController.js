@@ -860,6 +860,214 @@ class BoxModule {
     }
 }
 
+class SackModule {
+    SackBase;
+    SackTop;
+    SackItem;
+    SackOutline;
+    sackname;
+    sackScale = 1;
+
+    constructor(FenObj) {
+        this.FenObj = FenObj;
+        this.sackname = GenParam.get_sack_printed_name(FenObj.sack);
+    }
+
+    get_template() {
+        let template = document.getElementById(this.FenObj.sack);
+        if (!template) {
+            console.error("SackModule: missing SVG for sack id '" + this.FenObj.sack + "'");
+        }
+        return template;
+    }
+
+    ensure_target_centerpoint(root) {
+        if (!root) return null;
+        let existing = root.getElementsByClassName("sack_target_centerpoint")[0];
+        if (existing) return existing;
+
+        // Place the target inside the scaled sack artwork (same pattern as box_target_centerpoint).
+        // Appending to the outer translate group with inner SVG coords was off-center.
+        let anchor = root.querySelector(".sack_open") || root.querySelector(".sack_closed");
+        let host = anchor || root.querySelector(".sack") || root;
+        let bbox;
+        try {
+            bbox = (anchor || host).getBBox();
+        } catch (e) {
+            bbox = { x: 70, y: 70, width: 40, height: 40 };
+        }
+
+        let circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("class", "sack_target_centerpoint invisible_element");
+        circle.setAttribute("cx", String(bbox.x + bbox.width / 2));
+        circle.setAttribute("cy", String(bbox.y + bbox.height * 0.55));
+        circle.setAttribute("r", "3");
+        circle.setAttribute("fill", "#37c837");
+        circle.style.opacity = "0";
+        circle.style.pointerEvents = "none";
+        host.appendChild(circle);
+        return circle;
+    }
+
+    set_group_display(el, visible) {
+        if (!el) return;
+        el.style.display = visible ? "inline" : "none";
+    }
+
+    apply_closed_visual() {
+        if (this.SackBase) {
+            this.set_group_display(this.SackBase.querySelector(".sack_open"), false);
+            this.set_group_display(this.SackBase.querySelector(".sack_closed"), false);
+        }
+        if (this.SackTop) {
+            this.set_group_display(this.SackTop.querySelector(".sack_open"), false);
+            this.set_group_display(this.SackTop.querySelector(".sack_closed"), true);
+        }
+    }
+
+    apply_open_visual() {
+        if (this.SackBase) {
+            this.set_group_display(this.SackBase.querySelector(".sack_open"), true);
+            this.set_group_display(this.SackBase.querySelector(".sack_closed"), false);
+        }
+        if (this.SackTop) {
+            this.set_group_display(this.SackTop.querySelector(".sack_open"), true);
+            this.set_group_display(this.SackTop.querySelector(".sack_closed"), false);
+        }
+    }
+
+    // Container mode: back on Base, front (+ closed overlay) on Top — mirrors BoxModule layering.
+    create_and_appear_sack(ParentBase, ParentTop, center_x, center_y, scale, fade_in_time) {
+        return new Promise(resolve => {
+            let template = this.get_template();
+            if (!template) {
+                resolve();
+                return;
+            }
+
+            this.sackScale = (typeof scale === "number") ? scale : 1;
+            this.SackBase = copy_scale_and_move_object_to_position(template, ParentBase, center_x, center_y, scale);
+            let frontOnBase = this.SackBase.querySelector(".sack_front");
+            if (frontOnBase) frontOnBase.remove();
+            let closedOnBase = this.SackBase.querySelector(".sack_closed");
+            if (closedOnBase) closedOnBase.remove();
+            this.SackBase.style.opacity = 0;
+
+            this.SackTop = copy_scale_and_move_object_to_position(template, ParentTop, center_x, center_y, scale);
+            let backOnTop = this.SackTop.querySelector(".sack_back");
+            if (backOnTop) backOnTop.remove();
+            this.SackTop.style.opacity = 0;
+
+            this.ensure_target_centerpoint(this.SackTop);
+            this.apply_closed_visual();
+
+            window.getComputedStyle(this.SackBase).opacity;
+            this.SackTop.style.transition = "all " + fade_in_time + "ms ease-in-out";
+            this.SackBase.style.transition = "all " + fade_in_time + "ms ease-in-out";
+            this.SackBase.style.opacity = 1;
+            this.SackTop.style.opacity = 1;
+            this.play_placed_sfx();
+
+            setTimeout(() => resolve(), fade_in_time);
+        });
+    }
+
+    // Single closed graphic for dragging a sack as an item (e.g. sack_to_box).
+    create_and_appear_closed_sack_item(Parent, center_x, center_y, scale, fade_in_time) {
+        return new Promise(resolve => {
+            let template = this.get_template();
+            if (!template) {
+                resolve();
+                return;
+            }
+
+            this.sackScale = (typeof scale === "number") ? scale : 1;
+            this.SackItem = copy_scale_and_move_object_to_position(template, Parent, center_x, center_y, scale);
+            let openGroup = this.SackItem.querySelector(".sack_open");
+            if (openGroup) openGroup.remove();
+            let closedGroup = this.SackItem.querySelector(".sack_closed");
+            if (closedGroup) this.set_group_display(closedGroup, true);
+            this.SackItem.style.opacity = 0;
+
+            window.getComputedStyle(this.SackItem).opacity;
+            this.SackItem.style.transition = "all " + fade_in_time + "ms ease-in-out";
+            this.SackItem.style.opacity = 1;
+            // Skip SFX for instant under-lid spawns (fade_in_time === 0).
+            if (fade_in_time > 0) this.play_placed_sfx();
+
+            setTimeout(() => resolve(), fade_in_time);
+        });
+    }
+
+    play_placed_sfx() {
+        if (this.FenObj && this.FenObj.sack) {
+            AudioCont.play_sound_effect("sack_placed_" + this.FenObj.sack);
+        }
+    }
+
+    play_opened_sfx() {
+        if (this.FenObj && this.FenObj.sack) {
+            AudioCont.play_sound_effect("sack_opened_" + this.FenObj.sack);
+        }
+    }
+
+    open_sack() {
+        this.play_opened_sfx();
+        this.apply_open_visual();
+    }
+
+    close_sack() {
+        this.play_opened_sfx();
+        this.apply_closed_visual();
+    }
+
+    set_pointer_events_enabled(enabled) {
+        let value = enabled ? "auto" : "none";
+        if (this.SackBase) this.SackBase.style.pointerEvents = value;
+        if (this.SackTop) this.SackTop.style.pointerEvents = value;
+        if (this.SackItem) this.SackItem.style.pointerEvents = value;
+    }
+
+    wait_for_user_click(action, callback) {
+        Interface.Prompt.show_message("Click to " + action + " the " + this.sackname);
+        AudioCont.play_sound_effect("alert_minor");
+
+        if (this.SackBase && this.SackTop) {
+            this.SackOutline = create_SVG_outline_of_multiple_groups(this.SackBase, this.SackTop);
+            this.SackBase.parentNode.insertBefore(this.SackOutline, this.SackBase);
+        } else if (this.SackItem) {
+            this.SackOutline = create_SVG_outline_of_multiple_groups(this.SackItem);
+            this.SackItem.parentNode.insertBefore(this.SackOutline, this.SackItem);
+        }
+        if (this.SackOutline) this.SackOutline.classList.add("focus_on_SVG_outline");
+
+        const clickTargets = [this.SackBase, this.SackTop, this.SackItem].filter(Boolean);
+        clickTargets.forEach((el) => { el.style.cursor = "pointer"; });
+
+        const sack_clicked = () => {
+            clickTargets.forEach((el) => {
+                el.onpointerdown = null;
+                el.style.cursor = "auto";
+            });
+            if (this.SackOutline) this.SackOutline.remove();
+
+            if (action === "open") this.open_sack();
+            else this.close_sack();
+
+            callback();
+        };
+
+        clickTargets.forEach((el) => { el.onpointerdown = sack_clicked; });
+    }
+
+    clean_up() {
+        if (this.SackBase) this.SackBase.remove();
+        if (this.SackTop) this.SackTop.remove();
+        if (this.SackItem) this.SackItem.remove();
+        if (this.SackOutline) this.SackOutline.remove();
+    }
+}
+
 class BaseToyModule {
     ToyElement;
     FenObj;
@@ -3457,11 +3665,22 @@ class ToyToBoxTrialController {
         this.toy = new StandardToyModule(FenObj);
         this.partner = new PartnerModule(partner_is_present);
 
-        // Minimum |Δx| from the box center required when dragging an old toy out.
-        this.oldToyClearDistance = 400;
         this.old_toy = null;
-        this.oldToyDragController = null;
+        this.old_sack = null;
+        this.oldItemDragController = null;
         this.groundY = null;
+        this.boxY = null;
+        this.boxScale = 4;
+        this.sackScale = 3;
+        this.sackBoxShrinkFactor = 0.65;
+        this.binProximityX = 220;
+        this.binBack = null;
+        this.binFront = null;
+        this.binCenter = null;
+        this.binAboveLeft = null;
+        this.binAboveRight = null;
+        this.binStackCount = 0;
+        this.clearMode = null; // "sack" | "toy" | null
     }
 
     getScaledTemplateHalfWidth(elementId, scale) {
@@ -3472,81 +3691,6 @@ class ToyToBoxTrialController {
         return (Math.max(box.width, 1) * scale) / 2;
     }
 
-    getElementHalfWidthSVG(elem) {
-        if (!elem) return 0;
-
-        let rect = elem.getBoundingClientRect();
-        let svg = GenParam.SVGObject;
-        if (!svg || !svg.getScreenCTM) {
-            return Math.max(rect.width / 2, 120);
-        }
-
-        let inv = svg.getScreenCTM().inverse();
-        let p1 = svg.createSVGPoint();
-        let p2 = svg.createSVGPoint();
-        p1.x = rect.left;
-        p1.y = rect.top;
-        p2.x = rect.right;
-        p2.y = rect.bottom;
-        p1 = p1.matrixTransform(inv);
-        p2 = p2.matrixTransform(inv);
-        return Math.max(Math.abs(p2.x - p1.x) / 2, 80);
-    }
-
-    subtractForbiddenRanges(availableRanges, forbiddenRanges) {
-        let remaining = availableRanges.slice();
-
-        forbiddenRanges.forEach(([fStart, fEnd]) => {
-            let next = [];
-            remaining.forEach(([aStart, aEnd]) => {
-                if (fEnd <= aStart || fStart >= aEnd) {
-                    next.push([aStart, aEnd]);
-                    return;
-                }
-                if (fStart > aStart) next.push([aStart, Math.min(fStart, aEnd)]);
-                if (fEnd < aEnd) next.push([Math.max(fEnd, aStart), aEnd]);
-            });
-            remaining = next.filter(([start, end]) => end - start > 1);
-        });
-
-        return remaining;
-    }
-
-    pickNonOccludingBoxX(toyCenterX, toyHalfWidth, boxHalfWidth, partnerCenterX = null, partnerHalfWidth = null) {
-        const screenW = this.basics.W;
-        const margin = 50;
-        const gap = 50;
-        const minCenter = margin + boxHalfWidth;
-        const maxCenter = screenW - margin - boxHalfWidth;
-
-        const forbidden = [
-            [
-                toyCenterX - toyHalfWidth - boxHalfWidth - gap,
-                toyCenterX + toyHalfWidth + boxHalfWidth + gap
-            ]
-        ];
-
-        if (partnerCenterX !== null && partnerHalfWidth !== null) {
-            forbidden.push([
-                partnerCenterX - partnerHalfWidth - boxHalfWidth - gap,
-                partnerCenterX + partnerHalfWidth + boxHalfWidth + gap
-            ]);
-        }
-
-        let ranges = this.subtractForbiddenRanges([[minCenter, maxCenter]], forbidden);
-
-        if (ranges.length === 0) {
-            // Prefer the side away from the partner when possible.
-            if (partnerCenterX !== null && partnerCenterX > screenW * 0.5) {
-                return minCenter;
-            }
-            return (toyCenterX < screenW / 2) ? maxCenter : minCenter;
-        }
-
-        let range = ranges[Math.floor(Math.random() * ranges.length)];
-        return range[0] + Math.random() * (range[1] - range[0]);
-    }
-
     async start_sequence() {
         this.basics.create_svg_sublayers();
         if (this.partner.is_present) {
@@ -3554,10 +3698,20 @@ class ToyToBoxTrialController {
         }
         await this.basics.create_background_mask(true, 500);
 
-        const toyScale = 4;
-        const boxScale = 4;
-        const toyCenterX = 0.5 * this.basics.W;
+        const toyScale = this.boxScale;
+        const boxScale = this.boxScale;
+        const boxCenterX = 0.5 * this.basics.W;
         const toyCenterY = 0.55 * this.basics.H;
+        this.boxY = 0.7 * this.basics.H;
+
+        let toyHalfW = this.getScaledTemplateHalfWidth("toy_" + this.FenObj.toy, toyScale);
+        let boxHalfW = this.getScaledTemplateHalfWidth("toybox_" + this.FenObj.toybox, boxScale);
+        let toyCenterX = pick_flanking_item_x(
+            this.basics.W,
+            boxCenterX,
+            boxHalfW,
+            toyHalfW
+        );
 
         await this.toy.create_and_appear_toy(
             this.basics.ItemLayers.Plus1,
@@ -3570,7 +3724,7 @@ class ToyToBoxTrialController {
 
         // Match the "discarded" look used after play sequences.
         this.toy.ToyElement.style.transition = "all 200ms ease-out";
-        this.toy.ToyElement.style.transform += "translate(50px, 150px)";
+        this.toy.ToyElement.style.transform += "translate(0px, 150px)";
         await wait(200);
         this.groundY = getSVGInternalCenter(this.toy.ToyElement).y;
 
@@ -3579,44 +3733,47 @@ class ToyToBoxTrialController {
 
         Interface.Prompt.show_message("Let's keep the " + this.FenObj.toy + " safe in the " + this.box.boxname);
 
-        let toyHalfW = this.getScaledTemplateHalfWidth("toy_" + this.FenObj.toy, toyScale);
-        let boxHalfW = this.getScaledTemplateHalfWidth("toybox_" + this.FenObj.toybox, boxScale);
-        let liveToyCenter = getSVGInternalCenter(this.toy.ToyElement);
-
-        let partnerCenterX = null;
-        let partnerHalfW = null;
-        if (this.partner.is_present && this.partner.PartnerBaseGroup) {
-            partnerCenterX = getSVGInternalCenter(this.partner.PartnerBaseGroup).x;
-            partnerHalfW = this.getElementHalfWidthSVG(this.partner.PartnerBaseGroup);
-        }
-
-        let boxX = this.pickNonOccludingBoxX(
-            liveToyCenter.x,
-            toyHalfW,
-            boxHalfW,
-            partnerCenterX,
-            partnerHalfW
-        );
-        let boxY = 0.7 * this.basics.H;
-
         await this.box.create_and_appear_box(
             this.basics.ItemLayers.Main,
             this.basics.ItemLayers.Plus2,
-            boxX,
-            boxY,
+            boxCenterX,
+            this.boxY,
             boxScale,
             100
         );
         await wait(750);
 
-        // Treat same-toy contents as empty: participant just stores it again with no clear step.
-        let currentContents = WorldState.get_toybox_contents(this.FenObj.toybox);
-        this.boxNeedsClearing = (currentContents && currentContents !== this.FenObj.toy);
+        // Prefer showing a wrapping sack over a bare toy when clearing.
+        let boxEntry = WorldState.get_toybox_entry(this.FenObj.toybox);
+        let currentSack = boxEntry ? boxEntry.sack : false;
+        let currentToy = boxEntry ? boxEntry.toy : false;
 
-        if (this.boxNeedsClearing) {
-            this.old_toy = new StandardToyModule({ toy: currentContents });
+        if (currentSack) {
+            this.clearMode = "sack";
+            this.boxNeedsClearing = true;
+        } else if (currentToy && currentToy !== this.FenObj.toy) {
+            this.clearMode = "toy";
+            this.boxNeedsClearing = true;
+        } else {
+            this.clearMode = null;
+            this.boxNeedsClearing = false;
+        }
+
+        if (this.clearMode === "sack") {
+            this.create_toy_bin();
+            this.old_sack = new SackModule({ sack: currentSack });
             let boxTarget = getSVGInternalCenter(this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0]);
-            // Sit under the closed lid so opening reveals it.
+            await this.old_sack.create_and_appear_closed_sack_item(
+                this.basics.ItemLayers.Plus1,
+                boxTarget.x,
+                boxTarget.y,
+                this.sackScale * this.sackBoxShrinkFactor,
+                0
+            );
+        } else if (this.clearMode === "toy") {
+            this.create_toy_bin();
+            this.old_toy = new StandardToyModule({ toy: currentToy });
+            let boxTarget = getSVGInternalCenter(this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0]);
             await this.old_toy.create_and_appear_toy(
                 this.basics.ItemLayers.Plus1,
                 "old_box_contents",
@@ -3648,65 +3805,158 @@ class ToyToBoxTrialController {
         this.handle_box_opened();
     }
 
-    async clear_occupied_box() {
-        let oldToyName = this.old_toy.FenObj.toy;
-        let groundY = (this.groundY != null)
-            ? this.groundY
-            : getSVGInternalCenter(this.toy.ToyElement).y;
+    create_toy_bin() {
+        let template = document.getElementById("toy_bin");
+        if (!template) {
+            console.error("toy_to_box: #toy_bin not found in SVG assets");
+            return;
+        }
 
-        Interface.Prompt.show_message("There is already a " + oldToyName + " in the " + this.box.boxname);
+        let binX = 0.1 * this.basics.W;
+        let binY = this.boxY + 50;
+        let scale = this.boxScale;
+
+        this.binBack = copy_scale_and_move_object_to_position(
+            template,
+            this.basics.ItemLayers.Main,
+            binX,
+            binY,
+            scale,
+            "toy_to_box_toy_bin_back"
+        );
+        let frontOnBack = this.binBack.querySelector(".toy_bin_front");
+        if (frontOnBack) frontOnBack.remove();
+        this.binBack.style.pointerEvents = "none";
+
+        this.binFront = copy_scale_and_move_object_to_position(
+            template,
+            this.basics.ItemLayers.Plus1,
+            binX,
+            binY,
+            scale,
+            "toy_to_box_toy_bin_front"
+        );
+        let backOnFront = this.binFront.querySelector(".toy_bin_back");
+        if (backOnFront) backOnFront.remove();
+        this.binFront.style.pointerEvents = "none";
+
+        this.binCenter = getSVGInternalCenter(this.binBack);
+        this.binAboveLeft = { x: this.binCenter.x - 45, y: this.binCenter.y - 200 };
+        this.binAboveRight = { x: this.binCenter.x + 45, y: this.binCenter.y - 200 };
+    }
+
+    remove_toy_bin() {
+        if (this.binBack) this.binBack.remove();
+        if (this.binFront) this.binFront.remove();
+        this.binBack = null;
+        this.binFront = null;
+        this.binCenter = null;
+        this.binAboveLeft = null;
+        this.binAboveRight = null;
+    }
+
+    clearBoxWorldState() {
+        let oldSackId = this.old_sack ? this.old_sack.FenObj.sack : null;
+        WorldState.clear_toybox_contents(this.FenObj.toybox);
+        if (oldSackId) {
+            WorldState.clear_sack_contents(oldSackId);
+        }
+        if (this.partner.is_present) {
+            WorldState.change_partner_belief_in_box_contents(this.FenObj.toybox, false);
+        }
+    }
+
+    async animateToyIntoBin(toyElement) {
+        let stackIndex = this.binStackCount;
+        this.binStackCount++;
+
+        let above = (stackIndex % 2 === 0) ? this.binAboveLeft : this.binAboveRight;
+        let finalX = this.binCenter.x + ((stackIndex % 2 === 0) ? -35 : 35);
+        let finalY = this.binCenter.y + 55 - stackIndex * 22;
+
+        this.basics.ItemLayers.Main.appendChild(toyElement);
+        await this.animateToyToPoint(toyElement, above.x, above.y, 280);
+        toyElement.style.transition = "transform 400ms ease-in";
+        let cur = getSVGInternalCenter(toyElement);
+        toyElement.style.transform += ` translate(${finalX - cur.x}px, ${finalY - cur.y}px)`;
+        await wait(420);
+    }
+
+    async animateToyToPoint(toyElement, targetX, targetY, ms = 450) {
+        let current = getSVGInternalCenter(toyElement);
+        let dx = targetX - current.x;
+        let dy = targetY - current.y;
+        toyElement.style.transition = `transform ${ms}ms ease-in-out`;
+        toyElement.style.transform += ` translate(${dx}px, ${dy}px)`;
+        await wait(ms);
+    }
+
+    async clear_occupied_box() {
+        if (!this.binCenter) {
+            this.create_toy_bin();
+        }
+
+        let dragElement = null;
+        let label = "";
+        if (this.clearMode === "sack") {
+            label = this.old_sack.sackname;
+            dragElement = this.old_sack.SackItem;
+            Interface.Prompt.show_message("There is already a " + label + " in the " + this.box.boxname);
+        } else {
+            label = this.old_toy.FenObj.toy;
+            dragElement = this.old_toy.ToyElement;
+            Interface.Prompt.show_message("There is already a " + label + " in the " + this.box.boxname);
+        }
         await wait(1200);
 
-        Interface.Prompt.show_message("Drag the " + oldToyName + " out of the box");
+        Interface.Prompt.show_message(
+            this.clearMode === "sack"
+                ? "Drag the old sack into the toy bin"
+                : "Drag the old toy into the toy bin"
+        );
         AudioCont.play_sound_effect("alert_minor");
 
-        await new Promise(resolve => {
-            const enableDragAway = () => {
-                this.oldToyDragController = new MakeObjectDraggableObject(
-                    this.basics.ItemLayers.Main,
-                    this.basics.ItemLayers.Plus2,
-                    this.old_toy.ToyElement,
-                    this.box.BoxBase,
-                    this.oldToyClearDistance,
-                    async (DraggedToyElement) => {
-                        // Accepted: lock in place (no longer draggable), optionally fall to ground.
-                        Interface.Prompt.hide();
-                        if (this.oldToyDragController && this.oldToyDragController.destroy) {
-                            this.oldToyDragController.destroy();
-                        }
-                        this.oldToyDragController = null;
-                        DraggedToyElement.style.pointerEvents = "none";
-                        DraggedToyElement.style.cursor = "auto";
-
-                        let current = getSVGInternalCenter(DraggedToyElement);
-                        if (current.y < groundY) {
-                            let dy = groundY - current.y;
-                            DraggedToyElement.style.transition = "transform 350ms ease-in";
-                            DraggedToyElement.style.transform += ` translate(0px, ${dy}px)`;
-                            await wait(350);
-                        }
-
-                        // Same WorldState update as before; visual toy stays on screen.
-                        WorldState.clear_toybox_contents(this.FenObj.toybox);
-                        resolve();
+        await new Promise((resolve) => {
+            dragElement.style.pointerEvents = "auto";
+            this.oldItemDragController = new MakeObjectDraggableObject(
+                this.basics.ItemLayers.Main,
+                this.basics.ItemLayers.Plus2,
+                dragElement,
+                this.binBack || this.binFront,
+                this.binProximityX,
+                async (DraggedElement) => {
+                    if (this.oldItemDragController && this.oldItemDragController.destroy) {
+                        this.oldItemDragController.destroy();
+                    }
+                    this.oldItemDragController = null;
+                    DraggedElement.style.pointerEvents = "none";
+                    DraggedElement.style.cursor = "auto";
+                    if (this.clearMode === "sack" && this.old_sack) {
+                        this.old_sack.play_placed_sfx();
+                    }
+                    await this.animateToyIntoBin(DraggedElement);
+                    this.clearBoxWorldState();
+                    Interface.Prompt.hide();
+                    resolve();
+                },
+                {
+                    validateDrop: () => {
+                        if (!this.binCenter) return false;
+                        let itemCenter = getSVGInternalCenter(dragElement);
+                        return Math.abs(itemCenter.x - this.binCenter.x) <= this.binProximityX;
                     },
-                    {
-                        validateDrop: (distToBox, event) => {
-                            let toyCenter = getSVGInternalCenter(this.old_toy.ToyElement);
-                            let boxCenter = getSVGInternalCenter(this.box.BoxBase);
-                            return Math.abs(toyCenter.x - boxCenter.x) >= this.oldToyClearDistance;
-                        },
-                        onMiss: () => {
-                            Interface.Prompt.show_message("Move it farther to the side of the box");
-                            if (this.oldToyDragController && this.oldToyDragController.enable) {
-                                this.oldToyDragController.enable();
-                            }
+                    onMiss: () => {
+                        Interface.Prompt.show_message(
+                            this.clearMode === "sack"
+                                ? "Drop the sack near the toy bin"
+                                : "Drop the toy near the toy bin"
+                        );
+                        if (this.oldItemDragController && this.oldItemDragController.enable) {
+                            this.oldItemDragController.enable();
                         }
                     }
-                );
-            };
-
-            enableDragAway();
+                }
+            );
         });
     }
 
@@ -3727,14 +3977,597 @@ class ToyToBoxTrialController {
                     this.basics,
                     this.partner,
                     this.FenObj,
-                    () => this.finish_trial()
+                    () => this.after_toy_placed()
                 );
             }
         );
     }
 
+    async after_toy_placed() {
+        // Hide after shut so protruding parts cannot leak the quiz answer.
+        if (this.toy && this.toy.ToyElement) {
+            this.toy.ToyElement.style.transition = "opacity 150ms ease-in";
+            this.toy.ToyElement.style.opacity = 0;
+            await wait(150);
+        }
+        await this.run_placement_quiz();
+    }
+
+    getPlacementQuizOptions() {
+        let options = Array.isArray(this.FenObj.placement_quiz_options)
+            ? [...this.FenObj.placement_quiz_options]
+            : [];
+        if (this.FenObj.toy && !options.includes(this.FenObj.toy)) {
+            options.push(this.FenObj.toy);
+        }
+        return options.filter(Boolean);
+    }
+
+    /**
+     * Attention check after box close: which toy was just placed?
+     * Wrong → reopen, lift toy, show, lower, close, retry.
+     */
+    async run_placement_quiz() {
+        let options = this.getPlacementQuizOptions();
+        if (options.length === 0) {
+            console.warn("toy_to_box: no toys for placement quiz; skipping.");
+            Interface.Prompt.show_message(
+                "The " + this.FenObj.toy + " is now safely in the " + this.box.boxname + "!"
+            );
+            await wait(1600);
+            Interface.Prompt.hide();
+            this.finish_trial();
+            return;
+        }
+
+        this.FenObj.placement_errors = [];
+        let bar = new ToyChoiceBar(
+            this.basics.ItemLayers.Questions,
+            this.basics.W,
+            this.basics.H
+        );
+
+        while (true) {
+            Interface.Prompt.show_message("Which toy did you just place in this box?");
+            let selected = await bar.waitForSelection(shuffleArray([...options]));
+
+            if (selected === this.FenObj.toy) {
+                AudioCont.play_sound_effect("positive");
+                await bar.hide();
+                let burstCenter = getSVGInternalCenter(this.box.BoxBase);
+                await spawn_confetti_burst(
+                    this.basics.ItemLayers.Plus2,
+                    burstCenter.x,
+                    burstCenter.y,
+                    { awaitPopMs: 900 }
+                );
+                Interface.Prompt.show_message(
+                    "The " + this.FenObj.toy + " is now safely in the " + this.box.boxname + "!"
+                );
+                await wait(1600);
+                Interface.Prompt.hide();
+                this.finish_trial();
+                return;
+            }
+
+            AudioCont.play_sound_effect("rejected");
+            this.FenObj.placement_errors.push(selected);
+            await bar.hide();
+            await this.reveal_placed_toy();
+        }
+    }
+
+    async open_box_for_reveal() {
+        this.box.set_pointer_events_enabled(true);
+        if (this.partner.is_present) {
+            Interface.Prompt.show_message(this.partner.partnername + " opens the " + this.box.boxname);
+            await this.partner.move_to_element_and_act(this.box.BoxBase, () => this.box.open_box());
+            await wait(300);
+        } else {
+            await new Promise((resolve) => {
+                this.box.wait_for_user_click("open", () => resolve());
+            });
+            await wait(200);
+        }
+        this.box.set_pointer_events_enabled(false);
+    }
+
+    async close_box_for_reveal() {
+        this.box.set_pointer_events_enabled(true);
+        if (this.partner.is_present) {
+            Interface.Prompt.show_message(this.partner.partnername + " closes the " + this.box.boxname);
+            await this.partner.move_to_element_and_act(this.box.BoxBase, () => this.box.close_box());
+            await wait(250);
+        } else {
+            await new Promise((resolve) => {
+                this.box.wait_for_user_click("close", () => resolve());
+            });
+            await wait(150);
+        }
+        this.box.set_pointer_events_enabled(false);
+
+        if (this.toy && this.toy.ToyElement) {
+            this.toy.ToyElement.style.transition = "opacity 250ms ease-in";
+            this.toy.ToyElement.style.opacity = 0;
+            await wait(250);
+        }
+    }
+
+    /** Wrong-answer remediation: open → show toy under lid → lift → present → lower → close. */
+    async reveal_placed_toy() {
+        let toyEl = this.toy && this.toy.ToyElement;
+        if (!toyEl) {
+            console.warn("toy_to_box: missing placed toy for reveal; reopening without lift.");
+            await this.open_box_for_reveal();
+            await wait(1000);
+            await this.close_box_for_reveal();
+            return;
+        }
+
+        // Park behind the still-closed lid at full opacity so it is visible the
+        // instant the box opens (no post-open fade lag).
+        toyEl.style.pointerEvents = "none";
+        this.basics.ItemLayers.Plus1.appendChild(toyEl);
+        toyEl.style.transition = "none";
+        toyEl.style.opacity = 1;
+        void toyEl.getBoundingClientRect();
+
+        await this.open_box_for_reveal();
+
+        let boxTargetEl = this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0];
+        let boxTarget = getSVGInternalCenter(boxTargetEl);
+        let presentY = boxTarget.y - 400;
+
+        await this.animateToyToPoint(toyEl, boxTarget.x, presentY, 450);
+        await wait(1000);
+        await this.animateToyToPoint(toyEl, boxTarget.x, boxTarget.y, 450);
+
+        await this.close_box_for_reveal();
+    }
+
     async finish_trial() {
-        await wait(2000);
+        await wait(500);
+        this.returnfunc();
+    }
+
+    clean_up() {
+        if (this.oldItemDragController && this.oldItemDragController.destroy) {
+            this.oldItemDragController.destroy();
+            this.oldItemDragController = null;
+        }
+        if (this.oldToyDragController && this.oldToyDragController.destroy) {
+            this.oldToyDragController.destroy();
+            this.oldToyDragController = null;
+        }
+        this.basics.clean_up();
+        this.box.clean_up();
+        this.toy.clean_up();
+        if (this.old_toy) this.old_toy.clean_up();
+        if (this.old_sack) this.old_sack.clean_up();
+        this.remove_toy_bin();
+        if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
+        else if (this.partner.PartnerTranslateGroup) this.partner.PartnerTranslateGroup.remove();
+    }
+}
+
+class ToyToSackTrialController {
+    constructor(FenObj, partner_is_present, returnfunc) {
+        this.FenObj = FenObj;
+        this.returnfunc = returnfunc;
+
+        this.basics = new BasicElementsModule(FenObj);
+        this.sack = new SackModule(FenObj);
+        this.toy = new StandardToyModule(FenObj);
+        this.partner = new PartnerModule(partner_is_present);
+
+        this.old_toy = null;
+        this.oldToyDragController = null;
+        this.groundY = null;
+        this.sackY = null;
+        this.itemScale = 4;
+        // Dialable: sack size relative to the shared item scale (boxes stay at itemScale).
+        this.sackScale = 3;
+        // Dialable: toys shrink to this fraction of their drag size when settling into a sack.
+        this.sackToyShrinkFactor = 0.82;
+        this.binProximityX = 220;
+        this.binBack = null;
+        this.binFront = null;
+        this.binCenter = null;
+        this.binAboveLeft = null;
+        this.binAboveRight = null;
+        this.binStackCount = 0;
+    }
+
+    getScaledTemplateHalfWidth(elementId, scale) {
+        let template = document.getElementById(elementId);
+        if (!template) return 180 * (scale / 4);
+
+        let box = template.getBBox();
+        return (Math.max(box.width, 1) * scale) / 2;
+    }
+
+    async start_sequence() {
+        this.basics.create_svg_sublayers();
+        if (this.partner.is_present) {
+            this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        }
+        await this.basics.create_background_mask(true, 500);
+
+        const toyScale = this.itemScale;
+        const sackScale = this.sackScale;
+        const sackCenterX = 0.5 * this.basics.W;
+        const toyCenterY = 0.55 * this.basics.H;
+        this.sackY = 0.7 * this.basics.H;
+
+        let toyHalfW = this.getScaledTemplateHalfWidth("toy_" + this.FenObj.toy, toyScale);
+        let sackHalfW = this.getScaledTemplateHalfWidth(this.FenObj.sack, sackScale);
+        let toyCenterX = pick_flanking_item_x(
+            this.basics.W,
+            sackCenterX,
+            sackHalfW,
+            toyHalfW
+        );
+
+        await this.toy.create_and_appear_toy(
+            this.basics.ItemLayers.Plus1,
+            "main",
+            toyCenterX,
+            toyCenterY,
+            toyScale,
+            200
+        );
+
+        this.toy.ToyElement.style.transition = "all 200ms ease-out";
+        this.toy.ToyElement.style.transform += "translate(0px, 150px)";
+        await wait(200);
+        this.groundY = getSVGInternalCenter(this.toy.ToyElement).y;
+
+        Interface.Prompt.show_message("Oops! The " + this.FenObj.toy + " has been left behind");
+        await wait(750);
+
+        Interface.Prompt.show_message("Let's keep the " + this.FenObj.toy + " safe in the " + this.sack.sackname);
+
+        await this.sack.create_and_appear_sack(
+            this.basics.ItemLayers.Main,
+            this.basics.ItemLayers.Plus2,
+            sackCenterX,
+            this.sackY,
+            sackScale,
+            100
+        );
+        await wait(750);
+
+        let currentContents = WorldState.get_sack_contents(this.FenObj.sack);
+        this.sackNeedsClearing = (currentContents && currentContents !== this.FenObj.toy);
+
+        if (this.sackNeedsClearing) {
+            this.create_toy_bin();
+            this.old_toy = new StandardToyModule({ toy: currentContents });
+            let sackTarget = this.sack.SackTop.getElementsByClassName("sack_target_centerpoint")[0]
+                || this.sack.ensure_target_centerpoint(this.sack.SackTop);
+            let targetCenter = getSVGInternalCenter(sackTarget);
+            // Already-in-sack size matches the post-drop shrink.
+            await this.old_toy.create_and_appear_toy(
+                this.basics.ItemLayers.Plus1,
+                "old_sack_contents",
+                targetCenter.x,
+                targetCenter.y,
+                toyScale * this.sackToyShrinkFactor,
+                0
+            );
+        }
+
+        if (this.partner.is_present) {
+            Interface.Prompt.show_message(this.partner.partnername + " opens the " + this.sack.sackname);
+            await this.partner.move_to_element_and_act(this.sack.SackBase, () => this.sack.open_sack());
+            await wait(500);
+        } else {
+            await new Promise(resolve => {
+                this.sack.wait_for_user_click("open", () => resolve());
+            });
+            await wait(500);
+        }
+
+        this.sack.set_pointer_events_enabled(false);
+
+        if (this.sackNeedsClearing) {
+            await this.clear_occupied_sack();
+        }
+
+        this.handle_sack_opened();
+    }
+
+    create_toy_bin() {
+        let template = document.getElementById("toy_bin");
+        if (!template) {
+            console.error("toy_to_sack: #toy_bin not found in SVG assets");
+            return;
+        }
+
+        let binX = 0.1 * this.basics.W;
+        let binY = this.sackY + 50;
+        let scale = this.itemScale;
+
+        this.binBack = copy_scale_and_move_object_to_position(
+            template,
+            this.basics.ItemLayers.Main,
+            binX,
+            binY,
+            scale,
+            "toy_to_sack_toy_bin_back"
+        );
+        let frontOnBack = this.binBack.querySelector(".toy_bin_front");
+        if (frontOnBack) frontOnBack.remove();
+        this.binBack.style.pointerEvents = "none";
+
+        this.binFront = copy_scale_and_move_object_to_position(
+            template,
+            this.basics.ItemLayers.Plus1,
+            binX,
+            binY,
+            scale,
+            "toy_to_sack_toy_bin_front"
+        );
+        let backOnFront = this.binFront.querySelector(".toy_bin_back");
+        if (backOnFront) backOnFront.remove();
+        this.binFront.style.pointerEvents = "none";
+
+        this.binCenter = getSVGInternalCenter(this.binBack);
+        this.binAboveLeft = { x: this.binCenter.x - 45, y: this.binCenter.y - 200 };
+        this.binAboveRight = { x: this.binCenter.x + 45, y: this.binCenter.y - 200 };
+    }
+
+    remove_toy_bin() {
+        if (this.binBack) this.binBack.remove();
+        if (this.binFront) this.binFront.remove();
+        this.binBack = null;
+        this.binFront = null;
+        this.binCenter = null;
+        this.binAboveLeft = null;
+        this.binAboveRight = null;
+    }
+
+    clearSackWorldState() {
+        WorldState.clear_sack_contents(this.FenObj.sack);
+    }
+
+    async animateItemIntoBin(itemElement) {
+        let stackIndex = this.binStackCount;
+        this.binStackCount++;
+
+        let above = (stackIndex % 2 === 0) ? this.binAboveLeft : this.binAboveRight;
+        let finalX = this.binCenter.x + ((stackIndex % 2 === 0) ? -35 : 35);
+        let finalY = this.binCenter.y + 55 - stackIndex * 22;
+
+        this.basics.ItemLayers.Main.appendChild(itemElement);
+        await this.animateItemToPoint(itemElement, above.x, above.y, 280);
+        itemElement.style.transition = "transform 400ms ease-in";
+        let cur = getSVGInternalCenter(itemElement);
+        itemElement.style.transform += ` translate(${finalX - cur.x}px, ${finalY - cur.y}px)`;
+        await wait(420);
+    }
+
+    async animateItemToPoint(itemElement, targetX, targetY, ms = 450) {
+        let current = getSVGInternalCenter(itemElement);
+        let dx = targetX - current.x;
+        let dy = targetY - current.y;
+        itemElement.style.transition = `transform ${ms}ms ease-in-out`;
+        itemElement.style.transform += ` translate(${dx}px, ${dy}px)`;
+        await wait(ms);
+    }
+
+    async clear_occupied_sack() {
+        let oldToyName = this.old_toy.FenObj.toy;
+
+        if (!this.binCenter) {
+            this.create_toy_bin();
+        }
+
+        Interface.Prompt.show_message("There is already a " + oldToyName + " in the " + this.sack.sackname);
+        await wait(1200);
+
+        Interface.Prompt.show_message("Drag the old toy into the toy bin");
+        AudioCont.play_sound_effect("alert_minor");
+
+        await new Promise((resolve) => {
+            this.old_toy.ToyElement.style.pointerEvents = "auto";
+            this.oldToyDragController = new MakeObjectDraggableObject(
+                this.basics.ItemLayers.Main,
+                this.basics.ItemLayers.Plus2,
+                this.old_toy.ToyElement,
+                this.binBack || this.binFront,
+                this.binProximityX,
+                async (DraggedToyElement) => {
+                    if (this.oldToyDragController && this.oldToyDragController.destroy) {
+                        this.oldToyDragController.destroy();
+                    }
+                    this.oldToyDragController = null;
+                    DraggedToyElement.style.pointerEvents = "none";
+                    DraggedToyElement.style.cursor = "auto";
+                    await this.animateItemIntoBin(DraggedToyElement);
+                    this.clearSackWorldState();
+                    Interface.Prompt.hide();
+                    resolve();
+                },
+                {
+                    validateDrop: () => {
+                        if (!this.binCenter) return false;
+                        let toyCenter = getSVGInternalCenter(this.old_toy.ToyElement);
+                        return Math.abs(toyCenter.x - this.binCenter.x) <= this.binProximityX;
+                    },
+                    onMiss: () => {
+                        Interface.Prompt.show_message("Drop the toy near the toy bin");
+                        if (this.oldToyDragController && this.oldToyDragController.enable) {
+                            this.oldToyDragController.enable();
+                        }
+                    }
+                }
+            );
+        });
+    }
+
+    handle_sack_opened() {
+        Interface.Prompt.show_message("Please place the " + this.FenObj.toy + " in the " + this.sack.sackname);
+        AudioCont.play_sound_effect("alert_minor");
+
+        new MakeObjectDraggableObject(
+            this.basics.ItemLayers.Main,
+            this.basics.ItemLayers.Plus2,
+            this.toy.ToyElement,
+            this.sack.SackBase,
+            200,
+            (DroppedToyElement) => {
+                shared_toy_to_sack_drop_sequence(
+                    DroppedToyElement,
+                    this.sack,
+                    this.basics,
+                    this.partner,
+                    this.FenObj,
+                    () => this.run_placement_quiz(),
+                    { shrinkFactor: this.sackToyShrinkFactor }
+                );
+            }
+        );
+    }
+
+    getPlacementQuizOptions() {
+        let options = Array.isArray(this.FenObj.placement_quiz_options)
+            ? [...this.FenObj.placement_quiz_options]
+            : [];
+        if (this.FenObj.toy && !options.includes(this.FenObj.toy)) {
+            options.push(this.FenObj.toy);
+        }
+        return options.filter(Boolean);
+    }
+
+    /**
+     * Attention check after sack close: which toy was just placed?
+     * Wrong → reopen, lift toy to full size, show, lower+shrink, close, retry.
+     */
+    async run_placement_quiz() {
+        let options = this.getPlacementQuizOptions();
+        if (options.length === 0) {
+            console.warn("toy_to_sack: no toys for placement quiz; skipping.");
+            Interface.Prompt.show_message(
+                "The " + this.FenObj.toy + " is now safely in the " + this.sack.sackname + "!"
+            );
+            await wait(1600);
+            Interface.Prompt.hide();
+            this.finish_trial();
+            return;
+        }
+
+        this.FenObj.placement_errors = [];
+        let bar = new ToyChoiceBar(
+            this.basics.ItemLayers.Questions,
+            this.basics.W,
+            this.basics.H
+        );
+
+        while (true) {
+            Interface.Prompt.show_message("Which toy did you just place in the " + this.sack.sackname + "?");
+            let selected = await bar.waitForSelection(shuffleArray([...options]));
+
+            if (selected === this.FenObj.toy) {
+                AudioCont.play_sound_effect("positive");
+                await bar.hide();
+                let burstCenter = getSVGInternalCenter(this.sack.SackBase || this.sack.SackTop);
+                await spawn_confetti_burst(
+                    this.basics.ItemLayers.Plus2,
+                    burstCenter.x,
+                    burstCenter.y,
+                    { awaitPopMs: 900 }
+                );
+                Interface.Prompt.show_message(
+                    "The " + this.FenObj.toy + " is now safely in the " + this.sack.sackname + "!"
+                );
+                await wait(1600);
+                Interface.Prompt.hide();
+                this.finish_trial();
+                return;
+            }
+
+            AudioCont.play_sound_effect("rejected");
+            this.FenObj.placement_errors.push(selected);
+            await bar.hide();
+            await this.reveal_placed_toy();
+        }
+    }
+
+    async open_sack_for_reveal() {
+        this.sack.set_pointer_events_enabled(true);
+        if (this.partner.is_present) {
+            Interface.Prompt.show_message(this.partner.partnername + " opens the " + this.sack.sackname);
+            await this.partner.move_to_element_and_act(this.sack.SackBase, () => this.sack.open_sack());
+            await wait(300);
+        } else {
+            await new Promise((resolve) => {
+                this.sack.wait_for_user_click("open", () => resolve());
+            });
+            await wait(200);
+        }
+        this.sack.set_pointer_events_enabled(false);
+    }
+
+    async close_sack_for_reveal() {
+        this.sack.set_pointer_events_enabled(true);
+        if (this.partner.is_present) {
+            Interface.Prompt.show_message(this.partner.partnername + " closes the " + this.sack.sackname);
+            await this.partner.move_to_element_and_act(this.sack.SackBase, () => this.sack.close_sack());
+            await wait(250);
+        } else {
+            await new Promise((resolve) => {
+                this.sack.wait_for_user_click("close", () => resolve());
+            });
+            await wait(150);
+        }
+        this.sack.set_pointer_events_enabled(false);
+
+        if (this.toy && this.toy.ToyElement) {
+            this.toy.ToyElement.style.transition = "opacity 250ms ease-in";
+            this.toy.ToyElement.style.opacity = 0;
+            await wait(250);
+        }
+    }
+
+    /** Wrong-answer remediation: open → fade/grow toy up → present → shrink/lower → close. */
+    async reveal_placed_toy() {
+        let toyEl = this.toy && this.toy.ToyElement;
+        if (!toyEl) {
+            console.warn("toy_to_sack: missing placed toy for reveal; reopening without lift.");
+            await this.open_sack_for_reveal();
+            await wait(1000);
+            await this.close_sack_for_reveal();
+            return;
+        }
+
+        await this.open_sack_for_reveal();
+
+        let sackTarget = this.sack.SackTop.getElementsByClassName("sack_target_centerpoint")[0]
+            || this.sack.ensure_target_centerpoint(this.sack.SackTop);
+        let sackCenter = getSVGInternalCenter(sackTarget);
+        // Lift clear of the open sack mouth while staying behind the front panel.
+        let presentY = sackCenter.y - 400;
+
+        toyEl.style.pointerEvents = "none";
+        // Stay between sack back (Main) and sack front (Plus2) for the whole reveal.
+        this.basics.ItemLayers.Plus1.appendChild(toyEl);
+        toyEl.style.transition = "opacity 200ms ease-in";
+        toyEl.style.opacity = 1;
+        await wait(200);
+
+        set_nested_scale(toyEl, this.itemScale, 450);
+        await this.animateItemToPoint(toyEl, sackCenter.x, presentY, 450);
+        await wait(1000);
+
+        set_nested_scale(toyEl, this.itemScale * this.sackToyShrinkFactor, 450);
+        await this.animateItemToPoint(toyEl, sackCenter.x, sackCenter.y, 450);
+
+        await this.close_sack_for_reveal();
+    }
+
+    async finish_trial() {
+        await wait(500);
         this.returnfunc();
     }
 
@@ -3744,9 +4577,508 @@ class ToyToBoxTrialController {
             this.oldToyDragController = null;
         }
         this.basics.clean_up();
-        this.box.clean_up();
+        this.sack.clean_up();
         this.toy.clean_up();
         if (this.old_toy) this.old_toy.clean_up();
+        this.remove_toy_bin();
+        if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
+        else if (this.partner.PartnerTranslateGroup) this.partner.PartnerTranslateGroup.remove();
+    }
+}
+
+class SackToBoxTrialController {
+    constructor(FenObj, partner_is_present, returnfunc) {
+        this.FenObj = FenObj;
+        this.returnfunc = returnfunc;
+
+        this.basics = new BasicElementsModule(FenObj);
+        this.box = new BoxModule(FenObj);
+        this.sack = new SackModule(FenObj);
+        this.partner = new PartnerModule(partner_is_present);
+
+        this.old_toy = null;
+        this.old_sack = null;
+        this.oldItemDragController = null;
+        this.groundY = null;
+        this.boxY = null;
+        this.itemScale = 4;
+        // Dialable: sack size relative to the shared item scale (boxes stay at itemScale).
+        this.sackScale = 3;
+        // Dialable: sacks shrink to this fraction when settling into a box.
+        this.sackBoxShrinkFactor = 0.65;
+        this.sackDropDistance = 300;
+        this.binProximityX = 220;
+        this.binBack = null;
+        this.binFront = null;
+        this.binCenter = null;
+        this.binAboveLeft = null;
+        this.binAboveRight = null;
+        this.binStackCount = 0;
+        this.clearMode = null; // "sack" | "toy" | null
+    }
+
+    getScaledTemplateHalfWidth(elementId, scale) {
+        let template = document.getElementById(elementId);
+        if (!template) return 180 * (scale / 4);
+
+        let box = template.getBBox();
+        return (Math.max(box.width, 1) * scale) / 2;
+    }
+
+    async start_sequence() {
+        this.basics.create_svg_sublayers();
+        if (this.partner.is_present) {
+            this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        }
+        await this.basics.create_background_mask(true, 500);
+
+        const sackScale = this.sackScale;
+        const boxScale = this.itemScale;
+        const boxCenterX = 0.5 * this.basics.W;
+        const sackCenterY = 0.55 * this.basics.H;
+        this.boxY = 0.7 * this.basics.H;
+
+        let sackHalfW = this.getScaledTemplateHalfWidth(this.FenObj.sack, sackScale);
+        let boxHalfW = this.getScaledTemplateHalfWidth("toybox_" + this.FenObj.toybox, boxScale);
+        let sackCenterX = pick_flanking_item_x(
+            this.basics.W,
+            boxCenterX,
+            boxHalfW,
+            sackHalfW
+        );
+
+        await this.sack.create_and_appear_closed_sack_item(
+            this.basics.ItemLayers.Plus1,
+            sackCenterX,
+            sackCenterY,
+            sackScale,
+            200
+        );
+
+        this.sack.SackItem.style.transition = "all 200ms ease-out";
+        this.sack.SackItem.style.transform += "translate(0px, 150px)";
+        await wait(200);
+        this.groundY = getSVGInternalCenter(this.sack.SackItem).y;
+
+        Interface.Prompt.show_message("Oops! The " + this.sack.sackname + " has been left behind");
+        await wait(750);
+
+        Interface.Prompt.show_message("Let's keep the " + this.sack.sackname + " safe in the " + this.box.boxname);
+
+        await this.box.create_and_appear_box(
+            this.basics.ItemLayers.Main,
+            this.basics.ItemLayers.Plus2,
+            boxCenterX,
+            this.boxY,
+            boxScale,
+            100
+        );
+        await wait(750);
+
+        let boxEntry = WorldState.get_toybox_entry(this.FenObj.toybox);
+        let currentSackInBox = boxEntry ? boxEntry.sack : false;
+        let currentToyInBox = boxEntry ? boxEntry.toy : false;
+
+        // Prefer sack over bare toy when clearing. Same sack already in this box ⇒ treat as empty.
+        if (currentSackInBox && currentSackInBox === this.FenObj.sack) {
+            this.clearMode = null;
+        } else if (currentSackInBox) {
+            this.clearMode = "sack";
+        } else if (currentToyInBox && currentToyInBox !== false) {
+            this.clearMode = "toy";
+        } else {
+            this.clearMode = null;
+        }
+
+        if (this.clearMode === "sack") {
+            this.create_toy_bin();
+            this.old_sack = new SackModule({ sack: currentSackInBox });
+            let boxTarget = getSVGInternalCenter(this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0]);
+            // Closed sack under the lid — never open it; participant bins it closed.
+            // Already-in-box size matches the post-drop shrink.
+            await this.old_sack.create_and_appear_closed_sack_item(
+                this.basics.ItemLayers.Plus1,
+                boxTarget.x,
+                boxTarget.y,
+                sackScale * this.sackBoxShrinkFactor,
+                0
+            );
+        } else if (this.clearMode === "toy") {
+            this.create_toy_bin();
+            this.old_toy = new StandardToyModule({ toy: currentToyInBox });
+            let boxTarget = getSVGInternalCenter(this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0]);
+            await this.old_toy.create_and_appear_toy(
+                this.basics.ItemLayers.Plus1,
+                "old_box_contents",
+                boxTarget.x,
+                boxTarget.y,
+                boxScale,
+                0
+            );
+        }
+
+        if (this.partner.is_present) {
+            Interface.Prompt.show_message(this.partner.partnername + " opens the " + this.box.boxname);
+            await this.partner.move_to_element_and_act(this.box.BoxBase, () => this.box.open_box());
+            await wait(500);
+        } else {
+            await new Promise(resolve => {
+                this.box.wait_for_user_click("open", () => resolve());
+            });
+            await wait(500);
+        }
+
+        this.box.set_pointer_events_enabled(false);
+
+        if (this.clearMode) {
+            await this.clear_occupied_box();
+        }
+
+        this.handle_box_opened();
+    }
+
+    create_toy_bin() {
+        let template = document.getElementById("toy_bin");
+        if (!template) {
+            console.error("sack_to_box: #toy_bin not found in SVG assets");
+            return;
+        }
+
+        let binX = 0.1 * this.basics.W;
+        let binY = this.boxY + 50;
+        let scale = this.itemScale;
+
+        this.binBack = copy_scale_and_move_object_to_position(
+            template,
+            this.basics.ItemLayers.Main,
+            binX,
+            binY,
+            scale,
+            "sack_to_box_toy_bin_back"
+        );
+        let frontOnBack = this.binBack.querySelector(".toy_bin_front");
+        if (frontOnBack) frontOnBack.remove();
+        this.binBack.style.pointerEvents = "none";
+
+        this.binFront = copy_scale_and_move_object_to_position(
+            template,
+            this.basics.ItemLayers.Plus1,
+            binX,
+            binY,
+            scale,
+            "sack_to_box_toy_bin_front"
+        );
+        let backOnFront = this.binFront.querySelector(".toy_bin_back");
+        if (backOnFront) backOnFront.remove();
+        this.binFront.style.pointerEvents = "none";
+
+        this.binCenter = getSVGInternalCenter(this.binBack);
+        this.binAboveLeft = { x: this.binCenter.x - 45, y: this.binCenter.y - 200 };
+        this.binAboveRight = { x: this.binCenter.x + 45, y: this.binCenter.y - 200 };
+    }
+
+    remove_toy_bin() {
+        if (this.binBack) this.binBack.remove();
+        if (this.binFront) this.binFront.remove();
+        this.binBack = null;
+        this.binFront = null;
+        this.binCenter = null;
+        this.binAboveLeft = null;
+        this.binAboveRight = null;
+    }
+
+    clearBoxWorldStateAfterBin() {
+        let oldSackId = this.old_sack ? this.old_sack.FenObj.sack : null;
+        WorldState.clear_toybox_contents(this.FenObj.toybox);
+        if (oldSackId) {
+            WorldState.clear_sack_contents(oldSackId);
+        }
+        if (this.partner.is_present) {
+            WorldState.change_partner_belief_in_box_contents(this.FenObj.toybox, false);
+        }
+    }
+
+    async animateItemIntoBin(itemElement) {
+        let stackIndex = this.binStackCount;
+        this.binStackCount++;
+
+        let above = (stackIndex % 2 === 0) ? this.binAboveLeft : this.binAboveRight;
+        let finalX = this.binCenter.x + ((stackIndex % 2 === 0) ? -35 : 35);
+        let finalY = this.binCenter.y + 55 - stackIndex * 22;
+
+        this.basics.ItemLayers.Main.appendChild(itemElement);
+        await this.animateItemToPoint(itemElement, above.x, above.y, 280);
+        itemElement.style.transition = "transform 400ms ease-in";
+        let cur = getSVGInternalCenter(itemElement);
+        itemElement.style.transform += ` translate(${finalX - cur.x}px, ${finalY - cur.y}px)`;
+        await wait(420);
+    }
+
+    async animateItemToPoint(itemElement, targetX, targetY, ms = 450) {
+        let current = getSVGInternalCenter(itemElement);
+        let dx = targetX - current.x;
+        let dy = targetY - current.y;
+        itemElement.style.transition = `transform ${ms}ms ease-in-out`;
+        itemElement.style.transform += ` translate(${dx}px, ${dy}px)`;
+        await wait(ms);
+    }
+
+    async clear_occupied_box() {
+        if (!this.binCenter) {
+            this.create_toy_bin();
+        }
+
+        let dragElement = null;
+        let label = "";
+
+        if (this.clearMode === "sack") {
+            label = this.old_sack.sackname;
+            Interface.Prompt.show_message("There is already a " + label + " in the " + this.box.boxname);
+            dragElement = this.old_sack.SackItem;
+        } else {
+            label = this.old_toy.FenObj.toy;
+            Interface.Prompt.show_message("There is already a " + label + " in the " + this.box.boxname);
+            dragElement = this.old_toy.ToyElement;
+        }
+        await wait(1200);
+
+        Interface.Prompt.show_message(
+            this.clearMode === "sack"
+                ? "Drag the old sack into the toy bin"
+                : "Drag the old toy into the toy bin"
+        );
+        AudioCont.play_sound_effect("alert_minor");
+
+        await new Promise((resolve) => {
+            dragElement.style.pointerEvents = "auto";
+            this.oldItemDragController = new MakeObjectDraggableObject(
+                this.basics.ItemLayers.Main,
+                this.basics.ItemLayers.Plus2,
+                dragElement,
+                this.binBack || this.binFront,
+                this.binProximityX,
+                async (DraggedElement) => {
+                    if (this.oldItemDragController && this.oldItemDragController.destroy) {
+                        this.oldItemDragController.destroy();
+                    }
+                    this.oldItemDragController = null;
+                    DraggedElement.style.pointerEvents = "none";
+                    DraggedElement.style.cursor = "auto";
+                    if (this.clearMode === "sack" && this.old_sack) {
+                        this.old_sack.play_placed_sfx();
+                    }
+                    await this.animateItemIntoBin(DraggedElement);
+                    this.clearBoxWorldStateAfterBin();
+                    Interface.Prompt.hide();
+                    resolve();
+                },
+                {
+                    validateDrop: () => {
+                        if (!this.binCenter) return false;
+                        let itemCenter = getSVGInternalCenter(dragElement);
+                        return Math.abs(itemCenter.x - this.binCenter.x) <= this.binProximityX;
+                    },
+                    onMiss: () => {
+                        Interface.Prompt.show_message(
+                            this.clearMode === "sack"
+                                ? "Drop the sack near the toy bin"
+                                : "Drop the toy near the toy bin"
+                        );
+                        if (this.oldItemDragController && this.oldItemDragController.enable) {
+                            this.oldItemDragController.enable();
+                        }
+                    }
+                }
+            );
+        });
+    }
+
+    handle_box_opened() {
+        Interface.Prompt.show_message("Please place the " + this.sack.sackname + " in the " + this.box.boxname);
+        AudioCont.play_sound_effect("alert_minor");
+
+        new MakeObjectDraggableObject(
+            this.basics.ItemLayers.Main,
+            this.basics.ItemLayers.Plus2,
+            this.sack.SackItem,
+            this.box.BoxBase,
+            this.sackDropDistance,
+            (DroppedSackElement) => {
+                shared_sack_to_box_drop_sequence(
+                    DroppedSackElement,
+                    this.box,
+                    this.basics,
+                    this.partner,
+                    this.FenObj,
+                    () => this.after_sack_placed(),
+                    { shrinkFactor: this.sackBoxShrinkFactor }
+                );
+            }
+        );
+    }
+
+    async after_sack_placed() {
+        // Hide after shut so the sack cannot leak the quiz answer.
+        if (this.sack && this.sack.SackItem) {
+            this.sack.SackItem.style.transition = "opacity 150ms ease-in";
+            this.sack.SackItem.style.opacity = 0;
+            await wait(150);
+        }
+        await this.run_placement_quiz();
+    }
+
+    getPlacementQuizOptions() {
+        let options = Array.isArray(this.FenObj.placement_quiz_options)
+            ? [...this.FenObj.placement_quiz_options]
+            : [];
+        if (this.FenObj.sack && !options.includes(this.FenObj.sack)) {
+            options.push(this.FenObj.sack);
+        }
+        return options.filter(Boolean);
+    }
+
+    /**
+     * Attention check after box close: which sack was just placed?
+     * Wrong → reopen, lift sack to full size, show, shrink/lower, close, retry.
+     */
+    async run_placement_quiz() {
+        let options = this.getPlacementQuizOptions();
+        if (options.length === 0) {
+            console.warn("sack_to_box: no sacks for placement quiz; skipping.");
+            Interface.Prompt.show_message(
+                "The " + this.sack.sackname + " is now safely in the " + this.box.boxname + "!"
+            );
+            await wait(1600);
+            Interface.Prompt.hide();
+            this.finish_trial();
+            return;
+        }
+
+        this.FenObj.placement_errors = [];
+        let bar = new SackChoiceBar(
+            this.basics.ItemLayers.Questions,
+            this.basics.W,
+            this.basics.H
+        );
+
+        while (true) {
+            Interface.Prompt.show_message("Which sack did you just place in the " + this.box.boxname + "?");
+            let selected = await bar.waitForSelection(shuffleArray([...options]));
+
+            if (selected === this.FenObj.sack) {
+                AudioCont.play_sound_effect("positive");
+                await bar.hide();
+                let burstCenter = getSVGInternalCenter(this.box.BoxBase);
+                await spawn_confetti_burst(
+                    this.basics.ItemLayers.Plus2,
+                    burstCenter.x,
+                    burstCenter.y,
+                    { awaitPopMs: 900 }
+                );
+                Interface.Prompt.show_message(
+                    "The " + this.sack.sackname + " is now safely in the " + this.box.boxname + "!"
+                );
+                await wait(1600);
+                Interface.Prompt.hide();
+                this.finish_trial();
+                return;
+            }
+
+            AudioCont.play_sound_effect("rejected");
+            this.FenObj.placement_errors.push(selected);
+            await bar.hide();
+            await this.reveal_placed_sack();
+        }
+    }
+
+    async open_box_for_reveal() {
+        this.box.set_pointer_events_enabled(true);
+        if (this.partner.is_present) {
+            Interface.Prompt.show_message(this.partner.partnername + " opens the " + this.box.boxname);
+            await this.partner.move_to_element_and_act(this.box.BoxBase, () => this.box.open_box());
+            await wait(300);
+        } else {
+            await new Promise((resolve) => {
+                this.box.wait_for_user_click("open", () => resolve());
+            });
+            await wait(200);
+        }
+        this.box.set_pointer_events_enabled(false);
+    }
+
+    async close_box_for_reveal() {
+        this.box.set_pointer_events_enabled(true);
+        if (this.partner.is_present) {
+            Interface.Prompt.show_message(this.partner.partnername + " closes the " + this.box.boxname);
+            await this.partner.move_to_element_and_act(this.box.BoxBase, () => this.box.close_box());
+            await wait(250);
+        } else {
+            await new Promise((resolve) => {
+                this.box.wait_for_user_click("close", () => resolve());
+            });
+            await wait(150);
+        }
+        this.box.set_pointer_events_enabled(false);
+
+        if (this.sack && this.sack.SackItem) {
+            this.sack.SackItem.style.transition = "opacity 250ms ease-in";
+            this.sack.SackItem.style.opacity = 0;
+            await wait(250);
+        }
+    }
+
+    /** Wrong-answer remediation: open → show/grow sack up → present → shrink/lower → close. */
+    async reveal_placed_sack() {
+        let sackEl = this.sack && this.sack.SackItem;
+        if (!sackEl) {
+            console.warn("sack_to_box: missing placed sack for reveal; reopening without lift.");
+            await this.open_box_for_reveal();
+            await wait(1000);
+            await this.close_box_for_reveal();
+            return;
+        }
+
+        // Park behind the still-closed lid at full opacity so it is visible the
+        // instant the box opens (no post-open fade lag).
+        sackEl.style.pointerEvents = "none";
+        this.basics.ItemLayers.Plus1.appendChild(sackEl);
+        sackEl.style.transition = "none";
+        sackEl.style.opacity = 1;
+        void sackEl.getBoundingClientRect();
+
+        await this.open_box_for_reveal();
+
+        let boxTargetEl = this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0];
+        let boxTarget = getSVGInternalCenter(boxTargetEl);
+        // Lift clear of the open box while staying behind the lid/front panel.
+        let presentY = boxTarget.y - 400;
+
+        set_nested_scale(sackEl, this.sackScale, 450);
+        await this.animateItemToPoint(sackEl, boxTarget.x, presentY, 450);
+        await wait(1000);
+
+        set_nested_scale(sackEl, this.sackScale * this.sackBoxShrinkFactor, 450);
+        await this.animateItemToPoint(sackEl, boxTarget.x, boxTarget.y, 450);
+
+        await this.close_box_for_reveal();
+    }
+
+    async finish_trial() {
+        await wait(500);
+        this.returnfunc();
+    }
+
+    clean_up() {
+        if (this.oldItemDragController && this.oldItemDragController.destroy) {
+            this.oldItemDragController.destroy();
+            this.oldItemDragController = null;
+        }
+        this.basics.clean_up();
+        this.box.clean_up();
+        this.sack.clean_up();
+        if (this.old_sack) this.old_sack.clean_up();
+        if (this.old_toy) this.old_toy.clean_up();
+        this.remove_toy_bin();
         if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
         else if (this.partner.PartnerTranslateGroup) this.partner.PartnerTranslateGroup.remove();
     }
@@ -10840,7 +12172,7 @@ class BoxRoomTrialController {
 }
 
 // Closed toybox inventory scan: place box in scanner → start → laser pass → return to table.
-class ScanBoxInventoryTrialController {
+class ScanBoxHomeTrialController {
     constructor(FenObj, partner_is_present, returnfunc) {
         this.FenObj = FenObj;
         this.returnfunc = returnfunc;
@@ -10848,7 +12180,7 @@ class ScanBoxInventoryTrialController {
         this.basics = new BasicElementsModule(FenObj);
         this.box = new BoxModule(FenObj);
         this.partner = new PartnerModule(partner_is_present);
-        this.params = GenParam.ScanBoxInventory;
+        this.params = GenParam.ScanBoxHome;
 
         this.TableGroup = null;
         this.Background = null;
@@ -11029,7 +12361,7 @@ class ScanBoxInventoryTrialController {
     async spawn_scanner() {
         let template = document.getElementById("box_scanner");
         if (!template) {
-            console.error("scan_box_inventory: #box_scanner not found");
+            console.error("scan_box_home: #box_scanner not found");
             return;
         }
 
@@ -11044,7 +12376,7 @@ class ScanBoxInventoryTrialController {
             sx,
             sy,
             scale,
-            "scan_box_inventory_scanner"
+            "scan_box_home_scanner"
         );
         let bodyShield = this.Scanner.querySelector(".safety_shield");
         if (bodyShield) bodyShield.remove();
@@ -11055,7 +12387,7 @@ class ScanBoxInventoryTrialController {
             sx,
             sy,
             scale,
-            "scan_box_inventory_shield"
+            "scan_box_home_shield"
         );
         this.strip_shield_host_to_safety_shield_only();
 
@@ -11174,7 +12506,7 @@ class ScanBoxInventoryTrialController {
         let by = this.params.tableY * this.basics.H - 10;
 
         this.BoxCarrier = create_SVG_group(0, 0);
-        this.BoxCarrier.id = "scan_box_inventory_box_carrier";
+        this.BoxCarrier.id = "scan_box_home_box_carrier";
         this.basics.ItemLayers.Plus1.appendChild(this.BoxCarrier);
 
         // Both base + lid in the same carrier so the closed box moves as one unit.
@@ -11778,7 +13110,7 @@ class ScanBoxInventoryTrialController {
     }
 
     /**
-     * JS-only laser beam fan (tweak via GenParam.ScanBoxInventory).
+     * JS-only laser beam fan (tweak via GenParam.ScanBoxHome).
      * Drawn on Plus2 so it sits in front of the box and behind the safety shield.
      * Several beams share the nozzle output origin, fanned by small angles,
      * with a light tip-wiggle (origin fixed).
@@ -12067,6 +13399,563 @@ class ScanBoxInventoryTrialController {
     }
 }
 
+/**
+ * Location-based partner-belief probe: travel to the Fennimal whose toy is currently
+ * in the target box → closed box center + static Fennimal left + partner walk-in →
+ * curtain reveal → radial 3AFC (belief / reality / cyclic lure) → fade out.
+ * Partner is always forced present regardless of phase partner_behavior.
+ */
+class PartnerBeliefInSituTrialController {
+    constructor(FenObj, partner_is_present, returnfunc) {
+        this.FenObj = FenObj;
+        this.returnfunc = returnfunc;
+        // Always force partner presence for this interaction type.
+        this.partner_is_present = true;
+
+        this.basics = new BasicElementsModule(FenObj);
+        this.W = this.basics.W;
+        this.H = this.basics.H;
+
+        this.target_box = FenObj.target_box;
+        this.target_box_code = FenObj.target_box_code;
+        this.lure_cycle_codes = FenObj.lure_cycle_codes || [];
+        this.lure_cycle_boxes = FenObj.lure_cycle_boxes || [];
+
+        if (!this.target_box || !this.target_box_code) {
+            throw new Error(
+                "partner_belief_in_situ: FenObj is missing target_box / target_box_code " +
+                `(Fennimal "${FenObj.id}").`
+            );
+        }
+        if (!Array.isArray(this.lure_cycle_codes) || this.lure_cycle_codes.length < 2
+            || !Array.isArray(this.lure_cycle_boxes) || this.lure_cycle_boxes.length < 2) {
+            throw new Error(
+                "partner_belief_in_situ: FenObj is missing a valid lure_cycle " +
+                `(codes=${JSON.stringify(this.lure_cycle_codes)}, boxes=${JSON.stringify(this.lure_cycle_boxes)}).`
+            );
+        }
+
+        this.box_center_x = 0.5 * this.W;
+        this.box_center_y = 0.58 * this.H;
+        this.radial_radius = 260;
+        this.btn_size = 150;
+        this.fennimal_x = 0.22 * this.W;
+        this.fennimal_y = 0.82 * this.H;
+
+        this.partnername = "your partner";
+        this.Icons = {};
+        this.BoxElement = null;
+        this.CurtainGroup = null;
+        this.RevealCircle = null;
+        this.BlackOverlay = null;
+        this.PartnerTranslateGroup = null;
+        this.PartnerScaleGroup = null;
+        this.QuestionBubbleGroup = null;
+        this.radialUIGroup = null;
+        this.bubble_float_interval = null;
+        this.last_input_type = "unknown";
+
+        let settings = WorldState.get_partner_icon_settings();
+        if (settings && settings.name) this.partnername = settings.name;
+        let gender = (settings && settings.type) ? settings.type : "male";
+
+        let getIcon = (dir) => {
+            let icon = WorldState.get_person_icon("partner", dir);
+            if (!icon) {
+                let el = document.getElementById(`icon_player_${gender}_${dir}`);
+                icon = el ? el.cloneNode(true) : null;
+            }
+            return icon;
+        };
+        this.Icons = {
+            back: getIcon("back"),
+            left: getIcon("left"),
+            right: getIcon("right")
+        };
+    }
+
+    async start_sequence() {
+        this.basics.create_svg_sublayers();
+        await this.basics.create_background_mask(true, 500);
+
+        this.BlackOverlay = create_SVG_rect(0, 0, this.W, this.H);
+        this.BlackOverlay.setAttribute("fill", "black");
+        this.BlackOverlay.style.opacity = 0;
+        this.BlackOverlay.style.pointerEvents = "none";
+        this.basics.ItemLayers.Questions.appendChild(this.BlackOverlay);
+
+        await this.basics.create_and_appear_Fennimal(
+            this.basics.ItemLayers.Main,
+            this.fennimal_x,
+            this.fennimal_y,
+            1.75,
+            250
+        );
+        if (this.basics.Fennimal) {
+            this.basics.Fennimal.style.pointerEvents = "none";
+        }
+
+        this.place_target_box(this.target_box);
+
+        let triad = this.buildBeliefTriad();
+        this.create_curtain_with_reveal_circle({ armed: false });
+
+        await this.setup_partner_at_bottom_right();
+        await this.animate_partner_enter_and_face_box();
+
+        let printed_box_name = GenParam.get_box_printed_name(this.target_box);
+        Interface.Prompt.show_message("Click on the circle to start the question");
+        await this.enable_curtain_reveal();
+
+        Interface.Prompt.show_message(
+            `Which toy does ${this.partnername} believe is in the ${printed_box_name}?`
+        );
+
+        let response = await this.show_radial_options_and_wait(triad.answer_options);
+        Interface.Prompt.hide();
+        AudioCont.play_sound_effect("button_click");
+
+        let is_correct = (response.selected_id === triad.belief_answer);
+        this.FenObj.partner_belief_in_situ_answer = {
+            trial_kind: "belief",
+            target_box: this.target_box,
+            target_box_code: this.target_box_code,
+            scene_fennimal_id: this.FenObj.partner_belief_in_situ_scene_fennimal_id || this.FenObj.id,
+            options: this.buildStoredOptions(
+                response.option_layout,
+                triad.answer_options.map((toyId) => ({
+                    id: toyId,
+                    role: triad.option_roles[toyId] || "unknown"
+                }))
+            ),
+            selected: response.selected_id,
+            correct: is_correct,
+            reaction_time_ms: response.reaction_time_ms,
+            belief_answer: triad.belief_answer,
+            reality_answer: triad.reality_answer,
+            lure_answer: triad.lure_answer,
+            lure_source_box: triad.lure_source_box,
+            lure_source_box_code: triad.lure_source_box_code,
+            lure_source_type: triad.lure_source_type
+        };
+
+        await this.fade_black(1, 400);
+        this.returnfunc();
+    }
+
+    buildBeliefTriad() {
+        let cycleIndex = this.lure_cycle_codes.indexOf(this.target_box_code);
+        if (cycleIndex < 0) {
+            throw new Error(
+                `partner_belief_in_situ: target_box "${this.target_box_code}" is not in lure_cycle ` +
+                `[${this.lure_cycle_codes.join(", ")}].`
+            );
+        }
+
+        let lureIndex = (cycleIndex + 1) % this.lure_cycle_codes.length;
+        let lure_source_box_code = this.lure_cycle_codes[lureIndex];
+        let lure_source_box = this.lure_cycle_boxes[lureIndex];
+
+        let belief = WorldState.get_partner_belief_in_box_contents(this.target_box);
+        let reality = WorldState.get_toybox_contents(this.target_box);
+        if (reality === false) reality = undefined;
+        let lure = WorldState.get_partner_belief_in_box_contents(lure_source_box);
+        if (lure === false) lure = undefined;
+
+        if (belief === undefined || belief === false) {
+            throw new Error(
+                `partner_belief_in_situ: missing partner belief for box "${this.target_box}".`
+            );
+        }
+        if (reality === undefined) {
+            throw new Error(
+                `partner_belief_in_situ: missing current contents for box "${this.target_box}".`
+            );
+        }
+        if (lure === undefined) {
+            throw new Error(
+                `partner_belief_in_situ: missing partner belief for lure-source box ` +
+                `"${lure_source_box}" (code "${lure_source_box_code}").`
+            );
+        }
+        if (belief === reality || belief === lure || reality === lure) {
+            throw new Error(
+                `partner_belief_in_situ: belief/reality/lure are not three distinct toys for ` +
+                `box "${this.target_box}": belief=${belief}, reality=${reality}, lure=${lure} ` +
+                `(from ${lure_source_box_code}).`
+            );
+        }
+
+        let option_roles = {};
+        option_roles[belief] = "belief";
+        option_roles[reality] = "reality";
+        option_roles[lure] = "lure";
+
+        return {
+            answer_options: shuffleArray([belief, reality, lure]),
+            belief_answer: belief,
+            reality_answer: reality,
+            lure_answer: lure,
+            lure_source_box_code,
+            lure_source_box,
+            lure_source_type: "partner_belief",
+            option_roles
+        };
+    }
+
+    place_target_box(boxId) {
+        let template = document.getElementById("toybox_" + boxId);
+        if (!template) {
+            throw new Error(`partner_belief_in_situ: missing toybox_${boxId}`);
+        }
+        let BoxObj = copy_scale_and_move_object_to_position(
+            template,
+            this.basics.ItemLayers.Main,
+            this.box_center_x,
+            this.box_center_y,
+            2.5
+        );
+        apply_toybox_decoration_visibility_to_element(BoxObj, boxId);
+        Array.from(BoxObj.getElementsByClassName("alignment_field")).forEach((t) => t.remove());
+        BoxObj.style.opacity = 0;
+        BoxObj.style.pointerEvents = "none";
+        this.BoxElement = BoxObj;
+        return BoxObj;
+    }
+
+    create_curtain_with_reveal_circle({ armed = true } = {}) {
+        this.CurtainGroup = create_SVG_group(0, 0, "pb_insitu_curtain", undefined);
+        this.basics.ItemLayers.Plus1.appendChild(this.CurtainGroup);
+
+        let curtain_w = 220;
+        let curtain_h = 200;
+        let cx = this.box_center_x;
+        let cy = this.box_center_y - 20;
+
+        let fabric = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        fabric.setAttribute("x", cx - curtain_w / 2);
+        fabric.setAttribute("y", cy - curtain_h / 2);
+        fabric.setAttribute("width", curtain_w);
+        fabric.setAttribute("height", curtain_h);
+        fabric.setAttribute("rx", 18);
+        fabric.setAttribute("fill", "#6d4c41");
+        fabric.setAttribute("stroke", "#3e2723");
+        fabric.setAttribute("stroke-width", "6");
+        this.CurtainGroup.appendChild(fabric);
+
+        let fold = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        fold.setAttribute("x", cx - curtain_w / 2 + 18);
+        fold.setAttribute("y", cy - curtain_h / 2);
+        fold.setAttribute("width", 28);
+        fold.setAttribute("height", curtain_h);
+        fold.setAttribute("fill", "rgba(0,0,0,0.18)");
+        this.CurtainGroup.appendChild(fold);
+
+        let circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("cx", cx);
+        circle.setAttribute("cy", cy);
+        circle.setAttribute("r", 42);
+        circle.setAttribute("fill", "rgba(255,255,255,0.15)");
+        circle.setAttribute("stroke", "gold");
+        circle.setAttribute("stroke-width", "7");
+        circle.style.filter = "drop-shadow(0px 0px 12px gold)";
+        circle.style.pointerEvents = "none";
+        circle.style.cursor = "default";
+        this.CurtainGroup.appendChild(circle);
+        this.RevealCircle = circle;
+
+        if (armed) return this.enable_curtain_reveal();
+        return null;
+    }
+
+    enable_curtain_reveal() {
+        let circle = this.RevealCircle;
+        if (!circle) return Promise.resolve();
+
+        circle.style.pointerEvents = "all";
+        circle.style.cursor = "pointer";
+
+        return new Promise((resolve) => {
+            circle.onpointerdown = (evt) => {
+                if (evt && evt.pointerType) this.last_input_type = evt.pointerType;
+                circle.onpointerdown = null;
+                circle.style.cursor = "auto";
+                resolve();
+            };
+        });
+    }
+
+    async setup_partner_at_bottom_right() {
+        this.PartnerTranslateGroup = create_SVG_group(0, 0);
+        this.basics.ItemLayers.Partner.appendChild(this.PartnerTranslateGroup);
+
+        this.PartnerScaleGroup = create_SVG_group(0, 0);
+        this.PartnerTranslateGroup.appendChild(this.PartnerScaleGroup);
+
+        for (let dir in this.Icons) {
+            if (!this.Icons[dir]) continue;
+            let icon = this.Icons[dir];
+            icon.style.display = (dir === "back") ? "inherit" : "none";
+            icon.querySelectorAll(".prep_element_hidden").forEach((el) => el.remove());
+            icon.style.transform = "";
+            icon.removeAttribute("transform");
+            this.PartnerScaleGroup.appendChild(icon);
+        }
+
+        // Start already in the bottom-right of the scene.
+        this.partner_x = 0.88 * this.W;
+        this.partner_y = 0.95 * this.H;
+        this.PartnerTranslateGroup.style.transform = `translate(${this.partner_x}px, ${this.partner_y}px)`;
+        this.PartnerScaleGroup.style.transform = "scale(30)";
+        this.PartnerTranslateGroup.style.opacity = 1;
+        window.getComputedStyle(this.PartnerTranslateGroup).transform;
+    }
+
+    set_partner_direction(dir) {
+        for (let key in this.Icons) {
+            if (this.Icons[key]) this.Icons[key].style.display = (key === dir) ? "inherit" : "none";
+        }
+    }
+
+    async animate_partner_enter_and_face_box() {
+        // Forward (up the screen) — no diagonal.
+        this.set_partner_direction("back");
+        this.partner_y = this.box_center_y + 40;
+        this.PartnerTranslateGroup.style.transition = "transform 1000ms ease-in-out";
+        this.PartnerScaleGroup.style.transition = "transform 1000ms ease-in-out";
+        this.PartnerTranslateGroup.style.transform = `translate(${this.partner_x}px, ${this.partner_y}px)`;
+        this.PartnerScaleGroup.style.transform = "scale(24)";
+        await wait(1100);
+
+        // Then turn left and approach the box horizontally.
+        let targetX = this.box_center_x + 400;
+        this.set_partner_direction(targetX < this.partner_x ? "left" : "right");
+        this.partner_x = targetX;
+        this.PartnerTranslateGroup.style.transition = "transform 1000ms ease-in-out";
+        this.PartnerTranslateGroup.style.transform = `translate(${this.partner_x}px, ${this.partner_y}px)`;
+        await wait(1000);
+
+        this.set_partner_direction("left");
+        this.show_question_bubble();
+        AudioCont.play_sound_effect("alert_minor");
+    }
+
+    show_question_bubble() {
+        this.QuestionBubbleGroup = create_SVG_group(0, 0);
+        this.PartnerTranslateGroup.appendChild(this.QuestionBubbleGroup);
+
+        let dot1 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        dot1.setAttribute("cx", "-25"); dot1.setAttribute("cy", "30"); dot1.setAttribute("r", "12");
+        dot1.setAttribute("fill", "rgba(255, 255, 255, 0.85)");
+        dot1.setAttribute("stroke", "#ccc"); dot1.setAttribute("stroke-width", "2");
+
+        let dot2 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        dot2.setAttribute("cx", "5"); dot2.setAttribute("cy", "-5"); dot2.setAttribute("r", "18");
+        dot2.setAttribute("fill", "rgba(255, 255, 255, 0.85)");
+        dot2.setAttribute("stroke", "#ccc"); dot2.setAttribute("stroke-width", "2");
+
+        let bubble = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
+        bubble.setAttribute("cx", "50"); bubble.setAttribute("cy", "-70");
+        bubble.setAttribute("rx", "70"); bubble.setAttribute("ry", "55");
+        bubble.setAttribute("fill", "rgba(255, 255, 255, 0.85)");
+        bubble.setAttribute("stroke", "#ccc"); bubble.setAttribute("stroke-width", "4");
+
+        let text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", "50"); text.setAttribute("y", "-35");
+        text.setAttribute("font-family", "Arial, sans-serif");
+        text.setAttribute("font-weight", "bold");
+        text.setAttribute("font-size", "95");
+        text.setAttribute("fill", "gold");
+        text.setAttribute("stroke", "#b8860b");
+        text.setAttribute("stroke-width", "2");
+        text.setAttribute("text-anchor", "middle");
+        text.textContent = "?";
+
+        this.QuestionBubbleGroup.appendChild(dot1);
+        this.QuestionBubbleGroup.appendChild(dot2);
+        this.QuestionBubbleGroup.appendChild(bubble);
+        this.QuestionBubbleGroup.appendChild(text);
+
+        this.QuestionBubbleGroup.style.transformOrigin = "0px 40px";
+        this.QuestionBubbleGroup.style.transform = "translate(50px, -300px) scale(0)";
+        this.QuestionBubbleGroup.style.transition = "transform 400ms cubic-bezier(0.34, 1.56, 0.64, 1)";
+        window.getComputedStyle(this.QuestionBubbleGroup).transform;
+        this.QuestionBubbleGroup.style.transform = "translate(50px, -300px) scale(1.6)";
+
+        this.bubble_float_interval = setInterval(() => {
+            if (!this.QuestionBubbleGroup) return;
+            this.QuestionBubbleGroup.style.transition = "transform 1000ms ease-in-out";
+            this.QuestionBubbleGroup.style.transform = "translate(50px, -315px) scale(1.6)";
+            setTimeout(() => {
+                if (!this.QuestionBubbleGroup) return;
+                this.QuestionBubbleGroup.style.transform = "translate(50px, -285px) scale(1.6)";
+            }, 1000);
+        }, 2000);
+    }
+
+    hide_question_bubble() {
+        if (this.bubble_float_interval) {
+            clearInterval(this.bubble_float_interval);
+            this.bubble_float_interval = null;
+        }
+        if (this.QuestionBubbleGroup) {
+            this.QuestionBubbleGroup.remove();
+            this.QuestionBubbleGroup = null;
+        }
+    }
+
+    show_radial_options_and_wait(options) {
+        return new Promise((resolve) => {
+            let n = options.length;
+            let baseAngle = Math.random() * Math.PI * 2;
+            let layout = [];
+
+            this.radialUIGroup = create_SVG_group(0, 0);
+            this.radialUIGroup.style.opacity = 0;
+            this.basics.ItemLayers.Questions.insertBefore(
+                this.radialUIGroup,
+                this.BlackOverlay
+            );
+
+            let disabled = false;
+            let handleSelect = (selected_id, evt) => {
+                if (disabled) return;
+                disabled = true;
+                let response_perf = performance.now();
+                let input_type = (evt && evt.pointerType)
+                    ? evt.pointerType
+                    : (this.last_input_type || "unknown");
+
+                this.hide_question_bubble();
+                if (this.radialUIGroup) {
+                    this.radialUIGroup.style.transition = "opacity 150ms ease-in";
+                    this.radialUIGroup.style.opacity = 0;
+                    setTimeout(() => {
+                        if (this.radialUIGroup) this.radialUIGroup.remove();
+                        this.radialUIGroup = null;
+                    }, 160);
+                }
+
+                resolve({
+                    selected_id,
+                    option_layout: layout,
+                    reaction_time_ms: Math.round(response_perf - this._responseOnsetPerf),
+                    input_type
+                });
+            };
+
+            options.forEach((opt, i) => {
+                let angle = baseAngle + (i * 2 * Math.PI / n);
+                let bx = this.box_center_x + Math.cos(angle) * this.radial_radius - this.btn_size / 2;
+                let by = this.box_center_y + Math.sin(angle) * this.radial_radius - this.btn_size / 2;
+                let option_id = (typeof opt === "string") ? opt : opt.id;
+                layout.push({ option_id, x: Math.round(bx), y: Math.round(by) });
+                this.create_toy_choice_button(this.radialUIGroup, option_id, bx, by, handleSelect);
+            });
+
+            requestAnimationFrame(() => {
+                if (this.CurtainGroup) {
+                    this.CurtainGroup.remove();
+                    this.CurtainGroup = null;
+                }
+                if (this.BoxElement) this.BoxElement.style.opacity = 1;
+                this.radialUIGroup.style.opacity = 1;
+                this._responseOnsetPerf = performance.now();
+            });
+        });
+    }
+
+    create_toy_choice_button(parent, toy_id, btn_x, btn_y, onSelect) {
+        let BtnGroup = create_SVG_group(0, 0);
+        parent.appendChild(BtnGroup);
+
+        let btn_bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        btn_bg.setAttribute("x", btn_x);
+        btn_bg.setAttribute("y", btn_y);
+        btn_bg.setAttribute("width", this.btn_size);
+        btn_bg.setAttribute("height", this.btn_size);
+        btn_bg.setAttribute("rx", 15);
+        btn_bg.setAttribute("fill", "#d8c381");
+        btn_bg.setAttribute("stroke", "#b89f5d");
+        btn_bg.setAttribute("stroke-width", "3");
+        BtnGroup.appendChild(btn_bg);
+
+        let outline = btn_bg.cloneNode(true);
+        outline.removeAttribute("fill");
+        outline.setAttribute("fill", "none");
+        outline.removeAttribute("stroke");
+        outline.style.stroke = "";
+        outline.removeAttribute("stroke-width");
+        outline.style.strokeWidth = "";
+        outline.style.pointerEvents = "none";
+        outline.classList.add("focus_on_SVG_outline");
+        BtnGroup.insertBefore(outline, btn_bg.nextSibling);
+
+        let template = document.getElementById("toy_" + toy_id);
+        if (template) {
+            let RawToy = template.cloneNode(true);
+            RawToy.style.display = "inherit";
+            set_toy_color_scheme(RawToy, toy_id, false);
+            ToyChoiceBar.make_toy_static(RawToy, toy_id);
+            BtnGroup.appendChild(RawToy);
+
+            let TBox = RawToy.getBBox();
+            let max_dim = Math.max(TBox.width, TBox.height) || 100;
+            let scale = (this.btn_size * 0.85) / max_dim;
+            let raw_cx = TBox.x + (TBox.width / 2);
+            let raw_cy = TBox.y + (TBox.height / 2);
+            let target_cx = btn_x + (this.btn_size / 2);
+            let target_cy = btn_y + (this.btn_size / 2);
+            RawToy.style.transformOrigin = `${raw_cx}px ${raw_cy}px`;
+            RawToy.style.transform = `translate(${target_cx - raw_cx}px, ${target_cy - raw_cy}px) scale(${scale})`;
+        }
+
+        let click_catcher = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        click_catcher.setAttribute("x", btn_x);
+        click_catcher.setAttribute("y", btn_y);
+        click_catcher.setAttribute("width", this.btn_size);
+        click_catcher.setAttribute("height", this.btn_size);
+        click_catcher.setAttribute("fill", "transparent");
+        click_catcher.style.cursor = "pointer";
+        click_catcher.onpointerdown = (evt) => onSelect(toy_id, evt);
+        BtnGroup.appendChild(click_catcher);
+    }
+
+    buildStoredOptions(responseLayout, optionInfos) {
+        let byId = {};
+        (responseLayout || []).forEach((loc) => {
+            byId[loc.option_id] = loc;
+        });
+        return (optionInfos || []).map((info) => {
+            let loc = byId[info.id] || {};
+            return {
+                ...info,
+                x: (typeof loc.x === "number") ? loc.x : null,
+                y: (typeof loc.y === "number") ? loc.y : null
+            };
+        });
+    }
+
+    async fade_black(toOpacity, ms = 400) {
+        if (!this.BlackOverlay) return;
+        this.BlackOverlay.style.pointerEvents = toOpacity > 0 ? "auto" : "none";
+        this.BlackOverlay.style.transition = `opacity ${ms}ms ease-in-out`;
+        window.getComputedStyle(this.BlackOverlay).opacity;
+        this.BlackOverlay.style.opacity = toOpacity;
+        await wait(ms);
+    }
+
+    clean_up() {
+        this.hide_question_bubble();
+        if (this.radialUIGroup) this.radialUIGroup.remove();
+        if (this.CurtainGroup) this.CurtainGroup.remove();
+        if (this.BlackOverlay) this.BlackOverlay.remove();
+        if (this.PartnerTranslateGroup) this.PartnerTranslateGroup.remove();
+        if (this.BoxElement) this.BoxElement.remove();
+        this.basics.clean_up();
+    }
+}
+
 class TrialFactory {
     // The "static" keyword lets us call this function directly on the class
     static build(interaction_type, FenObj, partner_is_present, returnfunc) {
@@ -12097,8 +13986,17 @@ class TrialFactory {
             case "toy_to_box":
                 return new ToyToBoxTrialController(FenObj, partner_is_present, returnfunc);
 
+            case "toy_to_sack":
+                return new ToyToSackTrialController(FenObj, partner_is_present, returnfunc);
+
+            case "sack_to_box":
+                return new SackToBoxTrialController(FenObj, partner_is_present, returnfunc);
+
             case "box_room":
                 return new BoxRoomTrialController(FenObj, partner_is_present, returnfunc);
+
+            case "partner_belief_in_situ":
+                return new PartnerBeliefInSituTrialController(FenObj, partner_is_present, returnfunc);
 
             case "photo_box":
                 return new PhotoTrialController(FenObj, partner_is_present, returnfunc, "toybox");
@@ -12106,8 +14004,9 @@ class TrialFactory {
             case "photo_Fennimal":
                 return new PhotoTrialController(FenObj, partner_is_present, returnfunc, "fennimal");
 
-            case "scan_box_inventory":
-                return new ScanBoxInventoryTrialController(FenObj, partner_is_present, returnfunc);
+            case "scan_box_home":
+            case "scan_box_in_situ":
+                return new ScanBoxHomeTrialController(FenObj, partner_is_present, returnfunc);
 
             case "check_box_contents":
                 return new CheckBoxContentsTrialController(FenObj, partner_is_present, returnfunc);

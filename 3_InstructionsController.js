@@ -1470,6 +1470,20 @@ class InstructionsController {
                     mainText: `Oops! The ${trialObj.toy} has been left behind`
                 };
 
+            case "toy_to_sack":
+                return {
+                    ...baseConfig,
+                    type: "toy",
+                    mainText: `Oops! The ${trialObj.toy} has been left behind`
+                };
+
+            case "sack_to_box":
+                return {
+                    ...baseConfig,
+                    type: "sack",
+                    mainText: `Oops! The ${GenParam.get_sack_printed_name(trialObj.sack)} has been left behind`
+                };
+
             case "photo_box":
                 return {
                     ...baseConfig,
@@ -1477,14 +1491,21 @@ class InstructionsController {
                     mainText: "Go take a photo of the box to check if its still in good shape"
                 };
 
-            case "scan_box_inventory":
+            case "scan_box_home":
                 return {
                     ...baseConfig,
                     type: "box",
-                    mainText: `${GenParam.get_box_printed_name(trialObj.toybox)} needs to be inventoried`,
+                    mainText: `${capitalize_first_letter_in_string(GenParam.get_box_printed_name(trialObj.toybox))} needs to be inventoried`,
                     locationText: "We're heading to the warehouse",
                     regionText: "at Home.",
                     instructionText: "Close this message to continue."
+                };
+
+            case "scan_box_in_situ":
+                return {
+                    ...baseConfig,
+                    type: "box",
+                    mainText: `${capitalize_first_letter_in_string(GenParam.get_box_printed_name(trialObj.toybox))} needs to be inventoried`
                 };
 
             case "photo_Fennimal":
@@ -1534,6 +1555,17 @@ class InstructionsController {
                     instructionText: "Close this message to continue."
                 };
 
+            case "partner_belief_in_situ": {
+                let partnerSettings = WorldState.get_partner_icon_settings();
+                let partnerLabel = (partnerSettings && partnerSettings.name) ? partnerSettings.name : "your partner";
+                return {
+                    ...baseConfig,
+                    type: "box",
+                    mainText: `Which toy does ${partnerLabel} believe is in this box?`,
+                    instructionText: "Close this message to continue."
+                };
+            }
+
             default:
                 // Placeholder for other interaction types (broken_toy_in_box, broken_toy_no_box, dirty_toy, fly_swat, etc.).
                 // Keep the slumped Fennimal until type-specific copy/visuals are written.
@@ -1553,6 +1585,9 @@ class InstructionsController {
                 break;
             case "toy":
                 this.createPhoneRoomToyHintVisual(hintConfig.trialObj);
+                break;
+            case "sack":
+                this.createPhoneRoomSackHintVisual(hintConfig.trialObj);
                 break;
             case "box":
                 this.createPhoneRoomBoxHintVisual(hintConfig.trialObj);
@@ -1625,8 +1660,37 @@ class InstructionsController {
         this.phoneRoomHintSequentialElements.push(toyIcon);
     }
 
+    createPhoneRoomSackHintVisual(trialObj) {
+        let sackTemplate = document.getElementById(trialObj.sack);
+        if (!sackTemplate) {
+            this.createPhoneRoomPlaceholderHintVisual({ type: "sack" });
+            return;
+        }
+
+        let sackIcon = copy_scale_and_move_object_to_position(
+            sackTemplate,
+            this.currentInstructionsSVG,
+            GenParam.SVG_width / 2,
+            GenParam.SVG_height / 2 - 170,
+            3
+        );
+        // Closed sack for the hint: drop the open split, keep closed graphic.
+        let openGroup = sackIcon.querySelector(".sack_open");
+        if (openGroup) openGroup.remove();
+        let closedGroup = sackIcon.querySelector(".sack_closed");
+        if (closedGroup) closedGroup.style.display = "inline";
+
+        sackIcon.classList.add("instruction_element_nonbackground");
+        sackIcon.classList.add("phone_room_hint_sequential");
+        sackIcon.style.display = "none";
+        sackIcon.style.opacity = 0;
+
+        this.phoneRoomHintSequentialElements.push(sackIcon);
+    }
+
     createPhoneRoomBoxHintVisual(trialObj) {
-        let boxTemplate = document.getElementById("toybox_" + trialObj.toybox);
+        let boxId = trialObj.target_box || trialObj.toybox;
+        let boxTemplate = document.getElementById("toybox_" + boxId);
         if (!boxTemplate) {
             this.createPhoneRoomPlaceholderHintVisual({ type: "box" });
             return;
@@ -1639,7 +1703,7 @@ class InstructionsController {
             GenParam.SVG_height / 2 - 170,
             3
         );
-        apply_toybox_decoration_visibility_to_element(boxIcon, trialObj.toybox);
+        apply_toybox_decoration_visibility_to_element(boxIcon, boxId);
 
         // Closed box: keep back + front + lid (front is the visible body).
         boxIcon.classList.add("instruction_element_nonbackground");

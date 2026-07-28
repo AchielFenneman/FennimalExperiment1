@@ -369,7 +369,7 @@ class PhoneRoomController {
 
     /**
      * Tear down the phone-room scene but keep Fennimals_Layer ready for a Home overlay
-     * trial (box_room / scan_box_inventory). Does not reveal the map.
+     * trial (box_room / scan_box_home). Does not reveal the map.
      */
     exitRoomKeepInteractionLayer(onComplete) {
         if (!this.roomGroup) {
@@ -457,3 +457,4 @@ class PhoneRoomController {
 }
 
 console.log("%c SCRIPTS - LOADED PHONE ROOM CONTROLLER", "color:darkgreen");
+console.log("S")

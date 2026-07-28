@@ -62,6 +62,12 @@ class AudioControllerObject {
             box_open_giftbox: "giftbox_open.mp3",
             box_open_picknick: "wicker.mp3",
 
+            sack_placed_velvet_purse: "sack_velvet_purse_placed.mp3",
+            sack_opened_velvet_purse: "sack_velvet_purse_opened.mp3",
+            sack_placed_burlap_sack: "sack_burlap_sack_placed.mp3",
+            sack_opened_burlap_sack: "sack_burlap_sack_opened.mp3",
+            sack_placed_canvas_tote: "sack_canvas_tote_placed.mp3",
+            sack_opened_canvas_tote: "sack_canvas_tote_opened.mp3",
 
             fly_buzzing: "fly_buzzing.mp3",
             splat: "splat.mp3",

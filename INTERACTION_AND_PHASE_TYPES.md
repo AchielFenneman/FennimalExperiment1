@@ -263,9 +263,39 @@ Like a simplified intro: Fennimal + toy play + celebrate + wander off. **No box.
 #### `toy_to_box` → `ToyToBoxTrialController`
 No Fennimal: abandoned toy on screen → open box → drag toy in.
 
-If the box already holds a **different** toy: opening reveals it → participant must drag it far enough sideways (`|Δx| ≥ 300` from box; tunable via `oldToyClearDistance`) → on release it locks in place, falls to the discarded-toy ground line if above it, and stays on screen → WorldState box contents are cleared → then place the new toy. Same-toy contents are treated as an empty box. Partner (if present) only opens the box and otherwise observes.
+If the box already holds a **different** toy: a toy bin appears on the far left → opening reveals the old toy → participant drags it into the bin (magnetic snap above bin → fall between bin back/front mesh, same as `box_room`) → WorldState box contents and partner belief are cleared → then place the new toy. Same-toy contents are treated as an empty box. Partner (if present) only opens the box and otherwise observes.
 
 **Needs:** `toy`, `toybox`.
+
+#### `partner_belief_in_situ` → `PartnerBeliefInSituTrialController`
+Location-based partner-belief probe (map trial, not a warehouse phase). Stimulus is keyed by **box code**, not Fennimal id. At phase setup, TrialGenerator reads `WorldState` box contents, finds the Fennimal who owns that toy, and uses that Fennimal as the travel carrier (their `region` / `location`). Partner is **always forced present** for this type.
+
+**Stimulus forms**
+```js
+// Explicit trial list
+{ target_box: "A", interaction_type: "partner_belief_in_situ" }
+
+// Cartesian-style (subblock or top-level for jump_to_trial / hint_and_search / phone_room)
+{
+  target_boxes: ["A", "B"],
+  interaction_type: "partner_belief_in_situ"
+}
+```
+
+**Phase-level `lure_cycle`** (optional): e.g. `lure_cycle: ["A", "B"]`. If omitted, inferred from distinct `target_box` / `target_boxes` values in the phase (order of first appearance). Needs ≥ 2 codes.
+
+**Answer options** (same rule as `partner_belief_individual_boxes` belief trials): partner belief about target (correct) + current contents of target + partner belief about the *next* box in `lure_cycle` (lure). Fail loud if WorldState cannot build a distinct triad, or if box contents / owning Fennimal / partner belief are missing.
+
+**Sequence**
+1. Travel to the scene Fennimal’s location (normal phone-room / jump / hint-and-search travel).
+2. Static Fennimal on the left; closed target box in the center (under curtain); partner starts bottom-right.
+3. Partner walks **forward**, then **left** to the box (no diagonal), question bubble appears.
+4. Curtain reveal click → radial 3AFC toys → answer logged on `FenObj.partner_belief_in_situ_answer`.
+5. Fade to black → trial complete (phone_room returns home as usual).
+
+**Needs at generation time:** WorldState contents + partner belief for the target (and lure) boxes; a unique Fennimal whose `.toy` matches the target box contents.
+
+**Supported phases:** `phone_room`, `jump_to_trial`, `hint_and_search`.
 
 #### `box_room` → `BoxRoomTrialController`
 Multi-Fennimal warehouse sort (one trial for the whole set — **not** cartesian-expanded per Fennimal). One box per screen: each Fennimal gets a full open → recycle → place → close cycle before a fade-to-black transition to the next. Home warehouse background + low table persist across screens.
@@ -490,6 +520,7 @@ Exact help per trial varies (open box, cut foliage, swat flies, hand off food ba
 |---|---|
 | `Fennimal_toy`, `basic_intro` | Happy Fennimal |
 | `toy_to_box` | Toy |
+| `partner_belief_in_situ` | Toybox |
 | `box_room` | Toybox (warehouse sort) |
 | `photo_box` | Toybox |
 | `feed_Fennimal` | Slumped Fennimal (hungry) |
@@ -521,6 +552,7 @@ Full knobs live in `1_General_Parameters.js`.
 basic_intro
 Fennimal_toy
 toy_to_box
+partner_belief_in_situ
 box_room
 photo_box
 feed_Fennimal

@@ -345,6 +345,14 @@ class TrialGenerator {
         if (Array.isArray(phaseData.trial_subblocks)) {
             // Ordered subblocks: shuffle within each, then concatenate (preserves subblock order).
             mainTrials = this.generateTrialsFromSubblocks(phaseData);
+        } else if (this.isPartnerBeliefInSituOnlyInteraction(phaseData.interaction_type)
+            && Array.isArray(phaseData.target_boxes)
+            && phaseData.target_boxes.length > 0) {
+            mainTrials = this.generatePartnerBeliefInSituTrials(
+                phaseData.target_boxes,
+                phaseData,
+                `phase type "${phaseData.type}" top-level target_boxes`
+            );
         } else {
             mainTrials = this.generateCartesianMainTrials(
                 phaseData.Fennimals_encountered,
@@ -364,6 +372,11 @@ class TrialGenerator {
         orthogonalTrials = this.applyAskBoxSettingsToTrials(orthogonalTrials, phaseData);
         mainTrials = this.applyAskFennimalSettingsToTrials(mainTrials, phaseData);
         orthogonalTrials = this.applyAskFennimalSettingsToTrials(orthogonalTrials, phaseData);
+        mainTrials = this.applyPlacementQuizOptionsToTrials(mainTrials, phaseData);
+        orthogonalTrials = this.applyPlacementQuizOptionsToTrials(orthogonalTrials, phaseData);
+
+        mainTrials = this.applyPartnerBeliefInSituLureCycles(mainTrials, phaseData);
+        orthogonalTrials = this.applyPartnerBeliefInSituLureCycles(orthogonalTrials, phaseData);
 
         if (Array.isArray(phaseData.trial_subblocks)) {
             // Subblock order is intentional; do not re-shuffle across subblock boundaries.
@@ -371,6 +384,11 @@ class TrialGenerator {
         }
 
         return this.smartShuffleTrials(mainTrials, orthogonalTrials);
+    }
+
+    isPartnerBeliefInSituOnlyInteraction(interactionType) {
+        let types = Array.isArray(interactionType) ? interactionType : [interactionType];
+        return types.length === 1 && types[0] === "partner_belief_in_situ";
     }
 
     /**
@@ -417,10 +435,15 @@ class TrialGenerator {
         }
 
         if (!hasTopLevelFennimals) {
-            throw new Error(
-                `TrialGenerator: phase type "${phaseData.type}" is missing Fennimals_encountered ` +
-                `(and has no trial_subblocks).`
-            );
+            let allowsTargetBoxes = this.isPartnerBeliefInSituOnlyInteraction(phaseData.interaction_type)
+                && Array.isArray(phaseData.target_boxes)
+                && phaseData.target_boxes.length > 0;
+            if (!allowsTargetBoxes) {
+                throw new Error(
+                    `TrialGenerator: phase type "${phaseData.type}" is missing Fennimals_encountered ` +
+                    `(and has no trial_subblocks). For partner_belief_in_situ, provide target_boxes instead.`
+                );
+            }
         }
 
         if (!hasTopLevelInteractionType) {
@@ -441,12 +464,14 @@ class TrialGenerator {
         let hasTrials = Array.isArray(subblock.trials);
         let hasCartesianFennimals = subblock.Fennimals_encountered !== undefined && subblock.Fennimals_encountered !== null;
         let hasCartesianInteraction = subblock.interaction_type !== undefined && subblock.interaction_type !== null;
+        let hasTargetBoxes = Array.isArray(subblock.target_boxes) && subblock.target_boxes.length > 0;
 
-        if (hasTrials && (hasCartesianFennimals || hasCartesianInteraction)) {
+        if (hasTrials && (hasCartesianFennimals || hasCartesianInteraction || hasTargetBoxes)) {
             throw new Error(
                 `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}] mixes explicit trials with ` +
-                `Fennimals_encountered / interaction_type. Use either a cartesian subblock ` +
-                `({ Fennimals_encountered, interaction_type }) OR an explicit list ({ trials: [...] }), not both.`
+                `Fennimals_encountered / interaction_type / target_boxes. Use either a cartesian subblock ` +
+                `({ Fennimals_encountered, interaction_type } or { target_boxes, interaction_type: "partner_belief_in_situ" }) ` +
+                `OR an explicit list ({ trials: [...] }), not both.`
             );
         }
 
@@ -470,10 +495,26 @@ class TrialGenerator {
                 }
 
                 let isBoxRoom = trialSpec.interaction_type === "box_room";
+                let isBeliefInSitu = trialSpec.interaction_type === "partner_belief_in_situ";
                 let hasSingle = trialSpec.Fennimal !== undefined && trialSpec.Fennimal !== null;
                 let hasMulti = Array.isArray(trialSpec.Fennimals) && trialSpec.Fennimals.length > 0;
+                let hasTargetBox = trialSpec.target_box !== undefined && trialSpec.target_box !== null;
 
-                if (isBoxRoom) {
+                if (isBeliefInSitu) {
+                    if (!hasTargetBox) {
+                        throw new Error(
+                            `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}].trials[${trialIndex}] ` +
+                            `is partner_belief_in_situ and must define "target_box".`
+                        );
+                    }
+                    if (hasSingle || hasMulti) {
+                        throw new Error(
+                            `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}].trials[${trialIndex}] ` +
+                            `is partner_belief_in_situ and must not set "Fennimal" / "Fennimals" ` +
+                            `(scene Fennimal is resolved from WorldState box contents).`
+                        );
+                    }
+                } else if (isBoxRoom) {
                     if (!hasSingle && !hasMulti) {
                         throw new Error(
                             `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}].trials[${trialIndex}] ` +
@@ -499,15 +540,38 @@ class TrialGenerator {
                             `sets "Fennimals", which is only allowed for interaction_type "box_room".`
                         );
                     }
+                    if (hasTargetBox) {
+                        throw new Error(
+                            `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}].trials[${trialIndex}] ` +
+                            `sets "target_box", which is only allowed for interaction_type "partner_belief_in_situ".`
+                        );
+                    }
                 }
             });
+            return;
+        }
+
+        if (hasTargetBoxes) {
+            if (hasCartesianFennimals) {
+                throw new Error(
+                    `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}] sets both target_boxes and ` +
+                    `Fennimals_encountered. For partner_belief_in_situ use target_boxes only.`
+                );
+            }
+            if (!hasCartesianInteraction || !this.isPartnerBeliefInSituOnlyInteraction(subblock.interaction_type)) {
+                throw new Error(
+                    `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}] sets target_boxes but ` +
+                    `interaction_type must be exactly "partner_belief_in_situ".`
+                );
+            }
             return;
         }
 
         if (!hasCartesianFennimals || !hasCartesianInteraction) {
             throw new Error(
                 `TrialGenerator: phase type "${phaseType}" trial_subblocks[${index}] must define either ` +
-                `"trials: [...]" OR both "Fennimals_encountered" and "interaction_type".`
+                `"trials: [...]" OR both "Fennimals_encountered" and "interaction_type" ` +
+                `OR both "target_boxes" and interaction_type "partner_belief_in_situ".`
             );
         }
 
@@ -527,6 +591,12 @@ class TrialGenerator {
 
             if (Array.isArray(subblock.trials)) {
                 subblockTrials = this.generateExplicitTrials(subblock.trials, phaseData);
+            } else if (Array.isArray(subblock.target_boxes) && subblock.target_boxes.length > 0) {
+                subblockTrials = this.generatePartnerBeliefInSituTrials(
+                    subblock.target_boxes,
+                    phaseData,
+                    `trial_subblocks[${subblockIndex}].target_boxes`
+                );
             } else {
                 subblockTrials = this.generateCartesianMainTrials(
                     subblock.Fennimals_encountered,
@@ -555,6 +625,17 @@ class TrialGenerator {
                 return;
             }
 
+            if (trialSpec.interaction_type === "partner_belief_in_situ") {
+                trials.push(
+                    this.buildPartnerBeliefInSituTrial(
+                        trialSpec.target_box,
+                        phaseData,
+                        `explicit trials[${trialIndex}]`
+                    )
+                );
+                return;
+            }
+
             let fenArr = this.stimuli.get_Fennimals_in_array([trialSpec.Fennimal]);
             if (!fenArr || fenArr.length === 0) {
                 throw new Error(
@@ -565,7 +646,7 @@ class TrialGenerator {
 
             let trial = JSON.parse(JSON.stringify(fenArr[0]));
             trial.interaction_type = trialSpec.interaction_type;
-            if (trialSpec.interaction_type === "scan_box_inventory") {
+            if (trialSpec.interaction_type === "scan_box_home") {
                 trial.skip_phone_room_autotravel = true;
             }
             this.applyPhaseHintTypeIfNeeded(trial, phaseData);
@@ -573,6 +654,170 @@ class TrialGenerator {
         });
 
         return trials;
+    }
+
+    generatePartnerBeliefInSituTrials(boxCodes, phaseData, contextLabel) {
+        if (!Array.isArray(boxCodes) || boxCodes.length === 0) {
+            throw new Error(
+                `TrialGenerator: partner_belief_in_situ needs a non-empty target_boxes list ` +
+                `(phase type "${phaseData.type}", ${contextLabel}).`
+            );
+        }
+        return boxCodes.map((code, i) =>
+            this.buildPartnerBeliefInSituTrial(code, phaseData, `${contextLabel}[${i}]`)
+        );
+    }
+
+    /**
+     * Resolve target box → WorldState contents → Fennimal who owns that toy.
+     * Carrier FenObj is that Fennimal (for map travel); target_box is stamped separately.
+     */
+    buildPartnerBeliefInSituTrial(targetBoxCode, phaseData, contextLabel = "partner_belief_in_situ") {
+        if (targetBoxCode === undefined || targetBoxCode === null || targetBoxCode === "") {
+            throw new Error(
+                `TrialGenerator: partner_belief_in_situ is missing target_box ` +
+                `(phase type "${phaseData.type}", ${contextLabel}).`
+            );
+        }
+
+        let mapped = this.stimuli.get_assigned_names_of_code_array("toybox", [targetBoxCode]);
+        let target_box = mapped && mapped[0];
+        if (!target_box) {
+            throw new Error(
+                `TrialGenerator: partner_belief_in_situ failed to map target_box code "${targetBoxCode}" ` +
+                `(phase type "${phaseData.type}", ${contextLabel}).`
+            );
+        }
+
+        let contents = WorldState.get_toybox_contents(target_box);
+        if (!contents || contents === false) {
+            throw new Error(
+                `TrialGenerator: partner_belief_in_situ box "${target_box}" (code "${targetBoxCode}") ` +
+                `has no current contents in WorldState — cannot resolve travel Fennimal ` +
+                `(phase type "${phaseData.type}", ${contextLabel}).`
+            );
+        }
+
+        let allFens = this.stimuli.get_Fennimals_in_array("all");
+        let matches = (allFens || []).filter((fen) => fen.toy === contents);
+        if (matches.length === 0) {
+            throw new Error(
+                `TrialGenerator: partner_belief_in_situ box "${target_box}" contains toy "${contents}", ` +
+                `but no Fennimal owns that toy (phase type "${phaseData.type}", ${contextLabel}).`
+            );
+        }
+        if (matches.length > 1) {
+            throw new Error(
+                `TrialGenerator: partner_belief_in_situ box "${target_box}" contains toy "${contents}", ` +
+                `but multiple Fennimals own it: ${JSON.stringify(matches.map((f) => f.id))} ` +
+                `(phase type "${phaseData.type}", ${contextLabel}).`
+            );
+        }
+
+        let belief = WorldState.get_partner_belief_in_box_contents(target_box);
+        if (belief === undefined || belief === false) {
+            throw new Error(
+                `TrialGenerator: partner_belief_in_situ box "${target_box}" (code "${targetBoxCode}") ` +
+                `has no partner belief in WorldState (phase type "${phaseData.type}", ${contextLabel}).`
+            );
+        }
+
+        let carrier = JSON.parse(JSON.stringify(matches[0]));
+        carrier.interaction_type = "partner_belief_in_situ";
+        carrier.target_box = target_box;
+        carrier.target_box_code = targetBoxCode;
+        carrier.partner_belief_in_situ_scene_fennimal_id = matches[0].id;
+        carrier.force_partner_present = true;
+        this.applyPhaseHintTypeIfNeeded(carrier, phaseData);
+        return carrier;
+    }
+
+    applyPartnerBeliefInSituLureCycles(trials, phaseData) {
+        if (!trials || trials.length === 0) return trials;
+
+        let inSitu = trials.filter((t) => t.interaction_type === "partner_belief_in_situ");
+        if (inSitu.length === 0) return trials;
+
+        let codes;
+        if (Array.isArray(phaseData.lure_cycle) && phaseData.lure_cycle.length >= 2) {
+            codes = [...phaseData.lure_cycle];
+        } else {
+            codes = [];
+            inSitu.forEach((t) => {
+                if (t.target_box_code && !codes.includes(t.target_box_code)) {
+                    codes.push(t.target_box_code);
+                }
+            });
+        }
+
+        if (codes.length < 2) {
+            throw new Error(
+                `TrialGenerator: partner_belief_in_situ needs a lure_cycle of at least 2 box codes ` +
+                `(or at least 2 distinct target_box values in the phase). ` +
+                `Got ${JSON.stringify(codes)} (phase type "${phaseData.type}").`
+            );
+        }
+
+        let boxes = this.stimuli.get_assigned_names_of_code_array("toybox", codes);
+        if (!boxes || boxes.includes(false) || boxes.some((b) => !b)) {
+            throw new Error(
+                `TrialGenerator: partner_belief_in_situ failed to map lure_cycle codes ` +
+                `${JSON.stringify(codes)} (phase type "${phaseData.type}").`
+            );
+        }
+
+        inSitu.forEach((trial) => {
+            if (!codes.includes(trial.target_box_code)) {
+                throw new Error(
+                    `TrialGenerator: partner_belief_in_situ target_box "${trial.target_box_code}" ` +
+                    `is not in lure_cycle ${JSON.stringify(codes)} (phase type "${phaseData.type}").`
+                );
+            }
+            trial.lure_cycle_codes = codes;
+            trial.lure_cycle_boxes = boxes;
+            this.validatePartnerBeliefInSituTriad(trial, phaseData);
+        });
+
+        return trials;
+    }
+
+    validatePartnerBeliefInSituTriad(trial, phaseData) {
+        let cycleIndex = trial.lure_cycle_codes.indexOf(trial.target_box_code);
+        let lureIndex = (cycleIndex + 1) % trial.lure_cycle_codes.length;
+        let lure_source_box = trial.lure_cycle_boxes[lureIndex];
+        let lure_source_box_code = trial.lure_cycle_codes[lureIndex];
+
+        let belief = WorldState.get_partner_belief_in_box_contents(trial.target_box);
+        let reality = WorldState.get_toybox_contents(trial.target_box);
+        if (reality === false) reality = undefined;
+        let lure = WorldState.get_partner_belief_in_box_contents(lure_source_box);
+        if (lure === false) lure = undefined;
+
+        if (belief === undefined || belief === false) {
+            throw new Error(
+                `TrialGenerator: partner_belief_in_situ missing partner belief for box "${trial.target_box}" ` +
+                `(phase type "${phaseData.type}").`
+            );
+        }
+        if (reality === undefined) {
+            throw new Error(
+                `TrialGenerator: partner_belief_in_situ missing current contents for box "${trial.target_box}" ` +
+                `(phase type "${phaseData.type}").`
+            );
+        }
+        if (lure === undefined) {
+            throw new Error(
+                `TrialGenerator: partner_belief_in_situ missing partner belief for lure-source box ` +
+                `"${lure_source_box}" (code "${lure_source_box_code}", phase type "${phaseData.type}").`
+            );
+        }
+        if (belief === reality || belief === lure || reality === lure) {
+            throw new Error(
+                `TrialGenerator: partner_belief_in_situ belief/reality/lure are not three distinct toys for ` +
+                `box "${trial.target_box}": belief=${belief}, reality=${reality}, lure=${lure} ` +
+                `(from ${lure_source_box_code}; phase type "${phaseData.type}").`
+            );
+        }
     }
 
     /**
@@ -667,6 +912,13 @@ class TrialGenerator {
                 );
                 continue;
             }
+            if (type === "partner_belief_in_situ") {
+                throw new Error(
+                    `TrialGenerator: interaction_type "partner_belief_in_situ" cannot be crossed with ` +
+                    `Fennimals_encountered. Use target_boxes (or explicit trials with target_box) ` +
+                    `(phase type "${phaseData.type}").`
+                );
+            }
 
             let newSet = set_property_to_all_elem_in_arr(
                 "interaction_type",
@@ -675,7 +927,7 @@ class TrialGenerator {
             );
             newSet.forEach(trial => {
                 this.applyPhaseHintTypeIfNeeded(trial, phaseData);
-                if (type === "scan_box_inventory") {
+                if (type === "scan_box_home") {
                     trial.skip_phone_room_autotravel = true;
                 }
             });
@@ -711,6 +963,48 @@ class TrialGenerator {
 
         trials = set_property_to_all_elem_in_arr("ask_toy", true, trials);
         trials = set_property_to_all_elem_in_arr("toys_asked", toysAskedMapped, trials);
+        return trials;
+    }
+
+    /**
+     * Stamp distractor options for post-placement attention checks.
+     * Options = unique toys/sacks among sibling trials in the same subblock
+     * (i.e. the Fennimals_encountered cohort for that interaction).
+     */
+    applyPlacementQuizOptionsToTrials(trials, phaseData) {
+        if (!trials || trials.length === 0) return trials;
+
+        let bySubblock = {};
+        trials.forEach((trial) => {
+            if (!trial) return;
+            let key = (trial.trial_subblock_index != null) ? String(trial.trial_subblock_index) : "all";
+            if (!bySubblock[key]) bySubblock[key] = [];
+            bySubblock[key].push(trial);
+        });
+
+        Object.keys(bySubblock).forEach((key) => {
+            let cohort = bySubblock[key];
+            let toys = [];
+            let sacks = [];
+
+            cohort.forEach((trial) => {
+                if (trial.toy && !toys.includes(trial.toy)) toys.push(trial.toy);
+                if (trial.sack && !sacks.includes(trial.sack)) sacks.push(trial.sack);
+            });
+
+            cohort.forEach((trial) => {
+                if (trial.interaction_type === "toy_to_sack" || trial.interaction_type === "toy_to_box") {
+                    let opts = [...toys];
+                    if (trial.toy && !opts.includes(trial.toy)) opts.push(trial.toy);
+                    trial.placement_quiz_options = opts;
+                } else if (trial.interaction_type === "sack_to_box") {
+                    let opts = [...sacks];
+                    if (trial.sack && !opts.includes(trial.sack)) opts.push(trial.sack);
+                    trial.placement_quiz_options = opts;
+                }
+            });
+        });
+
         return trials;
     }
 
@@ -1384,7 +1678,7 @@ class ExperimentController {
         if (!trial) return false;
         if (trial.skip_phone_room_autotravel === true) return true;
         let type = trial.interaction_type;
-        return type === "box_room" || type === "scan_box_inventory";
+        return type === "box_room" || type === "scan_box_home";
     }
 
     /**
@@ -1662,6 +1956,10 @@ class ExperimentController {
             let partnerPresent = false;
             let role = WorldState.get_current_partner_role();
             if (role && role !== "absent") partnerPresent = true;
+            if (fennimalObject.interaction_type === "partner_belief_in_situ"
+                || fennimalObject.force_partner_present === true) {
+                partnerPresent = true;
+            }
 
             // Seconds since experiment start (coarse; stamped at interaction onset).
             fennimalObject.time_since_start = Math.round(

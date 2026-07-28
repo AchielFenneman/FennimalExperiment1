@@ -355,40 +355,75 @@ WorldStateObject = function () {
 
     //BOX FUNCTIONS
     ////////////////
+    // Each entry: { toy: string|false, sack: string|false }
+    // - sack false/undefined ⇒ toy sits in the box with no sack
+    // - get_toybox_contents returns the toy only (belief probes ignore sacks)
     let ToyBoxes = {}
-    // Chronological contents history per box: [{ toy, changed_at_ms }]
+    // Chronological contents history per box: [{ toy, sack, changed_at_ms }]
     let ToyBoxHistory = {}
 
-    //Checks the contents of a box. If this box has not been encountered yet, returns false.
-    this.get_toybox_contents = function(boxtype){
-        if(typeof ToyBoxes[boxtype] === "undefined"){
-            return false
-        }else{
-            return(ToyBoxes[boxtype])
+    function normalize_box_entry(entry) {
+        if (typeof entry === "undefined" || entry === null) return undefined
+        // Legacy plain-string storage (pre-sack)
+        if (typeof entry === "string" || entry === false) {
+            return { toy: entry, sack: false }
+        }
+        return {
+            toy: (typeof entry.toy === "undefined") ? false : entry.toy,
+            sack: entry.sack || false
         }
     }
-    //Changes the contents of a box. If this box has not been encountered, it will create a new entry
-    this.change_toybox_contents = function(boxtype, toy){
-        ToyBoxes[boxtype] = toy
+
+    function push_box_history(boxtype, toy, sack) {
         if (typeof ToyBoxHistory[boxtype] === "undefined") {
             ToyBoxHistory[boxtype] = []
         }
         ToyBoxHistory[boxtype].push({
             toy: toy,
+            sack: sack || false,
             changed_at_ms: Date.now()
         })
+    }
+
+    // Checks the toy in a box. If this box has not been encountered yet, returns false.
+    // Belief / memory probes should keep using this — it ignores any wrapping sack.
+    this.get_toybox_contents = function(boxtype){
+        let entry = normalize_box_entry(ToyBoxes[boxtype])
+        if (typeof entry === "undefined") {
+            return false
+        }
+        return entry.toy === false ? false : entry.toy
+    }
+
+    // Optional sack wrapping the toy in this box (false = bare toy / empty of sack).
+    this.get_toybox_sack = function(boxtype){
+        let entry = normalize_box_entry(ToyBoxes[boxtype])
+        if (typeof entry === "undefined") {
+            return false
+        }
+        return entry.sack || false
+    }
+
+    // Full { toy, sack } entry, or false if the box was never set.
+    this.get_toybox_entry = function(boxtype){
+        let entry = normalize_box_entry(ToyBoxes[boxtype])
+        if (typeof entry === "undefined") {
+            return false
+        }
+        return { toy: entry.toy, sack: entry.sack || false }
+    }
+
+    // Changes box contents. sack omitted/false ⇒ toy stored without a sack.
+    this.change_toybox_contents = function(boxtype, toy, sack){
+        let sackVal = (typeof sack === "undefined" || sack === null) ? false : sack
+        ToyBoxes[boxtype] = { toy: toy, sack: sackVal || false }
+        push_box_history(boxtype, toy, sackVal)
     }
 
     // Clears current contents (box becomes empty). Records the clear in history.
     this.clear_toybox_contents = function(boxtype){
         delete ToyBoxes[boxtype]
-        if (typeof ToyBoxHistory[boxtype] === "undefined") {
-            ToyBoxHistory[boxtype] = []
-        }
-        ToyBoxHistory[boxtype].push({
-            toy: null,
-            changed_at_ms: Date.now()
-        })
+        push_box_history(boxtype, null, null)
     }
 
     // Full chronological history for a box (empty array if never filled).
@@ -399,13 +434,80 @@ WorldStateObject = function () {
         return JSON.parse(JSON.stringify(ToyBoxHistory[boxtype]))
     }
 
-    // Previous contents before the current one (false if fewer than 2 entries).
+    // Previous toy before the current one (false if fewer than 2 entries).
     this.get_previous_toybox_contents = function(boxtype){
         let history = ToyBoxHistory[boxtype]
         if (!history || history.length < 2) {
             return false
         }
         return history[history.length - 2].toy
+    }
+
+    // Which box currently holds this sack (false if none).
+    this.find_box_containing_sack = function(sacktype){
+        for (let box in ToyBoxes) {
+            let entry = normalize_box_entry(ToyBoxes[box])
+            if (entry && entry.sack === sacktype) {
+                return box
+            }
+        }
+        return false
+    }
+
+    //SACK FUNCTIONS
+    ////////////////
+    let Sacks = {}
+    // Chronological contents history per sack: [{ toy, changed_at_ms }]
+    let SackHistory = {}
+
+    this.get_sack_contents = function(sacktype){
+        if (typeof Sacks[sacktype] === "undefined") {
+            return false
+        }
+        return Sacks[sacktype]
+    }
+
+    // Sets the toy inside a sack. If that sack is currently stored in a box,
+    // the box's toy is updated to match (sack wrapper preserved).
+    this.change_sack_contents = function(sacktype, toy){
+        Sacks[sacktype] = toy
+        if (typeof SackHistory[sacktype] === "undefined") {
+            SackHistory[sacktype] = []
+        }
+        SackHistory[sacktype].push({
+            toy: toy,
+            changed_at_ms: Date.now()
+        })
+
+        let box = this.find_box_containing_sack(sacktype)
+        if (box) {
+            ToyBoxes[box] = { toy: toy, sack: sacktype }
+            push_box_history(box, toy, sacktype)
+        }
+    }
+
+    this.clear_sack_contents = function(sacktype){
+        delete Sacks[sacktype]
+        if (typeof SackHistory[sacktype] === "undefined") {
+            SackHistory[sacktype] = []
+        }
+        SackHistory[sacktype].push({
+            toy: null,
+            changed_at_ms: Date.now()
+        })
+
+        let box = this.find_box_containing_sack(sacktype)
+        if (box) {
+            ToyBoxes[box] = { toy: false, sack: sacktype }
+            push_box_history(box, false, sacktype)
+        }
+    }
+
+    this.get_sack_contents_history = function(sacktype){
+        if (typeof SackHistory[sacktype] === "undefined") {
+            return []
+        }
+        return JSON.parse(JSON.stringify(SackHistory[sacktype]))
     }
 
     // BOX DECORATIONS (all-or-nothing flag per box; default undecorated)

@@ -693,6 +693,15 @@ GENERALPARAM = function () {
         return(box)
     }
 
+    this.get_sack_printed_name = function(sack){
+        switch(sack){
+            case("velvet_purse"): return("velvet purse")
+            case("burlap_sack"): return("burlap sack")
+            case("canvas_tote"): return("canvas tote")
+        }
+        return(sack)
+    }
+
     //ACTION BUTTON PARAMETERS
     // This is the action button if it is NOT shown on top of an object. (Presented on a fix location on the screen instead)
     // Note: this coordinate system is in the SCEEN space
@@ -975,8 +984,8 @@ GENERALPARAM = function () {
         bindingOutlineStrokeWidth: 22
     }
 
-    // Scan box for inventory (scan_box_inventory)
-    this.ScanBoxInventory = {
+    // Scan box for inventory (scan_box_home / scan_box_in_situ)
+    this.ScanBoxHome = {
         boxScale: 3.2,
         scannerScale: 3.4,
         tableY: 0.72,

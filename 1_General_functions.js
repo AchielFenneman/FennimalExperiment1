@@ -556,6 +556,33 @@ function get_center_coords_of_SVG_object(Obj) {
     return ({x: Math.round(Box.x + 0.5 * Box.width), y: Math.round(Box.y + 0.5 * Box.height)})
 }
 
+/**
+ * Place a destination container at screen center; put the handheld item on a random
+ * flanking side. Far ends (~20% each side) stay free for the recycle bin / partner.
+ */
+function pick_flanking_item_x(screenW, containerCenterX, containerHalfW, itemHalfW, options = {}) {
+    const gap = options.gap != null ? options.gap : 70;
+    const endReserve = options.endReserve != null ? options.endReserve : 0.2 * screenW;
+    const minCenter = endReserve + itemHalfW;
+    const maxCenter = screenW - endReserve - itemHalfW;
+
+    let leftX = containerCenterX - containerHalfW - gap - itemHalfW;
+    let rightX = containerCenterX + containerHalfW + gap + itemHalfW;
+
+    let candidates = [];
+    if (leftX >= minCenter && leftX <= maxCenter) candidates.push(leftX);
+    if (rightX >= minCenter && rightX <= maxCenter) candidates.push(rightX);
+
+    if (candidates.length === 0) {
+        // Prefer whichever side stays farther from the reserved ends.
+        let clampedLeft = Math.max(minCenter, Math.min(maxCenter, leftX));
+        let clampedRight = Math.max(minCenter, Math.min(maxCenter, rightX));
+        candidates = [clampedLeft, clampedRight];
+    }
+
+    return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
 function getSVGInternalCenter(element) {
     const svg = element.ownerSVGElement;
 
@@ -2206,15 +2233,39 @@ function create_SVG_outline_of_multiple_groups(...groups) {
 }
 
 /**
- * Automates the "Magnetic Drop" into a container using an exact target element.
+ * Set the nested .scale_group transform on a copy_scale_and_move wrapper.
  */
-async function animate_magnetic_drop(ToyElement, TargetCenterpoint, MiddleLayer) {
+function set_nested_scale(rootElement, scale, transitionMs = 0) {
+    if (!rootElement) return;
+    let scaleGroup = rootElement.getElementsByClassName("scale_group")[0];
+    if (!scaleGroup) return;
+    if (transitionMs > 0) {
+        scaleGroup.style.transition = "transform " + transitionMs + "ms ease-in-out";
+    } else {
+        scaleGroup.style.transition = "none";
+    }
+    scaleGroup.style.transform = "scale(" + scale + ")";
+}
+
+/**
+ * Automates the "Magnetic Drop" into a container using an exact target element.
+ * options.shrinkFactor — if set, scales the nested .scale_group to (current * factor) during the drop.
+ */
+async function animate_magnetic_drop(ToyElement, TargetCenterpoint, MiddleLayer, options = {}) {
     return new Promise(resolve => {
         // 1. Lock the toy from further interaction
         ToyElement.style.pointerEvents = "none";
         ToyElement.style.transition = "transform 300ms ease-in-out";
 
         let svg = ToyElement.ownerSVGElement;
+        let shrinkFactor = (typeof options.shrinkFactor === "number") ? options.shrinkFactor : null;
+        let scaleGroup = ToyElement.getElementsByClassName("scale_group")[0];
+        let baseScale = 1;
+        if (scaleGroup && shrinkFactor != null) {
+            let match = (scaleGroup.style.transform || "").match(/scale\(([^)]+)\)/);
+            baseScale = match ? parseFloat(match[1]) : 1;
+            if (!isFinite(baseScale) || baseScale <= 0) baseScale = 1;
+        }
 
         // 2. Find the exact monitor pixels of the Final Resting Point (the invisible target)
         let targetBox = TargetCenterpoint.getBBox();
@@ -2260,6 +2311,11 @@ async function animate_magnetic_drop(ToyElement, TargetCenterpoint, MiddleLayer)
             // Drop to the EXACT intended target center!
             ToyElement.style.transform = `translate(${newLocalFinal.x - toyCx}px, ${newLocalFinal.y - toyCy}px)`;
 
+            if (scaleGroup && shrinkFactor != null) {
+                scaleGroup.style.transition = "transform 300ms ease-in";
+                scaleGroup.style.transform = "scale(" + (baseScale * shrinkFactor) + ")";
+            }
+
             setTimeout(() => {
                 resolve();
             }, 350);
@@ -2294,6 +2350,90 @@ async function shared_toy_drop_sequence(DroppedToyElement, BoxMod, BasicsMod, Pa
     }
 
     // 3. Branching Logic: Who closes the box?
+    if (PartnerMod.is_present) {
+        Interface.Prompt.show_message(PartnerMod.partnername + " closes the " + BoxMod.boxname);
+        await PartnerMod.move_to_element_and_act(BoxMod.BoxBase, () => BoxMod.close_box());
+        finish_callback();
+    } else {
+        BoxMod.wait_for_user_click("close", () => finish_callback());
+    }
+}
+
+/**
+ * Drop a toy into an open sack, update sack (+ synced box) world state, then close.
+ * Toy shrinks on the way in; fades out when the sack closes.
+ * options.shrinkFactor — relative scale while settling in the sack (default 0.82).
+ */
+async function shared_toy_to_sack_drop_sequence(DroppedToyElement, SackMod, BasicsMod, PartnerMod, FenObj, finish_callback, options = {}) {
+    let sackTarget = SackMod.SackTop.getElementsByClassName("sack_target_centerpoint")[0];
+    if (!sackTarget) {
+        sackTarget = SackMod.ensure_target_centerpoint(SackMod.SackTop);
+    }
+
+    let shrinkFactor = (typeof options.shrinkFactor === "number") ? options.shrinkFactor : 0.82;
+
+    await animate_magnetic_drop(
+        DroppedToyElement,
+        sackTarget,
+        BasicsMod.ItemLayers.Plus1,
+        { shrinkFactor: shrinkFactor }
+    );
+
+    WorldState.change_sack_contents(FenObj.sack, FenObj.toy);
+
+    if (SackMod && typeof SackMod.set_pointer_events_enabled === "function") {
+        SackMod.set_pointer_events_enabled(true);
+    }
+
+    const fade_toy_into_sack = async () => {
+        if (!DroppedToyElement) return;
+        DroppedToyElement.style.transition = "opacity 350ms ease-in";
+        DroppedToyElement.style.opacity = 0;
+        await wait(350);
+    };
+
+    if (PartnerMod.is_present) {
+        Interface.Prompt.show_message(PartnerMod.partnername + " closes the " + SackMod.sackname);
+        await PartnerMod.move_to_element_and_act(SackMod.SackBase, () => SackMod.close_sack());
+        await fade_toy_into_sack();
+        finish_callback();
+    } else {
+        SackMod.wait_for_user_click("close", async () => {
+            await fade_toy_into_sack();
+            finish_callback();
+        });
+    }
+}
+
+/**
+ * Drop a closed sack into an open box, update box {toy, sack}, then close the box.
+ * options.shrinkFactor — relative scale while settling in the box (default 0.65).
+ */
+async function shared_sack_to_box_drop_sequence(DroppedSackElement, BoxMod, BasicsMod, PartnerMod, FenObj, finish_callback, options = {}) {
+    let boxTarget = BoxMod.BoxTop.getElementsByClassName("box_target_centerpoint")[0];
+    let shrinkFactor = (typeof options.shrinkFactor === "number") ? options.shrinkFactor : 0.65;
+
+    await animate_magnetic_drop(
+        DroppedSackElement,
+        boxTarget,
+        BasicsMod.ItemLayers.Plus1,
+        { shrinkFactor: shrinkFactor }
+    );
+
+    if (FenObj && FenObj.sack) {
+        AudioCont.play_sound_effect("sack_placed_" + FenObj.sack);
+    }
+
+    let toyInSack = WorldState.get_sack_contents(FenObj.sack);
+    WorldState.change_toybox_contents(FenObj.toybox, toyInSack, FenObj.sack);
+    if (PartnerMod.is_present) {
+        WorldState.change_partner_belief_in_box_contents(FenObj.toybox, toyInSack);
+    }
+
+    if (BoxMod && typeof BoxMod.set_pointer_events_enabled === "function") {
+        BoxMod.set_pointer_events_enabled(true);
+    }
+
     if (PartnerMod.is_present) {
         Interface.Prompt.show_message(PartnerMod.partnername + " closes the " + BoxMod.boxname);
         await PartnerMod.move_to_element_and_act(BoxMod.BoxBase, () => BoxMod.close_box());
@@ -2724,6 +2864,173 @@ class BoxChoiceBar {
             bonus_text.setAttribute('font-weight', 'bold');
             bonus_text.setAttribute('fill', 'navy');
             bonus_text.setAttribute('text-anchor', 'middle');
+            bonus_text.textContent = this.bonus_stars === 1
+                ? "You can earn a bonus star for a correct answer!"
+                : `You can earn ${this.bonus_stars} bonus stars for a correct answer!`;
+            this.UIGroup.appendChild(bonus_text);
+        }
+
+        this.UIGroup.style.transformOrigin = `${this.W / 2}px ${panel_y + (btn_size / 2)}px`;
+        this.UIGroup.style.transform = "scale(0.8)";
+        this.UIGroup.style.opacity = 0;
+        this.UIGroup.style.transition = "all 300ms cubic-bezier(0.34, 1.56, 0.64, 1)";
+        window.getComputedStyle(this.UIGroup).opacity;
+        this.UIGroup.style.transform = "scale(1)";
+        this.UIGroup.style.opacity = 1;
+    }
+}
+
+/**
+ * Sack-choice panel mirroring BoxChoiceBar (clones closed sack templates).
+ */
+class SackChoiceBar {
+    constructor(parentLayer, W, H, options = {}) {
+        this.parentLayer = parentLayer;
+        this.W = W;
+        this.H = H;
+        this.bonus_stars = options.bonus_stars || 0;
+        this.panel_y_ratio = options.panel_y_ratio != null ? options.panel_y_ratio : 0.76;
+        this.btn_size = options.btn_size || 170;
+        this.spacing = options.spacing || 25;
+        this.UIGroup = null;
+        this._selectionHandler = null;
+        this._disabled = false;
+    }
+
+    destroy() {
+        this._disabled = true;
+        this._selectionHandler = null;
+        if (this.UIGroup && this.UIGroup.parentNode) this.UIGroup.remove();
+        this.UIGroup = null;
+    }
+
+    async hide(fade_ms = 200) {
+        this._disabled = true;
+        this._selectionHandler = null;
+        if (!this.UIGroup) return;
+        this.UIGroup.style.transition = `all ${fade_ms}ms ease-in`;
+        this.UIGroup.style.opacity = 0;
+        this.UIGroup.style.transform = "scale(0.8)";
+        await wait(fade_ms);
+        this.destroy();
+    }
+
+    waitForSelection(sackIds) {
+        return new Promise(resolve => {
+            this.show(sackIds, (sack_id) => resolve(sack_id));
+        });
+    }
+
+    show(sackIds, onSelect) {
+        this.destroy();
+        this._disabled = false;
+        this._selectionHandler = onSelect;
+
+        this.UIGroup = create_SVG_group(0, 0);
+        this.parentLayer.appendChild(this.UIGroup);
+
+        const btn_size = this.btn_size;
+        const spacing = this.spacing;
+        const total_width = (sackIds.length * btn_size) + ((sackIds.length - 1) * spacing);
+        const start_x = (this.W - total_width) / 2;
+        const panel_y = this.panel_y_ratio * this.H;
+
+        let panel_height = btn_size + 40;
+        if (this.bonus_stars > 0) panel_height += 40;
+
+        let panel = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        panel.setAttribute("x", start_x - 30);
+        panel.setAttribute("y", panel_y - 20);
+        panel.setAttribute("width", total_width + 60);
+        panel.setAttribute("height", panel_height);
+        panel.setAttribute("rx", 20);
+        panel.setAttribute("fill", "rgba(255, 215, 0, 0.45)");
+        panel.setAttribute("stroke", "#d4af37");
+        panel.setAttribute("stroke-width", "4");
+        this.UIGroup.appendChild(panel);
+
+        sackIds.forEach((sack_id, index) => {
+            let btn_x = start_x + (index * (btn_size + spacing));
+            let btn_y = panel_y;
+
+            let BtnGroup = create_SVG_group(0, 0);
+            this.UIGroup.appendChild(BtnGroup);
+
+            let btn_bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            btn_bg.setAttribute("x", btn_x);
+            btn_bg.setAttribute("y", btn_y);
+            btn_bg.setAttribute("width", btn_size);
+            btn_bg.setAttribute("height", btn_size);
+            btn_bg.setAttribute("rx", 15);
+            btn_bg.setAttribute("fill", "#d8c381");
+            btn_bg.setAttribute("stroke", "#b89f5d");
+            btn_bg.setAttribute("stroke-width", "3");
+            btn_bg.style.transition = "all 150ms ease";
+            BtnGroup.appendChild(btn_bg);
+
+            let template = document.getElementById(sack_id);
+            if (!template) {
+                console.warn("SackChoiceBar: missing sack id " + sack_id);
+                return;
+            }
+            let RawSack = template.cloneNode(true);
+            RawSack.style.display = "inherit";
+            let openGroup = RawSack.querySelector(".sack_open");
+            if (openGroup) openGroup.remove();
+            let closedGroup = RawSack.querySelector(".sack_closed");
+            if (closedGroup) closedGroup.style.display = "inline";
+            Array.from(RawSack.getElementsByClassName("prep_element_hidden")).forEach((el) => {
+                el.style.display = "none";
+            });
+            BtnGroup.appendChild(RawSack);
+
+            let TBox = RawSack.getBBox();
+            let max_dim = Math.max(TBox.width, TBox.height) || 100;
+            let scale = (btn_size * 0.85) / max_dim;
+            let raw_cx = TBox.x + (TBox.width / 2);
+            let raw_cy = TBox.y + (TBox.height / 2);
+            let target_cx = btn_x + (btn_size / 2);
+            let target_cy = btn_y + (btn_size / 2);
+            RawSack.style.transformOrigin = `${raw_cx}px ${raw_cy}px`;
+            RawSack.style.transform = `translate(${target_cx - raw_cx}px, ${target_cy - raw_cy}px) scale(${scale})`;
+
+            let click_catcher = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            click_catcher.setAttribute("x", btn_x);
+            click_catcher.setAttribute("y", btn_y);
+            click_catcher.setAttribute("width", btn_size);
+            click_catcher.setAttribute("height", btn_size);
+            click_catcher.setAttribute("fill", "transparent");
+            click_catcher.style.cursor = "pointer";
+            BtnGroup.appendChild(click_catcher);
+
+            click_catcher.onpointerenter = () => {
+                if (this._disabled) return;
+                btn_bg.setAttribute("fill", "#ebd89b");
+                btn_bg.setAttribute("stroke", "gold");
+            };
+            click_catcher.onpointerleave = () => {
+                btn_bg.setAttribute("fill", "#d8c381");
+                btn_bg.setAttribute("stroke", "#b89f5d");
+            };
+            click_catcher.onpointerdown = () => {
+                if (this._disabled) return;
+                this._disabled = true;
+                AudioCont.play_sound_effect("button_click");
+                let handler = this._selectionHandler;
+                this._selectionHandler = null;
+                if (handler) handler(sack_id);
+            };
+        });
+
+        if (this.bonus_stars > 0) {
+            let bonus_text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            bonus_text.setAttribute("x", this.W / 2);
+            bonus_text.setAttribute("y", panel_y + btn_size + 45);
+            bonus_text.setAttribute("font-family", "Arial, sans-serif");
+            bonus_text.setAttribute("font-size", "30");
+            bonus_text.setAttribute("font-weight", "bold");
+            bonus_text.setAttribute("fill", "navy");
+            bonus_text.setAttribute("text-anchor", "middle");
             bonus_text.textContent = this.bonus_stars === 1
                 ? "You can earn a bonus star for a correct answer!"
                 : `You can earn ${this.bonus_stars} bonus stars for a correct answer!`;

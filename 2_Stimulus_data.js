@@ -1,6 +1,6 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["mentalizing_AC"];
+    this.Experiment_Code = ["mentalizing_sack_AC"];
 
     const All_Instructions_At_Start = {
         test: [],
@@ -28,12 +28,12 @@ let StimulusSettings = function () {
     // ----------------------------------------------------
     const All_Fennimal_Sets = {
         test: {
-            "S1": { head: "A", region: "A", toy: "A", toybox: "A" },
-            "S2": { head: "B", region: "B", toy: "B", toybox: "B" },
-          
-            "P1": { head: "D", region: "D", toy: "D", toybox: "A" },
-            "P2": { head: "E", region: "E", toy: "E", toybox: "B" },
-        
+            "S1": { head: "A", region: "A", toy: "A", toybox: "A", sack: "A" },
+            "S2": { head: "B", region: "B", toy: "B", toybox: "B", sack: "B" },
+
+            "P1": { head: "D", region: "D", toy: "D", toybox: "A", sack: "C" },
+            "P2": { head: "E", region: "E", toy: "E", toybox: "B", sack: "A" },
+
         },
 
         mentalizing: {
@@ -56,6 +56,13 @@ let StimulusSettings = function () {
             "P1": { head: "D", region: "D", toy: "D", toybox: "A" },
             "P2": { head: "E", region: "E", toy: "E", toybox: "B" },
         },
+        mentalizing_sack_AC :{
+            "S1": { head: "A", region: "A", toy: "A", toybox: "A", sack: "A" },
+            "S2": { head: "B", region: "B", toy: "B", toybox: "B", sack: "B" },
+            "P1": { head: "C", region: "C", toy: "C", toybox: "A", sack: "A" },
+            "P2": { head: "D", region: "D", toy: "D", toybox: "B", sack: "B" }, 
+        
+        }
     };
 
     // ----------------------------------------------------
@@ -74,7 +81,11 @@ let StimulusSettings = function () {
                 trial_subblocks: [
                     {
                         Fennimals_encountered: ["S1", "S2"],
-                        interaction_type: "box_room"
+                        interaction_type: "toy_to_sack"
+                    },
+                    {
+                        Fennimals_encountered: ["S1", "S2"],
+                        interaction_type: "sack_to_box"
                     }
                 ]
             },
@@ -411,7 +422,7 @@ let StimulusSettings = function () {
                     {
                         trials: [
                             { Fennimal: "S1", interaction_type: "joint_box_decoration" },
-                            { Fennimal: "S2", interaction_type: "scan_box_inventory" },
+                            { Fennimal: "S2", interaction_type: "scan_box_home" },
                             { Fennimal: "S2", interaction_type: "photo_Fennimal" },
                         ]
                     },
@@ -440,6 +451,117 @@ let StimulusSettings = function () {
                     {
                         Fennimals_encountered: ["P1", "P2"],
                         interaction_type: "box_room"
+                    },
+                    
+                ]
+            },
+
+            {
+                type: "pseudoday",
+                information: "partner_returns"
+            },
+
+            // BLOCK 5: Partner belief (individual boxes)
+            // Memory probes (when enabled): box→Fennimal uses S/P wave prompts +
+            // correct / co_box_mate / same_wave_foil; Fennimal→toy unchanged.
+            {
+                type: "partner_belief_individual_boxes",
+                include_practice_trial: true,
+                num_belief_blocks: 1,
+                include_reality_block_at_end: true,
+                include_memory_probe_at_end: true,
+                bonus_stars_per_correct_answer: 1,
+                memory_probe_isi_ms: 1000,
+                questions: [
+                    { question_id: "belief_A", target_box: "A" },
+                    { question_id: "belief_B", target_box: "B" },
+                ]
+            },
+
+
+
+        ],
+        mentalizing_sack_AC: [
+
+            // BLOCK 1: Introduction to all Fennimals
+            {
+                type: "free_exploration",
+                interaction_type: ["Fennimal_toy"],
+                Fennimals_encountered: ["S1", "S2", "P1", "P2"],
+                partner_behavior: "active",
+                include_Fennefinder: true,
+                force_climbing_tower_first: true
+            },
+
+            // BLOCK 2: 
+            // 1) Fennimal->toy, 
+            // 2) toy -> sack, 
+            // 3) sack -> box, 
+            // 4) Fennimal-box [manipulation]
+            {
+                type: "phone_room",
+                partner_behavior: "active",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                ask_Fennimal: true,
+                ask_toy: true,
+                ask_box: true,
+                trial_subblocks: [
+                    // 1) Fennimal->toy, 
+                    
+                    {
+                        Fennimals_encountered: ["S1", "S2", "P1", "P2"],
+                        interaction_type: "broken_toy_no_box"
+                    },
+                    {
+                        Fennimals_encountered: ["S1", "S2", "P1", "P2"],
+                        interaction_type: "Fennimal_toy"
+                    },
+                    
+
+                    // 2) toy -> sack, 
+                    {
+                        Fennimals_encountered: ["S1", "S2"],
+                        interaction_type: "toy_to_sack"
+                    },
+                    // 3) sack -> box, 
+                    {
+                        Fennimals_encountered: ["S1", "S2"],
+                        interaction_type: "sack_to_box"
+                    },
+                    // 4) Fennimal-box [manipulation] + scan variants (home vs in situ)
+                    {
+                        trials: [
+                            { Fennimal: "S1", interaction_type: "joint_box_decoration" },
+                            { Fennimal: "S2", interaction_type: "scan_box_home" },
+                            { Fennimal: "S2", interaction_type: "photo_Fennimal" },
+                        ]
+                    },
+                   
+                ]
+            },
+
+            //Partner leaves
+
+            {
+                type: "pseudoday",
+                information: "partner_leaves"
+            },
+            
+
+            // BLOCK 3: Change contents of boxes: A to toy C, B to toy D
+            {
+                type: "phone_room",
+                partner_behavior: "absent",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                ask_Fennimal: true,
+                ask_toy: true,
+                ask_box: true,
+                trial_subblocks: [
+                    {
+                        Fennimals_encountered: ["P1", "P2"],
+                        interaction_type: "toy_to_box"
                     },
                     
                 ]
@@ -788,6 +910,11 @@ let StimulusTransformer = function (StimTemplate) {
             return [...new Set(Array.from(document.getElementsByClassName("toybox")).map(b => b.id.split("_")[1]))];
         }
 
+        // Sack SVG roots use the bare id (e.g. velvet_purse), class "sack".
+        function get_all_sacks_in_SVG() {
+            return [...new Set(Array.from(document.getElementsByClassName("sack")).map(s => s.id).filter(Boolean))];
+        }
+
         function get_all_locations_in_SVG() {
             let Regions = {};
             Array.from(document.getElementsByClassName("location_marker")).forEach(marker => {
@@ -871,6 +998,7 @@ let StimulusTransformer = function (StimTemplate) {
             map_simple_feature("food_preference", get_all_food_flavors_in_SVG());
             map_simple_feature("toy", get_all_available_toys());
             map_simple_feature("toybox", get_all_boxes_in_SVG());
+            map_simple_feature("sack", get_all_sacks_in_SVG());
 
             return { Map: Map, Free: UnMappedItems };
         }
@@ -961,6 +1089,7 @@ let StimulusTransformer = function (StimTemplate) {
             if (req.food_preference) FenObj.food_preference = Map.food_preference[req.food_preference];
             if (req.toy) FenObj.toy = Map.toy[req.toy];
             if (req.toybox) FenObj.toybox = Map.toybox[req.toybox];
+            if (req.sack) FenObj.sack = Map.sack[req.sack];
 
             if (req.play_orthogonal_tasks) FenObj.play_orthogonal_tasks = true;
 
