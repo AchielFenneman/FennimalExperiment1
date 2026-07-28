@@ -1503,7 +1503,9 @@ class ExperimentController {
                     a.trial_kind === "belief" ||
                     a.trial_kind === "reality" ||
                     a.trial_kind === "memory_probe_box_to_fennimal" ||
-                    a.trial_kind === "memory_probe_fennimal_to_toy"
+                    a.trial_kind === "memory_probe_fennimal_to_toy" ||
+                    a.trial_kind === "memory_probe_box_to_sack" ||
+                    a.trial_kind === "memory_probe_sack_to_toy"
                 );
                 let bonusPerCorrect = this.currentPhaseData.bonus_stars_per_correct_answer || 0;
                 let earned = starEligibleAnswers.reduce(

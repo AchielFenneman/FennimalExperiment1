@@ -14837,6 +14837,11 @@ class PartnerBeliefIndividualBoxesController {
         let boxToFen = this._makeBoxToFennimalProbeTrials(fennimals);
         let fenToToy = this._makeFennimalToToyProbeTrials(fennimals);
 
+        let includeSackProbes = this._shouldIncludeSackMemoryProbes();
+        this.TaskObj.include_sack_memory_probes = includeSackProbes;
+        let boxToSack = includeSackProbes ? this._makeBoxToSackProbeTrials(fennimals) : [];
+        let sackToToy = includeSackProbes ? this._makeSackToToyProbeTrials(fennimals) : [];
+
         let blockOrder = (Math.random() < 0.5)
             ? ["box_to_fennimal", "fennimal_to_toy"]
             : ["fennimal_to_toy", "box_to_fennimal"];
@@ -14844,7 +14849,9 @@ class PartnerBeliefIndividualBoxesController {
 
         blockOrder.forEach((probeType, blockOrd) => {
             let blockIndex = blockOrd + 1;
-            let trials = (probeType === "box_to_fennimal") ? boxToFen : fenToToy;
+            let trials = (probeType === "box_to_fennimal")
+                ? [...boxToFen, ...boxToSack]
+                : [...fenToToy, ...sackToToy];
             shuffleArray(trials).forEach((trial, i) => {
                 queue.push({
                     ...trial,
@@ -14855,6 +14862,13 @@ class PartnerBeliefIndividualBoxesController {
                 });
             });
         });
+    }
+
+    _shouldIncludeSackMemoryProbes() {
+        if (!this.expCont || !this.expCont.stimuli || !this.expCont.stimuli.should_include_sack_memory_probes) {
+            return false;
+        }
+        return this.expCont.stimuli.should_include_sack_memory_probes() === true;
     }
 
     /**
@@ -15041,6 +15055,210 @@ class PartnerBeliefIndividualBoxesController {
                 option_roles
             };
         });
+    }
+
+    /**
+     * Sacks that would also be correct for "which sack did you place in this box?"
+     * (other Fennimals who share the box but use a different sack).
+     */
+    _competingSacksForBox(fen, fennimals) {
+        let competing = new Set();
+        fennimals.forEach((other) => {
+            if (!other || other.id === fen.id) return;
+            if (other.toybox !== fen.toybox) return;
+            if (other.sack && other.sack !== fen.sack) competing.add(other.sack);
+        });
+        return competing;
+    }
+
+    /**
+     * Toys that would also be correct for "which toy did you place in this sack?"
+     * (other Fennimals who share the same sack type).
+     */
+    _competingToysForSack(fen, fennimals) {
+        let competing = new Set();
+        fennimals.forEach((other) => {
+            if (!other || other.id === fen.id) return;
+            if (other.sack !== fen.sack) return;
+            if (other.toy && other.toy !== fen.toy) competing.add(other.toy);
+        });
+        return competing;
+    }
+
+    _sackFoilPool(fennimals, correctSack, competingSacks) {
+        let pool = [];
+        let seen = new Set([correctSack, ...competingSacks]);
+        fennimals.forEach((fen) => {
+            if (!fen.sack || seen.has(fen.sack)) return;
+            seen.add(fen.sack);
+            pool.push(fen.sack);
+        });
+        if (this.expCont && this.expCont.stimuli && this.expCont.stimuli.get_unused_items_of_type) {
+            let free = this.expCont.stimuli.get_unused_items_of_type("sack", 10) || [];
+            free.forEach((sackId) => {
+                if (!sackId || seen.has(sackId)) return;
+                seen.add(sackId);
+                pool.push(sackId);
+            });
+        }
+        return pool;
+    }
+
+    _toyFoilPool(fennimals, correctToy, competingToys) {
+        let pool = [];
+        let seen = new Set([correctToy, ...competingToys]);
+        fennimals.forEach((fen) => {
+            if (!fen.toy || seen.has(fen.toy)) return;
+            seen.add(fen.toy);
+            pool.push(fen.toy);
+        });
+        return pool;
+    }
+
+    _makeBoxToSackProbeTrials(fennimals) {
+        let withSacks = fennimals.filter((fen) => fen && fen.sack && fen.toybox);
+        let foilCounts = {};
+        withSacks.forEach((fen) => {
+            this._sackFoilPool(fennimals, fen.sack, this._competingSacksForBox(fen, fennimals))
+                .forEach((id) => { if (foilCounts[id] == null) foilCounts[id] = 0; });
+        });
+
+        let foilsByTarget = {};
+        shuffleArray([...withSacks]).forEach((fen) => {
+            let competing = this._competingSacksForBox(fen, fennimals);
+            let pool = this._sackFoilPool(fennimals, fen.sack, competing);
+
+            // Prefer a co-box mate's sack only when it is not also a correct answer for this box.
+            let coBoxMate = fennimals.find((other) =>
+                other.id !== fen.id && other.toybox === fen.toybox && other.sack
+            );
+            let preferred = null;
+            if (
+                coBoxMate &&
+                coBoxMate.sack !== fen.sack &&
+                !competing.has(coBoxMate.sack) &&
+                pool.includes(coBoxMate.sack)
+            ) {
+                preferred = coBoxMate.sack;
+                foilCounts[preferred] = (foilCounts[preferred] || 0) + 1;
+            }
+
+            let remaining = preferred ? pool.filter((id) => id !== preferred) : pool;
+            let needed = preferred ? 1 : 2;
+            let picked = this._pickBalancedItems(remaining, foilCounts, needed);
+            foilsByTarget[fen.id] = preferred ? [preferred, picked[0]].filter(Boolean) : picked;
+        });
+
+        return withSacks.map((fen) => {
+            let correctId = fen.sack;
+            let foils = (foilsByTarget[fen.id] || []).filter((id) => id && id !== correctId);
+            foils = [...new Set(foils)];
+            if (foils.length < 2) {
+                console.error(
+                    `PartnerBeliefIndividualBoxes: could not build safe sack triad for box→sack probe "${fen.id}" ` +
+                    `(correct=${correctId}, foils=${JSON.stringify(foils)}).`
+                );
+                return null;
+            }
+
+            let foilA = foils[0];
+            let foilB = foils[1];
+            let competing = this._competingSacksForBox(fen, fennimals);
+            let option_roles = {};
+            option_roles[correctId] = "correct";
+            option_roles[foilA] = competing.has(foilA) ? "competing_excluded_bug" : "foil";
+            option_roles[foilB] = competing.has(foilB) ? "competing_excluded_bug" : "foil";
+
+            let coBoxMate = fennimals.find((other) =>
+                other.id !== fen.id && other.toybox === fen.toybox
+            );
+            if (coBoxMate && (foilA === coBoxMate.sack || foilB === coBoxMate.sack)) {
+                option_roles[coBoxMate.sack] = "co_box_sack";
+            }
+
+            return {
+                trial_kind: "memory_probe_box_to_sack",
+                question_id: `probe_box_sack_${fen.id}`,
+                trial_instance_id: `probe_box_sack_${fen.id}`,
+                target_box: fen.toybox,
+                target_fennimal: fen.id,
+                correct_option_id: correctId,
+                answer_options: shuffleArray([correctId, foilA, foilB]),
+                option_roles
+            };
+        }).filter(Boolean);
+    }
+
+    _makeSackToToyProbeTrials(fennimals) {
+        let withSacks = fennimals.filter((fen) => fen && fen.sack && fen.toy);
+        let foilCounts = {};
+        withSacks.forEach((fen) => {
+            this._toyFoilPool(fennimals, fen.toy, this._competingToysForSack(fen, fennimals))
+                .forEach((id) => { if (foilCounts[id] == null) foilCounts[id] = 0; });
+        });
+
+        let foilsByTarget = {};
+        shuffleArray([...withSacks]).forEach((fen) => {
+            let competing = this._competingToysForSack(fen, fennimals);
+            let pool = this._toyFoilPool(fennimals, fen.toy, competing);
+
+            let coBoxMate = fennimals.find((other) =>
+                other.id !== fen.id && other.toybox === fen.toybox && other.toy
+            );
+            let preferred = null;
+            if (
+                coBoxMate &&
+                coBoxMate.toy !== fen.toy &&
+                !competing.has(coBoxMate.toy) &&
+                pool.includes(coBoxMate.toy)
+            ) {
+                preferred = coBoxMate.toy;
+                foilCounts[preferred] = (foilCounts[preferred] || 0) + 1;
+            }
+
+            let remaining = preferred ? pool.filter((id) => id !== preferred) : pool;
+            let needed = preferred ? 1 : 2;
+            let picked = this._pickBalancedItems(remaining, foilCounts, needed);
+            foilsByTarget[fen.id] = preferred ? [preferred, picked[0]].filter(Boolean) : picked;
+        });
+
+        return withSacks.map((fen) => {
+            let correctId = fen.toy;
+            let foils = (foilsByTarget[fen.id] || []).filter((id) => id && id !== correctId);
+            foils = [...new Set(foils)];
+            if (foils.length < 2) {
+                console.error(
+                    `PartnerBeliefIndividualBoxes: could not build safe toy triad for sack→toy probe "${fen.id}" ` +
+                    `(correct=${correctId}, foils=${JSON.stringify(foils)}).`
+                );
+                return null;
+            }
+
+            let foilA = foils[0];
+            let foilB = foils[1];
+            let option_roles = {};
+            option_roles[correctId] = "correct";
+            option_roles[foilA] = "foil";
+            option_roles[foilB] = "foil";
+
+            let coBoxMate = fennimals.find((other) =>
+                other.id !== fen.id && other.toybox === fen.toybox
+            );
+            if (coBoxMate && (foilA === coBoxMate.toy || foilB === coBoxMate.toy)) {
+                option_roles[coBoxMate.toy] = "co_box_toy";
+            }
+
+            return {
+                trial_kind: "memory_probe_sack_to_toy",
+                question_id: `probe_sack_toy_${fen.id}`,
+                trial_instance_id: `probe_sack_toy_${fen.id}`,
+                target_sack: fen.sack,
+                target_fennimal: fen.id,
+                correct_option_id: correctId,
+                answer_options: shuffleArray([correctId, foilA, foilB]),
+                option_roles
+            };
+        }).filter(Boolean);
     }
 
     _nextDistractorRule() {
@@ -15718,6 +15936,70 @@ class PartnerBeliefIndividualBoxesController {
         return BtnGroup;
     }
 
+    _create_sack_choice_button(parent, sack_id, btn_x, btn_y, onSelect) {
+        let BtnGroup = create_SVG_group(0, 0);
+        parent.appendChild(BtnGroup);
+
+        let btn_bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        btn_bg.setAttribute("x", btn_x);
+        btn_bg.setAttribute("y", btn_y);
+        btn_bg.setAttribute("width", this.btn_size);
+        btn_bg.setAttribute("height", this.btn_size);
+        btn_bg.setAttribute("rx", 15);
+        btn_bg.setAttribute("fill", "#d8c381");
+        btn_bg.setAttribute("stroke", "#b89f5d");
+        btn_bg.setAttribute("stroke-width", "3");
+        BtnGroup.appendChild(btn_bg);
+        this._add_focus_outline_to_button(BtnGroup, btn_bg);
+
+        let template = document.getElementById(sack_id);
+        if (template) {
+            let RawSack = template.cloneNode(true);
+            RawSack.style.display = "inherit";
+            let openGroup = RawSack.querySelector(".sack_open");
+            if (openGroup) openGroup.remove();
+            let closedGroup = RawSack.querySelector(".sack_closed");
+            if (closedGroup) closedGroup.style.display = "inline";
+            Array.from(RawSack.getElementsByClassName("prep_element_hidden")).forEach((el) => {
+                el.style.display = "none";
+            });
+            BtnGroup.appendChild(RawSack);
+
+            let TBox = RawSack.getBBox();
+            let max_dim = Math.max(TBox.width, TBox.height) || 100;
+            let scale = (this.btn_size * 0.85) / max_dim;
+            let raw_cx = TBox.x + (TBox.width / 2);
+            let raw_cy = TBox.y + (TBox.height / 2);
+            let target_cx = btn_x + (this.btn_size / 2);
+            let target_cy = btn_y + (this.btn_size / 2);
+            RawSack.style.transformOrigin = `${raw_cx}px ${raw_cy}px`;
+            RawSack.style.transform = `translate(${target_cx - raw_cx}px, ${target_cy - raw_cy}px) scale(${scale})`;
+        } else {
+            console.warn("PartnerBeliefIndividualBoxes: missing sack id " + sack_id);
+        }
+
+        let click_catcher = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        click_catcher.setAttribute("x", btn_x);
+        click_catcher.setAttribute("y", btn_y);
+        click_catcher.setAttribute("width", this.btn_size);
+        click_catcher.setAttribute("height", this.btn_size);
+        click_catcher.setAttribute("fill", "transparent");
+        click_catcher.style.cursor = "pointer";
+        BtnGroup.appendChild(click_catcher);
+
+        click_catcher.onpointerenter = () => {
+            btn_bg.setAttribute("fill", "#ebd89b");
+            btn_bg.setAttribute("stroke", "gold");
+        };
+        click_catcher.onpointerleave = () => {
+            btn_bg.setAttribute("fill", "#d8c381");
+            btn_bg.setAttribute("stroke", "#b89f5d");
+        };
+        click_catcher.onpointerdown = (evt) => onSelect(sack_id, evt, BtnGroup);
+
+        return BtnGroup;
+    }
+
     _drawFeatureShape(parent, shape, color, cx, cy, size = 42) {
         let el;
         if (shape === "circle") {
@@ -15807,7 +16089,7 @@ class PartnerBeliefIndividualBoxesController {
 
     /**
      * Reveal box/target (optional) + radial options on the same frame; resolve on first pointerdown.
-     * mode: "toys" | "features" | "heads"
+     * mode: "toys" | "features" | "heads" | "sacks"
      */
     show_radial_options_and_wait(options, { mode = "toys", showBox = false, showCentralTarget = false, showQuestionMark = false } = {}) {
         return new Promise(resolve => {
@@ -15858,6 +16140,8 @@ class PartnerBeliefIndividualBoxesController {
                     this._create_feature_choice_button(this.radialUIGroup, opt, bx, by, handleSelect);
                 } else if (mode === "heads") {
                     this._create_head_choice_button(this.radialUIGroup, option_id, bx, by, handleSelect);
+                } else if (mode === "sacks") {
+                    this._create_sack_choice_button(this.radialUIGroup, option_id, bx, by, handleSelect);
                 } else {
                     this._create_toy_choice_button(this.radialUIGroup, opt, bx, by, handleSelect);
                 }
@@ -15904,6 +16188,10 @@ class PartnerBeliefIndividualBoxesController {
             await this.run_box_to_fennimal_probe_trial(trial);
         } else if (trial.trial_kind === "memory_probe_fennimal_to_toy") {
             await this.run_fennimal_to_toy_probe_trial(trial);
+        } else if (trial.trial_kind === "memory_probe_box_to_sack") {
+            await this.run_box_to_sack_probe_trial(trial);
+        } else if (trial.trial_kind === "memory_probe_sack_to_toy") {
+            await this.run_sack_to_toy_probe_trial(trial);
         }
     }
 
@@ -16009,8 +16297,11 @@ class PartnerBeliefIndividualBoxesController {
             overlay.appendChild(panel);
 
             let body = create_SVG_text_in_foreign_element(
-                `We will now ask you about the Fennimals and their toys and boxes.<br><br>` +
-                `Answer as quickly and accurately as you can.`,
+                this.TaskObj.include_sack_memory_probes
+                    ? (`We will now ask you about the Fennimals and their toys, boxes, and sacks.<br><br>` +
+                        `Answer as quickly and accurately as you can.`)
+                    : (`We will now ask you about the Fennimals and their toys and boxes.<br><br>` +
+                        `Answer as quickly and accurately as you can.`),
                 0.16 * this.W,
                 0.28 * this.H,
                 0.68 * this.W,
@@ -16125,6 +16416,33 @@ class PartnerBeliefIndividualBoxesController {
         this.CentralFennimalElement = fen;
         this.CentralTargetGroup = fen;
         return fen;
+    }
+
+    place_central_sack(sackId) {
+        let template = document.getElementById(sackId);
+        if (!template) {
+            console.error("PartnerBeliefIndividualBoxes: missing sack id " + sackId);
+            return null;
+        }
+
+        let SackObj = copy_scale_and_move_object_to_position(
+            template,
+            this.ItemLayers.Main,
+            this.box_center_x,
+            this.box_center_y,
+            2.2
+        );
+        let openGroup = SackObj.querySelector(".sack_open");
+        if (openGroup) openGroup.remove();
+        let closedGroup = SackObj.querySelector(".sack_closed");
+        if (closedGroup) closedGroup.style.display = "inline";
+        Array.from(SackObj.getElementsByClassName("prep_element_hidden")).forEach((el) => {
+            el.style.display = "none";
+        });
+        SackObj.style.opacity = 0;
+        SackObj.style.pointerEvents = "none";
+        this.CentralTargetGroup = SackObj;
+        return SackObj;
     }
 
     /**
@@ -16461,6 +16779,90 @@ class PartnerBeliefIndividualBoxesController {
             question_id: trial.question_id,
             block_index: trial.block_index,
             trial_index: this.overall_presentation_index,
+            target_fennimal: trial.target_fennimal,
+            options: this._buildStoredOptions(
+                response.option_layout,
+                trial.answer_options.map((toyId) => ({
+                    id: toyId,
+                    role: (trial.option_roles && trial.option_roles[toyId]) || "unknown"
+                }))
+            ),
+            selected: response.selected_id,
+            correct: is_correct,
+            reaction_time_ms: response.reaction_time_ms
+        });
+
+        await wait(this.memory_probe_isi_ms);
+    }
+
+    async run_box_to_sack_probe_trial(trial) {
+        this.place_target_box(trial.target_box);
+        let revealPromise = this.create_curtain_with_reveal_circle();
+        await this.fade_black(0, 350);
+
+        Interface.Prompt.show_message("Click on the circle to start the question");
+        await revealPromise;
+
+        Interface.Prompt.show_message("Which sack did you previously place in this box?");
+
+        let response = await this.show_radial_options_and_wait(trial.answer_options, {
+            mode: "sacks",
+            showBox: true
+        });
+
+        Interface.Prompt.hide();
+        AudioCont.play_sound_effect("button_click");
+
+        let is_correct = (response.selected_id === trial.correct_option_id);
+
+        this.ParticipantAnswers.push({
+            trial_kind: "memory_probe_box_to_sack",
+            question_id: trial.question_id,
+            block_index: trial.block_index,
+            trial_index: this.overall_presentation_index,
+            target_box: trial.target_box,
+            target_fennimal: trial.target_fennimal,
+            options: this._buildStoredOptions(
+                response.option_layout,
+                trial.answer_options.map((sackId) => ({
+                    id: sackId,
+                    role: (trial.option_roles && trial.option_roles[sackId]) || "unknown"
+                }))
+            ),
+            selected: response.selected_id,
+            correct: is_correct,
+            reaction_time_ms: response.reaction_time_ms
+        });
+
+        await wait(this.memory_probe_isi_ms);
+    }
+
+    async run_sack_to_toy_probe_trial(trial) {
+        this.place_central_sack(trial.target_sack);
+        let revealPromise = this.create_curtain_with_reveal_circle();
+        await this.fade_black(0, 350);
+
+        Interface.Prompt.show_message("Click on the circle to start the question");
+        await revealPromise;
+
+        Interface.Prompt.show_message("Which toy did you previously place in this sack?");
+
+        let response = await this.show_radial_options_and_wait(trial.answer_options, {
+            mode: "toys",
+            showCentralTarget: true
+        });
+
+        Interface.Prompt.hide();
+        AudioCont.play_sound_effect("button_click");
+
+        let is_correct = (response.selected_id === trial.correct_option_id);
+
+        this.ParticipantAnswers.push({
+            trial_kind: "memory_probe_sack_to_toy",
+            question_id: trial.question_id,
+            block_index: trial.block_index,
+            trial_index: this.overall_presentation_index,
+            target_sack: trial.target_sack,
             target_fennimal: trial.target_fennimal,
             options: this._buildStoredOptions(
                 response.option_layout,

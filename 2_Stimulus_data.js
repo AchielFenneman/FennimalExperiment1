@@ -573,8 +573,8 @@ let StimulusSettings = function () {
             },
 
             // BLOCK 5: Partner belief (individual boxes)
-            // Memory probes (when enabled): box→Fennimal uses S/P wave prompts +
-            // correct / co_box_mate / same_wave_foil; Fennimal→toy unchanged.
+            // Memory probes (when enabled): box→Fennimal / Fennimal→toy;
+            // plus box→sack / sack→toy when sacks are templated and toy_to_sack appears.
             {
                 type: "partner_belief_individual_boxes",
                 include_practice_trial: true,
@@ -1221,6 +1221,44 @@ let StimulusTransformer = function (StimTemplate) {
         return this.Experiment_Structure.filter(block => block.type !== "pseudoday").length;
     };
 
+    /** True if any Fennimal template in this experiment was assigned a sack. */
+    this.fennimal_templates_include_sacks = function () {
+        return Array.isArray(FennimalObjArr) && FennimalObjArr.some((fen) => !!fen.sack);
+    };
+
+    /**
+     * Walk the experiment structure for an interaction_type string
+     * (top-level, arrays, trial_subblocks cartesian / explicit trials, orthogonal tasks).
+     */
+    this.experiment_includes_interaction_type = function (interactionType) {
+        if (!interactionType || !Array.isArray(this.Experiment_Structure)) return false;
+
+        const typeMatches = (value) => {
+            if (value === interactionType) return true;
+            return Array.isArray(value) && value.includes(interactionType);
+        };
+
+        for (let block of this.Experiment_Structure) {
+            if (!block) continue;
+            if (typeMatches(block.interaction_type)) return true;
+            if (typeMatches(block.included_orthogonal_tasks)) return true;
+            if (!Array.isArray(block.trial_subblocks)) continue;
+            for (let sb of block.trial_subblocks) {
+                if (!sb) continue;
+                if (typeMatches(sb.interaction_type)) return true;
+                if (Array.isArray(sb.trials) && sb.trials.some((t) => t && t.interaction_type === interactionType)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    /** Memory-probe sack questions only when sacks are templated and practiced via toy_to_sack. */
+    this.should_include_sack_memory_probes = function () {
+        return this.fennimal_templates_include_sacks() && this.experiment_includes_interaction_type("toy_to_sack");
+    };
+
     this.get_Feature_maps = () => FeatureMapConstant;
     this.get_instruction_pages_arr = () => JSON.parse(JSON.stringify(StimTemplate.Instructions_at_start));
     this.get_questionnaire_pages_arr = () => JSON.parse(JSON.stringify(StimTemplate.Pages_at_end));
@@ -1249,11 +1287,13 @@ let StimulusTransformer = function (StimTemplate) {
                     max_stars += bonus * 2;
                 }
                 if (block.include_memory_probe_at_end === true) {
-                    // One box→Fennimal and one Fennimal→toy probe per Fennimal in the set.
+                    // One box→Fennimal and one Fennimal→toy probe per Fennimal;
+                    // plus box→sack and sack→toy when sacks are in play.
                     let nFennimals = (typeof FennimalObjArr !== "undefined" && Array.isArray(FennimalObjArr))
                         ? FennimalObjArr.length
                         : 0;
-                    max_stars += bonus * nFennimals * 2;
+                    let probesPerFen = this.should_include_sack_memory_probes() ? 4 : 2;
+                    max_stars += bonus * nFennimals * probesPerFen;
                 }
             }
 
@@ -1289,4 +1329,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("P-READY")
+console.log("S-READY")
