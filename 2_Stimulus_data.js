@@ -8,6 +8,7 @@ let StimulusSettings = function () {
         mentalizing: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
         mentalizing_AB: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
         mentalizing_AC: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
+        mentalizing_sack_AC: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
     };
 
     // ----------------------------------------------------
@@ -1329,4 +1330,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("S-READY")
+console.log("P-READY")
