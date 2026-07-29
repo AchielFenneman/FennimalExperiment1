@@ -1227,4 +1227,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("AC-READY TO GO")
+console.log("AC-READY TO GO NOW --- ")
