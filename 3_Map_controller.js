@@ -949,8 +949,10 @@ class MapController {
         let role = this.WorldState.get_current_partner_role();
         if (role === "active" || role === "passive") {
             this.Partner.jump_to_position(startPoint.x - GenParam.AutoTravel.partnerStartOffset.x, startPoint.y - GenParam.AutoTravel.partnerStartOffset.y);
-            this.Partner.update_behavior();
         }
+        // Always sync visibility: absent partners must be hidden here, otherwise the
+        // previous phase's icon stays visible until return_to_map after the first trial.
+        this.Partner.update_behavior();
 
         // disable_map_interactions() stops region audio; phone_room never re-enables the map,
         // so restart ambient for the region we are about to travel through.

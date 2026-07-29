@@ -11098,6 +11098,315 @@ class JointBoxDecorationTrialController extends JointBoxCleaningTrialController 
     }
 }
 
+/**
+ * retrieve_lost_box phase interaction: Fennimal intro → dirty found box + celebration dance →
+ * joint cleaning (partner helps if present) → drag lost-and-found tag onto box → collect prompt.
+ */
+class RetrieveLostBoxTrialController extends JointBoxCleaningTrialController {
+    constructor(FenObj, partner_is_present, returnfunc) {
+        super(FenObj, partner_is_present, returnfunc);
+        this._tagDragController = null;
+        this._looseTagWrapper = null;
+        this.tagDropDistance = 300;
+    }
+
+    async start_sequence() {
+        const p = this.params;
+        this.basics.create_svg_sublayers();
+        if (this.partner.is_present) {
+            this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        }
+        await this.basics.create_background_mask(true, 500);
+
+        await this.basics.create_and_appear_Fennimal(
+            this.basics.ItemLayers.Main,
+            p.fennimalX * this.basics.W,
+            p.fennimalY * this.basics.H,
+            p.fennimalScale,
+            250
+        );
+        AudioCont.play_sound_effect("alert");
+        Interface.Prompt.show_message("This is " + this.FenObj.name);
+        await wait(1000);
+
+        await this.spawn_found_dirty_box();
+        this.prepare_decoration_removal_queue();
+
+        await this.move_fennimal_beside_box();
+
+        Interface.Prompt.show_message(
+            this.FenObj.name + " is proud to have found the " + this.box.boxname
+        );
+        await this.basics.perform_success_celebration(this.box.BoxTop);
+
+        // Celebration walks up to the box — return to the left-side rest pose before cleaning.
+        let fenAfterCelebrate = getSVGInternalCenter(this.basics.Fennimal);
+        let homeX = this.fenHome ? this.fenHome.x : fenAfterCelebrate.x;
+        await this.basics.Fennimal_move_relative(homeX - fenAfterCelebrate.x, 0, 400);
+
+        await this.introduce_cleaning_tools();
+        await this.run_cleaning_rounds();
+
+        await this.play_clean_reveal();
+        this.commit_box_undecorated_to_worldstate();
+
+        await this.run_lost_found_tagging();
+
+        Interface.Prompt.show_message(
+            "Somebody will come collect the " + this.box.boxname + " soon!"
+        );
+        await wait(2200);
+        Interface.Prompt.hide();
+
+        await wait(400);
+        this.returnfunc();
+    }
+
+    async spawn_found_dirty_box() {
+        const p = this.params;
+        await this.spawn_closed_box({ announce: false });
+        this.boxCenter = getSVGInternalCenter(this.box.BoxTop);
+
+        this.dirt.spawn_dirt_on_element(
+            this.box.BoxTop,
+            this.basics.ItemLayers.Plus2,
+            p.dirtSpots,
+            {
+                colors: this.get_region_dirt_colors(),
+                avoidLeftFraction: p.dirtAvoidLeftFraction != null ? p.dirtAvoidLeftFraction : 0.35
+            }
+        );
+        this.foliage.spawn_one_plant_left_of(
+            this.basics.ItemLayers,
+            this.boxCenter.x,
+            this.boxCenter.y,
+            p.foliageOffsetX,
+            p.foliageOffsetY,
+            p.foliageSize
+        );
+        this.dust.apply_dust_filter(null, this.box.BoxTop);
+
+        AudioCont.play_sound_effect("positive");
+        Interface.Prompt.show_message(
+            this.FenObj.name + " has found the " + this.box.boxname
+        );
+        let c = this.boxCenter || getSVGInternalCenter(this.box.BoxTop);
+        await spawn_confetti_burst(
+            this.basics.ItemLayers.Plus2,
+            c.x,
+            c.y,
+            { awaitPopMs: 900 }
+        );
+        await wait(700);
+    }
+
+    async play_clean_reveal() {
+        const p = this.params;
+
+        await Promise.all([
+            this.dirt.fade_out_sponge(400),
+            this.dust.fade_out_bellows(400),
+            this.fade_out_shears(400),
+            this.foliage.fade_out_all(400)
+        ]);
+
+        if (this.box.BoxBase) this.box.BoxBase.style.filter = "none";
+        if (this.box.BoxTop) this.box.BoxTop.style.filter = "none";
+        this.dirt.Spots.forEach(s => {
+            if (s.element && s.element.parentNode) s.element.remove();
+        });
+        this.dirt.Spots = [];
+        this.dirt.dirt_remaining = 0;
+
+        if (this._decorationRemovalOrder && this._decorationRemovalOrder.length) {
+            this.box.set_all_decorations_visible(false);
+            this._decorationRemovalOrder = [];
+        }
+
+        if (this.partner.is_present) {
+            this.partner.move_to_layer(this.basics.ItemLayers.Partner);
+            this.partner.set_scale(
+                p.partnerHomeScale != null ? p.partnerHomeScale : 40,
+                400
+            );
+            await this.partner.return_to_start();
+            this.partner.set_direction("back");
+        }
+        let fen = getSVGInternalCenter(this.basics.Fennimal);
+        let restOffset = p.fennimalRestOffsetX != null ? p.fennimalRestOffsetX : -150;
+        let leftX = Math.max(120, this.boxCenter.x + restOffset);
+        await this.basics.Fennimal_move_relative(leftX - fen.x, 0, 400);
+        this.fenHome = getSVGInternalCenter(this.basics.Fennimal);
+
+        let baseT = this.box.BoxTop.style.transform || "";
+        this.box.BoxTop.style.transition = "transform 350ms ease-out, filter 350ms ease-out";
+        this.box.BoxTop.style.filter = "brightness(1.25) drop-shadow(0px 0px 18px gold)";
+        this.box.BoxTop.style.transform = baseT + " scale(1.06)";
+
+        AudioCont.play_sound_effect("positive");
+        Interface.Prompt.show_message("Yay! The " + this.box.boxname + " is all clean again!");
+        let c = getSVGInternalCenter(this.box.BoxTop);
+        spawn_confetti_burst(this.basics.ItemLayers.Plus2, c.x, c.y, { awaitPopMs: 700 });
+        await wait(900);
+
+        this.box.BoxTop.style.transform = baseT;
+        this.box.BoxTop.style.filter = "none";
+    }
+
+    get_baked_loose_tag() {
+        if (!this.box.BoxTop) return null;
+        return this.box.BoxTop.querySelector(".lost_found_tag_loose");
+    }
+
+    get_baked_attached_tag() {
+        if (!this.box.BoxTop) return null;
+        return this.box.BoxTop.querySelector(".lost_found_tag_attached");
+    }
+
+    set_baked_tag_visible(el, visible) {
+        if (!el) return;
+        el.classList.toggle("invisible_element", !visible);
+        el.style.transition = "";
+        el.style.opacity = visible ? "1" : "0";
+        el.style.visibility = visible ? "visible" : "hidden";
+        el.style.pointerEvents = "none";
+    }
+
+    create_detached_loose_tag(startX, startY) {
+        let original = this.get_baked_loose_tag();
+        if (!original) {
+            console.warn("retrieve_lost_box: missing lost_found_tag_loose on box SVG");
+            return null;
+        }
+
+        let parentLayer = this.basics.ItemLayers.Plus2;
+        let boxScale = this.box.boxScale != null ? this.box.boxScale : 4;
+
+        let wrapper = create_SVG_group(0, 0);
+        let scaleGroup = create_SVG_group(0, 0);
+        let zeroGroup = create_SVG_group(0, 0);
+        let clone = original.cloneNode(true);
+        clone.classList.remove("invisible_element");
+        clone.style.opacity = "1";
+        clone.style.visibility = "visible";
+        // Must receive hits — MakeObjectDraggableObject listens on the wrapper,
+        // which only receives events through painted descendants (same as decorations).
+        clone.style.pointerEvents = "auto";
+        clone.querySelectorAll("*").forEach((el) => {
+            el.classList.remove("invisible_element");
+            el.style.pointerEvents = "auto";
+        });
+        clone.style.transition = "";
+        zeroGroup.appendChild(clone);
+        scaleGroup.appendChild(zeroGroup);
+        wrapper.appendChild(scaleGroup);
+        parentLayer.appendChild(wrapper);
+
+        let localBox = clone.getBBox();
+        let localCx = localBox.x + localBox.width / 2;
+        let localCy = localBox.y + localBox.height / 2;
+        zeroGroup.style.transform = `translate(${-localCx}px, ${-localCy}px)`;
+        scaleGroup.style.transform = `scale(${boxScale})`;
+
+        wrapper.style.transition = "none";
+        wrapper.style.transform = `translate(${startX}px, ${startY}px)`;
+        wrapper.style.opacity = "0";
+        wrapper.style.pointerEvents = "auto";
+        window.getComputedStyle(wrapper).opacity;
+
+        this.set_baked_tag_visible(original, false);
+        this._looseTagWrapper = wrapper;
+        this._looseTagStart = { x: startX, y: startY };
+        return wrapper;
+    }
+
+    async run_lost_found_tagging() {
+        let startX = this.boxCenter.x - 320;
+        let startY = this.boxCenter.y;
+        let wrapper = this.create_detached_loose_tag(startX, startY);
+        if (!wrapper) return;
+
+        wrapper.style.transition = "opacity 350ms ease-in";
+        wrapper.style.opacity = "1";
+        await wait(400);
+
+        Interface.Prompt.show_message("Lets tag the cleaned " + this.box.boxname);
+        AudioCont.play_sound_effect("alert_minor");
+
+        let dropTarget =
+            (this.box.BoxTop &&
+                this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0]) ||
+            this.box.BoxTop;
+
+        await new Promise((resolve) => {
+            this._tagDragController = MakeObjectDraggableObject(
+                this.basics.ItemLayers.Plus2,
+                this.basics.ItemLayers.Questions,
+                wrapper,
+                dropTarget,
+                this.tagDropDistance,
+                async () => {
+                    if (this._tagDragController && this._tagDragController.destroy) {
+                        this._tagDragController.destroy();
+                    }
+                    this._tagDragController = null;
+                    Interface.Prompt.hide();
+                    await this.attach_lost_found_tag(wrapper);
+                    resolve();
+                },
+                {
+                    onMiss: () => {
+                        if (this._tagDragController) this._tagDragController.enable();
+                    }
+                }
+            );
+        });
+    }
+
+    async attach_lost_found_tag(wrapper) {
+        AudioCont.play_sound_effect("positive");
+
+        if (wrapper) {
+            wrapper.style.pointerEvents = "none";
+            wrapper.style.transition = "opacity 350ms ease-out";
+            wrapper.style.opacity = "0";
+        }
+
+        let attached = this.get_baked_attached_tag();
+        if (attached) {
+            attached.classList.remove("invisible_element");
+            attached.style.pointerEvents = "none";
+            attached.style.visibility = "visible";
+            attached.style.transition = "none";
+            attached.style.opacity = "0";
+            window.getComputedStyle(attached).opacity;
+            attached.style.transition = "opacity 350ms ease-in";
+            attached.style.opacity = "1";
+        }
+
+        await wait(400);
+
+        if (wrapper && wrapper.parentNode) wrapper.remove();
+        this._looseTagWrapper = null;
+
+        if (typeof WorldState !== "undefined" && WorldState.change_toybox_has_lost_found_tag) {
+            WorldState.change_toybox_has_lost_found_tag(this.FenObj.toybox, true);
+        }
+    }
+
+    clean_up() {
+        if (this._tagDragController && this._tagDragController.destroy) {
+            this._tagDragController.destroy();
+            this._tagDragController = null;
+        }
+        if (this._looseTagWrapper && this._looseTagWrapper.parentNode) {
+            this._looseTagWrapper.remove();
+            this._looseTagWrapper = null;
+        }
+        super.clean_up();
+    }
+}
+
 // Closed box (+ partner): optional contents quiz → open → empty close OR take out → photo → put back → close.
 // WorldState is left unchanged (inspection only).
 class CheckBoxContentsTrialController {
@@ -14020,6 +14329,9 @@ class TrialFactory {
             case "joint_box_decoration":
                 return new JointBoxDecorationTrialController(FenObj, partner_is_present, returnfunc);
 
+            case "retrieve_lost_box":
+                return new RetrieveLostBoxTrialController(FenObj, partner_is_present, returnfunc);
+
             case "broken_toy_in_box":
                 return new BrokenToyInBoxTrialController(FenObj, partner_is_present, returnfunc);
 
@@ -14819,12 +15131,22 @@ class PartnerBeliefIndividualBoxesController {
         return Array.isArray(fens) ? fens : [];
     }
 
-    // Wave from Fennimal ID prefix (see All_Fennimal_Sets ID convention in 2_Stimulus_data.js).
+    // Optional S/P wave from ID prefix (mentalizing / mentalizing_AB).
+    // Non-S/P IDs (e.g. mentalizing_AC A–E) share one "default" wave; co-box
+    // mates are always resolved from shared toybox, not from ID pairing.
     _waveForFennimal(fen) {
         let id = (fen && fen.id) ? String(fen.id) : "";
         if (id.startsWith("S")) return "S";
         if (id.startsWith("P")) return "P";
         return "default";
+    }
+
+    /** Fennimals that share this Fennimal's assigned toybox (excluding self). */
+    _coBoxMates(fen, fennimals) {
+        if (!fen || !fen.toybox) return [];
+        return (fennimals || []).filter((other) =>
+            other && other.id !== fen.id && other.toybox === fen.toybox
+        );
     }
 
     _appendMemoryProbeSection(queue) {
@@ -14891,53 +15213,69 @@ class PartnerBeliefIndividualBoxesController {
     }
 
     _makeBoxToFennimalProbeTrials(fennimals) {
-        // Triad per Fennimal: correct + co-box mate (other wave, same toybox) +
-        // one same-wave foil (different toybox). Foils balanced by exposure count.
-        let byBox = {};
-        fennimals.forEach((fen) => {
-            let box = fen.toybox;
-            if (!byBox[box]) byBox[box] = [];
-            byBox[box].push(fen);
-        });
+        // Triad per Fennimal: correct + one co-box mate (same assigned toybox) +
+        // one other-box foil. Co-box mates come from the Fennimal set data
+        // (shared toybox), not from hardcoded S#/P# ID pairs. When a box has
+        // 2+ mates, one is chosen with exposure balancing. Foils prefer the
+        // same S/P wave when those prefixes exist; otherwise any other-box Fen.
+        let withBoxes = fennimals.filter((fen) => fen && fen.toybox);
+        let wavesPresent = new Set(withBoxes.map((f) => this._waveForFennimal(f)));
+        let hasSpWaves = wavesPresent.has("S") && wavesPresent.has("P");
 
-        let specs = fennimals.map((fen) => {
+        let specs = withBoxes.map((fen) => {
             let wave = this._waveForFennimal(fen);
-            let coBoxMates = (byBox[fen.toybox] || []).filter((other) => other.id !== fen.id);
-            let coBoxMate = coBoxMates[0] || null;
-            if (coBoxMates.length !== 1) {
+            let coBoxMates = this._coBoxMates(fen, withBoxes);
+            if (coBoxMates.length < 1) {
                 console.error(
-                    `PartnerBeliefIndividualBoxes: expected exactly 1 co-box mate for box→Fennimal probe "${fen.id}" (box "${fen.toybox}"), found ${coBoxMates.length}.`
+                    `PartnerBeliefIndividualBoxes: no co-box mate for box→Fennimal probe "${fen.id}" (box "${fen.toybox}").`
                 );
             }
 
-            let foilPool = fennimals.filter((other) =>
-                other.id !== fen.id &&
-                other.toybox !== fen.toybox &&
-                this._waveForFennimal(other) === wave
+            let foilPool = withBoxes.filter((other) =>
+                other.id !== fen.id && other.toybox !== fen.toybox
             );
+            if (hasSpWaves) {
+                let sameWaveFoils = foilPool.filter((other) => this._waveForFennimal(other) === wave);
+                if (sameWaveFoils.length > 0) foilPool = sameWaveFoils;
+            }
             if (foilPool.length < 1) {
                 console.error(
-                    `PartnerBeliefIndividualBoxes: no same-wave foil for box→Fennimal probe "${fen.id}".`
+                    `PartnerBeliefIndividualBoxes: no other-box foil for box→Fennimal probe "${fen.id}".`
                 );
             }
 
             return {
                 fen,
                 wave,
-                coBoxMateId: coBoxMate ? coBoxMate.id : null,
-                eligibleFoilIds: foilPool.map((f) => f.id)
+                eligibleCoBoxMateIds: coBoxMates.map((f) => f.id),
+                eligibleFoilIds: foilPool.map((f) => f.id),
+                foilRole: hasSpWaves ? "same_wave_foil" : "other_box_foil"
             };
         });
 
+        let coBoxMateCounts = {};
         let foilCounts = {};
-        fennimals.forEach((f) => { foilCounts[f.id] = 0; });
-        let foilByTarget = {};
-        shuffleArray([...specs]).forEach((spec) => {
-            foilByTarget[spec.fen.id] = this._pickBalancedItems(spec.eligibleFoilIds, foilCounts, 1)[0] || null;
+        withBoxes.forEach((f) => {
+            coBoxMateCounts[f.id] = 0;
+            foilCounts[f.id] = 0;
         });
 
-        return specs.map(({ fen, wave, coBoxMateId }) => {
+        let coBoxMateByTarget = {};
+        let foilByTarget = {};
+        shuffleArray([...specs]).forEach((spec) => {
+            coBoxMateByTarget[spec.fen.id] =
+                this._pickBalancedItems(spec.eligibleCoBoxMateIds, coBoxMateCounts, 1)[0] || null;
+            let foilEligible = spec.eligibleFoilIds.filter(
+                (id) => id !== coBoxMateByTarget[spec.fen.id]
+            );
+            foilByTarget[spec.fen.id] =
+                this._pickBalancedItems(foilEligible, foilCounts, 1)[0] || null;
+        });
+
+        return specs.map((spec) => {
+            let { fen, wave, foilRole } = spec;
             let correctId = fen.id;
+            let coBoxMateId = coBoxMateByTarget[fen.id] || null;
             let foilId = foilByTarget[fen.id] || null;
             if (!coBoxMateId || !foilId || foilId === coBoxMateId || foilId === correctId) {
                 console.error(
@@ -14950,7 +15288,7 @@ class PartnerBeliefIndividualBoxesController {
             let option_roles = {};
             option_roles[correctId] = "correct";
             option_roles[coBoxMateId] = "co_box_mate";
-            option_roles[foilId] = "same_wave_foil";
+            option_roles[foilId] = foilRole;
 
             return {
                 trial_kind: "memory_probe_box_to_fennimal",
@@ -14969,21 +15307,32 @@ class PartnerBeliefIndividualBoxesController {
     }
 
     _makeFennimalToToyProbeTrials(fennimals) {
+        // Skip Fennimals with no assigned toy (e.g. lost-box control Fennimal E).
+        let withToys = fennimals.filter((fen) => fen && fen.toy);
+        if (withToys.length < 3) {
+            console.error(
+                "PartnerBeliefIndividualBoxes: need at least 3 Fennimals with toys for Fennimal→toy probes."
+            );
+            return [];
+        }
+
         let byWave = {};
-        fennimals.forEach((fen) => {
+        withToys.forEach((fen) => {
             let wave = this._waveForFennimal(fen);
             if (!byWave[wave]) byWave[wave] = [];
             byWave[wave].push(fen);
         });
         let waveKeys = Object.keys(byWave);
-        let hasTwoWaves = waveKeys.length >= 2;
+        // Classic S/P wave foils only when both prefixes are present; otherwise
+        // pick any two distinct other toys (ABCDE-style sets).
+        let hasTwoWaves = waveKeys.includes("S") && waveKeys.includes("P");
 
         let foilToyCounts = {};
-        fennimals.forEach((f) => { foilToyCounts[f.toy] = 0; });
+        withToys.forEach((f) => { foilToyCounts[f.toy] = 0; });
 
         // Assign foils in random trial order so count-balancing is not ID-order biased.
         let foilsByTarget = {};
-        shuffleArray([...fennimals]).forEach((fen) => {
+        shuffleArray([...withToys]).forEach((fen) => {
             let correctToy = fen.toy;
             let ownWave = this._waveForFennimal(fen);
             let sameWaveFoilToy = null;
@@ -14993,12 +15342,13 @@ class PartnerBeliefIndividualBoxesController {
             if (hasTwoWaves) {
                 let sameWaveToys = [...new Set(
                     byWave[ownWave]
-                        .filter((f) => f.id !== fen.id && f.toy !== correctToy)
+                        .filter((f) => f.id !== fen.id && f.toy && f.toy !== correctToy)
                         .map((f) => f.toy)
                 )];
                 let otherWave = waveKeys.find((w) => w !== ownWave);
-                let otherWaveToys = [...new Set(byWave[otherWave].map((f) => f.toy))]
-                    .filter((t) => t !== correctToy);
+                let otherWaveToys = [...new Set(
+                    (byWave[otherWave] || []).filter((f) => f.toy).map((f) => f.toy)
+                )].filter((t) => t !== correctToy);
 
                 sameWaveFoilToy = this._pickBalancedItems(sameWaveToys, foilToyCounts, 1)[0];
                 otherWaveToys = otherWaveToys.filter((t) => t !== sameWaveFoilToy);
@@ -15008,9 +15358,8 @@ class PartnerBeliefIndividualBoxesController {
 
             if (!usedWaveRoles) {
                 let otherToys = [...new Set(
-                    fennimals.filter((f) => f.toy !== correctToy).map((f) => f.toy)
+                    withToys.filter((f) => f.toy && f.toy !== correctToy).map((f) => f.toy)
                 )];
-                // Avoid double-counting if a partial wave pick already incremented counts.
                 let picked = this._pickBalancedItems(otherToys, foilToyCounts, 2);
                 sameWaveFoilToy = picked[0];
                 otherWaveFoilToy = picked[1];
@@ -15023,7 +15372,7 @@ class PartnerBeliefIndividualBoxesController {
             };
         });
 
-        return fennimals.map((fen) => {
+        return withToys.map((fen) => {
             let correctToy = fen.toy;
             let assigned = foilsByTarget[fen.id] || {};
             let sameWaveFoilToy = assigned.sameWaveFoilToy;
@@ -15043,6 +15392,7 @@ class PartnerBeliefIndividualBoxesController {
                 console.error(
                     `PartnerBeliefIndividualBoxes: could not build distinct toy triad for Fennimal→toy probe "${fen.id}".`
                 );
+                return null;
             }
 
             return {
@@ -15054,7 +15404,7 @@ class PartnerBeliefIndividualBoxesController {
                 answer_options: shuffleArray([correctToy, sameWaveFoilToy, otherWaveFoilToy]),
                 option_roles
             };
-        });
+        }).filter(Boolean);
     }
 
     /**

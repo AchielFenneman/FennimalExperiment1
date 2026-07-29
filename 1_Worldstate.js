@@ -284,8 +284,8 @@ WorldStateObject = function () {
 
     }
 
-    //Can be active (following player), passive (confined to center) or null (absent entirely).
-    // Changes only go into effect after the map is reset!
+    // Can be active (following player), passive (confined to center) or null (absent entirely).
+    // Call MapCont.Partner.update_behavior() after changing so the map icon matches.
     let current_partner_role = null
     this.change_partner_role_behavior = function(new_role){
         // Accept common aliases so stimulus typos don't silently hide the partner.
@@ -522,6 +522,18 @@ WorldStateObject = function () {
         ToyBoxDecorations[boxtype] = is_decorated === true
     }
 
+    // LOST-AND-FOUND TAGS (all-or-nothing flag per box; default untagged)
+    /////////////////////////////////////////////////////////////////
+    let ToyBoxLostFoundTags = {}
+
+    this.get_toybox_has_lost_found_tag = function(boxtype){
+        return ToyBoxLostFoundTags[boxtype] === true
+    }
+
+    this.change_toybox_has_lost_found_tag = function(boxtype, has_tag){
+        ToyBoxLostFoundTags[boxtype] = has_tag === true
+    }
+
     // LOST AND FOUND
     ///////////////////////
     const w = GenParam.SVG_width, h = GenParam.SVG_height
@@ -642,3 +654,5 @@ WorldStateObject = function () {
 
 
 }
+
+console.log("S2 READY")

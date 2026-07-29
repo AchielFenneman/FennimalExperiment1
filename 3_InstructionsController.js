@@ -54,6 +54,7 @@ class InstructionsController {
         this.currentInstructionsSVG = null;
         this.closingButton = null;
         this.textElemMainInstructions = null;
+        this.retrieveLostBoxVisualGroup = null;
         if (this.explorationRoster) {
             this.explorationRoster.destroy();
             this.explorationRoster = null;
@@ -228,6 +229,9 @@ class InstructionsController {
         switch (this.currentInstructionType) {
             case "exploration":
                 this.updateAndShowFreeExplorationInstructions();
+                break;
+            case "retrieve_lost_box":
+                this.updateAndShowRetrieveLostBoxInstructions();
                 break;
             case "hint_and_search":
                 this.openInstructionsPage();
@@ -638,6 +642,219 @@ class InstructionsController {
         this.updateProgressNewDay(currentBlockNum);
         this.updateProgressWithinDay(false);
         this.addClosingButtonToParent("bottom-center", true, undefined, 400);
+    }
+
+    initializeRetrieveLostBoxInstructions(currentBlockNum, forcedTowerClimbAtStart, fennimalsInPhaseArray) {
+        this.fennimalsInPhase = this.uniqueFennimalsById(
+            (fennimalsInPhaseArray || []).filter((f) => f && f.name !== undefined)
+        );
+        this.currentInstructionType = "retrieve_lost_box";
+        this.explorationDayNum = currentBlockNum;
+        this.explorationForcedTower = forcedTowerClimbAtStart === true;
+        this.explorationFennefinderStatus = true;
+
+        this.clearInstructions();
+        this.currentInstructionsSVG = this.createBasicInstructionElements();
+        this.parentElem.appendChild(this.currentInstructionsSVG);
+        this.parentElem.style.display = "inherit";
+
+        let n = this.fennimalsInPhase.length;
+        let boxWord = n === 1 ? "box" : "boxes";
+        let namedBox = n === 1
+            ? GenParam.get_box_printed_name(this.fennimalsInPhase[0].toybox)
+            : null;
+
+        document.getElementById("Instructions_Title").innerHTML =
+            "Day " + currentBlockNum + ": retrieve the lost " + boxWord;
+
+        let domeText = this.explorationForcedTower
+            ? " Start by climbing the watchtower to spot their locations."
+            : "";
+        let boxClause = namedBox
+            ? "the " + namedBox + " has"
+            : "boxes have";
+        let instructionText =
+            "A storm has blown over the island — and as a result, " + boxClause + " gone missing." +
+            " Explore the island and retrieve " + (n === 1 ? "it" : "all " + n + " boxes") + "." +
+            " The Fennefinder (bottom-right) will help guide you." +
+            domeText;
+
+        this.setRetrieveLostBoxInstructionText(instructionText);
+        this.buildRetrieveLostBoxVisuals(this.fennimalsInPhase);
+        this.updateProgressNewDay(currentBlockNum);
+        this.updateProgressWithinDay(false);
+        this.addClosingButtonToParent("bottom-center", true, undefined, 400);
+    }
+
+    setRetrieveLostBoxInstructionText(html) {
+        if (this.textElemMainInstructions) {
+            this.textElemMainInstructions.remove();
+            this.textElemMainInstructions = null;
+        }
+        this.textElemMainInstructions = create_SVG_text_in_foreign_element(
+            html,
+            0.05 * GenParam.SVG_width,
+            0.16 * GenParam.SVG_height,
+            0.42 * GenParam.SVG_width,
+            0.58 * GenParam.SVG_height,
+            "instruction_element_text"
+        );
+        this.textElemMainInstructions.classList.add("instruction_element_nonbackground");
+        let textNode = this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0];
+        textNode.style.fontSize = "34px";
+        textNode.style.textAlign = "left";
+        textNode.style.margin = "0";
+        textNode.style.display = "flex";
+        textNode.style.alignItems = "center";
+        textNode.style.justifyContent = "flex-start";
+        this.currentInstructionsSVG.appendChild(this.textElemMainInstructions);
+    }
+
+    clearRetrieveLostBoxVisuals() {
+        if (this.retrieveLostBoxVisualGroup && this.retrieveLostBoxVisualGroup.parentNode) {
+            this.retrieveLostBoxVisualGroup.remove();
+        }
+        this.retrieveLostBoxVisualGroup = null;
+    }
+
+    buildRetrieveLostBoxVisuals(fenList, { showTags = false } = {}) {
+        this.clearRetrieveLostBoxVisuals();
+        let unique = this.uniqueFennimalsById(fenList || []);
+        if (unique.length === 0) return;
+
+        this.retrieveLostBoxVisualGroup = create_SVG_group(0, 0, "instruction_element_nonbackground", undefined);
+        this.currentInstructionsSVG.appendChild(this.retrieveLostBoxVisualGroup);
+
+        let n = unique.length;
+        let scale = n >= 3 ? 2.2 : 2.8;
+        let spacing = n >= 3 ? 280 : 340;
+        let centerX = 0.72 * GenParam.SVG_width;
+        let centerY = 0.48 * GenParam.SVG_height;
+        let startX = centerX - ((n - 1) * spacing) / 2;
+
+        unique.forEach((fen, i) => {
+            if (!fen || !fen.toybox) return;
+            let boxTemplate = document.getElementById("toybox_" + fen.toybox);
+            if (!boxTemplate) return;
+
+            let boxIcon = copy_scale_and_move_object_to_position(
+                boxTemplate,
+                this.retrieveLostBoxVisualGroup,
+                startX + i * spacing,
+                centerY,
+                scale
+            );
+            apply_toybox_decoration_visibility_to_element(boxIcon, fen.toybox);
+
+            boxIcon.querySelectorAll(".lost_found_tag_loose").forEach((el) => {
+                el.classList.add("invisible_element");
+                el.style.opacity = "0";
+                el.style.visibility = "hidden";
+            });
+
+            boxIcon.querySelectorAll(".lost_found_tag_attached").forEach((el) => {
+                if (showTags) {
+                    el.classList.remove("invisible_element");
+                    el.style.opacity = "1";
+                    el.style.visibility = "visible";
+                } else {
+                    el.classList.add("invisible_element");
+                    el.style.opacity = "0";
+                    el.style.visibility = "hidden";
+                }
+            });
+        });
+    }
+
+    showRetrieveLostBoxCompletionScreen() {
+        AudioCont.play_sound_effect("positive");
+
+        if (!this.currentInstructionsSVG || !this.currentInstructionsSVG.parentNode) {
+            this.clearInstructions();
+            this.currentInstructionType = "retrieve_lost_box";
+            this.currentInstructionsSVG = this.createBasicInstructionElements();
+            this.parentElem.appendChild(this.currentInstructionsSVG);
+            this.updateProgressNewDay(this.explorationDayNum);
+        }
+
+        this.parentElem.style.display = "inherit";
+        let background = this.parentElem.getElementsByClassName("instructions_element_background")[0];
+        if (background) {
+            background.style.display = "inherit";
+            background.setAttribute("x", this.boundarySize);
+            background.setAttribute("y", this.boundarySize);
+            background.setAttribute("width", GenParam.SVG_width - 2 * this.boundarySize);
+            background.setAttribute("height", GenParam.SVG_height - 2 * this.boundarySize);
+        }
+
+        if (this.closingButton) {
+            this.closingButton.remove();
+            this.closingButton = null;
+        }
+
+        let n = this.fennimalsInPhase.length;
+        let boxWord = n === 1 ? "box" : "boxes";
+        document.getElementById("Instructions_Title").innerHTML = "Well done!";
+        this.setRetrieveLostBoxInstructionText(
+            "You retrieved all " + n + " lost " + boxWord + ".<br>Continue when you are ready for the next part of the day."
+        );
+        this.buildRetrieveLostBoxVisuals(this.fennimalsInPhase, { showTags: true });
+
+        Array.from(this.parentElem.getElementsByClassName("instruction_element_nonbackground")).forEach((el) => {
+            el.style.display = "inherit";
+        });
+
+        this.addClosingButtonToParent("bottom-center", true, undefined, 600);
+    }
+
+    updateAndShowRetrieveLostBoxInstructions() {
+        if (this.expCont && this.expCont.flagExplorationPhaseCompleted) {
+            this.showRetrieveLostBoxCompletionScreen();
+            return;
+        }
+
+        let background = this.parentElem.getElementsByClassName("instructions_element_background")[0];
+        if (background) {
+            background.style.display = "inherit";
+            background.style.transition = "all 200ms ease-in-out";
+            setTimeout(() => {
+                background.setAttribute("x", this.boundarySize);
+                background.setAttribute("y", this.boundarySize);
+                background.setAttribute("width", GenParam.SVG_width - 2 * this.boundarySize);
+                background.setAttribute("height", GenParam.SVG_height - 2 * this.boundarySize);
+            }, 0);
+        }
+        this.parentElem.style.display = "inherit";
+
+        if (this.closingButton) {
+            this.closingButton.remove();
+            this.closingButton = null;
+        }
+
+        setTimeout(() => {
+            Array.from(this.parentElem.getElementsByClassName("instruction_element_nonbackground")).forEach((el) => {
+                el.style.display = "inherit";
+            });
+
+            let { visited, unvisited, all } = this.getExplorationRosterFennimalsFromWorld();
+            let foundCount = visited.length;
+            let total = all.length || this.fennimalsInPhase.length;
+            let remaining = unvisited.length || Math.max(0, total - foundCount);
+            let boxWord = total === 1 ? "box" : "boxes";
+
+            document.getElementById("Instructions_Title").innerHTML =
+                "Day " + this.explorationDayNum + ": retrieve the lost " + boxWord;
+
+            let statusText = foundCount === 0
+                ? "A storm blew " + (total === 1 ? "a box" : "boxes") + " off course. Explore the island and retrieve " +
+                  (total === 1 ? "it" : "all " + total + " boxes") + ". The Fennefinder will help guide you."
+                : "You've retrieved <b>" + foundCount + " of " + total + "</b> " + boxWord +
+                  " so far. " + remaining + " still missing — keep exploring!";
+
+            this.setRetrieveLostBoxInstructionText(statusText);
+            this.buildRetrieveLostBoxVisuals(unvisited.length ? unvisited : this.fennimalsInPhase);
+            this.addClosingButtonToParent("bottom-center", true);
+        }, 200);
     }
 
     uniqueFennimalsById(fenList) {

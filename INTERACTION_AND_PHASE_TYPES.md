@@ -142,6 +142,18 @@ All phase Fennimals on the map; participant explores until all are visited.
 | `ask_toy` / `toys_asked` | Same block-level stamp as phone_room (`toys_asked` optional; defaults to block toys) |
 | `bonus_stars_per_correct_answer` | Optional |
 
+#### `retrieve_lost_box`
+Free-map search like `free_exploration`, but each Fennimal encounter is a lost-box retrieval (clean + tag). Fennefinder is always forced on (`include_Fennefinder` is ignored).
+
+| Field | Meaning |
+|---|---|
+| `Fennimals_encountered` | One missing box per Fennimal (home location) |
+| `partner_behavior` | Optional; if present, partner helps with cleaning (same as `joint_box_cleaning`) |
+| `force_climbing_tower_first` | Optional watchtower intro |
+| `interaction_type` | Not required — always stamped as `"retrieve_lost_box"` |
+
+Flow per location: Fennimal intro → dirty found box + celebration → proud dance → joint clean → drag lost-and-found tag onto box → “Somebody will come collect…” → leave (or phase complete when all retrieved). Attached tags persist in WorldState like decorations.
+
 #### `hint_and_search`
 One target at a time; hint instruction, then find & interact. Supports orthogonal tasks.
 
@@ -204,8 +216,8 @@ Thus, with A→B→C→A, A’s lure comes from B, B’s from C, and C’s from 
 
 **Memory probes** (when `include_memory_probe_at_end`): two homogeneous blocks, order counterbalanced between participants (`memory_probe_block_order` on the phase):
 
-1. **Box→Fennimal** (`memory_probe_box_to_fennimal`): one trial per Fennimal; empty closed box cue; radial colored heads; foils exclude co-box mates.
-2. **Fennimal→toy** (`memory_probe_fennimal_to_toy`): one trial per Fennimal; full-body Fennimal cue; radial toys; foils = one same-wave + one other-wave toy (S vs P).
+1. **Box→Fennimal** (`memory_probe_box_to_fennimal`): one trial per Fennimal; empty closed box cue; radial colored heads; triad = correct + one co-box mate (shared `toybox`, balanced if 2+) + one other-box foil (same S/P wave when those prefixes exist).
+2. **Fennimal→toy** (`memory_probe_fennimal_to_toy`): one trial per Fennimal with a toy; full-body Fennimal cue; radial toys; foils = one same-wave + one other-wave toy when S/P IDs are present, otherwise any two other toys.
 
 No distractors between probes (ISI instead). Solo intro overlay before the first probe. Logged answer rows match belief/reality density (`trial_kind`, ids, `block_index`, `trial_index`, target, `options` with roles, `selected`, `correct`, `reaction_time_ms`).
 
@@ -357,7 +369,13 @@ Each sponge turn ends after ~25% of total dirt-mask health is cleaned; sponge dr
 
 **Needs on FenObj:** `name`, `toybox`, `region` (foliage art).  
 **Tunables:** `GenParam.JointBoxCleaning`, `GenParam.PhotoTrial` (camera / polaroid).  
-**No WorldState writes.**
+**WorldState:** clears decoration flag on the cleaned box.
+
+#### `retrieve_lost_box` → `RetrieveLostBoxTrialController`
+Used by the `retrieve_lost_box` phase. Fennimal intro → dirty found box + celebration → proud dance → joint cleaning (same tools/turns as `joint_box_cleaning`; partner helps if present) → drag loose lost-and-found tag onto box (300px drop) → fade loose / show attached → collect prompt. No handoff photo.
+
+**Needs on FenObj:** `name`, `toybox`, `region`.  
+**WorldState:** clears decoration; sets lost-and-found tag flag (attached tag persists on later box appearances).
 
 ---
 
@@ -557,6 +575,7 @@ box_room
 photo_box
 feed_Fennimal
 joint_box_cleaning
+retrieve_lost_box
 broken_toy_in_box
 broken_toy_no_box
 dirty_toy

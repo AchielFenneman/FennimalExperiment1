@@ -1,6 +1,6 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["mentalizing_sack_AC"];
+    this.Experiment_Code = ["mentalizing_AC"];
 
     const All_Instructions_At_Start = {
         test: [],
@@ -16,16 +16,12 @@ let StimulusSettings = function () {
     // Key: The unique Fennimal ID
     // Value: The required and optional properties
     //
-    // ID convention (mentalizing / partner-belief experiments):
-    // IDs are NOT entirely arbitrary. Prefix + index encode structure that
-    // downstream tasks rely on — do not rename casually when authoring new
-    // experiment codes that reuse these pipelines:
-    //   - "S*" / "P*" → shared vs private information wave (partner-belief
-    //     memory probes: prompt wording, same-wave foils, option roles)
-    //   - Matching toybox codes across S# and P# (e.g. S1+P1 → toybox "A")
-    //     → co-box mates for probes and false-belief box reuse
-    // Experiments without partner / toybox / wave distinctions can use any
-    // IDs; just avoid S/P prefixes if you do not want wave logic to apply.
+    // ID / toybox notes (mentalizing / partner-belief experiments):
+    //   - Co-box mates for memory probes are resolved from shared `toybox`
+    //     codes in this dictionary (any IDs; 2+ Fennimals may share a box).
+    //   - Optional "S*" / "P*" prefixes still mark shared vs private waves
+    //     (prompt wording + same-wave foils). Non-S/P IDs (e.g. A–E) skip
+    //     wave-specific wording and use other-box / other-toy foils instead.
     // ----------------------------------------------------
     const All_Fennimal_Sets = {
         test: {
@@ -52,18 +48,13 @@ let StimulusSettings = function () {
             "P2": { head: "E", region: "E", toy: "E", toybox: "B" },
         },
         mentalizing_AC: {
-            "S1": { head: "A", region: "A", toy: "A", toybox: "A" },
-            "S2": { head: "B", region: "B", toy: "B", toybox: "B" },
-            "P1": { head: "D", region: "D", toy: "D", toybox: "A" },
-            "P2": { head: "E", region: "E", toy: "E", toybox: "B" },
+            "A": { head: "A", region: "A", toy: "A", toybox: "A", sack: "A" },
+            "B": { head: "B", region: "B", toy: "B", toybox: "B", sack: "B" },
+            "C": { head: "C", region: "C", toy: "C", toybox: "A",  },
+            "D": { head: "D", region: "D", toy: "D", toybox: "B",  },
+            "E": { head: "E", region: "E", toybox: "B"},
         },
-        mentalizing_sack_AC :{
-            "S1": { head: "A", region: "A", toy: "A", toybox: "A", sack: "A" },
-            "S2": { head: "B", region: "B", toy: "B", toybox: "B", sack: "B" },
-            "P1": { head: "C", region: "C", toy: "C", toybox: "A", sack: "A" },
-            "P2": { head: "D", region: "D", toy: "D", toybox: "B", sack: "B" }, 
         
-        }
     };
 
     // ----------------------------------------------------
@@ -72,23 +63,10 @@ let StimulusSettings = function () {
     let All_Experiment_Structures = {
         test: [
             {
-                type: "phone_room",
-                partner_behavior: "absent",
-                include_Fennefinder: false,
-                return_to_phone_room_after_final_trial: false,
-                ask_Fennimal: false,
-                ask_toy: false,
-                ask_box: false,
-                trial_subblocks: [
-                    {
-                        Fennimals_encountered: ["S1", "S2"],
-                        interaction_type: "toy_to_sack"
-                    },
-                    {
-                        Fennimals_encountered: ["S1", "S2"],
-                        interaction_type: "sack_to_box"
-                    }
-                ]
+                type: "retrieve_lost_box",
+                Fennimals_encountered: ["S1", "S2"],
+                partner_behavior: "active",
+                force_climbing_tower_first: false
             },
         ],
 
@@ -221,8 +199,8 @@ let StimulusSettings = function () {
             },
 
             // BLOCK 5: Partner belief (individual boxes)
-            // Memory probes (when enabled): box→Fennimal uses S/P wave prompts +
-            // correct / co_box_mate / same_wave_foil; Fennimal→toy unchanged.
+            // Memory probes (when enabled): box→Fennimal / Fennimal→toy;
+            // co-box mates from shared toybox; S/P IDs also get wave prompts.
             {
                 type: "partner_belief_individual_boxes",
                 include_practice_trial: true,
@@ -366,8 +344,8 @@ let StimulusSettings = function () {
             },
 
             // BLOCK 5: Partner belief (individual boxes)
-            // Memory probes (when enabled): box→Fennimal uses S/P wave prompts +
-            // correct / co_box_mate / same_wave_foil; Fennimal→toy unchanged.
+            // Memory probes (when enabled): box→Fennimal / Fennimal→toy;
+            // co-box mates from shared toybox; S/P IDs also get wave prompts.
             {
                 type: "partner_belief_individual_boxes",
                 include_practice_trial: true,
@@ -387,113 +365,19 @@ let StimulusSettings = function () {
         ],
         mentalizing_AC: [
 
-            // BLOCK 1: Introduction to all Fennimals
-            {
-                type: "free_exploration",
-                interaction_type: ["Fennimal_toy"],
-                Fennimals_encountered: ["S1", "S2", "P1", "P2"],
-                partner_behavior: "active",
-                include_Fennefinder: true,
-                force_climbing_tower_first: true
-            },
-
-            // BLOCK 2: Main Fennimal -> toy block + box manipulation
-            {
-                type: "phone_room",
-                partner_behavior: "active",
-                include_Fennefinder: false,
-                return_to_phone_room_after_final_trial: false,
-                ask_Fennimal: true,
-                ask_toy: true,
-                ask_box: true,
-                trial_subblocks: [
-                    {
-                        Fennimals_encountered: ["S1", "S2", "P1", "P2"],
-                        interaction_type: "broken_toy_no_box"
-                    },
-                    {
-                        Fennimals_encountered: ["S1", "S2", "P1", "P2"],
-                        interaction_type: "Fennimal_toy"
-                    },
-                    
-                    {
-                        Fennimals_encountered: ["S1", "S2"],
-                        interaction_type: "box_room"
-                    },
-                    {
-                        trials: [
-                            { Fennimal: "S1", interaction_type: "joint_box_decoration" },
-                            { Fennimal: "S2", interaction_type: "scan_box_home" },
-                            { Fennimal: "S2", interaction_type: "photo_Fennimal" },
-                        ]
-                    },
-                   
-                ]
-            },
-
-            //Partner leaves
-
-            {
-                type: "pseudoday",
-                information: "partner_leaves"
-            },
             
 
-            // BLOCK 3: Boxes swapped 
-            {
-                type: "phone_room",
-                partner_behavior: "absent",
-                include_Fennefinder: false,
-                return_to_phone_room_after_final_trial: false,
-                ask_Fennimal: true,
-                ask_toy: true,
-                ask_box: true,
-                trial_subblocks: [
-                    {
-                        Fennimals_encountered: ["P1", "P2"],
-                        interaction_type: "box_room"
-                    },
-                    
-                ]
-            },
-
-            {
-                type: "pseudoday",
-                information: "partner_returns"
-            },
-
-            // BLOCK 5: Partner belief (individual boxes)
-            // Memory probes (when enabled): box→Fennimal uses S/P wave prompts +
-            // correct / co_box_mate / same_wave_foil; Fennimal→toy unchanged.
-            {
-                type: "partner_belief_individual_boxes",
-                include_practice_trial: true,
-                num_belief_blocks: 1,
-                include_reality_block_at_end: true,
-                include_memory_probe_at_end: true,
-                bonus_stars_per_correct_answer: 1,
-                memory_probe_isi_ms: 1000,
-                questions: [
-                    { question_id: "belief_A", target_box: "A" },
-                    { question_id: "belief_B", target_box: "B" },
-                ]
-            },
-
-
-
-        ],
-        mentalizing_sack_AC: [
-
             // BLOCK 1: Introduction to all Fennimals
+            
             {
                 type: "free_exploration",
                 interaction_type: ["Fennimal_toy"],
-                Fennimals_encountered: ["S1", "S2", "P1", "P2"],
+                Fennimals_encountered: ["A", "B", "C", "D"],
                 partner_behavior: "active",
                 include_Fennefinder: true,
                 force_climbing_tower_first: true
             },
-
+            
             // BLOCK 2: 
             // 1) Fennimal->toy, 
             // 2) toy -> sack, 
@@ -510,36 +394,44 @@ let StimulusSettings = function () {
                 trial_subblocks: [
                     // 1) Fennimal->toy, 
                     
+                    
                     {
-                        Fennimals_encountered: ["S1", "S2", "P1", "P2"],
+                        Fennimals_encountered: ["A", "B", "C", "D"],
                         interaction_type: "broken_toy_no_box"
                     },
                     {
-                        Fennimals_encountered: ["S1", "S2", "P1", "P2"],
+                        Fennimals_encountered: ["A", "B", "C", "D"],
                         interaction_type: "Fennimal_toy"
                     },
-                    
+                   
 
                     // 2) toy -> sack, 
                     {
-                        Fennimals_encountered: ["S1", "S2"],
+                        Fennimals_encountered: ["A", "B"],
                         interaction_type: "toy_to_sack"
                     },
                     // 3) sack -> box, 
                     {
-                        Fennimals_encountered: ["S1", "S2"],
+                        Fennimals_encountered: ["A", "B"],
                         interaction_type: "sack_to_box"
                     },
-                    // 4) Fennimal-box [manipulation] + scan variants (home vs in situ)
+                    // 4) Fennimal-box [manipulation] 
                     {
                         trials: [
-                            { Fennimal: "S1", interaction_type: "joint_box_decoration" },
-                            { Fennimal: "S2", interaction_type: "scan_box_home" },
-                            { Fennimal: "S2", interaction_type: "photo_Fennimal" },
+                            { Fennimal: "A", interaction_type: "joint_box_decoration" },
+                        
                         ]
                     },
                    
                 ]
+            },
+
+            //Block 3: Extra block for lost box trial (control)
+            {
+                type: "retrieve_lost_box",
+                Fennimals_encountered: ["E"],
+                partner_behavior: "active",
+                force_climbing_tower_first: false
             },
 
             //Partner leaves
@@ -550,7 +442,7 @@ let StimulusSettings = function () {
             },
             
 
-            // BLOCK 3: Change contents of boxes: A to toy C, B to toy D
+            // BLOCK 4: Change contents of boxes: A to toy C, B to toy D
             {
                 type: "phone_room",
                 partner_behavior: "absent",
@@ -561,7 +453,7 @@ let StimulusSettings = function () {
                 ask_box: true,
                 trial_subblocks: [
                     {
-                        Fennimals_encountered: ["P1", "P2"],
+                        Fennimals_encountered: ["C", "D"],
                         interaction_type: "toy_to_box"
                     },
                     

@@ -1236,6 +1236,7 @@ function copy_scale_and_move_object_to_position(Elem,Parent, center_x, center_y,
 /**
  * Show/hide baked-in `.box_decoration` groups on a toybox clone according to WorldState.
  * Default (never set / false): decorations hidden.
+ * Also applies lost-and-found tag visibility so every decoration call site stays in sync.
  */
 function apply_toybox_decoration_visibility_to_element(rootElem, boxtype) {
     if (!rootElem) return false;
@@ -1249,7 +1250,36 @@ function apply_toybox_decoration_visibility_to_element(rootElem, boxtype) {
         el.style.visibility = decorated ? "visible" : "hidden";
         el.style.pointerEvents = "none";
     });
+    apply_toybox_lost_found_tag_visibility_to_element(rootElem, boxtype);
     return decorated;
+}
+
+/**
+ * Show/hide lost-and-found tags on a toybox clone according to WorldState.
+ * Loose tags stay hidden outside the retrieve_lost_box tagging step.
+ * Attached tags show when the box has been tagged.
+ */
+function apply_toybox_lost_found_tag_visibility_to_element(rootElem, boxtype) {
+    if (!rootElem) return false;
+    let tagged = false;
+    if (typeof WorldState !== "undefined" && WorldState.get_toybox_has_lost_found_tag) {
+        tagged = WorldState.get_toybox_has_lost_found_tag(boxtype) === true;
+    }
+    rootElem.querySelectorAll(".lost_found_tag_loose").forEach((el) => {
+        el.classList.add("invisible_element");
+        el.style.transition = "";
+        el.style.opacity = "0";
+        el.style.visibility = "hidden";
+        el.style.pointerEvents = "none";
+    });
+    rootElem.querySelectorAll(".lost_found_tag_attached").forEach((el) => {
+        el.classList.toggle("invisible_element", !tagged);
+        el.style.transition = "";
+        el.style.opacity = tagged ? "1" : "0";
+        el.style.visibility = tagged ? "visible" : "hidden";
+        el.style.pointerEvents = "none";
+    });
+    return tagged;
 }
 
 function get_all_values_in_array_of_objects(key, Arr){

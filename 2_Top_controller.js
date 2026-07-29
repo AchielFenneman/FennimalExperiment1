@@ -337,6 +337,11 @@ class TrialGenerator {
     }
 
     generateTrialsForPhase(phaseData) {
+        if (phaseData && phaseData.type === "retrieve_lost_box") {
+            phaseData.interaction_type = "retrieve_lost_box";
+            phaseData.include_Fennefinder = true;
+        }
+
         this.validatePhaseTrialSpec(phaseData);
 
         let mainTrials;
@@ -1338,6 +1343,10 @@ class ExperimentController {
         }
 
         WorldState.change_partner_role_behavior(this.currentPhaseData.partner_behavior || null);
+        // Apply role to the map icon immediately (WorldState alone does not hide/show it).
+        if (this.mapCont && this.mapCont.Partner && this.mapCont.Partner.update_behavior) {
+            this.mapCont.Partner.update_behavior();
+        }
 
         // Route to the appropriate setup logic
         switch (this.currentPhaseType) {
@@ -1374,6 +1383,20 @@ class ExperimentController {
                 WorldState.populate_map_with_array_of_Fennimals(this.currentPhaseData.Fennimals_in_phase, true);
                 if (this.currentPhaseData.force_climbing_tower_first) this.mapCont.enforce_dome_until_tower_climbed();
                 this.instrCont.initializeFreeExplorationInstructions(this.currentPhaseData.interaction_type, this.currentDayNum, this.currentPhaseData.bonus_stars_per_correct_answer === true, this.currentPhaseData.include_Fennefinder, this.currentPhaseData.force_climbing_tower_first === true, this.currentPhaseData.Fennimals_in_phase);
+                break;
+            case "retrieve_lost_box":
+                // Phase always uses retrieve_lost_box trials and forces Fennefinder on.
+                this.currentPhaseData.interaction_type = "retrieve_lost_box";
+                this.currentPhaseData.include_Fennefinder = true;
+                this.setupTrialBasedPhase();
+                this.flagExplorationPhaseCompleted = false;
+                WorldState.populate_map_with_array_of_Fennimals(this.currentPhaseData.Fennimals_in_phase, true);
+                if (this.currentPhaseData.force_climbing_tower_first) this.mapCont.enforce_dome_until_tower_climbed();
+                this.instrCont.initializeRetrieveLostBoxInstructions(
+                    this.currentDayNum,
+                    this.currentPhaseData.force_climbing_tower_first === true,
+                    this.currentPhaseData.Fennimals_in_phase
+                );
                 break;
             case "jump_to_trial":
                 this.setupTrialBasedPhase();
@@ -1532,7 +1555,7 @@ class ExperimentController {
         if (this.currentPhaseData.include_Fennefinder === true || this.currentPhaseData.include_Fennefinder === "low_power_mode") {
             let targetArr = [];
             if (this.currentPhaseType === "hint_and_search") targetArr = [this.currentTrial];
-            if (this.currentPhaseType === "free_exploration") {
+            if (this.currentPhaseType === "free_exploration" || this.currentPhaseType === "retrieve_lost_box") {
                 let fennimalsInWorld = WorldState.get_array_of_Fennimals_on_map();
                 targetArr = fennimalsInWorld.filter(f => f.name && !f.visited);
             }
@@ -1787,7 +1810,7 @@ class ExperimentController {
         // Legacy star logic for trial-based phases
         let totalBonusStarsEarned = 0, maxBonusStars = 0;
         if (this.currentPhaseData.bonus_stars_per_correct_answer) {
-            if (["jump_to_trial", "hint_and_search", "free_exploration"].includes(this.currentPhaseData.type)) {
+            if (["jump_to_trial", "hint_and_search", "free_exploration", "retrieve_lost_box"].includes(this.currentPhaseData.type)) {
                 for (let trialNum = 0; trialNum < this.currentPhaseData.Data.length; trialNum++) {
                     if (this.currentPhaseData.Data[trialNum].bonus_stars_earned !== undefined) {
                         totalBonusStarsEarned += this.currentPhaseData.Data[trialNum].bonus_stars_earned === true ? 1 : this.currentPhaseData.Data[trialNum].bonus_stars_earned;
@@ -1873,6 +1896,7 @@ class ExperimentController {
     instructionsPageClosed() {
         switch (this.currentPhaseType) {
             case "free_exploration":
+            case "retrieve_lost_box":
                 if (this.flagExplorationPhaseCompleted) {
                     this.phaseCompleted();
                 } else {
@@ -2011,6 +2035,7 @@ class ExperimentController {
 
         switch (this.currentPhaseType) {
             case "free_exploration":
+            case "retrieve_lost_box":
                 this.instrCont.updateProgressWithinDay((this.currentInteractionNumInPhase / this.currentPhaseData.number_interactions_in_phase) * 100);
                 if (!fennimalPreviouslyVisited) {
                     this.explorationPhaseAddPhoto();
@@ -2080,7 +2105,11 @@ class ExperimentController {
 
         if (allFound) {
             this.flagExplorationPhaseCompleted = true;
-            this.instrCont.showFreeExplorationCompletionScreen();
+            if (this.currentPhaseType === "retrieve_lost_box") {
+                this.instrCont.showRetrieveLostBoxCompletionScreen();
+            } else {
+                this.instrCont.showFreeExplorationCompletionScreen();
+            }
         } else {
             this.mapCont.allow_participant_to_leave_location(true);
         }
