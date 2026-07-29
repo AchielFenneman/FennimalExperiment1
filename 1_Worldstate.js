@@ -654,5 +654,3 @@ WorldStateObject = function () {
 
 
 }
-
-console.log("S2 READY")

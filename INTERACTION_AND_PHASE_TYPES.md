@@ -216,7 +216,7 @@ Thus, with A→B→C→A, A’s lure comes from B, B’s from C, and C’s from 
 
 **Memory probes** (when `include_memory_probe_at_end`): two homogeneous blocks, order counterbalanced between participants (`memory_probe_block_order` on the phase):
 
-1. **Box→Fennimal** (`memory_probe_box_to_fennimal`): one trial per Fennimal; empty closed box cue; radial colored heads; triad = correct + one co-box mate (shared `toybox`, balanced if 2+) + one other-box foil (same S/P wave when those prefixes exist).
+1. **Box→Fennimal** (`memory_probe_box_to_fennimal`): one trial per Fennimal with a toybox; empty closed box cue; radial colored heads; triad = correct + two other-box foils (co-box mates excluded so the answer is unambiguous; prefer same S/P wave when those prefixes exist).
 2. **Fennimal→toy** (`memory_probe_fennimal_to_toy`): one trial per Fennimal with a toy; full-body Fennimal cue; radial toys; foils = one same-wave + one other-wave toy when S/P IDs are present, otherwise any two other toys.
 
 No distractors between probes (ISI instead). Solo intro overlay before the first probe. Logged answer rows match belief/reality density (`trial_kind`, ids, `block_index`, `trial_index`, target, `options` with roles, `selected`, `correct`, `reaction_time_ms`).

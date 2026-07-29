@@ -973,11 +973,13 @@ class TrialGenerator {
 
     /**
      * Stamp distractor options for post-placement attention checks.
-     * Options = unique toys/sacks among sibling trials in the same subblock
-     * (i.e. the Fennimals_encountered cohort for that interaction).
+     * toy_to_sack: unique toys across all Fennimals in the phase (not just the subblock).
+     * toy_to_box / sack_to_box: unique toys/sacks among sibling trials in the same subblock.
      */
     applyPlacementQuizOptionsToTrials(trials, phaseData) {
         if (!trials || trials.length === 0) return trials;
+
+        let phaseToys = this.collectUniqueAttributeFromPhaseFennimals(phaseData, "toy");
 
         let bySubblock = {};
         trials.forEach((trial) => {
@@ -998,7 +1000,11 @@ class TrialGenerator {
             });
 
             cohort.forEach((trial) => {
-                if (trial.interaction_type === "toy_to_sack" || trial.interaction_type === "toy_to_box") {
+                if (trial.interaction_type === "toy_to_sack") {
+                    let opts = [...phaseToys];
+                    if (trial.toy && !opts.includes(trial.toy)) opts.push(trial.toy);
+                    trial.placement_quiz_options = opts;
+                } else if (trial.interaction_type === "toy_to_box") {
                     let opts = [...toys];
                     if (trial.toy && !opts.includes(trial.toy)) opts.push(trial.toy);
                     trial.placement_quiz_options = opts;

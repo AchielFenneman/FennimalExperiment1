@@ -17,11 +17,11 @@ let StimulusSettings = function () {
     // Value: The required and optional properties
     //
     // ID / toybox notes (mentalizing / partner-belief experiments):
-    //   - Co-box mates for memory probes are resolved from shared `toybox`
-    //     codes in this dictionary (any IDs; 2+ Fennimals may share a box).
+    //   - Shared `toybox` codes mark co-box mates (sack probes / design);
+    //     box→Fennimal memory probes exclude co-box mates from options.
     //   - Optional "S*" / "P*" prefixes still mark shared vs private waves
-    //     (prompt wording + same-wave foils). Non-S/P IDs (e.g. A–E) skip
-    //     wave-specific wording and use other-box / other-toy foils instead.
+    //     (prompt wording + preferred same-wave foils). Non-S/P IDs (e.g. A–E)
+    //     use the generic box prompt and other-box / other-toy foils.
     // ----------------------------------------------------
     const All_Fennimal_Sets = {
         test: {
@@ -200,7 +200,7 @@ let StimulusSettings = function () {
 
             // BLOCK 5: Partner belief (individual boxes)
             // Memory probes (when enabled): box→Fennimal / Fennimal→toy;
-            // co-box mates from shared toybox; S/P IDs also get wave prompts.
+            // box→Fennimal uses other-box foils only; S/P IDs also get wave prompts.
             {
                 type: "partner_belief_individual_boxes",
                 include_practice_trial: true,
@@ -345,7 +345,7 @@ let StimulusSettings = function () {
 
             // BLOCK 5: Partner belief (individual boxes)
             // Memory probes (when enabled): box→Fennimal / Fennimal→toy;
-            // co-box mates from shared toybox; S/P IDs also get wave prompts.
+            // box→Fennimal uses other-box foils only; S/P IDs also get wave prompts.
             {
                 type: "partner_belief_individual_boxes",
                 include_practice_trial: true,
@@ -1180,13 +1180,18 @@ let StimulusTransformer = function (StimTemplate) {
                     max_stars += bonus * 2;
                 }
                 if (block.include_memory_probe_at_end === true) {
-                    // One box→Fennimal and one Fennimal→toy probe per Fennimal;
-                    // plus box→sack and sack→toy when sacks are in play.
-                    let nFennimals = (typeof FennimalObjArr !== "undefined" && Array.isArray(FennimalObjArr))
-                        ? FennimalObjArr.length
-                        : 0;
-                    let probesPerFen = this.should_include_sack_memory_probes() ? 4 : 2;
-                    max_stars += bonus * nFennimals * probesPerFen;
+                    // Count only probes that will actually be built (missing toy/sack skips that trial).
+                    let fens = (typeof FennimalObjArr !== "undefined" && Array.isArray(FennimalObjArr))
+                        ? FennimalObjArr
+                        : [];
+                    let nBoxToFen = fens.filter((f) => f && f.toybox).length;
+                    let nFenToToy = fens.filter((f) => f && f.toy).length;
+                    max_stars += bonus * (nBoxToFen + nFenToToy);
+                    if (this.should_include_sack_memory_probes()) {
+                        let nBoxToSack = fens.filter((f) => f && f.sack && f.toybox).length;
+                        let nSackToToy = fens.filter((f) => f && f.sack && f.toy).length;
+                        max_stars += bonus * (nBoxToSack + nSackToToy);
+                    }
                 }
             }
 
@@ -1222,4 +1227,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("P-READY")
+console.log("AC-READY TO GO")

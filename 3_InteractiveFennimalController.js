@@ -15132,21 +15132,13 @@ class PartnerBeliefIndividualBoxesController {
     }
 
     // Optional S/P wave from ID prefix (mentalizing / mentalizing_AB).
-    // Non-S/P IDs (e.g. mentalizing_AC A–E) share one "default" wave; co-box
-    // mates are always resolved from shared toybox, not from ID pairing.
+    // Non-S/P IDs (e.g. mentalizing_AC A–E) share one "default" wave; box→Fennimal
+    // foils are always other-box Fennimals (co-box mates excluded from options).
     _waveForFennimal(fen) {
         let id = (fen && fen.id) ? String(fen.id) : "";
         if (id.startsWith("S")) return "S";
         if (id.startsWith("P")) return "P";
         return "default";
-    }
-
-    /** Fennimals that share this Fennimal's assigned toybox (excluding self). */
-    _coBoxMates(fen, fennimals) {
-        if (!fen || !fen.toybox) return [];
-        return (fennimals || []).filter((other) =>
-            other && other.id !== fen.id && other.toybox === fen.toybox
-        );
     }
 
     _appendMemoryProbeSection(queue) {
@@ -15213,82 +15205,78 @@ class PartnerBeliefIndividualBoxesController {
     }
 
     _makeBoxToFennimalProbeTrials(fennimals) {
-        // Triad per Fennimal: correct + one co-box mate (same assigned toybox) +
-        // one other-box foil. Co-box mates come from the Fennimal set data
-        // (shared toybox), not from hardcoded S#/P# ID pairs. When a box has
-        // 2+ mates, one is chosen with exposure balancing. Foils prefer the
-        // same S/P wave when those prefixes exist; otherwise any other-box Fen.
+        // Triad per Fennimal: correct + two other-box foils.
+        // Co-box mates are excluded — with a generic box cue they would also be
+        // correct answers. Prefer same-wave foils when S/P prefixes exist.
         let withBoxes = fennimals.filter((fen) => fen && fen.toybox);
         let wavesPresent = new Set(withBoxes.map((f) => this._waveForFennimal(f)));
         let hasSpWaves = wavesPresent.has("S") && wavesPresent.has("P");
 
         let specs = withBoxes.map((fen) => {
             let wave = this._waveForFennimal(fen);
-            let coBoxMates = this._coBoxMates(fen, withBoxes);
-            if (coBoxMates.length < 1) {
-                console.error(
-                    `PartnerBeliefIndividualBoxes: no co-box mate for box→Fennimal probe "${fen.id}" (box "${fen.toybox}").`
-                );
-            }
-
-            let foilPool = withBoxes.filter((other) =>
+            let otherBox = withBoxes.filter((other) =>
                 other.id !== fen.id && other.toybox !== fen.toybox
             );
-            if (hasSpWaves) {
-                let sameWaveFoils = foilPool.filter((other) => this._waveForFennimal(other) === wave);
-                if (sameWaveFoils.length > 0) foilPool = sameWaveFoils;
-            }
-            if (foilPool.length < 1) {
+            let preferred = hasSpWaves
+                ? otherBox.filter((other) => this._waveForFennimal(other) === wave)
+                : [];
+            let preferredIds = preferred.map((f) => f.id);
+            let fillIds = otherBox
+                .filter((other) => !preferredIds.includes(other.id))
+                .map((f) => f.id);
+
+            if (otherBox.length < 2) {
                 console.error(
-                    `PartnerBeliefIndividualBoxes: no other-box foil for box→Fennimal probe "${fen.id}".`
+                    `PartnerBeliefIndividualBoxes: need at least 2 other-box foils for box→Fennimal probe "${fen.id}" ` +
+                    `(box "${fen.toybox}", found ${otherBox.length}).`
                 );
             }
 
             return {
                 fen,
                 wave,
-                eligibleCoBoxMateIds: coBoxMates.map((f) => f.id),
-                eligibleFoilIds: foilPool.map((f) => f.id),
-                foilRole: hasSpWaves ? "same_wave_foil" : "other_box_foil"
+                preferredFoilIds: preferredIds,
+                fillFoilIds: fillIds,
+                foilRolePreferred: hasSpWaves ? "same_wave_foil" : "other_box_foil",
+                foilRoleFill: "other_box_foil"
             };
         });
 
-        let coBoxMateCounts = {};
         let foilCounts = {};
-        withBoxes.forEach((f) => {
-            coBoxMateCounts[f.id] = 0;
-            foilCounts[f.id] = 0;
-        });
+        withBoxes.forEach((f) => { foilCounts[f.id] = 0; });
 
-        let coBoxMateByTarget = {};
-        let foilByTarget = {};
+        let foilsByTarget = {};
         shuffleArray([...specs]).forEach((spec) => {
-            coBoxMateByTarget[spec.fen.id] =
-                this._pickBalancedItems(spec.eligibleCoBoxMateIds, coBoxMateCounts, 1)[0] || null;
-            let foilEligible = spec.eligibleFoilIds.filter(
-                (id) => id !== coBoxMateByTarget[spec.fen.id]
-            );
-            foilByTarget[spec.fen.id] =
-                this._pickBalancedItems(foilEligible, foilCounts, 1)[0] || null;
+            let picked = this._pickBalancedItems(spec.preferredFoilIds, foilCounts, 2);
+            if (picked.length < 2) {
+                let fill = this._pickBalancedItems(
+                    spec.fillFoilIds.filter((id) => !picked.includes(id)),
+                    foilCounts,
+                    2 - picked.length
+                );
+                picked = picked.concat(fill);
+            }
+            foilsByTarget[spec.fen.id] = picked;
         });
 
         return specs.map((spec) => {
-            let { fen, wave, foilRole } = spec;
+            let { fen, wave, preferredFoilIds, foilRolePreferred, foilRoleFill } = spec;
             let correctId = fen.id;
-            let coBoxMateId = coBoxMateByTarget[fen.id] || null;
-            let foilId = foilByTarget[fen.id] || null;
-            if (!coBoxMateId || !foilId || foilId === coBoxMateId || foilId === correctId) {
+            let foils = foilsByTarget[fen.id] || [];
+            let foilA = foils[0] || null;
+            let foilB = foils[1] || null;
+            if (!foilA || !foilB || foilA === foilB || foilA === correctId || foilB === correctId) {
                 console.error(
                     `PartnerBeliefIndividualBoxes: could not build triad for box→Fennimal probe "${fen.id}" ` +
-                    `(correct=${correctId}, co_box_mate=${coBoxMateId}, foil=${foilId}).`
+                    `(correct=${correctId}, foils=${JSON.stringify(foils)}).`
                 );
                 return null;
             }
 
             let option_roles = {};
             option_roles[correctId] = "correct";
-            option_roles[coBoxMateId] = "co_box_mate";
-            option_roles[foilId] = foilRole;
+            option_roles[foilA] = preferredFoilIds.includes(foilA) ? foilRolePreferred : foilRoleFill;
+            option_roles[foilB] = preferredFoilIds.includes(foilB) ? foilRolePreferred : foilRoleFill;
 
             return {
                 trial_kind: "memory_probe_box_to_fennimal",
@@ -15297,10 +15285,9 @@ class PartnerBeliefIndividualBoxesController {
                 target_box: fen.toybox,
                 target_fennimal: fen.id,
                 probe_wave: wave,
-                co_box_mate_id: coBoxMateId,
-                foil_id: foilId,
+                foil_ids: [foilA, foilB],
                 correct_option_id: correctId,
-                answer_options: shuffleArray([correctId, coBoxMateId, foilId]),
+                answer_options: shuffleArray([correctId, foilA, foilB]),
                 option_roles
             };
         }).filter(Boolean);
@@ -17076,8 +17063,7 @@ class PartnerBeliefIndividualBoxesController {
             target_box: trial.target_box,
             target_fennimal: trial.target_fennimal,
             probe_wave: trial.probe_wave,
-            co_box_mate_id: trial.co_box_mate_id,
-            foil_id: trial.foil_id,
+            foil_ids: trial.foil_ids,
             options: this._buildStoredOptions(
                 response.option_layout,
                 trial.answer_options.map((fenId) => ({

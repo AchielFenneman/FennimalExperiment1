@@ -793,11 +793,17 @@ class InstructionsController {
         }
 
         let n = this.fennimalsInPhase.length;
-        let boxWord = n === 1 ? "box" : "boxes";
+        let completionText;
+        if (n === 1) {
+            let namedBox = GenParam.get_box_printed_name(this.fennimalsInPhase[0].toybox);
+            completionText =
+                "You retrieved the " + namedBox + ".<br>Press the button below to continue.";
+        } else {
+            completionText =
+                "You retrieved all " + n + " lost boxes.<br>Press the button below to continue.";
+        }
         document.getElementById("Instructions_Title").innerHTML = "Well done!";
-        this.setRetrieveLostBoxInstructionText(
-            "You retrieved all " + n + " lost " + boxWord + ".<br>Continue when you are ready for the next part of the day."
-        );
+        this.setRetrieveLostBoxInstructionText(completionText);
         this.buildRetrieveLostBoxVisuals(this.fennimalsInPhase, { showTags: true });
 
         Array.from(this.parentElem.getElementsByClassName("instruction_element_nonbackground")).forEach((el) => {
