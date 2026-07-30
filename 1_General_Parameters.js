@@ -753,10 +753,29 @@ GENERALPARAM = function () {
         arrivalDistance: 8,
         partnerCatchupDelay: 800,
         partnerFollowStopDistance: 4,
+        // Partner-led follow: wait, then chase once the leader has pulled ahead
+        // (mirrors PartnerIconController's 70→40 engage/hold distances).
+        followerStartDelay: 320,
+        followerEngageDistance: 60,
+        followerHoldDistance: 40,
+        followerTrailDistance: 28,
+        followerSpeed: 3.5,
+        followerRubberBand: 0.025,
+        followerMaxSpeed: 5.2,
         startDelay: 250,
         iconFadeTime: 450,
         iconHoldDelay: 300,
         travellingLabel: "Travelling...",
+        followingLabelPrefix: "Following",
+        // Default phone_room / escorted travel: partner walks the route, player trails.
+        // Use leader: "player" when the player should lead (e.g. future walk-home variants).
+        defaultLeader: "partner",
+        // Offset of the follower from the leader at travel start (SVG units).
+        // Keep small so the engage-distance lag is the main naturalistic cue.
+        followerStartOffset: {
+            x: 0,
+            y: 8
+        },
         partnerStartOffset: {
             x: 0,
             y: 0
@@ -772,11 +791,36 @@ GENERALPARAM = function () {
         trackmarkOpacity: 0.7
     }
 
+    // Partner speech bubble (Interface.PartnerSpeechBubble) — used on map + in locations.
+    this.PartnerSpeechBubble = {
+        tipGap: 100,
+        dimOpacity: 0.2,
+        fill: "#faf8eb",
+        fillOpacity: 0.92,
+        stroke: "#4b5563",
+        strokeWidth: 3,
+        cornerRadius: 28,
+        textColor: "#1e3a5f",
+        fontSize: 32,
+        maxWidth: 520,
+        minWidth: 280,
+        paddingX: 28,
+        paddingY: 22,
+        triangleBase: 36,
+        triangleDepth: 28,
+        buttonWidth: 320,
+        buttonHeight: 70,
+        buttonGap: 22,
+        fadeTime: 280,
+        edgeMargin: 24
+    }
+
     this.PhoneRoom = {
         backgroundColor: "#d9e7ef",
         floorColor: "#b7c8d2",
         roomFadeTime: 500,
         ringStartDelay: 500,
+        partnerEntranceTime: 500,
         phoneRingInterval: 2600,
         phoneShakeDuration: 450,
         returnToPhoneRoomAfterFinalTrial: true,

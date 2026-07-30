@@ -54,6 +54,14 @@ let StimulusSettings = function () {
             "D": { head: "D", region: "D", toy: "D", toybox: "B",  },
             "E": { head: "E", region: "E", toybox: "B"},
         },
+        mentalizing_BC: {
+            "A": { head: "A", region: "A", toy: "A", toybox: "A", sack: "A"},
+            "B": { head: "B", region: "B", toy: "B", toybox: "B", sack: "B" },
+            "C": { head: "C", region: "C", toy: "C", toybox: "A",  },
+            "D": { head: "D", region: "D", toy: "D", toybox: "B",  },
+            "E": { head: "E", region: "A", toy: "E", sack: "A", special_role: "found_toy"},
+            "F": { head: "F", region: "E", toybox: "B"},
+        },
         
     };
 
@@ -62,12 +70,53 @@ let StimulusSettings = function () {
     // ----------------------------------------------------
     let All_Experiment_Structures = {
         test: [
+
+            // Belief DV overhaul — WorldState auto-seeds a false-belief layout when empty (test only).
             {
-                type: "retrieve_lost_box",
-                Fennimals_encountered: ["S1", "S2"],
-                partner_behavior: "active",
-                force_climbing_tower_first: false
+                type: "partner_belief_individual_boxes",
+                include_practice_trial: true,
+                num_belief_blocks: 1,
+                include_reality_block_at_end: true,
+                include_memory_probe_at_end: true,
+                include_empty_box_choice_alternative: true,
+                bonus_stars_per_correct_answer: 1,
+                memory_probe_isi_ms: 1000,
+                gating_boxes: ["A", "B"],
+                action_prediction_toys: ["A", "B"],
+                questions: [
+                    { question_id: "belief_A", target_box: "A" },
+                    { question_id: "belief_B", target_box: "B" },
+                ]
             },
+
+            // Optional downstream phone_room checks (comment in/out as needed):
+            /*
+            {
+                type: "phone_room",
+                partner_behavior: "active",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                ask_Fennimal: true,
+                ask_toy: true,
+                ask_box: true,
+                trial_subblocks: [
+                    {
+                        Fennimals_encountered: ["S1", "S2"],
+                        interaction_type: "toy_to_box"
+                    },
+                ]
+            },
+            {
+                type: "phone_room",
+                partner_behavior: "active",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: true,
+                skip_instructions: true,
+                Fennimals_encountered: ["P1", "P2"],
+                interaction_type: ["switch_box_without_partner"],
+                hint_type: ["icon"]
+            },
+            */
         ],
 
 
@@ -207,8 +256,11 @@ let StimulusSettings = function () {
                 num_belief_blocks: 1,
                 include_reality_block_at_end: true,
                 include_memory_probe_at_end: true,
+                include_empty_box_choice_alternative: true,
                 bonus_stars_per_correct_answer: 1,
                 memory_probe_isi_ms: 1000,
+                gating_boxes: ["A", "B", "C"],
+                action_prediction_toys: ["A", "B", "C"],
                 questions: [
                     { question_id: "belief_A", target_box: "A" },
                     { question_id: "belief_B", target_box: "B" },
@@ -352,8 +404,11 @@ let StimulusSettings = function () {
                 num_belief_blocks: 1,
                 include_reality_block_at_end: true,
                 include_memory_probe_at_end: true,
+                include_empty_box_choice_alternative: true,
                 bonus_stars_per_correct_answer: 1,
                 memory_probe_isi_ms: 1000,
+                gating_boxes: ["A", "B"],
+                action_prediction_toys: ["A", "B"],
                 questions: [
                     { question_id: "belief_A", target_box: "A" },
                     { question_id: "belief_B", target_box: "B" },
@@ -369,6 +424,7 @@ let StimulusSettings = function () {
 
             // BLOCK 1: Introduction to all Fennimals
             
+            
             {
                 type: "free_exploration",
                 interaction_type: ["Fennimal_toy"],
@@ -377,6 +433,7 @@ let StimulusSettings = function () {
                 include_Fennefinder: true,
                 force_climbing_tower_first: true
             },
+            
             
             // BLOCK 2: 
             // 1) Fennimal->toy, 
@@ -399,6 +456,7 @@ let StimulusSettings = function () {
                         Fennimals_encountered: ["A", "B", "C", "D"],
                         interaction_type: "broken_toy_no_box"
                     },
+                    
                     {
                         Fennimals_encountered: ["A", "B", "C", "D"],
                         interaction_type: "Fennimal_toy"
@@ -434,6 +492,115 @@ let StimulusSettings = function () {
                 force_climbing_tower_first: false
             },
 
+           
+
+            // BLOCK 4: Change contents of boxes: A to toy C, B to toy D    
+            {
+                type: "phone_room",
+                partner_behavior: "active",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: true,
+                skip_instructions: false,
+                Fennimals_encountered: ["C", "D"],
+                interaction_type: ["switch_box_without_partner"],
+            },
+
+            // BLOCK 5: Partner belief (individual boxes)
+            // Memory probes (when enabled): box→Fennimal / Fennimal→toy;
+            // plus box→sack / sack→toy when sacks are templated and toy_to_sack appears.
+            {
+                type: "partner_belief_individual_boxes",
+                include_practice_trial: true,
+                num_belief_blocks: 1,
+                include_reality_block_at_end: true,
+                include_memory_probe_at_end: true,
+                include_empty_box_choice_alternative: true,
+                bonus_stars_per_correct_answer: 1,
+                memory_probe_isi_ms: 1000,
+                gating_boxes: ["A", "B"],
+                action_prediction_toys: ["A", "B"],
+                questions: [
+                    { question_id: "belief_A", target_box: "A" },
+                    { question_id: "belief_B", target_box: "B" },
+                ]
+            },
+
+
+
+        ],
+        mentalizing_BC: [
+
+            
+
+            // BLOCK 1: Introduction to all Fennimals
+           /* 
+            {
+                type: "free_exploration",
+                interaction_type: ["Fennimal_toy"],
+                Fennimals_encountered: ["A", "B", "C", "D"],
+                partner_behavior: "active",
+                include_Fennefinder: true,
+                force_climbing_tower_first: true
+            },
+            */
+            
+            // BLOCK 2: 
+            // 1) Fennimal->toy, 
+            // 2) toy -> sack, 
+            // 3) sack -> box, 
+            // 4) Fennimal-box [manipulation]
+            {
+                type: "phone_room",
+                partner_behavior: "active",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                ask_Fennimal: true,
+                ask_toy: true,
+                ask_box: true,
+                trial_subblocks: [
+                    // 1) Fennimal->toy, 
+                    
+                    /*
+                    {
+                        Fennimals_encountered: ["A", "B", "C", "D"],
+                        interaction_type: "broken_toy_no_box"
+                    },
+                    */
+                    {
+                        Fennimals_encountered: ["A", "B", "C", "D"],
+                        interaction_type: "Fennimal_toy"
+                    },
+                   
+
+                    // 2) toy -> sack, BUT: with a special role for E
+                    {
+                        Fennimals_encountered: ["E", "B"],
+                        interaction_type: "toy_to_sack"
+                    },
+                    // 3) sack -> box, 
+                    {
+                        Fennimals_encountered: ["A", "B"],
+                        interaction_type: "sack_to_box"
+                    },
+                    // 4) Fennimal-box [manipulation] 
+                    {
+                        trials: [
+                            { Fennimal: "A", interaction_type: "joint_box_decoration" },
+                        
+                        ]
+                    },
+                   
+                ]
+            },
+
+            //Block 3: Extra block for lost box trial (control)
+            {
+                type: "retrieve_lost_box",
+                Fennimals_encountered: ["F"],
+                partner_behavior: "active",
+                force_climbing_tower_first: false
+            },
+
             //Partner leaves
 
             {
@@ -442,7 +609,10 @@ let StimulusSettings = function () {
             },
             
 
-            // BLOCK 4: Change contents of boxes: A to toy C, B to toy D
+            // BLOCK 4: Partner absent — overwrite packed contents.
+            // Box A gets toy A (Fennimal A's own toy), strengthening the
+            // Box→Fennimal→Toy lure toward reality; partner still believes toy E.
+            // Box B gets toy D (AC-style swap foil).
             {
                 type: "phone_room",
                 partner_behavior: "absent",
@@ -453,7 +623,7 @@ let StimulusSettings = function () {
                 ask_box: true,
                 trial_subblocks: [
                     {
-                        Fennimals_encountered: ["C", "D"],
+                        Fennimals_encountered: ["A", "D"],
                         interaction_type: "toy_to_box"
                     },
                     
@@ -474,8 +644,11 @@ let StimulusSettings = function () {
                 num_belief_blocks: 1,
                 include_reality_block_at_end: true,
                 include_memory_probe_at_end: true,
+                include_empty_box_choice_alternative: true,
                 bonus_stars_per_correct_answer: 1,
                 memory_probe_isi_ms: 1000,
+                gating_boxes: ["A", "B"],
+                action_prediction_toys: ["A", "B"],
                 questions: [
                     { question_id: "belief_A", target_box: "A" },
                     { question_id: "belief_B", target_box: "B" },
@@ -835,9 +1008,13 @@ let StimulusTransformer = function (StimTemplate) {
         function extract_required_variables() {
             // Count unique requested properties across the entire dictionary
             let Counts = {};
+            // Behavioral tags (not SVG-mapped features) — copied onto FenObj separately.
+            const passthroughKeys = new Set(["special_role"]);
+
             for (let id in StimTemplate.Fennimal_Dictionary) {
                 let fenReq = StimTemplate.Fennimal_Dictionary[id];
                 for (let key in fenReq) {
+                    if (passthroughKeys.has(key)) continue;
                     if (fenReq[key] !== false) {
                         if (!Counts[key]) Counts[key] = new Set();
                         Counts[key].add(fenReq[key]);
@@ -983,6 +1160,7 @@ let StimulusTransformer = function (StimTemplate) {
             if (req.toy) FenObj.toy = Map.toy[req.toy];
             if (req.toybox) FenObj.toybox = Map.toybox[req.toybox];
             if (req.sack) FenObj.sack = Map.sack[req.sack];
+            if (req.special_role) FenObj.special_role = req.special_role;
 
             if (req.play_orthogonal_tasks) FenObj.play_orthogonal_tasks = true;
 
@@ -1171,10 +1349,12 @@ let StimulusTransformer = function (StimTemplate) {
                     ? block.num_belief_blocks
                     : ((typeof block.num_repeated_blocks === "number" && block.num_repeated_blocks > 0) ? block.num_repeated_blocks : 1);
                 let nQuestions = (block.questions || []).length;
+                let nGating = (block.gating_boxes || []).length;
+                let nAction = (block.action_prediction_toys || []).length;
                 let nBeliefTrials = nQuestions * nBlocks;
                 let nRealityTrials = (block.include_reality_block_at_end === true) ? nQuestions : 0;
-                // Belief/reality each earn stars; each is preceded by a distractor that also earns stars.
-                max_stars += bonus * (nBeliefTrials + nRealityTrials) * 2;
+                // Gating / belief / action / reality each earn stars; each is preceded by a distractor that also earns stars.
+                max_stars += bonus * (nGating + nBeliefTrials + nAction + nRealityTrials) * 2;
                 if (block.include_practice_trial === true) {
                     // Shape-match + color-match practice.
                     max_stars += bonus * 2;
@@ -1184,7 +1364,7 @@ let StimulusTransformer = function (StimTemplate) {
                     let fens = (typeof FennimalObjArr !== "undefined" && Array.isArray(FennimalObjArr))
                         ? FennimalObjArr
                         : [];
-                    let nBoxToFen = fens.filter((f) => f && f.toybox).length;
+                    let nBoxToFen = fens.filter((f) => f && f.toybox && f.toy).length;
                     let nFenToToy = fens.filter((f) => f && f.toy).length;
                     max_stars += bonus * (nBoxToFen + nFenToToy);
                     if (this.should_include_sack_memory_probes()) {
@@ -1227,4 +1407,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("AC-READY TO GO NOW --- ")
+console.log("NEW AC-READY")

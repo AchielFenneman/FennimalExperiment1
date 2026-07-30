@@ -46,6 +46,7 @@ class AudioControllerObject {
             alert: "alert.mp3",
             alert_minor: "alert_minor.mp3",
             phone_ring: "phone_ring.mp3",
+            partner_cellphone: "partner_cellphone.mp3",
 
             search_loop: "search.mp3",
             beep: "beep.mp3",

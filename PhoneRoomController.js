@@ -43,10 +43,12 @@ class PhoneRoomController {
         this.createPhone();
         this.createPhoneAttentionIndicator();
 
+        const entranceMs = GenParam.PhoneRoom.partnerEntranceTime || 500;
+        // Ring only after the partner has walked in (or immediately if absent).
         this.ringStartTimeout = setTimeout(() => {
             this.ringStartTimeout = null;
             this.startRinging();
-        }, GenParam.PhoneRoom.ringStartDelay);
+        }, this.partnerGroup ? entranceMs : (GenParam.PhoneRoom.ringStartDelay || 500));
     }
 
     createPlaceholderBackground() {
@@ -68,20 +70,37 @@ class PhoneRoomController {
         let role = this.worldState.get_current_partner_role();
         if (!role || role === "absent") return;
 
-        this.partnerGroup = create_SVG_group(0, 0, undefined, undefined);
-        let partnerIcon = this.worldState.get_person_icon("partner", "front");
-        partnerIcon.style.transform = `scale(${GenParam.PhoneRoom.partnerScale})`;
+        const entranceMs = GenParam.PhoneRoom.partnerEntranceTime || 500;
+        const homeX = GenParam.PhoneRoom.partnerCenter.x;
+        const homeY = GenParam.PhoneRoom.partnerCenter.y;
+        const startX = (GenParam.PhoneRoom.partnerExitX != null)
+            ? GenParam.PhoneRoom.partnerExitX
+            : -250;
 
+        this.partnerGroup = create_SVG_group(0, 0, undefined, undefined);
+        let partnerIcon = this.worldState.get_person_icon("partner", "right");
+        partnerIcon.style.transform = `scale(${GenParam.PhoneRoom.partnerScale})`;
         this.partnerGroup.appendChild(partnerIcon);
         this.roomGroup.appendChild(this.partnerGroup);
 
+        // Park off-screen left, then walk to the usual spot and face forward.
+        this.partnerGroup.style.transition = "none";
+        this.partnerGroup.style.transform = `translate(${startX}px, ${homeY}px)`;
+        void this.partnerGroup.getBoundingClientRect();
+
         setTimeout(() => {
-            moveSVGCenterTo(
-                this.partnerGroup,
-                GenParam.PhoneRoom.partnerCenter.x,
-                GenParam.PhoneRoom.partnerCenter.y
-            );
-        }, 0);
+            if (!this.partnerGroup) return;
+            this.partnerGroup.style.transition = `transform ${entranceMs}ms ease-out`;
+            this.partnerGroup.style.transform = `translate(${homeX}px, ${homeY}px)`;
+        }, 20);
+
+        setTimeout(() => {
+            if (!this.partnerGroup) return;
+            this.partnerGroup.innerHTML = "";
+            let frontIcon = this.worldState.get_person_icon("partner", "front");
+            frontIcon.style.transform = `scale(${GenParam.PhoneRoom.partnerScale})`;
+            this.partnerGroup.appendChild(frontIcon);
+        }, entranceMs + 30);
     }
 
     createPlaceholderTable() {

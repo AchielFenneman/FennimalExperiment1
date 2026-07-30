@@ -2044,19 +2044,32 @@ MakeObjectDraggableObject = function(ElemParentLayer, MaskLayer, DraggableElem, 
     hooks = hooks || {};
     let Mask, dragging_is_enabled = false;
     let OriginalParent = DraggableElem.parentNode;
+    // Optional siblings (e.g. box front/lid) that must share the drag transform + outline.
+    let extraElements = Array.isArray(hooks.extraElements)
+        ? hooks.extraElements.filter(Boolean)
+        : [];
+    let extraOriginalParents = extraElements.map((el) => el.parentNode);
 
     let current_delta_x = 0;
     let current_delta_y = 0;
 
     let DragGroup = create_SVG_group(0, 0);
     DragGroup.appendChild(DraggableElem);
+    for (let i = 0; i < extraElements.length; i++) {
+        DragGroup.appendChild(extraElements[i]);
+    }
     ElemParentLayer.appendChild(DragGroup);
 
     if (typeof DraggableElem.id === "undefined") {
         DraggableElem.id = "DragControllerTargetID_" + Math.floor(Math.random() * 10000);
     }
 
-    let Outline = create_SVG_outline_of_group_ID(DraggableElem);
+    let Outline;
+    if (extraElements.length > 0) {
+        Outline = create_SVG_outline_of_multiple_groups(DraggableElem, ...extraElements);
+    } else {
+        Outline = create_SVG_outline_of_group_ID(DraggableElem);
+    }
     Outline.removeAttribute("stroke");
     let allClonedChildren = Outline.querySelectorAll('*');
     allClonedChildren.forEach(child => child.removeAttribute("stroke"));
@@ -2064,15 +2077,41 @@ MakeObjectDraggableObject = function(ElemParentLayer, MaskLayer, DraggableElem, 
     DraggableElem.parentNode.insertBefore(Outline, DraggableElem);
     let OriginalPos = getSVGInternalCenter(DraggableElem);
 
+    function restore_elements_from_drag_group() {
+        if (OriginalParent) OriginalParent.appendChild(DraggableElem);
+        for (let i = 0; i < extraElements.length; i++) {
+            if (extraOriginalParents[i]) {
+                extraOriginalParents[i].appendChild(extraElements[i]);
+            }
+        }
+    }
+
+    function bake_drag_delta_into_elements() {
+        let delta = `translate(${current_delta_x}px, ${current_delta_y}px)`;
+        DraggableElem.style.transform += delta;
+        for (let i = 0; i < extraElements.length; i++) {
+            extraElements[i].style.transform += delta;
+        }
+    }
+
     function enable_object_draggable() {
         DraggableElem.style.cursor = "pointer";
-        Outline.classList.add("focus_on_SVG_outline");
+        DraggableElem.style.pointerEvents = "auto";
         DraggableElem.onpointerdown = start_dragging;
+        for (let i = 0; i < extraElements.length; i++) {
+            extraElements[i].style.cursor = "pointer";
+            extraElements[i].style.pointerEvents = "auto";
+            extraElements[i].onpointerdown = start_dragging;
+        }
+        Outline.classList.add("focus_on_SVG_outline");
         dragging_is_enabled = true;
     }
 
     function disable_object_draggable() {
         DraggableElem.style.cursor = "auto";
+        for (let i = 0; i < extraElements.length; i++) {
+            extraElements[i].style.cursor = "auto";
+        }
         Outline.classList.remove("focus_on_SVG_outline");
         dragging_is_enabled = false;
     }
@@ -2148,11 +2187,11 @@ MakeObjectDraggableObject = function(ElemParentLayer, MaskLayer, DraggableElem, 
         if (dropSucceeded) {
             if (Mask) Mask.remove();
 
-            // 1. Move back to the original layer
-            OriginalParent.appendChild(DraggableElem);
+            // 1. Move back to the original layer(s)
+            restore_elements_from_drag_group();
 
-            // 2. Apply the final dragged transform to the toy itself
-            DraggableElem.style.transform += `translate(${current_delta_x}px, ${current_delta_y}px)`;
+            // 2. Apply the final dragged transform to every dragged part
+            bake_drag_delta_into_elements();
 
             // 3. Clean up DragGroup
             DragGroup.remove();
@@ -2175,11 +2214,14 @@ MakeObjectDraggableObject = function(ElemParentLayer, MaskLayer, DraggableElem, 
         destroy: function() {
             disable_object_draggable();
             DraggableElem.onpointerdown = null;
+            for (let i = 0; i < extraElements.length; i++) {
+                extraElements[i].onpointerdown = null;
+            }
             if (Mask) Mask.remove();
             if (Outline && Outline.parentNode) Outline.remove();
-            // Leave DraggableElem in place; only tear down drag scaffolding.
+            // Leave elements in place; only tear down drag scaffolding.
             if (DragGroup.parentNode && DragGroup.contains(DraggableElem)) {
-                OriginalParent.appendChild(DraggableElem);
+                restore_elements_from_drag_group();
             }
             if (DragGroup.parentNode) DragGroup.remove();
         }
@@ -2356,8 +2398,10 @@ async function animate_magnetic_drop(ToyElement, TargetCenterpoint, MiddleLayer,
 
 /**
  * Shared logic for dropping a toy into a box, updating world state, and closing the box.
+ * options.updatePartnerBelief — default true; set false when partner was absent for the switch.
+ * options.forceUserClose — default false; when true, always ask the player to close (ignore partner).
  */
-async function shared_toy_drop_sequence(DroppedToyElement, BoxMod, BasicsMod, PartnerMod, FenObj, finish_callback) {
+async function shared_toy_drop_sequence(DroppedToyElement, BoxMod, BasicsMod, PartnerMod, FenObj, finish_callback, options = {}) {
     // Grab the exact target from the specific box
     let boxTarget = BoxMod.BoxTop.getElementsByClassName("box_target_centerpoint")[0];
 
@@ -2370,7 +2414,8 @@ async function shared_toy_drop_sequence(DroppedToyElement, BoxMod, BasicsMod, Pa
 
     // 2. Update Global World State
     WorldState.change_toybox_contents(FenObj.toybox, FenObj.toy);
-    if (PartnerMod.is_present) {
+    let updateBelief = options.updatePartnerBelief !== false;
+    if (updateBelief && PartnerMod && PartnerMod.is_present) {
         WorldState.change_partner_belief_in_box_contents(FenObj.toybox, FenObj.toy);
     }
 
@@ -2380,7 +2425,8 @@ async function shared_toy_drop_sequence(DroppedToyElement, BoxMod, BasicsMod, Pa
     }
 
     // 3. Branching Logic: Who closes the box?
-    if (PartnerMod.is_present) {
+    let partnerCloses = options.forceUserClose !== true && PartnerMod && PartnerMod.is_present;
+    if (partnerCloses) {
         Interface.Prompt.show_message(PartnerMod.partnername + " closes the " + BoxMod.boxname);
         await PartnerMod.move_to_element_and_act(BoxMod.BoxBase, () => BoxMod.close_box());
         finish_callback();

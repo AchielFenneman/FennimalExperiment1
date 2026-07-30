@@ -331,6 +331,14 @@ class MapController {
     }
 
     check_location_marker_proximity() {
+        // During manual phone-room return, ignore location markers (only #phone_room completes).
+        if (this.awaitingPhoneRoomProximityReturn) {
+            this.current_nearest_location = false;
+            this.update_nearest_location_highlights();
+            this.current_action_key_status = false;
+            return;
+        }
+
         let LocationMarkers = document.getElementsByClassName("location_marker_" + this.current_region);
         let ClosestMarker = get_closest_object(this.Player.CurrentPlayerPos, LocationMarkers);
 
@@ -924,7 +932,31 @@ class MapController {
         return [start, ...waypoints, destination];
     }
 
-    prepareForAutoTravel(startPoint) {
+    resolveAutoTravelOptions(options = {}) {
+        let role = this.WorldState.get_current_partner_role();
+        let partnerPresent = role === "active" || role === "passive";
+
+        let leader = options.leader || GenParam.AutoTravel.defaultLeader || "partner";
+        if (leader === "partner" && !partnerPresent) {
+            leader = "player";
+        }
+
+        let statusLabel = options.statusLabel;
+        if (!statusLabel) {
+            if (leader === "partner") {
+                let partnerName = this.WorldState.get_partner_icon_settings().name || "partner";
+                statusLabel = `${GenParam.AutoTravel.followingLabelPrefix} ${partnerName}`;
+            } else {
+                statusLabel = GenParam.AutoTravel.travellingLabel;
+            }
+        }
+
+        return Object.assign({}, options, { leader, statusLabel, partnerPresent });
+    }
+
+    prepareForAutoTravel(startPoint, options = {}) {
+        this.autoTravelOptions = this.resolveAutoTravelOptions(options);
+
         this.disable_map_interactions();
         this.remove_all_action_buttons();
         Interface.Prompt.hide();
@@ -944,22 +976,64 @@ class MapController {
         this.Interface_Layer.style.display = "inherit";
         this.hide_all_locations();
 
-        this.Player.force_move_to_coords(startPoint.x, startPoint.y);
+        let followerOffset = GenParam.AutoTravel.followerStartOffset || GenParam.AutoTravel.partnerStartOffset || { x: 0, y: 0 };
+        let leader = this.autoTravelOptions.leader;
 
-        let role = this.WorldState.get_current_partner_role();
-        if (role === "active" || role === "passive") {
-            this.Partner.jump_to_position(startPoint.x - GenParam.AutoTravel.partnerStartOffset.x, startPoint.y - GenParam.AutoTravel.partnerStartOffset.y);
+        if (leader === "partner" && this.autoTravelOptions.partnerPresent) {
+            // Partner leads: place them on the route start, player trails behind.
+            this.Partner.jump_to_position(startPoint.x, startPoint.y);
+            this.Partner.setAutoTravelLeadMode(true);
+            this.Player.force_move_to_coords(
+                startPoint.x + followerOffset.x,
+                startPoint.y + followerOffset.y,
+                { notifyPartner: false }
+            );
+        } else {
+            // Player leads: partner starts offset (legacy / fallback when partner absent).
+            this.Player.force_move_to_coords(startPoint.x, startPoint.y, { notifyPartner: false });
+            if (this.autoTravelOptions.partnerPresent) {
+                let legacyOffset = GenParam.AutoTravel.partnerStartOffset || followerOffset;
+                this.Partner.jump_to_position(
+                    startPoint.x - legacyOffset.x,
+                    startPoint.y - legacyOffset.y
+                );
+                this.Partner.setAutoTravelLeadMode(false);
+            }
         }
+
         // Always sync visibility: absent partners must be hidden here, otherwise the
         // previous phase's icon stays visible until return_to_map after the first trial.
         this.Partner.update_behavior();
+        if (leader === "partner" && this.autoTravelOptions.partnerPresent) {
+            // update_behavior() clears lead mode flags via role sync — re-assert lead.
+            this.Partner.setAutoTravelLeadMode(true);
+        }
 
         // disable_map_interactions() stops region audio; phone_room never re-enables the map,
         // so restart ambient for the region we are about to travel through.
         this.ensureAutoTravelRegionSound();
 
         this.setAutoTravelCharacterIconOpacity(0, false);
-        this.showAutoTravelChrome();
+        this.syncAutoTravelIconStackOrder();
+        this.showAutoTravelChrome(this.autoTravelOptions.statusLabel);
+    }
+
+    syncAutoTravelIconStackOrder() {
+        let playerLayer = document.getElementById("Map_player_level");
+        if (!playerLayer || !this.Player || !this.Player.PlayerIcon) return;
+
+        let leader = this.autoTravelOptions && this.autoTravelOptions.leader;
+        let partnerPresent = this.autoTravelOptions && this.autoTravelOptions.partnerPresent;
+        let partnerIcon = this.Partner && this.Partner.PartnerIcon;
+
+        // Later siblings paint above earlier ones in SVG.
+        if (leader === "partner" && partnerPresent && partnerIcon) {
+            playerLayer.appendChild(this.Player.PlayerIcon);
+            playerLayer.appendChild(partnerIcon);
+        } else {
+            if (partnerIcon) playerLayer.appendChild(partnerIcon);
+            playerLayer.appendChild(this.Player.PlayerIcon);
+        }
     }
 
     getAutoTravelCharacterIcons() {
@@ -1010,7 +1084,7 @@ class MapController {
         }, GenParam.AutoTravel.iconFadeTime);
     }
 
-    showAutoTravelChrome() {
+    showAutoTravelChrome(statusLabel) {
         this.clearAutoTravelChrome();
 
         let taskSvg = GenParam.SVGObject || document.getElementById("Scannimals_Task_SVG");
@@ -1032,7 +1106,7 @@ class MapController {
         this.autoTravelStatusText = create_SVG_text_elem(
             0.5 * GenParam.SVG_width,
             GenParam.SVG_height - 55,
-            GenParam.AutoTravel.travellingLabel,
+            statusLabel || GenParam.AutoTravel.travellingLabel,
             "auto_travel_status_text",
             "AutoTravelStatusText"
         );
@@ -1092,6 +1166,73 @@ class MapController {
         }, GenParam.AutoTravel.iconHoldDelay);
     }
 
+    getAutoTravelLeaderPos() {
+        if (this.autoTravelOptions && this.autoTravelOptions.leader === "partner" && this.Partner) {
+            return this.Partner.PartnerIconPos;
+        }
+        return this.Player.CurrentPlayerPos;
+    }
+
+    moveAutoTravelLeaderTo(x, y) {
+        if (this.autoTravelOptions && this.autoTravelOptions.leader === "partner" && this.Partner) {
+            this.Partner.force_move_to_coords(x, y);
+            this.moveAutoTravelFollowerTowardLeader();
+            return;
+        }
+
+        this.Player.force_move_to_coords(x, y);
+    }
+
+    beginAutoTravelFollowerLag() {
+        this.autoTravelFollowerEngaged = false;
+        this.autoTravelFollowerMayMoveAt = performance.now() + (GenParam.AutoTravel.followerStartDelay || 0);
+    }
+
+    moveAutoTravelFollowerTowardLeader(forceCatchup = false) {
+        if (!this.autoTravelOptions || this.autoTravelOptions.leader !== "partner" || !this.Partner) {
+            return;
+        }
+
+        if (!forceCatchup && performance.now() < (this.autoTravelFollowerMayMoveAt || 0)) {
+            return;
+        }
+
+        let leaderPos = this.Partner.PartnerIconPos;
+        let followerPos = this.Player.CurrentPlayerPos;
+        let dist = EUDistPoints(followerPos, leaderPos);
+
+        let engageDistance = GenParam.AutoTravel.followerEngageDistance;
+        let holdDistance = GenParam.AutoTravel.followerHoldDistance;
+        let trailDistance = GenParam.AutoTravel.followerTrailDistance;
+        let stopDistance = forceCatchup
+            ? GenParam.AutoTravel.partnerFollowStopDistance
+            : (this.autoTravelFollowerEngaged ? holdDistance : engageDistance);
+
+        if (dist <= stopDistance) {
+            if (!forceCatchup) this.autoTravelFollowerEngaged = false;
+            return;
+        }
+
+        this.autoTravelFollowerEngaged = true;
+
+        let angleRad = Math.atan2(leaderPos.y - followerPos.y, leaderPos.x - followerPos.x);
+        let baseSpeed = forceCatchup
+            ? Math.max(GenParam.AutoTravel.followerSpeed, GenParam.AutoTravel.speed + 1.5)
+            : GenParam.AutoTravel.followerSpeed;
+        // Mild rubber-band: close larger gaps a bit faster without matching the leader 1:1.
+        let gapBeyondTrail = Math.max(0, dist - trailDistance);
+        let dynamicSpeed = baseSpeed + gapBeyondTrail * (GenParam.AutoTravel.followerRubberBand || 0);
+        let maxSpeed = forceCatchup ? 6 : GenParam.AutoTravel.followerMaxSpeed;
+        let stepSize = Math.min(maxSpeed, dynamicSpeed, dist - (forceCatchup ? 0 : trailDistance * 0.35));
+        if (stepSize <= 0) return;
+
+        this.Player.force_move_to_coords(
+            followerPos.x + stepSize * Math.cos(angleRad),
+            followerPos.y + stepSize * Math.sin(angleRad),
+            { notifyPartner: false }
+        );
+    }
+
     autoTravelAlongRoute(routePoints, onComplete, options = {}) {
         if (!Array.isArray(routePoints) || routePoints.length === 0) {
             console.warn("Auto-travel requested without valid route points.");
@@ -1101,16 +1242,23 @@ class MapController {
             return;
         }
 
+        // prepareForAutoTravel may already have resolved options; merge route hooks in.
+        if (!this.autoTravelOptions) {
+            this.autoTravelOptions = this.resolveAutoTravelOptions(options);
+        } else {
+            this.autoTravelOptions = Object.assign({}, this.autoTravelOptions, options);
+        }
+
         let currentTargetIndex = 1;
         let triggeredRoutePointHooks = {};
 
         if (routePoints.length === 1) {
-            this.Player.force_move_to_coords(routePoints[0].x, routePoints[0].y);
+            this.moveAutoTravelLeaderTo(routePoints[0].x, routePoints[0].y);
             this.spawnAutoTravelArrivalRipples(routePoints[0].x, routePoints[0].y);
             this.autoTravelStartTimeout = setTimeout(() => {
                 this.autoTravelStartTimeout = null;
                 this.runAutoTravelStartSequence(() => {
-                    this.finishAutoTravelWithPartnerCatchup(onComplete);
+                    this.finishAutoTravelWithFollowerCatchup(onComplete);
                 });
             }, GenParam.AutoTravel.startDelay);
             return;
@@ -1126,12 +1274,12 @@ class MapController {
         };
 
         const step = () => {
-            let currentPos = this.Player.CurrentPlayerPos;
+            let currentPos = this.getAutoTravelLeaderPos();
             let target = routePoints[currentTargetIndex];
             let dist = EUDistPoints(currentPos, target);
 
             if (dist <= GenParam.AutoTravel.arrivalDistance) {
-                this.Player.force_move_to_coords(target.x, target.y);
+                this.moveAutoTravelLeaderTo(target.x, target.y);
                 if (currentTargetIndex >= routePoints.length - 1) {
                     this.spawnAutoTravelArrivalRipples(target.x, target.y);
                 }
@@ -1142,20 +1290,21 @@ class MapController {
                 if (currentTargetIndex >= routePoints.length) {
                     this.autoTravelFrameId = null;
                     this.autoTravelDistanceSinceTrackmark = 0;
-                    this.finishAutoTravelWithPartnerCatchup(onComplete);
+                    this.finishAutoTravelWithFollowerCatchup(onComplete);
                     return;
                 }
 
                 target = routePoints[currentTargetIndex];
-                dist = EUDistPoints(this.Player.CurrentPlayerPos, target);
+                dist = EUDistPoints(this.getAutoTravelLeaderPos(), target);
             }
 
-            let angleRad = Math.atan2(target.y - this.Player.CurrentPlayerPos.y, target.x - this.Player.CurrentPlayerPos.x);
+            let leaderPos = this.getAutoTravelLeaderPos();
+            let angleRad = Math.atan2(target.y - leaderPos.y, target.x - leaderPos.x);
             let stepSize = Math.min(GenParam.AutoTravel.speed, dist);
-            let nextX = this.Player.CurrentPlayerPos.x + stepSize * Math.cos(angleRad);
-            let nextY = this.Player.CurrentPlayerPos.y + stepSize * Math.sin(angleRad);
+            let nextX = leaderPos.x + stepSize * Math.cos(angleRad);
+            let nextY = leaderPos.y + stepSize * Math.sin(angleRad);
 
-            this.Player.force_move_to_coords(nextX, nextY);
+            this.moveAutoTravelLeaderTo(nextX, nextY);
             this.autoTravelFrameId = requestAnimationFrame(step);
             this.maybeSpawnAutoTravelTrackmark(stepSize);
         };
@@ -1168,6 +1317,7 @@ class MapController {
         this.autoTravelStartTimeout = setTimeout(() => {
             this.autoTravelStartTimeout = null;
             this.runAutoTravelStartSequence(() => {
+                this.beginAutoTravelFollowerLag();
                 this.autoTravelFrameId = requestAnimationFrame(step);
             });
         }, GenParam.AutoTravel.startDelay);
@@ -1201,15 +1351,50 @@ class MapController {
         });
     }
 
-    finishAutoTravelWithPartnerCatchup(onComplete) {
+    finishAutoTravelWithFollowerCatchup(onComplete) {
         const finish = () => {
             if (this.Partner) {
                 this.Partner.setAutoTravelFollowMode(false);
+                this.Partner.setAutoTravelLeadMode(false);
             }
 
+            // Snap follower onto the leader so arrival looks clean.
+            let leaderPos = this.getAutoTravelLeaderPos();
+            if (this.autoTravelOptions && this.autoTravelOptions.leader === "partner" && this.Partner) {
+                this.Player.force_move_to_coords(leaderPos.x, leaderPos.y, { notifyPartner: false });
+            } else if (this.Partner && this.autoTravelOptions && this.autoTravelOptions.partnerPresent) {
+                this.Partner.jump_to_position(leaderPos.x, leaderPos.y);
+            }
+
+            this.autoTravelOptions = null;
             this.runAutoTravelArrivalSequence(onComplete);
         };
 
+        let leader = this.autoTravelOptions && this.autoTravelOptions.leader;
+
+        // Partner-led: wait for the player to close the trail gap.
+        if (leader === "partner" && this.Partner) {
+            this.autoTravelFollowerMayMoveAt = 0;
+            this.autoTravelFollowerEngaged = true;
+            const catchupStartedAt = performance.now();
+            const waitForPlayer = () => {
+                this.moveAutoTravelFollowerTowardLeader(true);
+                let dist = EUDistPoints(this.Player.CurrentPlayerPos, this.Partner.PartnerIconPos);
+                let timedOut = performance.now() - catchupStartedAt >= GenParam.AutoTravel.partnerCatchupDelay;
+
+                if (dist <= GenParam.AutoTravel.partnerFollowStopDistance || timedOut) {
+                    finish();
+                    return;
+                }
+
+                requestAnimationFrame(waitForPlayer);
+            };
+
+            requestAnimationFrame(waitForPlayer);
+            return;
+        }
+
+        // Player-led: wait for the partner to catch up (legacy behavior).
         if (!this.Partner || !this.Partner.currently_following_player) {
             setTimeout(finish, GenParam.AutoTravel.partnerCatchupDelay);
             return;
@@ -1246,7 +1431,8 @@ class MapController {
         if (this.autoTravelDistanceSinceTrackmark < GenParam.MapFlair.trackmarkSpacing) return;
 
         this.autoTravelDistanceSinceTrackmark = 0;
-        this.spawnAutoTravelTrackmark(this.Player.CurrentPlayerPos.x, this.Player.CurrentPlayerPos.y);
+        let leaderPos = this.getAutoTravelLeaderPos();
+        this.spawnAutoTravelTrackmark(leaderPos.x, leaderPos.y);
     }
 
     spawnAutoTravelTrackmark(x, y) {
@@ -1269,9 +1455,9 @@ class MapController {
         setTimeout(() => mark.remove(), GenParam.MapFlair.trackmarkFadeTime + 50);
     }
 
-    autoTravelToTrialLocation(trialObj, onComplete) {
+    autoTravelToTrialLocation(trialObj, onComplete, travelOptions = {}) {
         let route = this.buildAutoRouteToLocation(trialObj);
-        this.prepareForAutoTravel(route[0]);
+        this.prepareForAutoTravel(route[0], travelOptions);
 
         // Route index 0 = phone room.
         // Route index 1 = first regional waypoint, if present.
@@ -1287,19 +1473,136 @@ class MapController {
         }, { regionAtRoutePoint: regionAtRoutePoint });
     }
 
-    autoTravelBackToPhoneRoom(trialObj, onComplete) {
+    autoTravelBackToPhoneRoom(trialObj, onComplete, travelOptions = {}) {
         let route = this.buildAutoRouteBackToPhoneRoom(trialObj);
-        this.prepareForAutoTravel(route[0]);
+        this.prepareForAutoTravel(route[0], travelOptions);
 
         // The final route point is the phone room/Home fallback.
-        // Force Home there so return travel cannot miss the region-leave trigger.
+        // Also flip to Home at the last regional waypoint (was the region-entry waypoint
+        // on the outbound leg) so partner-led returns don't wait until the phone room.
         let regionAtRoutePoint = {};
         regionAtRoutePoint[route.length - 1] = "Home";
+        if (route.length > 2) {
+            regionAtRoutePoint[route.length - 2] = "Home";
+        }
 
         this.autoTravelAlongRoute(route, () => {
             this.forceAutoTravelRegion("Home");
             if (onComplete) onComplete();
         }, { regionAtRoutePoint: regionAtRoutePoint });
+    }
+
+    /**
+     * Walk the map partner icon to the player's current position (player stays fixed).
+     */
+    animatePartnerToPlayer(durationMs = 1200) {
+        return new Promise((resolve) => {
+            if (!this.Partner || !this.Player) {
+                resolve();
+                return;
+            }
+
+            this.Partner.setAutoTravelLeadMode(true);
+            let start = {
+                x: this.Partner.PartnerIconPos.x,
+                y: this.Partner.PartnerIconPos.y
+            };
+            let end = {
+                x: this.Player.CurrentPlayerPos.x,
+                y: this.Player.CurrentPlayerPos.y
+            };
+            let startedAt = performance.now();
+
+            const step = (now) => {
+                let t = Math.min(1, (now - startedAt) / durationMs);
+                // ease-in-out
+                let e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+                let x = start.x + (end.x - start.x) * e;
+                let y = start.y + (end.y - start.y) * e;
+                this.Partner.force_move_to_coords(x, y);
+                if (t < 1) {
+                    requestAnimationFrame(step);
+                } else {
+                    this.Partner.jump_to_position(end.x, end.y);
+                    this.Partner.setAutoTravelLeadMode(false);
+                    resolve();
+                }
+            };
+            requestAnimationFrame(step);
+        });
+    }
+
+    startPhoneRoomProximityReturnWatch(onArrive) {
+        this.stopPhoneRoomProximityReturnWatch();
+        this.awaitingPhoneRoomProximityReturn = true;
+        this.phoneRoomProximityReturnCallback = onArrive;
+
+        const threshold = Math.max(GenParam.location_detection_distance * 1.4, 48);
+        this.phoneRoomProximityReturnInterval = setInterval(() => {
+            if (!this.awaitingPhoneRoomProximityReturn) return;
+            if (!this.Player) return;
+            let phonePoint = this.getPhoneRoomMapPoint();
+            let dist = EUDistPoints(this.Player.CurrentPlayerPos, phonePoint);
+            if (dist <= threshold) {
+                let cb = this.phoneRoomProximityReturnCallback;
+                this.stopPhoneRoomProximityReturnWatch();
+                if (cb) cb();
+            }
+        }, 200);
+    }
+
+    stopPhoneRoomProximityReturnWatch() {
+        this.awaitingPhoneRoomProximityReturn = false;
+        this.phoneRoomProximityReturnCallback = null;
+        if (this.phoneRoomProximityReturnInterval) {
+            clearInterval(this.phoneRoomProximityReturnInterval);
+            this.phoneRoomProximityReturnInterval = null;
+        }
+    }
+
+    /**
+     * Manual walk-home arrival: lock movement, magnetically settle on the phone room,
+     * then fade icons like a normal autotravel arrival before continuing the phone-room queue.
+     */
+    runManualPhoneRoomArrivalSequence(onComplete) {
+        this.disable_map_interactions();
+        this.remove_all_action_buttons();
+
+        let dest = this.getPhoneRoomMapPoint();
+        let start = {
+            x: this.Player.CurrentPlayerPos.x,
+            y: this.Player.CurrentPlayerPos.y
+        };
+        let durationMs = 550;
+        let startedAt = performance.now();
+
+        if (this.Partner) {
+            this.Partner.setAutoTravelFollowMode(true);
+            this.Partner.player_moved_to_location(dest.x, dest.y);
+        }
+
+        const step = (now) => {
+            let t = Math.min(1, (now - startedAt) / durationMs);
+            let e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+            let x = start.x + (dest.x - start.x) * e;
+            let y = start.y + (dest.y - start.y) * e;
+            this.Player.force_move_to_coords(x, y, { notifyPartner: true });
+            if (t < 1) {
+                requestAnimationFrame(step);
+                return;
+            }
+
+            this.Player.force_move_to_coords(dest.x, dest.y, { notifyPartner: true });
+            if (this.Partner) {
+                this.Partner.jump_to_position(dest.x, dest.y);
+                this.Partner.setAutoTravelFollowMode(false);
+            }
+            this.forceAutoTravelRegion("Home");
+            this.runAutoTravelArrivalSequence(() => {
+                if (onComplete) onComplete();
+            });
+        };
+        requestAnimationFrame(step);
     }
 
 
@@ -1325,6 +1628,13 @@ class MapController {
     enable_map_interactions() {
         this.resetAutoTravelCharacterIconOpacity();
         this.clearAutoTravelChrome();
+        if (this.Partner) {
+            this.Partner.setAutoTravelFollowMode(false);
+            this.Partner.setAutoTravelLeadMode(false);
+        }
+        this.autoTravelOptions = null;
+        // Restore default stack: player above partner.
+        this.syncAutoTravelIconStackOrder();
         this.Player.allow_movement();
         AudioCont.play_region_sound(this.current_region);
         this.Partner.update_behavior();
@@ -1633,7 +1943,7 @@ class MapController {
             }
         }
 
-        force_move_to_coords(x, y) {
+        force_move_to_coords(x, y, options = {}) {
             if (x === this.CurrentPlayerPos.x && y === this.CurrentPlayerPos.y) return;
 
             let delta_x = x - this.CurrentPlayerPos.x;
@@ -1648,7 +1958,9 @@ class MapController {
                 this.update_player_icon_direction(delta_y > 0 ? "down" : "up");
             }
 
-            if (this.MapCont.Partner) this.MapCont.Partner.player_moved_to_location(x, y);
+            if (options.notifyPartner !== false && this.MapCont.Partner) {
+                this.MapCont.Partner.player_moved_to_location(x, y);
+            }
             Interface.FenneFinder.update_player_location(this.CurrentPlayerPos);
 
             this.check_for_region_shift();
@@ -1656,6 +1968,13 @@ class MapController {
 
 
         check_for_region_shift() {
+            // During auto-travel, region changes are driven exclusively by route waypoints
+            // (see regionAtRoutePoint). Player trail / partner lead positions must not
+            // flicker Home↔region by brushing invisible enter/leave polygons.
+            if (this.MapCont.autoTravelOptions || this.MapCont.autoTravelFrameId) {
+                return;
+            }
+
             let PointObj = GenParam.SVGObject.createSVGPoint();
             PointObj.x = this.CurrentPlayerPos.x; PointObj.y = this.CurrentPlayerPos.y;
 
@@ -1789,6 +2108,7 @@ class MapController {
             this.currently_following_player = false;
             this.currently_on_the_move = false;
             this.autoTravelFollowMode = false;
+            this.autoTravelLeadMode = false;
             this.animationFrameId = null;
 
             this.PartnerIcon = create_SVG_group(false, false, false, "PartnerIconGroup");
@@ -1853,11 +2173,39 @@ class MapController {
         setAutoTravelFollowMode(enabled) {
             this.autoTravelFollowMode = !!enabled;
             if (enabled) {
+                this.autoTravelLeadMode = false;
                 this.currently_on_the_move = true;
             }
         }
 
+        setAutoTravelLeadMode(enabled) {
+            this.autoTravelLeadMode = !!enabled;
+            if (enabled) {
+                this.autoTravelFollowMode = false;
+                this.TargetPos = false;
+                this.currently_on_the_move = true;
+            }
+        }
+
+        force_move_to_coords(x, y) {
+            if (x === this.PartnerIconPos.x && y === this.PartnerIconPos.y) return;
+
+            let delta_x = x - this.PartnerIconPos.x;
+            let delta_y = y - this.PartnerIconPos.y;
+
+            this.PartnerIconPos = { x: parseFloat(x), y: parseFloat(y) };
+            this.PartnerIcon.style.transform = `translate(${this.PartnerIconPos.x}px, ${this.PartnerIconPos.y}px)`;
+
+            if (Math.abs(delta_x) > Math.abs(delta_y)) {
+                this.update_icon_direction(delta_x > 0 ? "right" : "left");
+            } else {
+                this.update_icon_direction(delta_y > 0 ? "down" : "up");
+            }
+        }
+
         step_logic() {
+            if (this.autoTravelLeadMode) return;
+
             if (this.currently_following_player && this.TargetPos) {
                 let dist_to_player = EUDistPoints(this.PartnerIconPos, this.TargetPos);
                 let critical_movement_distance = this.autoTravelFollowMode

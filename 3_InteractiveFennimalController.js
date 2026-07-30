@@ -4150,6 +4150,775 @@ class ToyToBoxTrialController {
     }
 }
 
+/**
+ * Phone-room variant of toy_to_box: partner is called away, player reuses a box alone,
+ * then walks home manually with the partner rejoining on the map.
+ * Reality (box contents) updates; partner beliefs do not.
+ */
+class SwitchBoxWithoutPartnerTrialController {
+    constructor(FenObj, partner_is_present, returnfunc) {
+        this.FenObj = FenObj;
+        this.returnfunc = returnfunc;
+
+        // Hard-force partner for this interaction type (ignore phase partner_presence).
+        this.basics = new BasicElementsModule(FenObj);
+        this.box = new BoxModule(FenObj);
+        this.toy = new StandardToyModule(FenObj);
+        this.partner = new PartnerModule(true);
+
+        this.old_toy = null;
+        this.old_sack = null;
+        this.oldItemDragController = null;
+        this.toyDragController = null;
+        this.clearMode = null;
+        this.boxNeedsClearing = false;
+        this.partnerLeftScene = false;
+
+        this.boxScale = 4;
+        this.previewBoxScale = 2;
+        this.sackScale = 3;
+        this.sackBoxShrinkFactor = 0.65;
+        this.binProximityX = 220;
+
+        this.Backpack = null;
+        this.previewBoxes = []; // { toybox, module, group }
+        this.boxY = null;
+    }
+
+    getScaledTemplateHalfWidth(elementId, scale) {
+        let template = document.getElementById(elementId);
+        if (!template) return 180 * (scale / 4);
+        let box = template.getBBox();
+        return (Math.max(box.width, 1) * scale) / 2;
+    }
+
+    pickDiversionLocation() {
+        let region = this.FenObj.region;
+        let regionData = GenParam.RegionData[region];
+        let locations = regionData && Array.isArray(regionData.Locations)
+            ? regionData.Locations.slice()
+            : [];
+
+        let occupied = new Set();
+        if (typeof topController !== "undefined" && topController.currentPhaseData) {
+            let phaseFens = topController.currentPhaseData.Fennimals_in_phase || [];
+            phaseFens.forEach((f) => {
+                if (f && f.location) occupied.add(f.location);
+            });
+        }
+        occupied.add(this.FenObj.location);
+
+        let candidates = locations.filter((loc) => !occupied.has(loc));
+        if (candidates.length === 0) {
+            candidates = locations.filter((loc) => loc !== this.FenObj.location);
+        }
+        if (candidates.length === 0) {
+            console.warn("switch_box_without_partner: no diversion location found; using current.");
+            return this.FenObj.location;
+        }
+        return shuffleArray(candidates)[0];
+    }
+
+    getBoxesInSubblock() {
+        if (Array.isArray(this.FenObj.boxes_in_subblock) && this.FenObj.boxes_in_subblock.length > 0) {
+            return this.FenObj.boxes_in_subblock.slice();
+        }
+        return this.FenObj.toybox ? [this.FenObj.toybox] : [];
+    }
+
+    async start_sequence() {
+        this.FenObj.force_partner_present = true;
+        this.FenObj.return_travel = "manual";
+        this.FenObj.partner_diversion_location = this.pickDiversionLocation();
+
+        this.basics.create_svg_sublayers();
+        this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        await this.basics.create_background_mask(true, 500);
+
+        const toyScale = this.boxScale;
+        const toyCenterY = 0.55 * this.basics.H;
+        const toyCenterX = 0.32 * this.basics.W;
+        this.boxY = 0.7 * this.basics.H;
+
+        await this.toy.create_and_appear_toy(
+            this.basics.ItemLayers.Plus1,
+            "main",
+            toyCenterX,
+            toyCenterY,
+            toyScale,
+            200
+        );
+        this.toy.ToyElement.style.transition = "all 200ms ease-out";
+        this.toy.ToyElement.style.transform += "translate(0px, 150px)";
+        await wait(200);
+
+        await this.run_partner_phone_departure();
+        await this.run_backpack_box_selection();
+        await this.run_box_clear_and_place();
+    }
+
+    async run_partner_phone_departure() {
+        AudioCont.play_sound_effect("partner_cellphone");
+        await wait(1200);
+
+        this.partner.set_direction("back_phone");
+        await this.partner.animate_offset(-180, -40, 450);
+        await wait(750);
+
+        this.partner.set_direction("front");
+        await wait(200);
+
+        let diversionLabel = GenParam.get_display_name_of_location(this.FenObj.partner_diversion_location);
+        let bubbleText =
+            `There's a minor situation over at ${diversionLabel}. ` +
+            `I'll go check it out. I'll leave my backpack here — can you take care of things here while I'm gone?`;
+        if (typeof Interface.showPartnerSpeechBubble === "function") {
+            await Interface.showPartnerSpeechBubble({
+                target: this.partner.PartnerBaseGroup,
+                context: "location",
+                text: bubbleText,
+                buttonLabel: "No problem!"
+            });
+        } else if (typeof PartnerSpeechBubbleController === "function") {
+            Interface.PartnerSpeechBubble = new PartnerSpeechBubbleController();
+            await Interface.PartnerSpeechBubble.show({
+                target: this.partner.PartnerBaseGroup,
+                context: "location",
+                text: bubbleText,
+                buttonLabel: "No problem!"
+            });
+        } else {
+            console.error(
+                "PartnerSpeechBubble missing — hard-refresh the page (Ctrl+Shift+R) so 3_Interface.js reloads."
+            );
+            // Unblock the trial if a stale Interface.js is cached.
+            await wait(800);
+        }
+
+        this.partner.set_direction("right");
+        await this.partner.animate_offset(700, -40, 650);
+        this.partner.PartnerBaseGroup.style.transition = "opacity 300ms ease-in";
+        this.partner.PartnerBaseGroup.style.opacity = 0;
+        await wait(320);
+        this.partner.PartnerBaseGroup.style.display = "none";
+        this.partnerLeftScene = true;
+        this.partner.is_present = false;
+
+        await wait(250);
+    }
+
+    async run_backpack_box_selection() {
+        this.spawn_backpack();
+        await this.fade_in_backpack(350);
+        Interface.Prompt.show_message("Click to open the backpack");
+        AudioCont.play_sound_effect("alert_minor");
+        await this.wait_for_backpack_open_click();
+        await this.open_backpack();
+
+        let boxIds = this.getBoxesInSubblock();
+        if (!boxIds.includes(this.FenObj.toybox)) boxIds.push(this.FenObj.toybox);
+
+        await this.pop_boxes_from_backpack(boxIds);
+        Interface.Prompt.show_message(
+            `Oops! We don't have enough boxes. Lets reuse the ${this.box.boxname}!`
+        );
+        await wait(900);
+        await this.focus_target_box_and_stow_others();
+    }
+
+    spawn_backpack() {
+        let template = document.getElementById("backpack");
+        if (!template) {
+            console.error("switch_box_without_partner: #backpack not found");
+            return;
+        }
+        this.Backpack = copy_scale_and_move_object_to_position(
+            template,
+            this.basics.ItemLayers.Plus1,
+            0.88 * this.basics.W,
+            0.78 * this.basics.H,
+            3
+        );
+        this.Backpack.id = "switch_box_backpack";
+        this.Backpack.style.opacity = 0;
+        let flaps = this.Backpack.getElementsByClassName("backpack_flap");
+        for (let i = 0; i < flaps.length; i++) {
+            flaps[i].style.display = "inherit";
+            if (flaps[i].id && flaps[i].id.includes("closed")) flaps[i].style.opacity = 1;
+            if (flaps[i].id && flaps[i].id.includes("open")) flaps[i].style.opacity = 0;
+        }
+    }
+
+    async fade_in_backpack(ms = 350) {
+        if (!this.Backpack) return;
+        this.Backpack.style.transition = `opacity ${ms}ms ease-in`;
+        void this.Backpack.getBoundingClientRect();
+        this.Backpack.style.opacity = 1;
+        await wait(ms);
+    }
+
+    wait_for_backpack_open_click() {
+        return new Promise((resolve) => {
+            if (!this.Backpack) {
+                resolve();
+                return;
+            }
+            this.Backpack.style.cursor = "pointer";
+            this.Backpack.style.pointerEvents = "auto";
+
+            let outline = create_SVG_outline_of_group_ID(this.Backpack);
+            this.Backpack.parentNode.insertBefore(outline, this.Backpack);
+            outline.classList.add("focus_on_SVG_outline");
+
+            const onClick = () => {
+                this.Backpack.onpointerdown = null;
+                this.Backpack.style.cursor = "auto";
+                if (outline && outline.parentNode) outline.remove();
+                resolve();
+            };
+            this.Backpack.onpointerdown = onClick;
+        });
+    }
+
+    open_backpack() {
+        if (!this.Backpack) return wait(0);
+        let flaps = this.Backpack.getElementsByClassName("backpack_flap");
+        for (let i = 0; i < flaps.length; i++) {
+            flaps[i].style.display = "inherit";
+            flaps[i].style.transition = "opacity 250ms ease-in-out";
+            if (flaps[i].id && flaps[i].id.includes("closed")) flaps[i].style.opacity = 0;
+            if (flaps[i].id && flaps[i].id.includes("open")) flaps[i].style.opacity = 1;
+        }
+        return wait(280);
+    }
+
+    get_preview_slot_ys(count) {
+        let top = 0.22 * this.basics.H;
+        let bottom = 0.55 * this.basics.H;
+        if (count <= 1) return [(top + bottom) / 2];
+        let ys = [];
+        for (let i = 0; i < count; i++) {
+            ys.push(top + (i / (count - 1)) * (bottom - top));
+        }
+        return ys;
+    }
+
+    async pop_boxes_from_backpack(boxIds) {
+        const x = 0.88 * this.basics.W;
+        const startY = 0.78 * this.basics.H - 40;
+        const ys = this.get_preview_slot_ys(boxIds.length);
+        this.previewBoxes = [];
+
+        for (let i = 0; i < boxIds.length; i++) {
+            let toybox = boxIds[i];
+            let module = new BoxModule({ toybox: toybox });
+            await module.create_and_appear_box(
+                this.basics.ItemLayers.Main,
+                this.basics.ItemLayers.Plus2,
+                x,
+                startY,
+                this.previewBoxScale,
+                120
+            );
+            let el = module.BoxBase;
+            let targetY = ys[i];
+            let cur = getSVGInternalCenter(el);
+            el.style.transition = "transform 450ms ease-out";
+            el.style.transform += ` translate(${0}px, ${targetY - cur.y}px)`;
+            if (module.BoxTop) {
+                module.BoxTop.style.transition = "transform 450ms ease-out";
+                module.BoxTop.style.transform += ` translate(${0}px, ${targetY - cur.y}px)`;
+            }
+            this.previewBoxes.push({ toybox, module });
+            await wait(120);
+        }
+        await wait(400);
+    }
+
+    async focus_target_box_and_stow_others() {
+        let targetEntry = this.previewBoxes.find((b) => b.toybox === this.FenObj.toybox);
+        let others = this.previewBoxes.filter((b) => b.toybox !== this.FenObj.toybox);
+        let backpackCenter = this.Backpack
+            ? getSVGInternalCenter(this.Backpack)
+            : { x: 0.88 * this.basics.W, y: 0.78 * this.basics.H };
+
+        for (let entry of others) {
+            await this.animate_box_into_backpack(entry.module, backpackCenter);
+            entry.module.clean_up();
+        }
+
+        const boxCenterX = 0.5 * this.basics.W;
+        const boxCenterY = this.boxY;
+
+        if (targetEntry && targetEntry.module && targetEntry.module.BoxBase) {
+            let start = getSVGInternalCenter(targetEntry.module.BoxBase);
+            // Spawn the working-size box on the preview, then slide+scale feel via translate to center.
+            await this.box.create_and_appear_box(
+                this.basics.ItemLayers.Main,
+                this.basics.ItemLayers.Plus2,
+                start.x,
+                start.y,
+                this.boxScale,
+                120
+            );
+            targetEntry.module.clean_up();
+            this.previewBoxes = [];
+            await this.animate_box_module_to_point(this.box, boxCenterX, boxCenterY, 550);
+        } else {
+            this.previewBoxes = [];
+            await this.box.create_and_appear_box(
+                this.basics.ItemLayers.Main,
+                this.basics.ItemLayers.Plus2,
+                boxCenterX,
+                boxCenterY,
+                this.boxScale,
+                180
+            );
+            await wait(400);
+        }
+    }
+
+    async animate_box_module_to_point(boxModule, targetX, targetY, ms = 500) {
+        if (!boxModule || !boxModule.BoxBase) return;
+        let cur = getSVGInternalCenter(boxModule.BoxBase);
+        let dx = targetX - cur.x;
+        let dy = targetY - cur.y;
+        boxModule.BoxBase.style.transition = `transform ${ms}ms ease-in-out`;
+        boxModule.BoxBase.style.transform += ` translate(${dx}px, ${dy}px)`;
+        if (boxModule.BoxTop) {
+            boxModule.BoxTop.style.transition = `transform ${ms}ms ease-in-out`;
+            boxModule.BoxTop.style.transform += ` translate(${dx}px, ${dy}px)`;
+        }
+        await wait(ms);
+    }
+
+    async animate_box_into_backpack(boxModule, backpackCenter, options = {}) {
+        let el = boxModule.BoxBase;
+        let top = boxModule.BoxTop;
+        let includeTop = options.includeTop !== false && top;
+        if (!el) return;
+
+        // Keep the crate above the backpack so the shrink/fade is visible (Base lives on Main).
+        let overlay = this.basics.ItemLayers.Plus2;
+        if (overlay) {
+            overlay.appendChild(el);
+            if (includeTop) overlay.appendChild(top);
+        }
+
+        let cur = getSVGInternalCenter(el);
+        let dx = backpackCenter.x - cur.x;
+        let dy = backpackCenter.y - cur.y;
+
+        el.style.transition = "none";
+        if (includeTop) top.style.transition = "none";
+        void el.getBoundingClientRect();
+
+        el.style.transition = "transform 400ms ease-in, opacity 400ms ease-in";
+        el.style.transform += ` translate(${dx}px, ${dy}px) scale(0.4)`;
+        el.style.opacity = 0;
+        if (includeTop) {
+            let topCur = getSVGInternalCenter(top);
+            top.style.transition = "transform 400ms ease-in, opacity 400ms ease-in";
+            top.style.transform += ` translate(${backpackCenter.x - topCur.x}px, ${backpackCenter.y - topCur.y}px) scale(0.4)`;
+            top.style.opacity = 0;
+        }
+        await wait(420);
+    }
+
+    async stow_closed_box_in_backpack() {
+        if (this.toy && this.toy.ToyElement) {
+            this.toy.ToyElement.style.opacity = 0;
+            this.toy.ToyElement.style.pointerEvents = "none";
+        }
+
+        if (!this.Backpack) {
+            this.spawn_backpack();
+            await this.fade_in_backpack(280);
+            await this.open_backpack();
+        }
+
+        if (this.box && typeof this.box.set_pointer_events_enabled === "function") {
+            this.box.set_pointer_events_enabled(true);
+        }
+
+        // Keep the full closed crate visible: snap front/lid onto the back before dragging.
+        this.syncBoxTopToBase();
+
+        Interface.Prompt.show_message("Put the " + this.box.boxname + " into the backpack");
+        AudioCont.play_sound_effect("alert_minor");
+
+        await new Promise((resolve) => {
+            let dragEl = this.box.BoxBase;
+            dragEl.style.pointerEvents = "auto";
+            dragEl.style.cursor = "pointer";
+
+            this.boxStowDragController = new MakeObjectDraggableObject(
+                this.basics.ItemLayers.Plus2,
+                this.basics.ItemLayers.Plus2,
+                dragEl,
+                this.Backpack,
+                this.binProximityX,
+                async (DraggedElement) => {
+                    if (this.boxStowDragController && this.boxStowDragController.destroy) {
+                        this.boxStowDragController.destroy();
+                    }
+                    this.boxStowDragController = null;
+                    DraggedElement.style.pointerEvents = "none";
+                    DraggedElement.style.cursor = "auto";
+
+                    await this.animate_box_into_backpack(
+                        this.box,
+                        getSVGInternalCenter(this.Backpack),
+                        { includeTop: true }
+                    );
+                    await this.close_backpack();
+                    Interface.Prompt.hide();
+                    resolve();
+                },
+                {
+                    // Front/lid share one drag group with the back → one outline, one snap-back.
+                    extraElements: this.box.BoxTop ? [this.box.BoxTop] : [],
+                    validateDrop: () => {
+                        if (!this.Backpack) return false;
+                        let itemCenter = getSVGInternalCenter(dragEl);
+                        let bp = getSVGInternalCenter(this.Backpack);
+                        return Math.abs(itemCenter.x - bp.x) <= this.binProximityX
+                            && Math.abs(itemCenter.y - bp.y) <= this.binProximityX * 1.4;
+                    },
+                    onMiss: () => {
+                        Interface.Prompt.show_message("Drop the box near the backpack");
+                        if (this.boxStowDragController && this.boxStowDragController.enable) {
+                            this.boxStowDragController.enable();
+                        }
+                    }
+                }
+            );
+        });
+    }
+
+    syncBoxTopToBase() {
+        if (!this.box || !this.box.BoxBase || !this.box.BoxTop) return;
+        let baseC = getSVGInternalCenter(this.box.BoxBase);
+        let topC = getSVGInternalCenter(this.box.BoxTop);
+        this.box.BoxTop.style.transition = "none";
+        this.box.BoxTop.style.opacity = 1;
+        this.box.BoxTop.style.transform += ` translate(${baseC.x - topC.x}px, ${baseC.y - topC.y}px)`;
+        void this.box.BoxTop.getBoundingClientRect();
+    }
+
+    async run_box_clear_and_place() {
+        let boxEntry = WorldState.get_toybox_entry(this.FenObj.toybox);
+        let currentSack = boxEntry ? boxEntry.sack : false;
+        let currentToy = boxEntry ? boxEntry.toy : false;
+
+        if (currentSack) {
+            this.clearMode = "sack";
+            this.boxNeedsClearing = true;
+        } else if (currentToy && currentToy !== this.FenObj.toy) {
+            this.clearMode = "toy";
+            this.boxNeedsClearing = true;
+        } else {
+            this.clearMode = null;
+            this.boxNeedsClearing = false;
+        }
+
+        if (this.clearMode === "sack") {
+            this.old_sack = new SackModule({ sack: currentSack });
+            let boxTarget = getSVGInternalCenter(this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0]);
+            await this.old_sack.create_and_appear_closed_sack_item(
+                this.basics.ItemLayers.Plus1,
+                boxTarget.x,
+                boxTarget.y,
+                this.sackScale * this.sackBoxShrinkFactor,
+                0
+            );
+        } else if (this.clearMode === "toy") {
+            this.old_toy = new StandardToyModule({ toy: currentToy });
+            let boxTarget = getSVGInternalCenter(this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0]);
+            await this.old_toy.create_and_appear_toy(
+                this.basics.ItemLayers.Plus1,
+                "old_box_contents",
+                boxTarget.x,
+                boxTarget.y,
+                this.boxScale,
+                0
+            );
+        }
+
+        Interface.Prompt.show_message("Click to open the " + this.box.boxname);
+        await new Promise((resolve) => this.box.wait_for_user_click("open", () => resolve()));
+        await wait(400);
+        this.box.set_pointer_events_enabled(false);
+
+        if (this.boxNeedsClearing) {
+            await this.clear_occupied_box_into_backpack();
+        }
+
+        this.handle_box_opened();
+    }
+
+    async clear_occupied_box_into_backpack() {
+        let dragElement = null;
+        let label = "";
+        if (this.clearMode === "sack") {
+            label = this.old_sack.sackname;
+            dragElement = this.old_sack.SackItem;
+        } else {
+            label = this.old_toy.FenObj.toy;
+            dragElement = this.old_toy.ToyElement;
+        }
+
+        Interface.Prompt.show_message(`Lets put the ${label} back into the backpack`);
+        AudioCont.play_sound_effect("alert_minor");
+
+        let backpackTarget = this.Backpack;
+        await new Promise((resolve) => {
+            dragElement.style.pointerEvents = "auto";
+            this.oldItemDragController = new MakeObjectDraggableObject(
+                this.basics.ItemLayers.Main,
+                this.basics.ItemLayers.Plus2,
+                dragElement,
+                backpackTarget,
+                this.binProximityX,
+                async (DraggedElement) => {
+                    if (this.oldItemDragController && this.oldItemDragController.destroy) {
+                        this.oldItemDragController.destroy();
+                    }
+                    this.oldItemDragController = null;
+                    DraggedElement.style.pointerEvents = "none";
+                    DraggedElement.style.cursor = "auto";
+                    await this.animate_item_fade_into_backpack(DraggedElement);
+                    this.clearBoxWorldStateRealityOnly();
+                    Interface.Prompt.hide();
+                    resolve();
+                },
+                {
+                    validateDrop: () => {
+                        if (!backpackTarget) return false;
+                        let itemCenter = getSVGInternalCenter(dragElement);
+                        let bp = getSVGInternalCenter(backpackTarget);
+                        return Math.abs(itemCenter.x - bp.x) <= this.binProximityX
+                            && Math.abs(itemCenter.y - bp.y) <= this.binProximityX * 1.4;
+                    },
+                    onMiss: () => {
+                        Interface.Prompt.show_message("Drop it near the backpack");
+                        if (this.oldItemDragController && this.oldItemDragController.enable) {
+                            this.oldItemDragController.enable();
+                        }
+                    }
+                }
+            );
+        });
+    }
+
+    async animate_item_fade_into_backpack(element) {
+        if (!element) return;
+        let bp = this.Backpack
+            ? getSVGInternalCenter(this.Backpack)
+            : { x: 0.88 * this.basics.W, y: 0.78 * this.basics.H };
+        let cur = getSVGInternalCenter(element);
+        element.style.transition = "transform 350ms ease-in, opacity 350ms ease-in";
+        element.style.transform += ` translate(${bp.x - cur.x}px, ${bp.y - cur.y}px) scale(0.35)`;
+        element.style.opacity = 0;
+        await wait(380);
+    }
+
+    clearBoxWorldStateRealityOnly() {
+        let oldSackId = this.old_sack ? this.old_sack.FenObj.sack : null;
+        WorldState.clear_toybox_contents(this.FenObj.toybox);
+        if (oldSackId) {
+            WorldState.clear_sack_contents(oldSackId);
+        }
+        // Intentionally do NOT update partner beliefs — partner was not present.
+    }
+
+    handle_box_opened() {
+        Interface.Prompt.show_message("Please place the " + this.FenObj.toy + " in the " + this.box.boxname);
+        AudioCont.play_sound_effect("alert_minor");
+
+        this.toyDragController = new MakeObjectDraggableObject(
+            this.basics.ItemLayers.Main,
+            this.basics.ItemLayers.Plus2,
+            this.toy.ToyElement,
+            this.box.BoxBase,
+            200,
+            (DroppedToyElement) => {
+                this.toyDragController = null;
+                shared_toy_drop_sequence(
+                    DroppedToyElement,
+                    this.box,
+                    this.basics,
+                    this.partner,
+                    this.FenObj,
+                    () => this.after_toy_placed(),
+                    { updatePartnerBelief: false, forceUserClose: true }
+                );
+            }
+        );
+    }
+
+    async after_toy_placed() {
+        // Keep backpack visible; hide the placed toy so the closed box doesn't leak the answer.
+        if (this.toy && this.toy.ToyElement) {
+            this.toy.ToyElement.style.transition = "opacity 150ms ease-in";
+            this.toy.ToyElement.style.opacity = 0;
+            await wait(150);
+        }
+        await this.run_placement_quiz();
+    }
+
+    getPlacementQuizOptions() {
+        let options = Array.isArray(this.FenObj.placement_quiz_options)
+            ? [...this.FenObj.placement_quiz_options]
+            : [];
+        if (this.FenObj.toy && !options.includes(this.FenObj.toy)) {
+            options.push(this.FenObj.toy);
+        }
+        return options.filter(Boolean);
+    }
+
+    async run_placement_quiz() {
+        let options = this.getPlacementQuizOptions();
+        if (options.length === 0) {
+            Interface.Prompt.show_message(
+                "The " + this.FenObj.toy + " is now safely in the " + this.box.boxname + "!"
+            );
+            await wait(1200);
+            Interface.Prompt.hide();
+            await this.stow_closed_box_in_backpack();
+            this.finish_trial();
+            return;
+        }
+
+        this.FenObj.placement_errors = [];
+        let bar = new ToyChoiceBar(
+            this.basics.ItemLayers.Questions,
+            this.basics.W,
+            this.basics.H
+        );
+
+        while (true) {
+            Interface.Prompt.show_message(
+                "Which toy did you just place in the " + this.box.boxname + "?"
+            );
+            let selected = await bar.waitForSelection(shuffleArray([...options]));
+
+            if (selected === this.FenObj.toy) {
+                AudioCont.play_sound_effect("positive");
+                await bar.hide();
+                let burstCenter = getSVGInternalCenter(this.box.BoxBase);
+                await spawn_confetti_burst(
+                    this.basics.ItemLayers.Plus2,
+                    burstCenter.x,
+                    burstCenter.y,
+                    { awaitPopMs: 900 }
+                );
+                Interface.Prompt.hide();
+                await this.stow_closed_box_in_backpack();
+                this.finish_trial();
+                return;
+            }
+
+            AudioCont.play_sound_effect("rejected");
+            this.FenObj.placement_errors.push(selected);
+            await bar.hide();
+            await this.reveal_placed_toy();
+        }
+    }
+
+    close_backpack() {
+        if (!this.Backpack) return wait(0);
+        let flaps = this.Backpack.getElementsByClassName("backpack_flap");
+        for (let i = 0; i < flaps.length; i++) {
+            flaps[i].style.display = "inherit";
+            flaps[i].style.transition = "opacity 250ms ease-in-out";
+            if (flaps[i].id && flaps[i].id.includes("closed")) flaps[i].style.opacity = 1;
+            if (flaps[i].id && flaps[i].id.includes("open")) flaps[i].style.opacity = 0;
+        }
+        return wait(280);
+    }
+
+    async open_box_for_reveal() {
+        this.box.set_pointer_events_enabled(true);
+        await new Promise((resolve) => this.box.wait_for_user_click("open", () => resolve()));
+        await wait(200);
+        this.box.set_pointer_events_enabled(false);
+    }
+
+    async close_box_for_reveal() {
+        this.box.set_pointer_events_enabled(true);
+        await new Promise((resolve) => this.box.wait_for_user_click("close", () => resolve()));
+        await wait(150);
+        this.box.set_pointer_events_enabled(false);
+        if (this.toy && this.toy.ToyElement) {
+            this.toy.ToyElement.style.transition = "opacity 250ms ease-in";
+            this.toy.ToyElement.style.opacity = 0;
+            await wait(250);
+        }
+    }
+
+    async reveal_placed_toy() {
+        let toyEl = this.toy && this.toy.ToyElement;
+        if (!toyEl) {
+            await this.open_box_for_reveal();
+            await wait(1000);
+            await this.close_box_for_reveal();
+            return;
+        }
+
+        toyEl.style.transition = "none";
+        toyEl.style.opacity = 1;
+        await this.open_box_for_reveal();
+
+        let target = this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0];
+        let boxPt = getSVGInternalCenter(target || this.box.BoxBase);
+        let cur = getSVGInternalCenter(toyEl);
+        toyEl.style.transition = "transform 350ms ease-out";
+        toyEl.style.transform += ` translate(${boxPt.x - cur.x}px, ${boxPt.y - 120 - cur.y}px)`;
+        await wait(900);
+        cur = getSVGInternalCenter(toyEl);
+        toyEl.style.transition = "transform 300ms ease-in";
+        toyEl.style.transform += ` translate(${boxPt.x - cur.x}px, ${boxPt.y - cur.y}px)`;
+        await wait(320);
+        await this.close_box_for_reveal();
+    }
+
+    finish_trial() {
+        this.returnfunc();
+    }
+
+    clean_up() {
+        if (this.oldItemDragController && this.oldItemDragController.destroy) {
+            this.oldItemDragController.destroy();
+            this.oldItemDragController = null;
+        }
+        if (this.toyDragController && this.toyDragController.destroy) {
+            this.toyDragController.destroy();
+            this.toyDragController = null;
+        }
+        if (Interface.PartnerSpeechBubble) Interface.PartnerSpeechBubble.hide(true);
+        this.previewBoxes.forEach((entry) => {
+            try { entry.module.clean_up(); } catch (e) { /* ignore */ }
+        });
+        this.previewBoxes = [];
+        if (this.Backpack) {
+            this.Backpack.remove();
+            this.Backpack = null;
+        }
+        this.basics.clean_up();
+        this.box.clean_up();
+        this.toy.clean_up();
+        if (this.old_toy) this.old_toy.clean_up();
+        if (this.old_sack) this.old_sack.clean_up();
+        if (this.boxStowDragController && this.boxStowDragController.destroy) {
+            this.boxStowDragController.destroy();
+            this.boxStowDragController = null;
+        }
+        if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
+        else if (this.partner.PartnerTranslateGroup) this.partner.PartnerTranslateGroup.remove();
+    }
+}
+
 class ToyToSackTrialController {
     constructor(FenObj, partner_is_present, returnfunc) {
         this.FenObj = FenObj;
@@ -4193,20 +4962,43 @@ class ToyToSackTrialController {
         }
         await this.basics.create_background_mask(true, 500);
 
+        const isFoundToy = this.FenObj.special_role === "found_toy";
         const toyScale = this.itemScale;
         const sackScale = this.sackScale;
-        const sackCenterX = 0.5 * this.basics.W;
+        // Leave room on the left for the finder Fennimal in the found_toy special case.
+        const sackCenterX = isFoundToy ? 0.62 * this.basics.W : 0.5 * this.basics.W;
         const toyCenterY = 0.55 * this.basics.H;
         this.sackY = 0.7 * this.basics.H;
 
+        if (isFoundToy) {
+            await this.basics.create_and_appear_Fennimal(
+                this.basics.ItemLayers.Main,
+                0.16 * this.basics.W,
+                0.82 * this.basics.H,
+                1.55,
+                250
+            );
+            AudioCont.play_sound_effect("alert");
+            Interface.Prompt.show_message("This Fennimal is called " + this.FenObj.name);
+            await wait(1000);
+        }
+
         let toyHalfW = this.getScaledTemplateHalfWidth("toy_" + this.FenObj.toy, toyScale);
         let sackHalfW = this.getScaledTemplateHalfWidth(this.FenObj.sack, sackScale);
-        let toyCenterX = pick_flanking_item_x(
-            this.basics.W,
-            sackCenterX,
-            sackHalfW,
-            toyHalfW
-        );
+        let toyCenterX;
+        if (isFoundToy) {
+            // Keep the toy on the right of the sack so it doesn't collide with the Fennimal.
+            toyCenterX = sackCenterX + sackHalfW + 70 + toyHalfW;
+            let maxCenter = this.basics.W - 0.12 * this.basics.W - toyHalfW;
+            toyCenterX = Math.min(toyCenterX, maxCenter);
+        } else {
+            toyCenterX = pick_flanking_item_x(
+                this.basics.W,
+                sackCenterX,
+                sackHalfW,
+                toyHalfW
+            );
+        }
 
         await this.toy.create_and_appear_toy(
             this.basics.ItemLayers.Plus1,
@@ -4222,10 +5014,23 @@ class ToyToSackTrialController {
         await wait(200);
         this.groundY = getSVGInternalCenter(this.toy.ToyElement).y;
 
-        Interface.Prompt.show_message("Oops! The " + this.FenObj.toy + " has been left behind");
-        await wait(750);
+        if (isFoundToy && this.basics.Fennimal) {
+            this.basics.set_gaze_target(this.toy.ToyElement);
+        }
 
-        Interface.Prompt.show_message("Let's keep the " + this.FenObj.toy + " safe in the " + this.sack.sackname);
+        if (isFoundToy) {
+            Interface.Prompt.show_message(this.FenObj.name + " found a " + this.FenObj.toy + "!");
+            await wait(750);
+            Interface.Prompt.show_message(
+                "Let's keep the found " + this.FenObj.toy + " safe in the " + this.sack.sackname
+            );
+        } else {
+            Interface.Prompt.show_message("Oops! The " + this.FenObj.toy + " has been left behind");
+            await wait(750);
+            Interface.Prompt.show_message(
+                "Let's keep the " + this.FenObj.toy + " safe in the " + this.sack.sackname
+            );
+        }
 
         await this.sack.create_and_appear_sack(
             this.basics.ItemLayers.Main,
@@ -4407,7 +5212,10 @@ class ToyToSackTrialController {
     }
 
     handle_sack_opened() {
-        Interface.Prompt.show_message("Please place the " + this.FenObj.toy + " in the " + this.sack.sackname);
+        let placePrompt = this.FenObj.special_role === "found_toy"
+            ? "Please place the found " + this.FenObj.toy + " in the " + this.sack.sackname
+            : "Please place the " + this.FenObj.toy + " in the " + this.sack.sackname;
+        Interface.Prompt.show_message(placePrompt);
         AudioCont.play_sound_effect("alert_minor");
 
         new MakeObjectDraggableObject(
@@ -14295,6 +15103,9 @@ class TrialFactory {
             case "toy_to_box":
                 return new ToyToBoxTrialController(FenObj, partner_is_present, returnfunc);
 
+            case "switch_box_without_partner":
+                return new SwitchBoxWithoutPartnerTrialController(FenObj, partner_is_present, returnfunc);
+
             case "toy_to_sack":
                 return new ToyToSackTrialController(FenObj, partner_is_present, returnfunc);
 
@@ -14881,6 +15692,8 @@ class PartnerBeliefIndividualBoxesController {
         this.include_reality_block_at_end = TaskObj.include_reality_block_at_end === true;
         this.include_practice_trial = TaskObj.include_practice_trial === true;
         this.include_memory_probe_at_end = TaskObj.include_memory_probe_at_end === true;
+        this.include_empty_box_choice_alternative = TaskObj.include_empty_box_choice_alternative === true;
+        this.EMPTY_OPTION_ID = "empty";
         this.memory_probe_isi_ms = (typeof TaskObj.memory_probe_isi_ms === "number" && TaskObj.memory_probe_isi_ms >= 0)
             ? TaskObj.memory_probe_isi_ms
             : 1000;
@@ -14923,12 +15736,16 @@ class PartnerBeliefIndividualBoxesController {
             return icon;
         };
         this.Icons = {
+            front: getIcon("front"),
             back: getIcon("back"),
             left: getIcon("left"),
             right: getIcon("right")
         };
 
         this.questions = this._normalizeQuestions(TaskObj.questions || []);
+        this.gatingBoxes = this._normalizeBoxCodeArray(TaskObj.gating_boxes || [], "gating_boxes");
+        this.actionPredictionToys = this._normalizeToyCodeArray(TaskObj.action_prediction_toys || [], "action_prediction_toys");
+        this.experimentToys = this._collectExperimentToys();
         this.lureCycle = this._normalizeLureCycle(TaskObj.lure_cycle);
         this.trialQueue = this._buildTrialQueue();
     }
@@ -14968,7 +15785,7 @@ class PartnerBeliefIndividualBoxesController {
             if (Object.prototype.hasOwnProperty.call(q, "answer_options")) {
                 console.error(
                     `PartnerBeliefIndividualBoxes: question "${q.question_id}" must not set answer_options. ` +
-                    "Options are auto-built as belief / reality / cyclic lure from WorldState."
+                    "Options are auto-built from all experiment toys (plus optional empty)."
                 );
                 return;
             }
@@ -14990,9 +15807,80 @@ class PartnerBeliefIndividualBoxesController {
         return mapped;
     }
 
+    _normalizeBoxCodeArray(rawCodes, fieldName) {
+        if (!Array.isArray(rawCodes) || rawCodes.length === 0) return [];
+
+        let mapped = [];
+        let seen = new Set();
+        rawCodes.forEach((code, index) => {
+            if (!code) {
+                console.error(`PartnerBeliefIndividualBoxes: ${fieldName}[${index}] is missing.`);
+                return;
+            }
+            if (seen.has(code)) {
+                console.error(`PartnerBeliefIndividualBoxes: duplicate ${fieldName} entry "${code}".`);
+                return;
+            }
+            seen.add(code);
+            let boxMapped = this.expCont.stimuli.get_assigned_names_of_code_array("toybox", [code]);
+            let target_box = boxMapped && boxMapped[0];
+            if (!target_box) {
+                console.error(`PartnerBeliefIndividualBoxes: failed to map ${fieldName} code "${code}".`);
+                return;
+            }
+            mapped.push({
+                target_box_code: code,
+                target_box: target_box
+            });
+        });
+        return mapped;
+    }
+
+    _normalizeToyCodeArray(rawCodes, fieldName) {
+        if (!Array.isArray(rawCodes) || rawCodes.length === 0) return [];
+
+        let mapped = [];
+        let seen = new Set();
+        rawCodes.forEach((code, index) => {
+            if (!code) {
+                console.error(`PartnerBeliefIndividualBoxes: ${fieldName}[${index}] is missing.`);
+                return;
+            }
+            if (seen.has(code)) {
+                console.error(`PartnerBeliefIndividualBoxes: duplicate ${fieldName} entry "${code}".`);
+                return;
+            }
+            seen.add(code);
+            let toyMapped = this.expCont.stimuli.get_assigned_names_of_code_array("toy", [code]);
+            let target_toy = toyMapped && toyMapped[0];
+            if (!target_toy) {
+                console.error(`PartnerBeliefIndividualBoxes: failed to map ${fieldName} code "${code}".`);
+                return;
+            }
+            mapped.push({
+                target_toy_code: code,
+                target_toy: target_toy
+            });
+        });
+        return mapped;
+    }
+
+    _collectExperimentToys() {
+        let fens = this._getProbeFennimals();
+        let toys = [];
+        let seen = new Set();
+        fens.forEach((fen) => {
+            if (!fen || !fen.toy || seen.has(fen.toy)) return;
+            seen.add(fen.toy);
+            toys.push(fen.toy);
+        });
+        return toys;
+    }
+
     /**
      * Box-code cycle used for the lure: lure for box i = partner belief of the next box.
      * Defaults to unique target_box codes in questions[] order (e.g. A→B→C→A).
+     * Kept for legacy / diagnostics; belief and reality now use all-toy options.
      */
     _normalizeLureCycle(rawCycle) {
         let codes;
@@ -15006,10 +15894,6 @@ class PartnerBeliefIndividualBoxesController {
         }
 
         if (codes.length < 2) {
-            console.error(
-                "PartnerBeliefIndividualBoxes: lure cycle needs at least 2 boxes " +
-                "(provide lure_cycle or at least two distinct target_box values in questions[])."
-            );
             return { codes: [], boxes: [] };
         }
 
@@ -15057,6 +15941,35 @@ class PartnerBeliefIndividualBoxesController {
             }));
         }
 
+        if (this.gatingBoxes.length > 0) {
+            let gatingTrials = shuffleArray([...this.gatingBoxes]);
+            gatingTrials.forEach((box, i) => {
+                let qid = `gating_${box.target_box_code}`;
+                queue.push(this._makeFeatureMatchTrial({
+                    section: "gating",
+                    trial_kind: "distractor",
+                    match_rule: this._nextDistractorRule(),
+                    question_id: `distractor_before_${qid}`,
+                    trial_instance_id: `distractor_${qid}`,
+                    block_index: 1,
+                    position_in_block: i + 1,
+                    is_practice: false,
+                    precedes_question_id: qid
+                }));
+                queue.push({
+                    section: "gating",
+                    trial_kind: "gating",
+                    is_practice: false,
+                    question_id: qid,
+                    trial_instance_id: qid,
+                    block_index: 1,
+                    position_in_block: i + 1,
+                    target_box_code: box.target_box_code,
+                    target_box: box.target_box
+                });
+            });
+        }
+
         for (let b = 1; b <= this.num_belief_blocks; b++) {
             let blockTrials = shuffleArray([...this.questions]);
             blockTrials.forEach((q, i) => {
@@ -15084,6 +15997,35 @@ class PartnerBeliefIndividualBoxesController {
                     presentation_number_for_box: b,
                     target_box_code: q.target_box_code,
                     target_box: q.target_box
+                });
+            });
+        }
+
+        if (this.actionPredictionToys.length > 0) {
+            let actionTrials = shuffleArray([...this.actionPredictionToys]);
+            actionTrials.forEach((toy, i) => {
+                let qid = `action_${toy.target_toy_code}`;
+                queue.push(this._makeFeatureMatchTrial({
+                    section: "action_prediction",
+                    trial_kind: "distractor",
+                    match_rule: this._nextDistractorRule(),
+                    question_id: `distractor_before_${qid}`,
+                    trial_instance_id: `distractor_${qid}`,
+                    block_index: 1,
+                    position_in_block: i + 1,
+                    is_practice: false,
+                    precedes_question_id: qid
+                }));
+                queue.push({
+                    section: "action_prediction",
+                    trial_kind: "action_prediction",
+                    is_practice: false,
+                    question_id: qid,
+                    trial_instance_id: qid,
+                    block_index: 1,
+                    position_in_block: i + 1,
+                    target_toy_code: toy.target_toy_code,
+                    target_toy: toy.target_toy
                 });
             });
         }
@@ -15206,9 +16148,10 @@ class PartnerBeliefIndividualBoxesController {
 
     _makeBoxToFennimalProbeTrials(fennimals) {
         // Triad per Fennimal: correct + two other-box foils.
+        // Require both toy and toybox (e.g. skip lost-box control Fennimal E).
         // Co-box mates are excluded — with a generic box cue they would also be
         // correct answers. Prefer same-wave foils when S/P prefixes exist.
-        let withBoxes = fennimals.filter((fen) => fen && fen.toybox);
+        let withBoxes = fennimals.filter((fen) => fen && fen.toybox && fen.toy);
         let wavesPresent = new Set(withBoxes.map((f) => this._waveForFennimal(f)));
         let hasSpWaves = wavesPresent.has("S") && wavesPresent.has("P");
 
@@ -15643,7 +16586,120 @@ class PartnerBeliefIndividualBoxesController {
     }
 
     /**
-     * Build the fixed 3AFC triad for a target box:
+     * Build radial options for belief/reality: all experiment toys (+ optional empty).
+     */
+    _normalizeContentId(value) {
+        if (value === false || value === null || value === undefined) return this.EMPTY_OPTION_ID;
+        return value;
+    }
+
+    _partnerKnowsBoxContents(boxId) {
+        let belief = WorldState.get_partner_belief_in_box_contents(boxId);
+        if (belief === undefined) return false;
+        let reality = WorldState.get_toybox_contents(boxId);
+        return this._normalizeContentId(belief) === this._normalizeContentId(reality);
+    }
+
+    _findPartnerBelievedLocationForToy(toyId) {
+        let boxes = this._uniqueBoxesForActionPrediction();
+        for (let i = 0; i < boxes.length; i++) {
+            let belief = WorldState.get_partner_belief_in_box_contents(boxes[i].target_box);
+            if (belief === toyId) {
+                return {
+                    option_id: boxes[i].target_box,
+                    option_type: "box",
+                    target_box: boxes[i].target_box,
+                    target_box_code: boxes[i].target_box_code
+                };
+            }
+        }
+        return {
+            option_id: "backpack",
+            option_type: "backpack"
+        };
+    }
+
+    _uniqueBoxesForActionPrediction() {
+        let byCode = new Map();
+        this.questions.forEach((q) => {
+            if (!byCode.has(q.target_box_code)) {
+                byCode.set(q.target_box_code, {
+                    target_box_code: q.target_box_code,
+                    target_box: q.target_box
+                });
+            }
+        });
+        this.gatingBoxes.forEach((q) => {
+            if (!byCode.has(q.target_box_code)) {
+                byCode.set(q.target_box_code, {
+                    target_box_code: q.target_box_code,
+                    target_box: q.target_box
+                });
+            }
+        });
+        return Array.from(byCode.values());
+    }
+
+    _buildAllToyChoiceSet(trial, trialKind) {
+        if (trialKind !== "belief" && trialKind !== "reality") {
+            console.error(`PartnerBeliefIndividualBoxes: unsupported all-toy trial kind "${trialKind}".`);
+            return null;
+        }
+
+        let belief = WorldState.get_partner_belief_in_box_contents(trial.target_box);
+        let reality = WorldState.get_toybox_contents(trial.target_box);
+
+        if (trialKind === "belief" && belief === undefined) {
+            console.error(
+                `PartnerBeliefIndividualBoxes: missing partner belief for target box "${trial.target_box}" ` +
+                `(question "${trial.question_id}").`
+            );
+            return null;
+        }
+
+        let correctRaw = (trialKind === "belief") ? belief : reality;
+        let correct_option_id = this._normalizeContentId(correctRaw);
+
+        if (correct_option_id !== this.EMPTY_OPTION_ID && !this.experimentToys.includes(correct_option_id)) {
+            console.error(
+                `PartnerBeliefIndividualBoxes: correct ${trialKind} answer "${correct_option_id}" ` +
+                `is not in the experiment toy set for question "${trial.question_id}".`
+            );
+            return null;
+        }
+        if (correct_option_id === this.EMPTY_OPTION_ID && !this.include_empty_box_choice_alternative) {
+            console.error(
+                `PartnerBeliefIndividualBoxes: ${trialKind} answer is empty for "${trial.question_id}" ` +
+                "but include_empty_box_choice_alternative is false."
+            );
+            return null;
+        }
+
+        let answer_options = [...this.experimentToys];
+        if (this.include_empty_box_choice_alternative) {
+            answer_options.push(this.EMPTY_OPTION_ID);
+        }
+        answer_options = shuffleArray(answer_options);
+
+        let option_roles = {};
+        answer_options.forEach((id) => {
+            option_roles[id] = (id === correct_option_id) ? "correct" : "foil";
+        });
+
+        return {
+            answer_options,
+            answer_option_codes: answer_options.map((toy) =>
+                toy === this.EMPTY_OPTION_ID ? "empty" : this._codeForAssignedName("toy", toy)
+            ),
+            belief_answer: this._normalizeContentId(belief),
+            reality_answer: this._normalizeContentId(reality),
+            correct_option_id,
+            option_roles
+        };
+    }
+
+    /**
+     * Build the fixed 3AFC triad for a target box (legacy helper, unused by current DV options).
      *   belief trial:  target belief (old), target reality (new), next-box belief (old lure)
      *   reality trial: target belief (old), target reality (new), next-box reality (new lure)
      * The lure source follows lureCycle (A→B→C→A by default).
@@ -15739,16 +16795,13 @@ class PartnerBeliefIndividualBoxesController {
     }
 
     /**
-     * Belief/reality 3AFC needs partner belief ≠ current contents (and a distinct cyclic lure).
-     * In the full experiment that state comes from shared then private toy_to_box play.
+     * Belief/reality need partner belief and current contents for each asked box.
      * When WorldState is still empty and Experiment_Code is "test", seed a valid false-belief layout.
      */
     _ensureWorldStateSupportsTriads() {
-        let kinds = ["belief"];
-        if (this.include_reality_block_at_end) kinds.push("reality");
-
         let allValid = this.questions.every(q =>
-            kinds.every(kind => this._buildBeliefRealityCyclicTriad(q, kind, { silent: true }))
+            this._buildAllToyChoiceSet(q, "belief") &&
+            (!this.include_reality_block_at_end || this._buildAllToyChoiceSet(q, "reality"))
         );
         if (allValid) return;
 
@@ -15761,7 +16814,7 @@ class PartnerBeliefIndividualBoxesController {
         if (anyFilled) {
             console.error(
                 "PartnerBeliefIndividualBoxes: WorldState has box belief/contents but they do not form " +
-                "valid cyclic belief/reality/lure triads. Trials will be skipped. " +
+                "valid belief/reality option sets. Trials will be skipped. " +
                 "Ensure partner saw the initial put-away, then contents changed while partner was away."
             );
             return;
@@ -15779,13 +16832,13 @@ class PartnerBeliefIndividualBoxesController {
             return;
         }
 
-        if (!this._seedFalseBeliefWorldState()) return;
-
-        let seededOk = this.questions.every(q =>
-            kinds.every(kind => this._buildBeliefRealityCyclicTriad(q, kind, { silent: true }))
+        this._seedFalseBeliefWorldState();
+        allValid = this.questions.every(q =>
+            this._buildAllToyChoiceSet(q, "belief") &&
+            (!this.include_reality_block_at_end || this._buildAllToyChoiceSet(q, "reality"))
         );
-        if (!seededOk) {
-            console.error("PartnerBeliefIndividualBoxes: auto-seeded WorldState still cannot build valid triads.");
+        if (!allValid) {
+            console.error("PartnerBeliefIndividualBoxes: auto-seeded WorldState still cannot build valid option sets.");
         }
     }
 
@@ -15905,6 +16958,9 @@ class PartnerBeliefIndividualBoxesController {
         this.CentralTargetGroup = null;
         this.CentralFennimalElement = null;
         this.BoxQuestionMarkGroup = null;
+        this.BackpackElement = null;
+        this.ActionTargetElements = null;
+        this.GatingOverlay = null;
     }
 
     setup_background_and_table(smaller = true) {
@@ -16232,23 +17288,51 @@ class PartnerBeliefIndividualBoxesController {
         BtnGroup.appendChild(btn_bg);
         this._add_focus_outline_to_button(BtnGroup, btn_bg);
 
-        let template = document.getElementById("toy_" + toy_id);
-        if (template) {
-            let RawToy = template.cloneNode(true);
-            RawToy.style.display = "inherit";
-            set_toy_color_scheme(RawToy, toy_id, false);
-            ToyChoiceBar.make_toy_static(RawToy, toy_id);
-            BtnGroup.appendChild(RawToy);
+        if (toy_id === this.EMPTY_OPTION_ID) {
+            let emptyInner = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            emptyInner.setAttribute("x", btn_x + 22);
+            emptyInner.setAttribute("y", btn_y + 28);
+            emptyInner.setAttribute("width", this.btn_size - 44);
+            emptyInner.setAttribute("height", this.btn_size - 56);
+            emptyInner.setAttribute("rx", 10);
+            emptyInner.setAttribute("fill", "none");
+            emptyInner.setAttribute("stroke", "#8d6e63");
+            emptyInner.setAttribute("stroke-width", "4");
+            emptyInner.setAttribute("stroke-dasharray", "10 8");
+            BtnGroup.appendChild(emptyInner);
 
-            let TBox = RawToy.getBBox();
-            let max_dim = Math.max(TBox.width, TBox.height) || 100;
-            let scale = (this.btn_size * 0.85) / max_dim;
-            let raw_cx = TBox.x + (TBox.width / 2);
-            let raw_cy = TBox.y + (TBox.height / 2);
-            let target_cx = btn_x + (this.btn_size / 2);
-            let target_cy = btn_y + (this.btn_size / 2);
-            RawToy.style.transformOrigin = `${raw_cx}px ${raw_cy}px`;
-            RawToy.style.transform = `translate(${target_cx - raw_cx}px, ${target_cy - raw_cy}px) scale(${scale})`;
+            let emptyLabel = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            let emptyCx = btn_x + this.btn_size / 2;
+            let emptyCy = btn_y + this.btn_size / 2 + 6;
+            emptyLabel.setAttribute("x", emptyCx);
+            emptyLabel.setAttribute("y", emptyCy);
+            emptyLabel.setAttribute("text-anchor", "middle");
+            emptyLabel.setAttribute("font-size", "26");
+            emptyLabel.setAttribute("font-weight", "700");
+            emptyLabel.setAttribute("fill", "#5d4037");
+            emptyLabel.setAttribute("font-family", "Arial, sans-serif");
+            emptyLabel.setAttribute("transform", `rotate(-45 ${emptyCx} ${emptyCy})`);
+            emptyLabel.textContent = "empty";
+            BtnGroup.appendChild(emptyLabel);
+        } else {
+            let template = document.getElementById("toy_" + toy_id);
+            if (template) {
+                let RawToy = template.cloneNode(true);
+                RawToy.style.display = "inherit";
+                set_toy_color_scheme(RawToy, toy_id, false);
+                ToyChoiceBar.make_toy_static(RawToy, toy_id);
+                BtnGroup.appendChild(RawToy);
+
+                let TBox = RawToy.getBBox();
+                let max_dim = Math.max(TBox.width, TBox.height) || 100;
+                let scale = (this.btn_size * 0.85) / max_dim;
+                let raw_cx = TBox.x + (TBox.width / 2);
+                let raw_cy = TBox.y + (TBox.height / 2);
+                let target_cx = btn_x + (this.btn_size / 2);
+                let target_cy = btn_y + (this.btn_size / 2);
+                RawToy.style.transformOrigin = `${raw_cx}px ${raw_cy}px`;
+                RawToy.style.transform = `translate(${target_cx - raw_cx}px, ${target_cy - raw_cy}px) scale(${scale})`;
+            }
         }
 
         let click_catcher = document.createElementNS("http://www.w3.org/2000/svg", "rect");
@@ -16433,6 +17517,13 @@ class PartnerBeliefIndividualBoxesController {
             let n = options.length;
             let baseAngle = Math.random() * Math.PI * 2;
             let layout = [];
+            let prevRadius = this.radial_radius;
+            // Keep distractor-sized buttons; widen the ring when there are more options.
+            if (n >= 5) {
+                this.radial_radius = 330;
+            } else if (n === 4) {
+                this.radial_radius = 300;
+            }
 
             this.radialUIGroup = create_SVG_group(0, 0);
             this.radialUIGroup.style.opacity = 0;
@@ -16453,6 +17544,8 @@ class PartnerBeliefIndividualBoxesController {
                         this.radialUIGroup = null;
                     }, 160);
                 }
+
+                this.radial_radius = prevRadius;
 
                 resolve({
                     selected_id,
@@ -16517,8 +17610,12 @@ class PartnerBeliefIndividualBoxesController {
 
         if (trial.trial_kind === "practice" || trial.trial_kind === "distractor") {
             await this.run_feature_match_trial(trial);
+        } else if (trial.trial_kind === "gating") {
+            await this.run_gating_trial(trial);
         } else if (trial.trial_kind === "belief") {
             await this.run_belief_trial(trial);
+        } else if (trial.trial_kind === "action_prediction") {
+            await this.run_action_prediction_trial(trial);
         } else if (trial.trial_kind === "reality") {
             await this.run_reality_trial(trial);
         } else if (trial.trial_kind === "memory_probe_box_to_fennimal") {
@@ -16907,10 +18004,336 @@ class PartnerBeliefIndividualBoxesController {
         await wait(400);
     }
 
+    async run_gating_trial(trial) {
+        this.place_target_box(trial.target_box);
+        if (this.BoxElement) {
+            this.BoxElement.style.opacity = 1;
+            this.BoxElement.style.pointerEvents = "none";
+        }
+
+        await this.setup_partner_facing_participant({ x: 0.72 * this.W });
+        await this.fade_black(0, 350);
+
+        let printed_box_name = GenParam.get_box_printed_name(trial.target_box);
+        let correct_answer = this._partnerKnowsBoxContents(trial.target_box) ? "yes" : "no";
+        let response = await this.show_gating_yes_no_overlay(
+            `Does ${this.partnername} know which toy is currently in the ${printed_box_name}?`
+        );
+
+        AudioCont.play_sound_effect("button_click");
+        let is_correct = (response.selected_id === correct_answer);
+
+        this.ParticipantAnswers.push({
+            trial_kind: "gating",
+            question_id: trial.question_id,
+            block_index: trial.block_index,
+            trial_index: this.overall_presentation_index,
+            target_box: trial.target_box,
+            target_box_code: trial.target_box_code,
+            options: [
+                { id: "yes", role: correct_answer === "yes" ? "correct" : "foil" },
+                { id: "no", role: correct_answer === "no" ? "correct" : "foil" }
+            ],
+            selected: response.selected_id,
+            correct: is_correct,
+            correct_option_id: correct_answer,
+            partner_knows: correct_answer === "yes",
+            reaction_time_ms: response.reaction_time_ms
+        });
+
+        await this.fade_black(1, 350);
+    }
+
+    setup_partner_facing_participant({ x = null, y = null } = {}) {
+        this.PartnerTranslateGroup = create_SVG_group(0, 0);
+        this.ItemLayers.Plus2.insertBefore(this.PartnerTranslateGroup, this.BlackOverlay);
+
+        this.PartnerScaleGroup = create_SVG_group(0, 0);
+        this.PartnerTranslateGroup.appendChild(this.PartnerScaleGroup);
+
+        for (let dir in this.Icons) {
+            if (!this.Icons[dir]) continue;
+            let icon = this.Icons[dir];
+            icon.style.display = (dir === "front") ? "inherit" : "none";
+            icon.querySelectorAll(".prep_element_hidden").forEach(el => el.remove());
+            icon.style.transform = "";
+            icon.removeAttribute("transform");
+            this.PartnerScaleGroup.appendChild(icon);
+        }
+
+        this.partner_x = (typeof x === "number") ? x : (0.5 * this.W);
+        this.partner_y = (typeof y === "number") ? y : (0.88 * this.H);
+        this.PartnerTranslateGroup.style.transition = "none";
+        this.PartnerScaleGroup.style.transition = "none";
+        this.PartnerTranslateGroup.style.transform = `translate(${this.partner_x}px, ${this.partner_y}px)`;
+        this.PartnerScaleGroup.style.transform = "scale(28)";
+        this.PartnerTranslateGroup.style.opacity = 1;
+        window.getComputedStyle(this.PartnerTranslateGroup).transform;
+    }
+
+    show_gating_yes_no_overlay(questionText) {
+        return new Promise(resolve => {
+            let overlay = create_SVG_group(0, 0, undefined, "pb_gating_overlay");
+            this.ItemLayers.Plus2.appendChild(overlay);
+            this.GatingOverlay = overlay;
+
+            // Transparent full-screen catcher so clicks outside buttons don't fall through,
+            // but no dark dim over the scene.
+            let catcher = create_SVG_rect(0, 0, this.W, this.H);
+            catcher.setAttribute("fill", "transparent");
+            catcher.style.pointerEvents = "all";
+            overlay.appendChild(catcher);
+
+            let panelW = 0.62 * this.W;
+            let panelH = 0.16 * this.H;
+            let panelX = (this.W - panelW) / 2;
+            let panelY = 0.06 * this.H;
+            let panel = create_SVG_rect(panelX, panelY, panelW, panelH);
+            panel.setAttribute("rx", 20);
+            panel.setAttribute("fill", "#f7f1e4");
+            panel.setAttribute("stroke", "#b89f5d");
+            panel.setAttribute("stroke-width", "5");
+            overlay.appendChild(panel);
+
+            let body = create_SVG_text_in_foreign_element(
+                questionText,
+                panelX + 0.03 * this.W,
+                panelY + 0.02 * this.H,
+                panelW - 0.06 * this.W,
+                panelH - 0.03 * this.H,
+                "instruction_element_text"
+            );
+            body.style.fontSize = "36px";
+            body.style.textAlign = "center";
+            overlay.appendChild(body);
+
+            let onset = performance.now();
+            let answered = false;
+            let buttonY = panelY + panelH + 0.055 * this.H;
+            let makeButton = (label, optionId, cx) => {
+                let btn = create_SVG_buttonElement(cx, buttonY, 240, 70, label, 36);
+                overlay.appendChild(btn);
+                btn.style.cursor = "pointer";
+                btn.onpointerdown = () => {
+                    if (answered) return;
+                    answered = true;
+                    btn.onpointerdown = null;
+                    overlay.remove();
+                    this.GatingOverlay = null;
+                    resolve({
+                        selected_id: optionId,
+                        reaction_time_ms: Math.round(performance.now() - onset)
+                    });
+                };
+            };
+
+            makeButton("Yes", "yes", 0.38 * this.W);
+            makeButton("No", "no", 0.62 * this.W);
+        });
+    }
+
+    async run_action_prediction_trial(trial) {
+        let boxes = this._uniqueBoxesForActionPrediction();
+        if (boxes.length === 0) {
+            console.error(`PartnerBeliefIndividualBoxes: no boxes available for action prediction "${trial.question_id}".`);
+            await this.fade_black(0, 200);
+            return;
+        }
+
+        let correctLoc = this._findPartnerBelievedLocationForToy(trial.target_toy);
+        this.place_action_prediction_targets(boxes);
+
+        let rightmostX = Math.max(
+            ...(this.ActionTargetElements || []).map((t) => t.x),
+            this.table_center_x
+        );
+        let clearX = Math.min(0.88 * this.W, rightmostX + 220);
+        await this.setup_partner_facing_participant({ x: clearX });
+        await this.fade_black(0, 350);
+
+        await Interface.showPartnerSpeechBubble({
+            target: this.PartnerTranslateGroup || this.PartnerScaleGroup,
+            context: "location",
+            text: `I'll go and find the ${trial.target_toy}`,
+            buttonLabel: "OK"
+        });
+
+        this.set_partner_direction("back");
+        await wait(200);
+
+        // Short step toward the table from the already-cleared x position.
+        this.PartnerTranslateGroup.style.transition = "transform 450ms ease-out";
+        this.partner_y = this.partner_y - 0.06 * this.H;
+        this.PartnerTranslateGroup.style.transform = `translate(${this.partner_x}px, ${this.partner_y}px)`;
+        await wait(500);
+
+        this.highlight_action_prediction_targets();
+        Interface.Prompt.show_message(
+            `Where will ${this.partnername} first look for the ${trial.target_toy}?`
+        );
+
+        let response = await this.wait_for_action_prediction_selection();
+        Interface.Prompt.hide();
+        AudioCont.play_sound_effect("button_click");
+
+        let is_correct = (response.selected_id === correctLoc.option_id);
+
+        this.ParticipantAnswers.push({
+            trial_kind: "action_prediction",
+            question_id: trial.question_id,
+            block_index: trial.block_index,
+            trial_index: this.overall_presentation_index,
+            target_toy: trial.target_toy,
+            target_toy_code: trial.target_toy_code,
+            options: (this.ActionTargetElements || []).map((t) => ({
+                id: t.option_id,
+                option_type: t.option_type,
+                role: (t.option_id === correctLoc.option_id) ? "correct" : "foil",
+                x: t.x,
+                y: t.y
+            })),
+            selected: response.selected_id,
+            correct: is_correct,
+            correct_option_id: correctLoc.option_id,
+            correct_option_type: correctLoc.option_type,
+            reaction_time_ms: response.reaction_time_ms
+        });
+
+        await this.fade_black(1, 350);
+    }
+
+    place_action_prediction_targets(boxes) {
+        let items = boxes.map((b) => ({
+            option_id: b.target_box,
+            option_type: "box",
+            target_box: b.target_box,
+            target_box_code: b.target_box_code
+        }));
+        items.push({ option_id: "backpack", option_type: "backpack" });
+        items = shuffleArray(items);
+
+        let n = items.length;
+        let spacing = Math.min(280, (0.7 * this.W) / Math.max(n, 1));
+        let total = (n - 1) * spacing;
+        let startX = this.table_center_x - total / 2;
+        let y = this.table_center_y - 10;
+
+        this.ActionTargetElements = [];
+
+        items.forEach((item, i) => {
+            let x = startX + i * spacing;
+            let elem = null;
+
+            if (item.option_type === "box") {
+                let template = document.getElementById("toybox_" + item.target_box);
+                if (!template) {
+                    console.error("PartnerBeliefIndividualBoxes: missing toybox_" + item.target_box);
+                    return;
+                }
+                elem = copy_scale_and_move_object_to_position(
+                    template,
+                    this.ItemLayers.Main,
+                    x,
+                    y,
+                    2.1
+                );
+                apply_toybox_decoration_visibility_to_element(elem, item.target_box);
+                Array.from(elem.getElementsByClassName("alignment_field")).forEach(t => t.remove());
+                elem.style.opacity = 1;
+            } else {
+                let template = document.getElementById("backpack");
+                if (!template) {
+                    console.error("PartnerBeliefIndividualBoxes: missing #backpack");
+                    return;
+                }
+                elem = copy_scale_and_move_object_to_position(
+                    template,
+                    this.ItemLayers.Main,
+                    x,
+                    y + 20,
+                    1.6
+                );
+                elem.style.opacity = 1;
+                this.BackpackElement = elem;
+            }
+
+            this.ActionTargetElements.push({
+                ...item,
+                element: elem,
+                outline: null,
+                catcher: null,
+                x: Math.round(x),
+                y: Math.round(y)
+            });
+        });
+    }
+
+    highlight_action_prediction_targets() {
+        (this.ActionTargetElements || []).forEach((target) => {
+            if (!target.element) return;
+
+            let outline = null;
+            if (typeof create_SVG_outline_of_multiple_groups === "function") {
+                outline = create_SVG_outline_of_multiple_groups(target.element);
+                target.element.parentNode.insertBefore(outline, target.element);
+                outline.classList.add("focus_on_SVG_outline");
+            }
+
+            // Placement uses CSS transforms, so getBBox is unreliable for hit targets.
+            let hitW = 180;
+            let hitH = 180;
+            let catcher = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            catcher.setAttribute("x", target.x - hitW / 2);
+            catcher.setAttribute("y", target.y - hitH / 2);
+            catcher.setAttribute("width", hitW);
+            catcher.setAttribute("height", hitH);
+            catcher.setAttribute("fill", "transparent");
+            catcher.style.cursor = "pointer";
+            catcher.style.pointerEvents = "all";
+            this.ItemLayers.Plus1.appendChild(catcher);
+
+            target.outline = outline;
+            target.catcher = catcher;
+        });
+    }
+
+    wait_for_action_prediction_selection() {
+        return new Promise(resolve => {
+            let disabled = false;
+            let onset = performance.now();
+            (this.ActionTargetElements || []).forEach((target) => {
+                if (!target.catcher) return;
+                target.catcher.onpointerdown = (evt) => {
+                    if (disabled) return;
+                    disabled = true;
+                    (this.ActionTargetElements || []).forEach((other) => {
+                        if (other.catcher) {
+                            other.catcher.onpointerdown = null;
+                            other.catcher.style.pointerEvents = "none";
+                            other.catcher.style.cursor = "default";
+                        }
+                        if (other !== target && other.outline) {
+                            other.outline.classList.remove("focus_on_SVG_outline");
+                            other.outline.style.opacity = 0.25;
+                        }
+                        if (other !== target && other.element) {
+                            other.element.style.opacity = 0.45;
+                        }
+                    });
+                    resolve({
+                        selected_id: target.option_id,
+                        reaction_time_ms: Math.round(performance.now() - onset),
+                        input_type: (evt && evt.pointerType) ? evt.pointerType : "unknown"
+                    });
+                };
+            });
+        });
+    }
+
     async run_belief_trial(trial) {
-        let triad = this._buildBeliefRealityCyclicTriad(trial, "belief");
-        if (!triad) {
-            console.error(`PartnerBeliefIndividualBoxes: skipping belief trial "${trial.question_id}" due to invalid triad.`);
+        let choiceSet = this._buildAllToyChoiceSet(trial, "belief");
+        if (!choiceSet) {
+            console.error(`PartnerBeliefIndividualBoxes: skipping belief trial "${trial.question_id}" due to invalid options.`);
             await this.fade_black(0, 200);
             return;
         }
@@ -16929,10 +18352,10 @@ class PartnerBeliefIndividualBoxesController {
         await this.enable_curtain_reveal();
 
         Interface.Prompt.show_message(
-            `What does ${this.partnername} believe is in the ${printed_box_name}? Answer as quickly and accurately as you can.`
+            `What does ${this.partnername} believe is in the ${printed_box_name}? Answer as accurately as you can.`
         );
 
-        let response = await this.show_radial_options_and_wait(triad.answer_options, {
+        let response = await this.show_radial_options_and_wait(choiceSet.answer_options, {
             mode: "toys",
             showBox: true
         });
@@ -16940,7 +18363,7 @@ class PartnerBeliefIndividualBoxesController {
         Interface.Prompt.hide();
         AudioCont.play_sound_effect("button_click");
 
-        let is_correct = (response.selected_id === triad.belief_answer);
+        let is_correct = (response.selected_id === choiceSet.correct_option_id);
 
         this.ParticipantAnswers.push({
             trial_kind: "belief",
@@ -16950,9 +18373,9 @@ class PartnerBeliefIndividualBoxesController {
             target_box: trial.target_box,
             options: this._buildStoredOptions(
                 response.option_layout,
-                triad.answer_options.map((toyId) => ({
+                choiceSet.answer_options.map((toyId) => ({
                     id: toyId,
-                    role: triad.option_roles[toyId] || "unknown"
+                    role: choiceSet.option_roles[toyId] || "unknown"
                 }))
             ),
             selected: response.selected_id,
@@ -16965,9 +18388,9 @@ class PartnerBeliefIndividualBoxesController {
     }
 
     async run_reality_trial(trial) {
-        let triad = this._buildBeliefRealityCyclicTriad(trial, "reality");
-        if (!triad) {
-            console.error(`PartnerBeliefIndividualBoxes: skipping reality trial "${trial.question_id}" due to invalid triad.`);
+        let choiceSet = this._buildAllToyChoiceSet(trial, "reality");
+        if (!choiceSet) {
+            console.error(`PartnerBeliefIndividualBoxes: skipping reality trial "${trial.question_id}" due to invalid options.`);
             await this.fade_black(0, 200);
             return;
         }
@@ -16981,10 +18404,10 @@ class PartnerBeliefIndividualBoxesController {
         await revealPromise;
 
         Interface.Prompt.show_message(
-            `What is really in the ${printed_box_name} right now? Answer as quickly and accurately as you can.`
+            `What is really in the ${printed_box_name} right now? Answer as accurately as you can.`
         );
 
-        let response = await this.show_radial_options_and_wait(triad.answer_options, {
+        let response = await this.show_radial_options_and_wait(choiceSet.answer_options, {
             mode: "toys",
             showBox: true,
             showQuestionMark: true
@@ -16994,7 +18417,7 @@ class PartnerBeliefIndividualBoxesController {
         this.hide_box_question_mark();
         AudioCont.play_sound_effect("button_click");
 
-        let is_correct = (response.selected_id === triad.reality_answer);
+        let is_correct = (response.selected_id === choiceSet.correct_option_id);
 
         this.ParticipantAnswers.push({
             trial_kind: "reality",
@@ -17004,9 +18427,9 @@ class PartnerBeliefIndividualBoxesController {
             target_box: trial.target_box,
             options: this._buildStoredOptions(
                 response.option_layout,
-                triad.answer_options.map((toyId) => ({
+                choiceSet.answer_options.map((toyId) => ({
                     id: toyId,
-                    role: triad.option_roles[toyId] || "unknown"
+                    role: choiceSet.option_roles[toyId] || "unknown"
                 }))
             ),
             selected: response.selected_id,

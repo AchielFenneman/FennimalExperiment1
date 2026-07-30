@@ -377,8 +377,12 @@ class TrialGenerator {
         orthogonalTrials = this.applyAskBoxSettingsToTrials(orthogonalTrials, phaseData);
         mainTrials = this.applyAskFennimalSettingsToTrials(mainTrials, phaseData);
         orthogonalTrials = this.applyAskFennimalSettingsToTrials(orthogonalTrials, phaseData);
+        mainTrials = this.stripAskFlagsForSpecialRoles(mainTrials);
+        orthogonalTrials = this.stripAskFlagsForSpecialRoles(orthogonalTrials);
         mainTrials = this.applyPlacementQuizOptionsToTrials(mainTrials, phaseData);
         orthogonalTrials = this.applyPlacementQuizOptionsToTrials(orthogonalTrials, phaseData);
+        mainTrials = this.applySwitchBoxWithoutPartnerSettingsToTrials(mainTrials);
+        orthogonalTrials = this.applySwitchBoxWithoutPartnerSettingsToTrials(orthogonalTrials);
 
         mainTrials = this.applyPartnerBeliefInSituLureCycles(mainTrials, phaseData);
         orthogonalTrials = this.applyPartnerBeliefInSituLureCycles(orthogonalTrials, phaseData);
@@ -1008,6 +1012,13 @@ class TrialGenerator {
                     let opts = [...toys];
                     if (trial.toy && !opts.includes(trial.toy)) opts.push(trial.toy);
                     trial.placement_quiz_options = opts;
+                } else if (trial.interaction_type === "switch_box_without_partner") {
+                    let opts = [...toys];
+                    if (trial.toy && !opts.includes(trial.toy)) opts.push(trial.toy);
+                    trial.placement_quiz_options = opts;
+                    trial.boxes_in_subblock = cohort
+                        .map((t) => t.toybox)
+                        .filter((box, idx, arr) => box && arr.indexOf(box) === idx);
                 } else if (trial.interaction_type === "sack_to_box") {
                     let opts = [...sacks];
                     if (trial.sack && !opts.includes(trial.sack)) opts.push(trial.sack);
@@ -1016,6 +1027,16 @@ class TrialGenerator {
             });
         });
 
+        return trials;
+    }
+
+    applySwitchBoxWithoutPartnerSettingsToTrials(trials) {
+        if (!trials || trials.length === 0) return trials;
+        trials.forEach((trial) => {
+            if (!trial || trial.interaction_type !== "switch_box_without_partner") return;
+            trial.force_partner_present = true;
+            trial.return_travel = "manual";
+        });
         return trials;
     }
 
@@ -1077,6 +1098,20 @@ class TrialGenerator {
         trials = set_property_to_all_elem_in_arr("ask_Fennimal", true, trials);
         trials = set_property_to_all_elem_in_arr("fennimals_asked", ids, trials);
         trials = set_property_to_all_elem_in_arr("fennimals_asked_objects", fenObjects, trials);
+        return trials;
+    }
+
+    /**
+     * found_toy trials introduce a new Fennimal for packing only — skip identity/toy quizzes.
+     */
+    stripAskFlagsForSpecialRoles(trials) {
+        if (!trials || trials.length === 0) return trials;
+        trials.forEach((trial) => {
+            if (trial && trial.special_role === "found_toy") {
+                trial.ask_Fennimal = false;
+                trial.ask_toy = false;
+            }
+        });
         return trials;
     }
 
@@ -1525,11 +1560,13 @@ class ExperimentController {
                 this.currentPhaseData.answers = this.currentPhaseData.PartnerBeliefAnswers;
                 delete this.currentPhaseData.PartnerBeliefAnswers;
 
-                // All answered trial kinds earn stars (practice, distractors, belief/reality, probes).
+                // All answered trial kinds earn stars (practice, distractors, gating/belief/action/reality, probes).
                 let starEligibleAnswers = this.currentPhaseData.answers.filter(a =>
                     a.trial_kind === "practice" ||
                     a.trial_kind === "distractor" ||
+                    a.trial_kind === "gating" ||
                     a.trial_kind === "belief" ||
+                    a.trial_kind === "action_prediction" ||
                     a.trial_kind === "reality" ||
                     a.trial_kind === "memory_probe_box_to_fennimal" ||
                     a.trial_kind === "memory_probe_fennimal_to_toy" ||
@@ -1954,6 +1991,18 @@ class ExperimentController {
                 this.startNextExperimentPhase();
                 break;
             case "phone_room":
+                if (this.waitingForSwitchBoxReturnReminder) {
+                    this.waitingForSwitchBoxReturnReminder = false;
+                    this.instrCont.clearInstructions();
+                    if (this.instrCont.parentElem) this.instrCont.parentElem.style.display = "none";
+                    this.manualReturnTrial = null;
+                    if (this.shouldReturnToPhoneRoomAfterCurrentTrial()) {
+                        this.phoneRoomReturnCompleted();
+                    } else {
+                        this.phaseCompleted();
+                    }
+                    return;
+                }
                 if (!this.flagPhoneRoomInstructionsShown) {
                     this.flagPhoneRoomInstructionsShown = true;
                     this.startNextTrialInPhoneRoomPhase();
@@ -2025,6 +2074,85 @@ class ExperimentController {
                 this.startNextTrialInOnCallPhase();
             }, 400);
         }
+
+        if (this.waitingForManualPhoneRoomReturn && this.manualReturnTrial) {
+            let trial = this.manualReturnTrial;
+            setTimeout(() => {
+                this.beginManualPhoneRoomReturn(trial);
+            }, Math.max(400, 0.5 * GenParam.map_to_location_transition_speed));
+        }
+    }
+
+    /**
+     * After switch_box_without_partner: partner waits at diversion location, walks to player,
+     * speech bubble, then player leads home to #phone_room (proximity completes the trial).
+     */
+    async beginManualPhoneRoomReturn(fenObj) {
+        this.waitingForManualPhoneRoomReturn = false;
+        this.mapCont.remove_all_action_buttons();
+        this.mapCont.Player.disable_movement();
+
+        // Icons may still be opacity-0 from the outbound autotravel arrival fade.
+        this.mapCont.resetAutoTravelCharacterIconOpacity();
+        this.mapCont.clearAutoTravelChrome();
+
+        // Ensure map chrome is up and partner is visible/active.
+        WorldState.change_partner_role_behavior("active");
+        this.mapCont.Partner.update_behavior();
+        this.mapCont.Partner.setAutoTravelLeadMode(false);
+        this.mapCont.Partner.setAutoTravelFollowMode(false);
+
+        let diversion = fenObj.partner_diversion_location;
+        let diversionPoint = diversion
+            ? this.mapCont.getLocationMarkerPoint(diversion)
+            : this.mapCont.getHomeCenterPoint();
+        this.mapCont.Partner.jump_to_position(diversionPoint.x, diversionPoint.y);
+
+        // Zoom/region to the trial region so the diversion marker is on-screen.
+        if (fenObj.region) {
+            this.mapCont.forceAutoTravelRegion(fenObj.region);
+        }
+
+        // Make sure both icons are visible before the approach / speech bubble.
+        this.mapCont.resetAutoTravelCharacterIconOpacity();
+
+        await wait(350);
+        await this.mapCont.animatePartnerToPlayer(1200);
+
+        await Interface.showPartnerSpeechBubble({
+            target: this.mapCont.Partner.PartnerIcon,
+            context: "map",
+            text: "Lets go back home — you lead the way!",
+            buttonLabel: "Got it!"
+        });
+
+        this.mapCont.Partner.setAutoTravelFollowMode(false);
+        this.mapCont.Partner.update_behavior();
+        Interface.Prompt.show_message("Lets go back home!");
+        this.mapCont.enable_map_interactions();
+        this.mapCont.startPhoneRoomProximityReturnWatch(() => {
+            Interface.Prompt.hide();
+            this.mapCont.stopPhoneRoomProximityReturnWatch();
+            this.mapCont.runManualPhoneRoomArrivalSequence(() => {
+                this.showSwitchBoxReturnReminder(fenObj);
+            });
+        });
+    }
+
+    showSwitchBoxReturnReminder(fenObj) {
+        this.waitingForSwitchBoxReturnReminder = true;
+        this.manualReturnTrial = fenObj;
+
+        let partnerName = WorldState.get_partner_icon_settings().name || "your partner";
+        let boxName = GenParam.get_box_printed_name(fenObj.toybox);
+
+        this.mapCont.disable_map_interactions();
+        this.instrCont.showSimpleInformationPage({
+            title: "One more thing...",
+            text:
+                `After returning back to the phone room, you forgot to tell ${partnerName} ` +
+                `that you replaced the contents of the ${boxName}.`
+        });
     }
 
     fennimalInteractionCompleted(fenObj) {
@@ -2092,6 +2220,14 @@ class ExperimentController {
                         } else {
                             this.phaseCompleted();
                         }
+                        return;
+                    }
+
+                    // Manual walk-home (e.g. switch_box_without_partner): show return arrow.
+                    if (fenObj.return_travel === "manual") {
+                        this.waitingForManualPhoneRoomReturn = true;
+                        this.manualReturnTrial = fenObj;
+                        this.mapCont.allow_participant_to_leave_location(true);
                         return;
                     }
 

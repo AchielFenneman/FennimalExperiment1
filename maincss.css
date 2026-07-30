@@ -403,6 +403,15 @@ html, body {
     fill: darkgoldenrod;
 }
 
+.partner_speech_bubble_text {
+    pointer-events: none;
+    user-select: none;
+}
+
+.partner_speech_bubble_dim {
+    cursor: default;
+}
+
 /*RECALL NAMES TASK */
 .recall_input_answerbox_start {
     width: 100%;

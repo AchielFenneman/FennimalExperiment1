@@ -438,7 +438,7 @@ class InstructionsController {
         this.showEmptyPage(true);
         let partnerInfo = this.worldState.get_partner_icon_settings();
         document.getElementById("Instructions_Title").innerHTML = "Meet " + partnerInfo.name;
-        let pronoun = partnerInfo.type === "female" ? "she" : "he";
+        let pronoun = partnerInfo.type === "female" ? "She" : "He";
         AudioCont.play_sound_effect("alert");
 
         let iconBox = create_SVG_rect(0.6 * GenParam.SVG_width, 0.2 * GenParam.SVG_height, 540, 640, undefined, undefined);
@@ -453,9 +453,9 @@ class InstructionsController {
         this.currentInstructionsSVG.appendChild(iconTranslateGroup);
         moveSVGCenterTo(iconTranslateGroup, iconBox.getBBox().x + 0.5 * iconBox.getBBox().width, iconBox.getBBox().y + 0.5 * iconBox.getBBox().height);
 
-        let introText = partnerInfo.name + " is an intern on the island, who will be shadowing you for the next couple of days to " +
-            "get a feel of what's it like to be a caretaker on the island. " + pronoun + " will observe your interactions with the Fennimals on the island, but " +
-            pronoun + " will not interact with any of the Fennimals directly. ";
+        let introText =
+            partnerInfo.name + " is a guide on the island, who will be giving you a basic introduction into how to take care of the Fennimals on the island. " +
+            pronoun + " will observe your interactions with the Fennimals, and will assist you where needed.";
         let textObj = create_SVG_text_in_foreign_element(introText, 0.1 * GenParam.SVG_width, 0.3 * GenParam.SVG_height, 0.5 * GenParam.SVG_width, 0.3 * GenParam.SVG_height, undefined, undefined);
         textObj.style.fontSize = "40px";
         this.currentInstructionsSVG.appendChild(textObj);
@@ -1253,7 +1253,7 @@ class InstructionsController {
             instructionText =
                 `You and ${partnerName} will be staffing the island’s phone room today!<br><br>` +
                 `Whenever someone on the island needs assistance, the phone will ring. Click the phone to answer it and receive instructions about the task and where you need to go.<br><br>` +
-                `During this part of your stay on the island, your route will be arranged for you. You and ${partnerName} will travel automatically to each destination, so you do not need to navigate the map yourself.<br><br>` +
+                `Today ${partnerName} will take the lead and will guide you along the island - so you do not need to navigate the map yourself.<br><br>` +
                 `After each task, you will automatically return to the phone room. Wait there until the phone rings again.`;
         } else {
             instructionText =
@@ -1395,7 +1395,8 @@ class InstructionsController {
         this.parentElem.appendChild(this.currentInstructionsSVG);
         this.parentElem.style.display = "inherit";
 
-        document.getElementById("Instructions_Title").innerHTML = `Day ${currentBlockNum}: What does ${partnerName} think?`;
+        document.getElementById("Instructions_Title").innerHTML =
+            `Day ${currentBlockNum}: Questions about your memories of the island.`;
 
         // Partner icon on the left, raised to leave room for bonus stars underneath.
         let iconBox = create_SVG_rect(0.08 * GenParam.SVG_width, 0.12 * GenParam.SVG_height, 400, 400, undefined, undefined);
@@ -1410,21 +1411,10 @@ class InstructionsController {
         this.currentInstructionsSVG.appendChild(iconTranslateGroup);
         moveSVGCenterTo(iconTranslateGroup, iconBox.getBBox().x + 0.5 * iconBox.getBBox().width, iconBox.getBBox().y + 0.5 * iconBox.getBBox().height);
 
-        let practiceLine = includePracticeTrial
-            ? `First, you will complete a short practice with simple shapes and colors so you can learn the controls.<br><br>`
-            : "";
-
-        let realityLine = includeRealityBlockAtEnd
-            ? `<br><br>Later, you will also be asked which toy is <i>currently</i> inside each box.`
-            : "";
-
         let instructionText =
-            `${partnerName} has returned to the warehouse! We will now test what you think ${partnerName} believes is inside each box.<br><br>` +
-            practiceLine +
-            `On each question, click the highlighted circle to reveal the answer choices. Between box questions, you will also answer a few simple shape or color questions.<br><br>` +
-            `<div style='text-align:center; font-size:42px; font-weight:bold; color:navy;'>Please answer as quickly and accurately as you can.</div><br>` +
-            `Remember: when asked about ${partnerName}, tell us what <i>${partnerName}</i> believes is inside — not necessarily what is actually inside.` +
-            realityLine;
+            `We will now test your memory and knowledge of what you've experienced on the island.<br><br>` +
+            `One at a time, you will be asked different questions. In each question, possible answers will be highlighted.<br><br>` +
+            `<div style='text-align:center; font-size:42px; font-weight:bold; color:navy;'>Please carefully consider the questions and respond as accurately as you can.</div><br>`;
 
         if (canEarnStars) {
             continueButtonTime += bonusStarsPerCorrectAnswer * 500;
@@ -1456,8 +1446,15 @@ class InstructionsController {
             perAnswerLabel.classList.add("instruction_element_nonbackground");
             this.currentInstructionsSVG.appendChild(perAnswerLabel);
 
-            let numText = bonusStarsPerCorrectAnswer > 1 ? bonusStarsPerCorrectAnswer + " bonus stars" : "a bonus star";
-            instructionText += `<br><br><b>You can earn ${numText} for each correct answer.</b> You will only learn how many you earned at the end of the experiment.`;
+            instructionText +=
+                `<b>You will earn a bonus star for each correct answer.</b> ` +
+                `It is therefore in your best interest to take your time and consider each question. ` +
+                `You will only learn how many stars you've earned at the end of the experiment.<br><br>`;
+        }
+
+        if (includePracticeTrial) {
+            instructionText +=
+                `First, you will complete a short practice with simple shapes and colors so you can learn the controls.`;
         }
 
         this.textElemMainInstructions = create_SVG_text_in_foreign_element(
@@ -1687,6 +1684,7 @@ class InstructionsController {
                 };
 
             case "toy_to_box":
+            case "switch_box_without_partner":
                 return {
                     ...baseConfig,
                     type: "toy",
@@ -1694,6 +1692,14 @@ class InstructionsController {
                 };
 
             case "toy_to_sack":
+                if (trialObj.special_role === "found_toy") {
+                    return {
+                        ...baseConfig,
+                        type: "fennimal",
+                        slumped: false,
+                        mainText: `${displayName} found a toy!`
+                    };
+                }
                 return {
                     ...baseConfig,
                     type: "toy",
@@ -2560,6 +2566,43 @@ class InstructionsController {
                 }
             }
         }
+    }
+
+    /**
+     * Generic centered instruction page (same chrome as pseudoday / block-separation pages).
+     * Continue calls expCont.instructionsPageClosed().
+     */
+    showSimpleInformationPage({ title = "", text = "" } = {}) {
+        this.showEmptyPage(true);
+        AudioCont.play_sound_effect("alert");
+
+        document.getElementById("Instructions_Title").innerHTML = title || "";
+
+        let textObj = create_SVG_text_in_foreign_element(
+            text,
+            0.1 * GenParam.SVG_width,
+            0.32 * GenParam.SVG_height,
+            0.8 * GenParam.SVG_width,
+            0.35 * GenParam.SVG_height,
+            undefined,
+            undefined
+        );
+        textObj.style.textAlign = "center";
+        textObj.style.fontSize = "40px";
+        this.currentInstructionsSVG.appendChild(textObj);
+
+        let continueButton = create_SVG_buttonElement(
+            0.5 * GenParam.SVG_width,
+            0.875 * GenParam.SVG_height,
+            400,
+            75,
+            "Continue",
+            40
+        );
+        continueButton.onpointerdown = () => {
+            this.expCont.instructionsPageClosed();
+        };
+        this.currentInstructionsSVG.appendChild(continueButton);
     }
 
     showQuestionnairePage(pageType) {
