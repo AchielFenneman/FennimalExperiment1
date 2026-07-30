@@ -26,6 +26,7 @@ class DataController {
             paymentData: null,
             fennimals: [],
             colorAssignment: null,
+            phaseRandomizations: {},
             avatar: null,
             attentionData: null,
             totalDuration: 0,
@@ -98,6 +99,12 @@ class DataController {
                     this.experimentData.fennimals = this.stimuli.get_clean_Fennimal_templates();
                     this.experimentData.colorAssignment = this.stimuli.get_color_assignment_overview();
                     this.experimentData.featureMap = this.stimuli.get_feature_map();
+                    if (earlySession.assignment.phaseRandomizations
+                        && typeof earlySession.assignment.phaseRandomizations === "object") {
+                        this.experimentData.phaseRandomizations = JSON.parse(
+                            JSON.stringify(earlySession.assignment.phaseRandomizations)
+                        );
+                    }
                     this.experimentData.assignmentRestored = true;
                     this.didRestoreAssignment = true;
                 } else {
@@ -162,7 +169,8 @@ class DataController {
                     assignment: {
                         fennimals: this.experimentData.fennimals,
                         featureMap: this.experimentData.featureMap,
-                        colorAssignment: this.experimentData.colorAssignment
+                        colorAssignment: this.experimentData.colorAssignment,
+                        phaseRandomizations: this.experimentData.phaseRandomizations || {}
                     }
                 })
             );
@@ -228,6 +236,59 @@ class DataController {
         this.experimentData.storedData.push(clonedPhaseData);
         this.recordTimestamp(clonedPhaseData.type);
         this.storeAllData(false);
+    }
+
+    /**
+     * Between-subjects box_locations draw for retrieve_lost_box.
+     * Restores a prior draw from phaseRandomizations when present (Layer 1 refresh).
+     */
+    getOrCreateBoxLocationSelection(randomizationKey, poolEntries, nSample) {
+        if (!this.experimentData.phaseRandomizations
+            || typeof this.experimentData.phaseRandomizations !== "object") {
+            this.experimentData.phaseRandomizations = {};
+        }
+
+        let existing = this.experimentData.phaseRandomizations[randomizationKey];
+        if (existing && Array.isArray(existing.labels) && existing.labels.length > 0) {
+            let byLabel = new Map(poolEntries.map((e) => [e.label, e]));
+            let restoredEntries = [];
+            for (let lab of existing.labels) {
+                let match = byLabel.get(lab);
+                if (!match) {
+                    throw new Error(
+                        `DataController: restored retrieve_lost_box selection "${randomizationKey}" ` +
+                        `has label "${lab}" which is not in the current box_locations pool.`
+                    );
+                }
+                restoredEntries.push({
+                    label: match.label,
+                    Fennimal_finding_box: match.Fennimal_finding_box,
+                    target_box: match.target_box
+                });
+            }
+            return {
+                labels: existing.labels.slice(),
+                label: restoredEntries.length === 1 ? restoredEntries[0].label : (existing.label || null),
+                entries: restoredEntries
+            };
+        }
+
+        let shuffled = shuffleArray(poolEntries.map((e) => ({
+            label: e.label,
+            Fennimal_finding_box: e.Fennimal_finding_box,
+            target_box: e.target_box
+        })));
+        let selected = shuffled.slice(0, nSample);
+        let record = {
+            labels: selected.map((e) => e.label),
+            label: selected.length === 1 ? selected[0].label : null,
+            entries: selected
+        };
+        this.experimentData.phaseRandomizations[randomizationKey] = JSON.parse(JSON.stringify(record));
+        // Persist immediately so a mid-phase refresh keeps the same between-subjects draw.
+        this.storeAllData(false);
+        this.writeSessionClaim(false);
+        return record;
     }
 
     storeAllData(bool_experiment_completed) {
@@ -332,8 +393,9 @@ class DataController {
 // 2. TRIAL GENERATOR (Decoupled Phase Logic)
 // ----------------------------------------------------
 class TrialGenerator {
-    constructor(stimuli) {
+    constructor(stimuli, dataCont = null) {
         this.stimuli = stimuli;
+        this.dataCont = dataCont;
     }
 
     generateTrialsForPhase(phaseData) {
@@ -350,6 +412,10 @@ class TrialGenerator {
         if (Array.isArray(phaseData.trial_subblocks)) {
             // Ordered subblocks: shuffle within each, then concatenate (preserves subblock order).
             mainTrials = this.generateTrialsFromSubblocks(phaseData);
+        } else if (phaseData.type === "retrieve_lost_box"
+            && Array.isArray(phaseData.box_locations)
+            && phaseData.box_locations.length > 0) {
+            mainTrials = this.generateRetrieveLostBoxTrialsFromBoxLocations(phaseData);
         } else if (this.isPartnerBeliefInSituOnlyInteraction(phaseData.interaction_type)
             && Array.isArray(phaseData.target_boxes)
             && phaseData.target_boxes.length > 0) {
@@ -407,6 +473,14 @@ class TrialGenerator {
         let hasSubblocks = Array.isArray(phaseData.trial_subblocks);
         let hasTopLevelFennimals = phaseData.Fennimals_encountered !== undefined && phaseData.Fennimals_encountered !== null;
         let hasTopLevelInteractionType = phaseData.interaction_type !== undefined && phaseData.interaction_type !== null;
+        let hasBoxLocations = Array.isArray(phaseData.box_locations) && phaseData.box_locations.length > 0;
+
+        if (hasBoxLocations && phaseData.type !== "retrieve_lost_box") {
+            throw new Error(
+                `TrialGenerator: phase type "${phaseData.type}" sets box_locations, which is only allowed ` +
+                `on retrieve_lost_box phases.`
+            );
+        }
 
         if (hasSubblocks) {
             if (phaseData.trial_subblocks.length === 0) {
@@ -420,6 +494,13 @@ class TrialGenerator {
                 throw new Error(
                     `TrialGenerator: phase type "${phaseData.type}" sets both trial_subblocks and top-level Fennimals_encountered. ` +
                     `Use one or the other — when trial_subblocks is present, put Fennimals only inside each subblock.`
+                );
+            }
+
+            if (hasBoxLocations) {
+                throw new Error(
+                    `TrialGenerator: phase type "${phaseData.type}" sets both trial_subblocks and box_locations. ` +
+                    `Use one or the other.`
                 );
             }
 
@@ -443,6 +524,18 @@ class TrialGenerator {
             return;
         }
 
+        if (hasBoxLocations && hasTopLevelFennimals) {
+            throw new Error(
+                `TrialGenerator: phase type "${phaseData.type}" sets both Fennimals_encountered and box_locations. ` +
+                `Use one or the other — box_locations already names the Fennimal per trial via Fennimal_finding_box.`
+            );
+        }
+
+        if (hasBoxLocations) {
+            this.validateRetrieveLostBoxLocations(phaseData);
+            return;
+        }
+
         if (!hasTopLevelFennimals) {
             let allowsTargetBoxes = this.isPartnerBeliefInSituOnlyInteraction(phaseData.interaction_type)
                 && Array.isArray(phaseData.target_boxes)
@@ -450,7 +543,8 @@ class TrialGenerator {
             if (!allowsTargetBoxes) {
                 throw new Error(
                     `TrialGenerator: phase type "${phaseData.type}" is missing Fennimals_encountered ` +
-                    `(and has no trial_subblocks). For partner_belief_in_situ, provide target_boxes instead.`
+                    `(and has no trial_subblocks). For partner_belief_in_situ, provide target_boxes instead. ` +
+                    `For retrieve_lost_box, provide Fennimals_encountered or box_locations.`
                 );
             }
         }
@@ -461,6 +555,135 @@ class TrialGenerator {
                 `(and has no trial_subblocks).`
             );
         }
+    }
+
+    /**
+     * Fail loud on malformed retrieve_lost_box box_locations entries.
+     * Each entry: { Fennimal_finding_box, target_box, label? }.
+     * When n_trials_to_sample is set, every entry must have a unique label.
+     */
+    validateRetrieveLostBoxLocations(phaseData) {
+        let locs = phaseData.box_locations;
+        if (!Array.isArray(locs) || locs.length === 0) {
+            throw new Error(
+                `TrialGenerator: retrieve_lost_box box_locations must be a non-empty array.`
+            );
+        }
+
+        let nSample = phaseData.n_trials_to_sample;
+        let sampling = nSample !== undefined && nSample !== null;
+        if (sampling) {
+            if (!Number.isInteger(nSample) || nSample < 1) {
+                throw new Error(
+                    `TrialGenerator: retrieve_lost_box n_trials_to_sample must be a positive integer ` +
+                    `(got ${JSON.stringify(nSample)}).`
+                );
+            }
+            if (nSample > locs.length) {
+                throw new Error(
+                    `TrialGenerator: retrieve_lost_box n_trials_to_sample (${nSample}) exceeds ` +
+                    `box_locations length (${locs.length}).`
+                );
+            }
+        }
+
+        let seenFindingIds = new Set();
+        let seenLabels = new Set();
+        locs.forEach((entry, index) => {
+            if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+                throw new Error(
+                    `TrialGenerator: retrieve_lost_box box_locations[${index}] must be an object ` +
+                    `with Fennimal_finding_box and target_box.`
+                );
+            }
+            if (entry.Fennimal_finding_box === undefined || entry.Fennimal_finding_box === null || entry.Fennimal_finding_box === "") {
+                throw new Error(
+                    `TrialGenerator: retrieve_lost_box box_locations[${index}] is missing Fennimal_finding_box.`
+                );
+            }
+            if (entry.target_box === undefined || entry.target_box === null || entry.target_box === "") {
+                throw new Error(
+                    `TrialGenerator: retrieve_lost_box box_locations[${index}] is missing target_box.`
+                );
+            }
+            if (seenFindingIds.has(entry.Fennimal_finding_box)) {
+                throw new Error(
+                    `TrialGenerator: retrieve_lost_box box_locations repeats Fennimal_finding_box ` +
+                    `"${entry.Fennimal_finding_box}" — each finding Fennimal can appear only once ` +
+                    `(map locations are unique per Fennimal).`
+                );
+            }
+            seenFindingIds.add(entry.Fennimal_finding_box);
+
+            let hasLabel = entry.label !== undefined && entry.label !== null && entry.label !== "";
+            if (sampling && !hasLabel) {
+                throw new Error(
+                    `TrialGenerator: retrieve_lost_box box_locations[${index}] is missing required ` +
+                    `"label" (needed when n_trials_to_sample is set).`
+                );
+            }
+            if (hasLabel) {
+                if (seenLabels.has(entry.label)) {
+                    throw new Error(
+                        `TrialGenerator: retrieve_lost_box box_locations repeats label ` +
+                        `"${entry.label}" — labels must be unique.`
+                    );
+                }
+                seenLabels.add(entry.label);
+            }
+        });
+    }
+
+    /**
+     * Between-subjects draw from box_locations when n_trials_to_sample is set.
+     * Stamps selected_box_location_label(s) / selected_box_locations onto phaseData for export.
+     */
+    applyRetrieveLostBoxSampling(phaseData) {
+        if (!Array.isArray(phaseData.box_locations) || phaseData.box_locations.length === 0) {
+            return phaseData.box_locations || [];
+        }
+
+        let nSample = phaseData.n_trials_to_sample;
+        if (nSample === undefined || nSample === null) {
+            // No sampling: run all options; still expose labels when present.
+            let labels = phaseData.box_locations
+                .map((e) => e && e.label)
+                .filter((lab) => lab !== undefined && lab !== null && lab !== "");
+            if (labels.length > 0) {
+                phaseData.selected_box_location_labels = labels.slice();
+                phaseData.selected_box_location_label = labels.length === 1 ? labels[0] : null;
+            }
+            phaseData.selected_box_locations = phaseData.box_locations.map((e) => ({
+                label: e.label || null,
+                Fennimal_finding_box: e.Fennimal_finding_box,
+                target_box: e.target_box
+            }));
+            return phaseData.box_locations;
+        }
+
+        if (!this.dataCont || typeof this.dataCont.getOrCreateBoxLocationSelection !== "function") {
+            throw new Error(
+                `TrialGenerator: retrieve_lost_box n_trials_to_sample requires DataController ` +
+                `for between-subjects persistence.`
+            );
+        }
+
+        let key = phaseData.randomization_id
+            || `retrieve_lost_box__${phaseData.phasenum != null ? phaseData.phasenum : "unknown"}`;
+        let record = this.dataCont.getOrCreateBoxLocationSelection(
+            key,
+            phaseData.box_locations,
+            nSample
+        );
+
+        phaseData.randomization_key = key;
+        phaseData.selected_box_location_labels = record.labels.slice();
+        phaseData.selected_box_location_label = record.label;
+        phaseData.selected_box_locations = record.entries.map((e) => ({ ...e }));
+        // Convenient alias for the main between-subjects manipulation.
+        phaseData.manipulation_label = record.label;
+
+        return phaseData.box_locations.filter((entry) => record.labels.includes(entry.label));
     }
 
     validateSubblockSpec(subblock, index, phaseType) {
@@ -675,6 +898,107 @@ class TrialGenerator {
         return boxCodes.map((code, i) =>
             this.buildPartnerBeliefInSituTrial(code, phaseData, `${contextLabel}[${i}]`)
         );
+    }
+
+    /**
+     * retrieve_lost_box alternative: one trial per (possibly sampled) box_locations entry.
+     * Travel to a non-home location in Fennimal_finding_box's native region;
+     * interaction uses target_box (overrides FenObj.toybox).
+     */
+    generateRetrieveLostBoxTrialsFromBoxLocations(phaseData) {
+        let locs = this.applyRetrieveLostBoxSampling(phaseData);
+        let occupied = new Set();
+        // Prefer spare map spots: exclude every Fennimal's assigned home in this experiment.
+        let allFens = this.stimuli.get_all_Fennimals_objects_in_array() || [];
+        allFens.forEach((fen) => {
+            if (fen && fen.location) occupied.add(fen.location);
+        });
+
+        return locs.map((entry, index) => {
+            let trial = this.buildRetrieveLostBoxTrialFromBoxLocation(
+                entry,
+                phaseData,
+                index,
+                occupied
+            );
+            occupied.add(trial.location);
+            return trial;
+        });
+    }
+
+    /**
+     * Pick a location in the Fennimal's region that is not their home (and not already taken).
+     * Prefer unused region spots; fall back to any non-home location in the region.
+     */
+    pickAlternateLocationInRegion(homeLocation, region, occupiedSet, contextLabel) {
+        let regionData = typeof GenParam !== "undefined" ? GenParam.RegionData[region] : null;
+        let locations = regionData && Array.isArray(regionData.Locations)
+            ? regionData.Locations.slice()
+            : [];
+
+        if (locations.length === 0) {
+            throw new Error(
+                `TrialGenerator: ${contextLabel} region "${region}" has no Locations in GenParam.RegionData ` +
+                `(MapController must have initialized markers first).`
+            );
+        }
+
+        let candidates = locations.filter(
+            (loc) => loc !== homeLocation && !occupiedSet.has(loc)
+        );
+        if (candidates.length === 0) {
+            candidates = locations.filter((loc) => loc !== homeLocation);
+        }
+        if (candidates.length === 0) {
+            throw new Error(
+                `TrialGenerator: ${contextLabel} cannot place encounter away from home location ` +
+                `"${homeLocation}" — region "${region}" has no other location markers.`
+            );
+        }
+        return shuffleArray(candidates)[0];
+    }
+
+    buildRetrieveLostBoxTrialFromBoxLocation(entry, phaseData, index, occupiedSet) {
+        let fenId = entry.Fennimal_finding_box;
+        let fenArr = this.stimuli.get_Fennimals_in_array([fenId]);
+        if (!fenArr || fenArr.length === 0) {
+            throw new Error(
+                `TrialGenerator: retrieve_lost_box box_locations[${index}] unknown Fennimal_finding_box ` +
+                `"${fenId}" (phase type "${phaseData.type}").`
+            );
+        }
+
+        let mapped = this.stimuli.get_assigned_names_of_code_array("toybox", [entry.target_box]);
+        let target_box = mapped && mapped[0];
+        if (!target_box) {
+            throw new Error(
+                `TrialGenerator: retrieve_lost_box box_locations[${index}] failed to map target_box code ` +
+                `"${entry.target_box}" (phase type "${phaseData.type}").`
+            );
+        }
+
+        let trial = JSON.parse(JSON.stringify(fenArr[0]));
+        trial.interaction_type = "retrieve_lost_box";
+        // BoxModule / WorldState tag commits read FenObj.toybox — point it at the found box.
+        trial.toybox = target_box;
+        trial.target_box = target_box;
+        trial.target_box_code = entry.target_box;
+        trial.Fennimal_finding_box = fenId;
+
+        if (entry.label !== undefined && entry.label !== null && entry.label !== "") {
+            trial.label = entry.label;
+            trial.manipulation_label = entry.label;
+        }
+
+        trial.home_location = trial.location;
+        trial.location = this.pickAlternateLocationInRegion(
+            trial.home_location,
+            trial.region,
+            occupiedSet || new Set(),
+            `retrieve_lost_box box_locations[${index}] (Fennimal "${fenId}")`
+        );
+
+        return trial;
     }
 
     /**
@@ -1144,6 +1468,11 @@ class TrialGenerator {
         if (Array.isArray(phaseData.Fennimals_encountered)) {
             return [...phaseData.Fennimals_encountered];
         }
+        if (Array.isArray(phaseData.box_locations)) {
+            return phaseData.box_locations
+                .map((entry) => entry && entry.Fennimal_finding_box)
+                .filter((id) => id !== undefined && id !== null && id !== "");
+        }
         return [];
     }
 
@@ -1272,7 +1601,7 @@ class ExperimentController {
         // SVGREDUCER runs in finalizeSession AFTER optional assignment restore.
         // Otherwise a fresh randomization can delete heads that the restored session still needs.
         this.svgReducer = null;
-        this.trialGenerator = new TrialGenerator(this.stimuli);
+        this.trialGenerator = new TrialGenerator(this.stimuli, this.dataCont);
 
         WorldState.rebuild_state_from_available_locations(this.stimuli.get_all_locations_visited_during_experiment_with_regions());
 
@@ -1382,6 +1711,7 @@ class ExperimentController {
         if (GenParam.DisplayFoundFennimalIconsOnMap.show && GenParam.DisplayFoundFennimalIconsOnMap.clear_Fennimal_icons_from_map_at_start_of_new_day) {
             this.mapCont.clear_all_Fennimal_icons_from_map();
         }
+        this.mapCont.clear_all_lost_box_icons_from_map();
 
         WorldState.change_partner_role_behavior(this.currentPhaseData.partner_behavior || null);
         // Apply role to the map icon immediately (WorldState alone does not hide/show it).
@@ -1431,7 +1761,12 @@ class ExperimentController {
                 this.currentPhaseData.include_Fennefinder = true;
                 this.setupTrialBasedPhase();
                 this.flagExplorationPhaseCompleted = false;
+                // box_locations trials may sit at non-home spots — preload those backgrounds.
+                this.ensureLocationImagesLoaded(
+                    (this.currentPhaseData.Fennimals_in_phase || []).map((t) => [t.location, t.region])
+                );
                 WorldState.populate_map_with_array_of_Fennimals(this.currentPhaseData.Fennimals_in_phase, true);
+                this.mapCont.add_lost_box_icons_on_map(this.currentPhaseData.Fennimals_in_phase);
                 if (this.currentPhaseData.force_climbing_tower_first) this.mapCont.enforce_dome_until_tower_climbed();
                 this.instrCont.initializeRetrieveLostBoxInstructions(
                     this.currentDayNum,
@@ -2163,6 +2498,10 @@ class ExperimentController {
 
         if (GenParam.DisplayFoundFennimalIconsOnMap.show) {
             this.mapCont.add_Fennimal_icon_on_map(fenObj);
+        }
+
+        if (this.currentPhaseType === "retrieve_lost_box") {
+            this.mapCont.remove_lost_box_icon_at_location(fenObj.location);
         }
 
         this.currentPhaseData.Data.push(JSON.parse(JSON.stringify(fenObj)));

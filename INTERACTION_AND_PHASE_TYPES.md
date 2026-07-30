@@ -145,14 +145,43 @@ All phase Fennimals on the map; participant explores until all are visited.
 #### `retrieve_lost_box`
 Free-map search like `free_exploration`, but each Fennimal encounter is a lost-box retrieval (clean + tag). Fennefinder is always forced on (`include_Fennefinder` is ignored).
 
+Specify trials with **either** `Fennimals_encountered` **or** `box_locations` (not both).
+
 | Field | Meaning |
 |---|---|
-| `Fennimals_encountered` | One missing box per Fennimal (home location) |
+| `Fennimals_encountered` | One missing box per Fennimal (home location); box is that Fennimal’s `toybox` |
+| `box_locations` | Explicit per-trial pool: `[{ label: "…", Fennimal_finding_box: "A", target_box: "A" }, …]` — place the finder Fennimal at a **different** location in their native region (not their home); tag the mapped `target_box`. Each `Fennimal_finding_box` may appear only once. Tiny box icons appear on those map locations until each box is retrieved |
+| `n_trials_to_sample` | Optional between-subjects draw: keep this many entries from `box_locations` at random. Requires a unique `label` on every pool entry |
+| `randomization_id` | Optional stable key for the draw (persisted in Layer 1 assignment). Defaults to `retrieve_lost_box__{phasenum}` |
 | `partner_behavior` | Optional; if present, partner helps with cleaning (same as `joint_box_cleaning`) |
 | `force_climbing_tower_first` | Optional watchtower intro |
 | `interaction_type` | Not required — always stamped as `"retrieve_lost_box"` |
 
+**Stored manipulation fields** (kept on the phase in `storedData`, and the draw is also in `experimentData.phaseRandomizations`):
+
+| Field | Meaning |
+|---|---|
+| `selected_box_location_label` / `manipulation_label` | Chosen label when `n_trials_to_sample === 1` |
+| `selected_box_location_labels` | All chosen labels |
+| `selected_box_locations` | Chosen `{ label, Fennimal_finding_box, target_box }` entries |
+| trial `label` / `manipulation_label` | Same label on each completed interaction record in `Data[]` |
+
 Flow per location: Fennimal intro → dirty found box + celebration → proud dance → joint clean → drag lost-and-found tag onto box → “Somebody will come collect…” → leave (or phase complete when all retrieved). Attached tags persist in WorldState like decorations.
+
+Example — between-subjects, one random option:
+
+```js
+{
+  type: "retrieve_lost_box",
+  n_trials_to_sample: 1,
+  randomization_id: "lost_box_manipulation",
+  box_locations: [
+    { label: "A_finds_A", Fennimal_finding_box: "A", target_box: "A" },
+    { label: "C_finds_A", Fennimal_finding_box: "C", target_box: "A" }
+  ],
+  partner_behavior: "active"
+}
+```
 
 #### `hint_and_search`
 One target at a time; hint instruction, then find & interact. Supports orthogonal tasks.
@@ -372,7 +401,7 @@ Each sponge turn ends after ~25% of total dirt-mask health is cleaned; sponge dr
 **WorldState:** clears decoration flag on the cleaned box.
 
 #### `retrieve_lost_box` → `RetrieveLostBoxTrialController`
-Used by the `retrieve_lost_box` phase. Fennimal intro → dirty found box + celebration → proud dance → joint cleaning (same tools/turns as `joint_box_cleaning`; partner helps if present) → drag loose lost-and-found tag onto box (300px drop) → fade loose / show attached → collect prompt. No handoff photo.
+Used by the `retrieve_lost_box` phase. Fennimal intro → dirty found box + celebration → proud dance → joint cleaning (same tools/turns as `joint_box_cleaning`; partner helps if present) → drag loose lost-and-found tag onto box (300px drop) → fade loose / show attached → collect prompt. No handoff photo. With `box_locations`, the trial’s `toybox` is the mapped `target_box`, and map travel uses a non-home location in the finder Fennimal’s region (`home_location` keeps the original).
 
 **Needs on FenObj:** `name`, `toybox`, `region`.  
 **WorldState:** clears decoration; sets lost-and-found tag flag (attached tag persists on later box appearances).

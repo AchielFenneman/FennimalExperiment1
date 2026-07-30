@@ -1,6 +1,6 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["mentalizing_AC"];
+    this.Experiment_Code = ["mentalizing_between_subjects"];
 
     const All_Instructions_At_Start = {
         test: [],
@@ -9,6 +9,7 @@ let StimulusSettings = function () {
         mentalizing_AB: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
         mentalizing_AC: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
         mentalizing_sack_AC: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
+        mentalizing_between_subjects: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
     };
 
     // ----------------------------------------------------
@@ -61,6 +62,12 @@ let StimulusSettings = function () {
             "D": { head: "D", region: "D", toy: "D", toybox: "B",  },
             "E": { head: "E", region: "A", toy: "E", sack: "A", special_role: "found_toy"},
             "F": { head: "F", region: "E", toybox: "B"},
+        },
+        mentalizing_between_subjects: {
+            "A": { head: "A", region: "A", toy: "A", toybox: "A", sack: "A" },
+            "B": { head: "B", region: "B", toy: "B", toybox: "A" },
+            "C": { head: "C", region: "C", toy: "C" },
+          
         },
         
     };
@@ -656,6 +663,104 @@ let StimulusSettings = function () {
             },
 
 
+
+        ],
+        mentalizing_between_subjects: [
+            
+            // BLOCK 1: Introduction to all Fennimals
+            {
+                type: "free_exploration",
+                interaction_type: ["Fennimal_toy"],
+                Fennimals_encountered: ["A", "B", "C"],
+                partner_behavior: "active",
+                include_Fennefinder: true,
+                force_climbing_tower_first: true
+            },
+            
+            
+            // BLOCK 2: 
+            // 1) Fennimal->toy, 
+            // 2) toy -> sack, 
+            // 3) sack -> box, 
+            // 4) Fennimal-box [manipulation]
+            {
+                type: "phone_room",
+                partner_behavior: "active",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                ask_Fennimal: true,
+                ask_toy: true,
+                ask_box: true,
+                trial_subblocks: [
+                    // 1) Fennimal->toy, 
+                    
+                    {
+                        Fennimals_encountered: ["A", "B", "C"],
+                        interaction_type: "broken_toy_no_box"
+                    },
+                    
+                    {
+                        Fennimals_encountered: ["A", "B", "C"],
+                        interaction_type: "Fennimal_toy"
+                    },
+                   
+                    // 2) toy -> sack, 
+                    {
+                        Fennimals_encountered: ["A"],
+                        interaction_type: "toy_to_sack"
+                    },
+                    // 3) sack -> box, 
+                    {
+                        Fennimals_encountered: ["A"],
+                        interaction_type: "sack_to_box"
+                    },
+                
+                   
+                ]
+            },
+
+            //Block 3: Lost box (manipulation) — between-subjects: one of these options
+            {
+                type: "retrieve_lost_box",
+                n_trials_to_sample: 1,
+                randomization_id: "lost_box_manipulation",
+                box_locations: [
+                  { label: "boost", Fennimal_finding_box: "A", target_box: "A" },
+                  { label: "neutral", Fennimal_finding_box: "C", target_box: "A" },
+                ],
+                partner_behavior: "active"
+            },
+
+
+            // BLOCK 4: Change contents of box A to toy B 
+            {
+                type: "phone_room",
+                partner_behavior: "active",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: true,
+                skip_instructions: false,
+                Fennimals_encountered: ["B"],
+                interaction_type: ["switch_box_without_partner"],
+            },
+
+            // BLOCK 5: Partner belief (individual boxes)
+            // Memory probes (when enabled): box→Fennimal / Fennimal→toy;
+            // plus box→sack / sack→toy when sacks are templated and toy_to_sack appears.
+            {
+                type: "partner_belief_individual_boxes",
+                include_practice_trial: true,
+                num_belief_blocks: 1,
+                include_reality_block_at_end: true,
+                include_memory_probe_at_end: true,
+                include_empty_box_choice_alternative: true,
+                bonus_stars_per_correct_answer: 1,
+                memory_probe_isi_ms: 1000,
+                gating_boxes: ["A"],
+                action_prediction_toys: ["A"],
+                questions: [
+                    { question_id: "belief_A", target_box: "A" },
+                ]
+            },
 
         ]
     };
@@ -1407,4 +1512,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("NEW AC-READY")
+console.log("P-READY")

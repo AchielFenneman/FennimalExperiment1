@@ -157,6 +157,7 @@ class MapController {
         this.ActiveActionButtonArr = [];
         this.CurrentFennimalIconsOnMap = [];
         this.Arr_IDs_of_Fennimals_currently_on_map = [];
+        this.CurrentLostBoxIconsOnMap = [];
 
         // Initialize Sub-Controllers
         this.DomeCont = new this.DomeController();
@@ -273,6 +274,7 @@ class MapController {
         if (GenParam.DisplayFoundFennimalIconsOnMap.show && GenParam.DisplayFoundFennimalIconsOnMap.display_only_in_current_region) {
             this.display_all_Fennimal_icon_on_map_for_region(region_name);
         }
+        this.display_all_lost_box_icons_on_map_for_region(region_name);
     }
 
     reset_all_region_opacity_masks() {
@@ -787,6 +789,7 @@ class MapController {
         if (GenParam.DisplayFoundFennimalIconsOnMap.show && GenParam.DisplayFoundFennimalIconsOnMap.display_only_in_current_region) {
             this.display_all_Fennimal_icon_on_map_for_region("Home");
         }
+        this.display_all_lost_box_icons_on_map_for_region("Home");
 
         this.Partner.jump_to_map_center();
         this.Partner.update_behavior();
@@ -1679,6 +1682,38 @@ class MapController {
         this.CurrentFennimalIconsOnMap.forEach(icon => icon.display_only_if_in_region(region));
     }
 
+    // ----------------------------------------------------
+    // LOST BOX ICONS ON MAP (retrieve_lost_box)
+    // ----------------------------------------------------
+    add_lost_box_icons_on_map(trials) {
+        this.clear_all_lost_box_icons_from_map();
+        (trials || []).forEach((trial) => {
+            if (!trial || !trial.toybox || !trial.location) return;
+            this.CurrentLostBoxIconsOnMap.push(new this.LostBoxIconOnMap(trial, this.Map_Layer));
+        });
+        this.display_all_lost_box_icons_on_map_for_region(this.current_region);
+    }
+
+    remove_lost_box_icon_at_location(location) {
+        if (!location) return;
+        this.CurrentLostBoxIconsOnMap = this.CurrentLostBoxIconsOnMap.filter((icon) => {
+            if (icon.location === location) {
+                icon.remove();
+                return false;
+            }
+            return true;
+        });
+    }
+
+    clear_all_lost_box_icons_from_map() {
+        this.CurrentLostBoxIconsOnMap.forEach((icon) => icon.remove());
+        this.CurrentLostBoxIconsOnMap = [];
+    }
+
+    display_all_lost_box_icons_on_map_for_region(region) {
+        this.CurrentLostBoxIconsOnMap.forEach((icon) => icon.display_only_if_in_region(region));
+    }
+
     update_player_settings() {
         this.Partner.update_settings();
         this.Player.update_settings();
@@ -1800,6 +1835,96 @@ class MapController {
         display_only_if_in_region(region) {
             let should_display = (this.FenObj.region === region) || (GenParam.DisplayFoundFennimalIconsOnMap.display_all_icons_on_watchtower && region === "All");
             this.FennimalIconGroup.style.opacity = should_display ? this.BoxSettings.max_opacity : 0;
+        }
+    };
+
+    /**
+     * Tiny closed toybox marker for retrieve_lost_box: sits on the map location
+     * where that lost box currently is.
+     */
+    LostBoxIconOnMap = class {
+        constructor(trial, MapLayer) {
+            this.trial = trial;
+            this.location = trial.location;
+            this.region = trial.region;
+            this.toybox = trial.toybox;
+            this.targetSize = 44;
+            this.max_opacity = 0.95;
+            this.offset_x = 18;
+            this.offset_y = -28;
+
+            switch (this.location) {
+                case "Lake": this.offset_x = -20; this.offset_y = 8; break;
+                case "Statue": this.offset_x = 28; break;
+                case "Fountain": this.offset_x = -22; this.offset_y = -10; break;
+                case "Farm": this.offset_x = 28; this.offset_y = -8; break;
+                case "Dam": this.offset_x = 18; this.offset_y = -48; break;
+                case "Waterfall": this.offset_x = -18; break;
+                case "Cliff": this.offset_x = 28; this.offset_y = 20; break;
+                case "Rainforest": this.offset_x = -18; break;
+                case "Bush": this.offset_x = -18; this.offset_y = -8; break;
+                case "Iceberg": this.offset_x = -18; this.offset_y = -12; break;
+                case "Igloo": this.offset_x = -18; this.offset_y = -8; break;
+                case "Pineforest": this.offset_y = -14; break;
+            }
+
+            let marker = document.getElementById("location_marker_" + this.location);
+            if (!marker) {
+                console.warn("LostBoxIconOnMap: missing location_marker_" + this.location);
+                this.IconGroup = null;
+                return;
+            }
+            let template = document.getElementById("toybox_" + this.toybox);
+            if (!template) {
+                console.warn("LostBoxIconOnMap: missing toybox_" + this.toybox);
+                this.IconGroup = null;
+                return;
+            }
+
+            let bbox = marker.getBBox();
+            let cx = bbox.x + 0.5 * bbox.width + this.offset_x;
+            let cy = bbox.y + 0.5 * bbox.height + this.offset_y;
+
+            this.IconGroup = copy_scale_and_move_object_to_position(
+                template,
+                MapLayer,
+                cx,
+                cy,
+                1
+            );
+            this.IconGroup.classList.add("lost_box_map_icon");
+            this.IconGroup.style.pointerEvents = "none";
+            this.IconGroup.style.transition = "opacity 400ms ease-in-out";
+
+            apply_toybox_decoration_visibility_to_element(this.IconGroup, this.toybox);
+            Array.from(this.IconGroup.getElementsByClassName("alignment_field")).forEach((el) => el.remove());
+
+            let rawBox = template.getBBox();
+            let scale = this.targetSize / Math.max(rawBox.width, rawBox.height, 1);
+            let scaleGroup = this.IconGroup.getElementsByClassName("scale_group")[0];
+            if (scaleGroup) {
+                scaleGroup.style.transform = `scale(${scale})`;
+            }
+
+            this.IconGroup.style.opacity = this.max_opacity;
+        }
+
+        remove() {
+            if (this.IconGroup && this.IconGroup.parentNode) {
+                this.IconGroup.remove();
+            }
+            this.IconGroup = null;
+        }
+
+        display_only_if_in_region(region) {
+            if (!this.IconGroup) return;
+            let should_display =
+                this.region === region
+                || region === "All"
+                || (GenParam.DisplayFoundFennimalIconsOnMap
+                    && GenParam.DisplayFoundFennimalIconsOnMap.display_all_icons_on_watchtower
+                    && region === "All");
+            this.IconGroup.style.opacity = should_display ? this.max_opacity : 0;
         }
     };
 
