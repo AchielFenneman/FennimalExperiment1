@@ -153,7 +153,8 @@ Specify trials with **either** `Fennimals_encountered` **or** `box_locations` (n
 | `box_locations` | Explicit per-trial pool: `[{ label: "…", Fennimal_finding_box: "A", target_box: "A" }, …]` — place the finder Fennimal at a **different** location in their native region (not their home); tag the mapped `target_box`. Each `Fennimal_finding_box` may appear only once. Tiny box icons appear on those map locations until each box is retrieved |
 | `n_trials_to_sample` | Optional between-subjects draw: keep this many entries from `box_locations` at random. Requires a unique `label` on every pool entry |
 | `randomization_id` | Optional stable key for the draw (persisted in Layer 1 assignment). Defaults to `retrieve_lost_box__{phasenum}` |
-| `partner_behavior` | Optional; if present, partner helps with cleaning (same as `joint_box_cleaning`) |
+| `include_decoration` | Optional. If `true`, after cleaning (and before tagging) run the joint decoration pile/turns; decorations persist in WorldState (including **which Fennimal decorated** via `get_toybox_decorator`). No photo after decorate — photo is always at the end of the whole interaction |
+| `partner_behavior` | Optional; if present, partner helps with cleaning (and decoration turns when `include_decoration`) |
 | `force_climbing_tower_first` | Optional watchtower intro |
 | `interaction_type` | Not required — always stamped as `"retrieve_lost_box"` |
 
@@ -166,7 +167,7 @@ Specify trials with **either** `Fennimals_encountered` **or** `box_locations` (n
 | `selected_box_locations` | Chosen `{ label, Fennimal_finding_box, target_box }` entries |
 | trial `label` / `manipulation_label` | Same label on each completed interaction record in `Data[]` |
 
-Flow per location: Fennimal intro → dirty found box + celebration → proud dance → joint clean → drag lost-and-found tag onto box → “Somebody will come collect…” → leave (or phase complete when all retrieved). Attached tags persist in WorldState like decorations.
+Flow per location: Fennimal intro → dirty found box + celebration → proud dance → joint clean → optional decorate (`include_decoration`) → drag lost-and-found tag onto box → partner photo tableau → “Somebody will come collect…” → leave (or phase complete when all retrieved). Attached tags (and decorations, when included) persist in WorldState.
 
 Example — between-subjects, one random option:
 
@@ -175,6 +176,7 @@ Example — between-subjects, one random option:
   type: "retrieve_lost_box",
   n_trials_to_sample: 1,
   randomization_id: "lost_box_manipulation",
+  include_decoration: true,
   box_locations: [
     { label: "A_finds_A", Fennimal_finding_box: "A", target_box: "A" },
     { label: "C_finds_A", Fennimal_finding_box: "C", target_box: "A" }
@@ -225,28 +227,56 @@ One-box-at-a-time DV task with curtain reveal, radial forced-choice options, and
 
 | Field | Meaning |
 |---|---|
-| `questions` | Array of `{ question_id, target_box }` (stimulus codes). `question_id` is mandatory and unique. Do **not** set `answer_options` |
-| `lure_cycle` | Optional box-code cycle for the lure (default = unique `target_box` values in `questions` order, e.g. A→B→C→A) |
+| `questions` | Mixed array of **belief questions** and optional **memory-probe declarations** (see below). Belief entries: `{ question_id, target_box }` (stimulus codes). `question_id` is mandatory and unique for belief entries. Do **not** set `answer_options` |
+| `lure_cycle` | Optional box-code cycle for the lure (default = unique `target_box` values in belief `questions` order, e.g. A→B→C→A) |
 | `num_belief_blocks` | How many shuffled belief blocks (default `1`). Deprecated alias: `num_repeated_blocks` |
 | `include_reality_block_at_end` | If `true`, after all belief blocks run one shuffled reality-memory block (no partner). Includes the existing reality-block intro overlay |
 | `include_practice_trial` | If `true`, prepend shape-match and color-match practice trials |
-| `include_memory_probe_at_end` | If `true`, after reality (or after belief if no reality block) run a solo memory-probe section (no partner, no distractors) |
 | `memory_probe_isi_ms` | Pause after each memory-probe response before the next trial (default `1000`) |
 | `bonus_stars_per_correct_answer` | Silent stars per correct practice/distractor/belief/reality/memory-probe answer |
 
-**Answer options (fixed rule `belief_reality_cyclic_lure`):** for each question the controller auto-builds a shuffled 3AFC triad from `WorldState`:
+**`questions` belief entries:** `{ question_id, target_box }` — used for belief blocks and (when enabled) the reality block.
+
+**`questions` memory-probe declarations** (typed; order in the array is the run order):
+
+| `kind` | Expands to |
+|---|---|
+| `memory_probe_box_to_fennimal` | One trial per eligible Fennimal with toybox + toy (3AFC heads; needs ≥2 other-box foils — skip when co-box mates leave too few foils) |
+| `memory_probe_box_decorator` | **One trial** for `target_box` (required). Cue = box; options = **all** experiment Fennimal heads; correct = WorldState decorator (who decorated, not necessarily the owner). Written by `joint_box_decoration` / `retrieve_lost_box` decoration |
+| `memory_probe_fennimal_to_toy` | One trial per eligible Fennimal with a toy |
+| `memory_probe_box_to_sack` | One trial per eligible Fennimal with sack + toybox (**skipped** unless sacks are templated and `toy_to_sack` appears in the experiment) |
+| `memory_probe_sack_to_toy` | One trial per eligible Fennimal with sack + toy (same sack auto-gate) |
+
+Optional `fennimals: ["A","B",…]` limits/orders **targets** for expandable kinds (foil options still use the full Fennimal pool). For `memory_probe_box_decorator`, optional `fennimals` limits the **option heads** (correct decorator is always included). Omit `fennimals` to include all eligible Fennimals / all heads. Optional `question_id` on a probe declaration is only for uniqueness bookkeeping — expanded trials keep their own ids (`probe_box_*`, etc.).
+
+Example:
+
+```js
+questions: [
+  { question_id: "belief_A", target_box: "A" },
+  { kind: "memory_probe_box_decorator", target_box: "A" },
+  { kind: "memory_probe_box_to_fennimal", fennimals: ["A", "B", "C"] },
+  { kind: "memory_probe_fennimal_to_toy" },
+  { kind: "memory_probe_box_to_sack" },
+  { kind: "memory_probe_sack_to_toy" },
+]
+```
+
+**Answer options (fixed rule `belief_reality_cyclic_lure`):** for each belief/reality question the controller auto-builds a shuffled 3AFC triad from `WorldState`:
 
 - **Belief trials:** target-box partner belief (old; correct) + target-box current contents (new) + partner belief about the *next* box in `lure_cycle` (old lure).
 - **Reality trials:** target-box partner belief (old) + target-box current contents (new; correct) + current contents of the *next* box in `lure_cycle` (new lure).
 
 Thus, with A→B→C→A, A’s lure comes from B, B’s from C, and C’s from A; only the source type changes by trial kind. Fails loud if any piece is missing or the three toys are not distinct. Logged fields include `lure_source_box`, `lure_source_box_code`, `lure_source_type`, `lure_answer`, and `option_roles`.
 
-**Trial structure:** optional practice → for each belief block: (distractor → belief)×N → optional final reality block: (distractor → reality)×N → optional memory probes. Distractors alternate shape/color matching with orthogonal features. Question presentation order is shuffled within each block.
+**Trial structure:** optional practice → for each belief block: (distractor → belief)×N → optional final reality block: (distractor → reality)×N → memory probes in `questions` declaration order. Distractors alternate shape/color matching with orthogonal features. Belief/reality presentation order is shuffled within each block.
 
-**Memory probes** (when `include_memory_probe_at_end`): two homogeneous blocks, order counterbalanced between participants (`memory_probe_block_order` on the phase):
+**Memory probes** (when declared in `questions`):
 
-1. **Box→Fennimal** (`memory_probe_box_to_fennimal`): one trial per Fennimal with a toybox; empty closed box cue; radial colored heads; triad = correct + two other-box foils (co-box mates excluded so the answer is unambiguous; prefer same S/P wave when those prefixes exist).
-2. **Fennimal→toy** (`memory_probe_fennimal_to_toy`): one trial per Fennimal with a toy; full-body Fennimal cue; radial toys; foils = one same-wave + one other-wave toy when S/P IDs are present, otherwise any two other toys.
+1. **Box→Fennimal** (`memory_probe_box_to_fennimal`): empty closed box cue; radial colored heads; triad = correct + two other-box foils (co-box mates excluded; prefer same S/P wave when those prefixes exist).
+2. **Box decorator** (`memory_probe_box_decorator`): empty closed box cue; radial colored heads for **all** experiment Fennimals; correct = Fennimal recorded as decorator in WorldState.
+3. **Fennimal→toy** (`memory_probe_fennimal_to_toy`): full-body Fennimal cue; radial toys; foils = one same-wave + one other-wave toy when S/P IDs are present, otherwise any two other toys.
+4. **Box→sack / sack→toy** when declared and the sack auto-gate passes.
 
 No distractors between probes (ISI instead). Solo intro overlay before the first probe. Logged answer rows match belief/reality density (`trial_kind`, ids, `block_index`, `trial_index`, target, `options` with roles, `selected`, `correct`, `reaction_time_ms`).
 
@@ -401,7 +431,7 @@ Each sponge turn ends after ~25% of total dirt-mask health is cleaned; sponge dr
 **WorldState:** clears decoration flag on the cleaned box.
 
 #### `retrieve_lost_box` → `RetrieveLostBoxTrialController`
-Used by the `retrieve_lost_box` phase. Fennimal intro → dirty found box + celebration → proud dance → joint cleaning (same tools/turns as `joint_box_cleaning`; partner helps if present) → drag loose lost-and-found tag onto box (300px drop) → fade loose / show attached → collect prompt. No handoff photo. With `box_locations`, the trial’s `toybox` is the mapped `target_box`, and map travel uses a non-home location in the finder Fennimal’s region (`home_location` keeps the original).
+Used by the `retrieve_lost_box` phase. Fennimal intro → dirty found box + celebration → proud dance → joint cleaning → optional decoration (if `include_decoration`) → drag lost-and-found tag onto box → partner photo (no ownership handoff) → collect prompt. With `box_locations`, the trial’s `toybox` is the mapped `target_box`, and map travel uses a non-home location in the finder Fennimal’s region (`home_location` keeps the original).
 
 **Needs on FenObj:** `name`, `toybox`, `region`.  
 **WorldState:** clears decoration; sets lost-and-found tag flag (attached tag persists on later box appearances).

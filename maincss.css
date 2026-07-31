@@ -1909,6 +1909,24 @@ html, body {
     }
 }
 
+/* Map asset glow while walking home to #phone_room (manual proximity return). */
+#phone_room.phone_room_map_return_pulse {
+    animation: phone_room_map_return_pulse var(--phone-room-map-return-pulse-time, 1.2s) ease-in-out infinite;
+}
+
+@keyframes phone_room_map_return_pulse {
+    0%, 100% {
+        filter:
+            drop-shadow(0px 0px 6px var(--phone-room-map-return-color, #FFE566))
+            drop-shadow(0px 0px 16px var(--phone-room-map-return-color, #FFE566));
+    }
+    50% {
+        filter:
+            drop-shadow(0px 0px 14px var(--phone-room-map-return-color, #FFE566))
+            drop-shadow(0px 0px 36px var(--phone-room-map-return-color, #FFE566));
+    }
+}
+
 .phone_room_partner_exiting {
     animation: phone_room_partner_exit_bob 260ms ease-in-out infinite alternate;
 }

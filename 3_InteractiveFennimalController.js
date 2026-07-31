@@ -725,12 +725,24 @@ class BoxModule {
     create_and_appear_box(ParentBase, ParentTop, center_x, center_y, scale, fade_in_time) {
         return new Promise(resolve => {
             this.boxScale = (typeof scale === "number") ? scale : 1;
-            this.BoxBase = copy_scale_and_move_object_to_position(document.getElementById("toybox_" + this.FenObj.toybox), ParentBase, center_x, center_y , scale);
+            let template = (typeof get_toybox_template === "function")
+                ? get_toybox_template(this.FenObj.toybox)
+                : document.getElementById("toybox_" + this.FenObj.toybox);
+            if (!template) {
+                console.warn("BoxModule: missing toybox_" + this.FenObj.toybox);
+                resolve();
+                return;
+            }
+            this.BoxBase = copy_scale_and_move_object_to_position(template, ParentBase, center_x, center_y , scale);
             this.BoxBase.getElementsByClassName("front")[0].remove();
             this.BoxBase.getElementsByClassName("lid")[0].remove();
             this.BoxBase.style.opacity = 0;
 
-            this.BoxTop = copy_scale_and_move_object_to_position(document.getElementById("toybox_" + this.FenObj.toybox), ParentTop, center_x, center_y , scale);
+            // Re-resolve: never clone the BoxBase we just created (duplicate-id hazard).
+            template = (typeof get_toybox_template === "function")
+                ? get_toybox_template(this.FenObj.toybox)
+                : document.getElementById("toybox_" + this.FenObj.toybox);
+            this.BoxTop = copy_scale_and_move_object_to_position(template, ParentTop, center_x, center_y , scale);
             this.BoxTop.getElementsByClassName("back")[0].remove();
             this.BoxTop.style.opacity = 0;
 
@@ -4341,12 +4353,7 @@ class SwitchBoxWithoutPartnerTrialController {
         );
         this.Backpack.id = "switch_box_backpack";
         this.Backpack.style.opacity = 0;
-        let flaps = this.Backpack.getElementsByClassName("backpack_flap");
-        for (let i = 0; i < flaps.length; i++) {
-            flaps[i].style.display = "inherit";
-            if (flaps[i].id && flaps[i].id.includes("closed")) flaps[i].style.opacity = 1;
-            if (flaps[i].id && flaps[i].id.includes("open")) flaps[i].style.opacity = 0;
-        }
+        set_backpack_flaps_open(this.Backpack, false);
     }
 
     async fade_in_backpack(ms = 350) {
@@ -4384,11 +4391,9 @@ class SwitchBoxWithoutPartnerTrialController {
         if (!this.Backpack) return wait(0);
         let flaps = this.Backpack.getElementsByClassName("backpack_flap");
         for (let i = 0; i < flaps.length; i++) {
-            flaps[i].style.display = "inherit";
             flaps[i].style.transition = "opacity 250ms ease-in-out";
-            if (flaps[i].id && flaps[i].id.includes("closed")) flaps[i].style.opacity = 0;
-            if (flaps[i].id && flaps[i].id.includes("open")) flaps[i].style.opacity = 1;
         }
+        set_backpack_flaps_open(this.Backpack, true);
         return wait(280);
     }
 
@@ -4830,11 +4835,9 @@ class SwitchBoxWithoutPartnerTrialController {
         if (!this.Backpack) return wait(0);
         let flaps = this.Backpack.getElementsByClassName("backpack_flap");
         for (let i = 0; i < flaps.length; i++) {
-            flaps[i].style.display = "inherit";
             flaps[i].style.transition = "opacity 250ms ease-in-out";
-            if (flaps[i].id && flaps[i].id.includes("closed")) flaps[i].style.opacity = 1;
-            if (flaps[i].id && flaps[i].id.includes("open")) flaps[i].style.opacity = 0;
         }
+        set_backpack_flaps_open(this.Backpack, false);
         return wait(280);
     }
 
@@ -9818,22 +9821,15 @@ class FeedFennimalTrialController {
         );
         this.Backpack.id = "feed_trial_backpack";
 
-        let flaps = this.Backpack.getElementsByClassName("backpack_flap");
-        for (let i = 0; i < flaps.length; i++) {
-            flaps[i].style.display = "inherit";
-            if (flaps[i].id && flaps[i].id.includes("closed")) flaps[i].style.opacity = 1;
-            if (flaps[i].id && flaps[i].id.includes("open")) flaps[i].style.opacity = 0;
-        }
+        set_backpack_flaps_open(this.Backpack, false);
     }
 
     open_backpack() {
         let flaps = this.Backpack.getElementsByClassName("backpack_flap");
         for (let i = 0; i < flaps.length; i++) {
-            flaps[i].style.display = "inherit";
             flaps[i].style.transition = "opacity 250ms ease-in-out";
-            if (flaps[i].id && flaps[i].id.includes("closed")) flaps[i].style.opacity = 0;
-            if (flaps[i].id && flaps[i].id.includes("open")) flaps[i].style.opacity = 1;
         }
+        set_backpack_flaps_open(this.Backpack, true);
         return wait(280);
     }
 
@@ -10631,8 +10627,10 @@ class JointBoxCleaningTrialController {
 
     async introduce_cleaning_tools() {
         const p = this.params;
-        Interface.Prompt.show_message("Let's clean the box together!");
-        await wait(2000);
+
+        await this.explain_cleaning_step(
+            "Oh no, the " + this.box.boxname + " is very dirty. Lets clean it up first!"
+        );
 
         // Bellows (left of box, raised) — NPC operated, no player click outline
         this.dust.spawn_bellows(
@@ -10651,21 +10649,19 @@ class JointBoxCleaningTrialController {
         await this.flash_attention(this.dust.BellowsTranslateGroup);
 
         if (this.partner.is_present) {
-            Interface.Prompt.show_message(
-                this.partner.partnername + " will clean the dust off of the " + this.box.boxname + "!"
-            );
             // Stay in the corner while idle; only approach during their turn
             await this.partner.return_to_start();
-            await wait(1000);
+            await this.explain_cleaning_step(
+                "I will clean the dust off of the " + this.box.boxname + "!"
+            );
         }
 
         // Fennimal + shears at the cleaning rest position
-        Interface.Prompt.show_message(
-            this.FenObj.name + " will cut down the plants!"
-        );
         this.spawn_garden_shears();
         await this.flash_attention(this.ShearsGroup);
-        await wait(800);
+        await this.explain_cleaning_step(
+            this.FenObj.name + " will cut down the plants!"
+        );
 
         // Sponge between box and partner corner
         let spongeX = p.spongeActiveX * this.basics.W;
@@ -10679,13 +10675,40 @@ class JointBoxCleaningTrialController {
         this.dirt._spongeActive = false;
         this.dirt.SpongeTranslateGroup.onpointerdown = null;
         await this.flash_attention(this.dirt.SpongeTranslateGroup);
-        Interface.Prompt.show_message(
+        await this.explain_cleaning_step(
             "You have to wash away the dirt from the " + this.box.boxname + "."
         );
-        await wait(1800);
 
-        Interface.Prompt.show_message("Let's clean the " + this.box.boxname + " together!");
-        await wait(1200);
+        await this.explain_cleaning_step(
+            "Let's clean the " + this.box.boxname + " together!"
+        );
+    }
+
+    /**
+     * Partner speech bubble when present, else Prompt fallback.
+     * @param {string} text
+     * @param {{ promptWaitMs?: number, buttonLabel?: string }} [options]
+     */
+    async explain_cleaning_step(text, options = {}) {
+        let promptWaitMs = options.promptWaitMs != null ? options.promptWaitMs : 1600;
+        let buttonLabel = options.buttonLabel || "Got it!";
+
+        if (this.partner && this.partner.is_present
+            && typeof Interface !== "undefined"
+            && typeof Interface.showPartnerSpeechBubble === "function"
+            && this.partner.PartnerBaseGroup) {
+            if (Interface.Prompt && Interface.Prompt.hide) Interface.Prompt.hide();
+            await Interface.showPartnerSpeechBubble({
+                target: this.partner.PartnerBaseGroup,
+                context: "location",
+                text: text,
+                buttonLabel: buttonLabel
+            });
+            return;
+        }
+
+        Interface.Prompt.show_message(text);
+        await wait(promptWaitMs);
     }
 
     async flash_attention(elem, popMs = 400) {
@@ -11516,22 +11539,34 @@ class JointBoxDecorationTrialController extends JointBoxCleaningTrialController 
 
         await this.move_fennimal_beside_box();
 
-        Interface.Prompt.show_message(
-            this.FenObj.name + " would like to decorate their " + this.box.boxname + "!"
+        await this.explain_cleaning_step(
+            "Now that the " + this.box.boxname + " is clean again, " +
+            this.FenObj.name + " would like to cheer it up with some decorations. " +
+            "Let's help " + this.FenObj.name + " decorate the " + this.box.boxname + "!"
         );
-        await wait(1600);
 
         await this.spawn_decoration_pile();
         await this.run_decoration_turns();
         await this.play_decoration_reveal();
 
-        if (typeof WorldState !== "undefined" && WorldState.change_toybox_is_decorated) {
-            WorldState.change_toybox_is_decorated(this.FenObj.toybox, true);
-        }
+        this.commit_box_decorated_to_worldstate();
 
         await this.run_box_handoff();
         await wait(500);
         this.returnfunc();
+    }
+
+    /** Mark box decorated and record which Fennimal did the decorating. */
+    commit_box_decorated_to_worldstate() {
+        if (typeof WorldState === "undefined") return;
+        let box = this.FenObj && this.FenObj.toybox;
+        if (!box) return;
+        if (WorldState.change_toybox_is_decorated) {
+            WorldState.change_toybox_is_decorated(box, true);
+        }
+        if (WorldState.change_toybox_decorator && this.FenObj && this.FenObj.id) {
+            WorldState.change_toybox_decorator(box, this.FenObj.id);
+        }
     }
 
     build_turn_plan(letters) {
@@ -11908,14 +11943,25 @@ class JointBoxDecorationTrialController extends JointBoxCleaningTrialController 
 
 /**
  * retrieve_lost_box phase interaction: Fennimal intro → dirty found box + celebration dance →
- * joint cleaning (partner helps if present) → drag lost-and-found tag onto box → collect prompt.
+ * joint cleaning → optional decoration → lost-and-found tag → partner photo → collect prompt.
+ * Extends JointBoxDecoration so decoration pile/turns are available when include_decoration is set.
  */
-class RetrieveLostBoxTrialController extends JointBoxCleaningTrialController {
+class RetrieveLostBoxTrialController extends JointBoxDecorationTrialController {
     constructor(FenObj, partner_is_present, returnfunc) {
         super(FenObj, partner_is_present, returnfunc);
+        // Need cleaning knobs (dirtSpots, cleaningRounds, …) plus decoration / photo knobs.
+        this.params = Object.assign({}, GenParam.JointBoxCleaning, GenParam.JointBoxDecoration);
+        if (this.foliage) {
+            this.foliage.foliage_base_health = this.params.cleaningRounds;
+        }
         this._tagDragController = null;
         this._looseTagWrapper = null;
         this.tagDropDistance = 300;
+    }
+
+    get_encoding_prompt_message() {
+        // Neutral — lost box may not belong to the finder Fennimal.
+        return "Looking good!";
     }
 
     async start_sequence() {
@@ -11958,7 +12004,13 @@ class RetrieveLostBoxTrialController extends JointBoxCleaningTrialController {
         await this.play_clean_reveal();
         this.commit_box_undecorated_to_worldstate();
 
+        if (this.FenObj.include_decoration === true) {
+            await this.run_optional_decoration_segment();
+        }
+
         await this.run_lost_found_tagging();
+
+        await this.run_retrieve_lost_box_end_photo();
 
         Interface.Prompt.show_message(
             "Somebody will come collect the " + this.box.boxname + " soon!"
@@ -11968,6 +12020,65 @@ class RetrieveLostBoxTrialController extends JointBoxCleaningTrialController {
 
         await wait(400);
         this.returnfunc();
+    }
+
+    /**
+     * Same decorate mechanics as joint_box_decoration (pile + turns + reveal), but no handoff/photo.
+     */
+    async run_optional_decoration_segment() {
+        await this.explain_cleaning_step(
+            "Now that the " + this.box.boxname + " is clean again, " +
+            this.FenObj.name + " would like to cheer it up with some decorations. " +
+            "Let's help " + this.FenObj.name + " decorate the " + this.box.boxname + "!"
+        );
+
+        this.box.set_all_decorations_visible(false);
+        await this.spawn_decoration_pile();
+        await this.run_decoration_turns();
+        await this.play_decoration_reveal();
+
+        this.commit_box_decorated_to_worldstate();
+    }
+
+    /**
+     * End tableau + photo with partner (no ownership handoff / walk-off — box awaits collection).
+     */
+    async run_retrieve_lost_box_end_photo() {
+        const p = this.params;
+
+        await this.pose_fennimal_behind_box_for_photo();
+        this.create_or_update_binding_outline();
+        await this.pulse_binding_outline();
+
+        if (this.partner.is_present) {
+            await this.explain_cleaning_step(
+                "Can you take a photo of me with " + this.FenObj.name +
+                " and " + this.box.boxname +
+                "? This will look great in the monthly newsletter!",
+                { buttonLabel: "No problem!" }
+            );
+            await this.partner_pose_for_photo_celebration();
+        }
+
+        Interface.Prompt.hide();
+        let freezeMs = p.freezeTableauMs != null ? p.freezeTableauMs : 1800;
+        await wait(freezeMs);
+
+        await this.run_end_photo();
+
+        if (this.partner.is_present) {
+            this.partner.set_direction("front");
+            await wait(400);
+            this.partner.move_to_layer(this.basics.ItemLayers.Partner);
+            this.partner.set_scale(
+                p.partnerHomeScale != null ? p.partnerHomeScale : 40,
+                400
+            );
+            await this.partner.return_to_start();
+            this.partner.set_direction("back");
+        }
+
+        this.remove_binding_outline();
     }
 
     async spawn_found_dirty_box() {
@@ -12138,7 +12249,7 @@ class RetrieveLostBoxTrialController extends JointBoxCleaningTrialController {
         wrapper.style.opacity = "1";
         await wait(400);
 
-        Interface.Prompt.show_message("Lets tag the cleaned " + this.box.boxname);
+        await this.explain_cleaning_step("Let's put a tag on the cleaned " + this.box.boxname);
         AudioCont.play_sound_effect("alert_minor");
 
         let dropTarget =
@@ -15691,7 +15802,6 @@ class PartnerBeliefIndividualBoxesController {
 
         this.include_reality_block_at_end = TaskObj.include_reality_block_at_end === true;
         this.include_practice_trial = TaskObj.include_practice_trial === true;
-        this.include_memory_probe_at_end = TaskObj.include_memory_probe_at_end === true;
         this.include_empty_box_choice_alternative = TaskObj.include_empty_box_choice_alternative === true;
         this.EMPTY_OPTION_ID = "empty";
         this.memory_probe_isi_ms = (typeof TaskObj.memory_probe_isi_ms === "number" && TaskObj.memory_probe_isi_ms >= 0)
@@ -15699,6 +15809,18 @@ class PartnerBeliefIndividualBoxesController {
             : 1000;
         this._realityBlockIntroShown = false;
         this._memoryProbeIntroShown = false;
+
+        this.MEMORY_PROBE_KINDS = new Set([
+            "memory_probe_box_to_fennimal",
+            "memory_probe_box_decorator",
+            "memory_probe_fennimal_to_toy",
+            "memory_probe_box_to_sack",
+            "memory_probe_sack_to_toy"
+        ]);
+        this.SACK_MEMORY_PROBE_KINDS = new Set([
+            "memory_probe_box_to_sack",
+            "memory_probe_sack_to_toy"
+        ]);
 
         this.FEATURE_SHAPES = ["circle", "triangle", "square"];
         this.FEATURE_COLORS = [
@@ -15742,7 +15864,9 @@ class PartnerBeliefIndividualBoxesController {
             right: getIcon("right")
         };
 
-        this.questions = this._normalizeQuestions(TaskObj.questions || []);
+        let normalized = this._normalizePhaseQuestions(TaskObj.questions || []);
+        this.questions = normalized.beliefQuestions;
+        this.memoryProbeSpecs = normalized.memoryProbeSpecs;
         this.gatingBoxes = this._normalizeBoxCodeArray(TaskObj.gating_boxes || [], "gating_boxes");
         this.actionPredictionToys = this._normalizeToyCodeArray(TaskObj.action_prediction_toys || [], "action_prediction_toys");
         this.experimentToys = this._collectExperimentToys();
@@ -15758,17 +15882,90 @@ class PartnerBeliefIndividualBoxesController {
         return Date.now() - this.expStartDate;
     }
 
-    _normalizeQuestions(rawQuestions) {
+    _normalizePhaseQuestions(rawQuestions) {
         if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) {
             console.error("PartnerBeliefIndividualBoxes: questions[] is required and must be non-empty.");
-            return [];
+            return { beliefQuestions: [], memoryProbeSpecs: [] };
         }
 
         let seenIds = new Set();
-        let mapped = [];
+        let beliefQuestions = [];
+        let memoryProbeSpecs = [];
 
         rawQuestions.forEach((q, index) => {
-            if (!q || typeof q.question_id !== "string" || !q.question_id.length) {
+            if (!q || typeof q !== "object") {
+                console.error(`PartnerBeliefIndividualBoxes: question at index ${index} is invalid.`);
+                return;
+            }
+
+            // Typed memory-probe declaration (expands to one trial per eligible Fennimal).
+            if (typeof q.kind === "string" && this.MEMORY_PROBE_KINDS.has(q.kind)) {
+                if (q.question_id) {
+                    if (seenIds.has(q.question_id)) {
+                        console.error(`PartnerBeliefIndividualBoxes: duplicate question_id "${q.question_id}".`);
+                        return;
+                    }
+                    seenIds.add(q.question_id);
+                }
+                if (q.fennimals !== undefined && !Array.isArray(q.fennimals)) {
+                    console.error(
+                        `PartnerBeliefIndividualBoxes: memory probe kind "${q.kind}" at index ${index} ` +
+                        `has fennimals that is not an array.`
+                    );
+                    return;
+                }
+                if (Array.isArray(q.fennimals) && q.fennimals.length === 0) {
+                    console.error(
+                        `PartnerBeliefIndividualBoxes: memory probe kind "${q.kind}" at index ${index} ` +
+                        `has an empty fennimals array.`
+                    );
+                    return;
+                }
+                if (q.kind === "memory_probe_box_decorator") {
+                    if (!q.target_box) {
+                        console.error(
+                            `PartnerBeliefIndividualBoxes: memory_probe_box_decorator at index ${index} ` +
+                            `needs target_box.`
+                        );
+                        return;
+                    }
+                    let boxMapped = this.expCont.stimuli.get_assigned_names_of_code_array("toybox", [q.target_box]);
+                    let target_box = boxMapped && boxMapped[0];
+                    if (!target_box) {
+                        console.error(
+                            `PartnerBeliefIndividualBoxes: failed to map target_box for ` +
+                            `memory_probe_box_decorator at index ${index}.`
+                        );
+                        return;
+                    }
+                    memoryProbeSpecs.push({
+                        kind: q.kind,
+                        question_id: q.question_id || null,
+                        fennimal_ids: Array.isArray(q.fennimals) ? q.fennimals.map(String) : null,
+                        target_box_code: String(q.target_box),
+                        target_box: target_box,
+                        source_index: index
+                    });
+                    return;
+                }
+                memoryProbeSpecs.push({
+                    kind: q.kind,
+                    question_id: q.question_id || null,
+                    fennimal_ids: Array.isArray(q.fennimals) ? q.fennimals.map(String) : null,
+                    source_index: index
+                });
+                return;
+            }
+
+            if (q.kind) {
+                console.error(
+                    `PartnerBeliefIndividualBoxes: unknown kind "${q.kind}" at questions[${index}]. ` +
+                    `Expected a belief question ({ question_id, target_box }) or a memory_probe_* kind.`
+                );
+                return;
+            }
+
+            if (typeof q.question_id !== "string" || !q.question_id.length) {
                 console.error(`PartnerBeliefIndividualBoxes: question at index ${index} is missing mandatory question_id.`);
                 return;
             }
@@ -15797,14 +15994,21 @@ class PartnerBeliefIndividualBoxesController {
                 return;
             }
 
-            mapped.push({
+            beliefQuestions.push({
                 question_id: q.question_id,
                 target_box_code: q.target_box,
                 target_box: target_box
             });
         });
 
-        return mapped;
+        if (beliefQuestions.length === 0) {
+            console.error(
+                "PartnerBeliefIndividualBoxes: questions[] must include at least one belief question " +
+                "({ question_id, target_box })."
+            );
+        }
+
+        return { beliefQuestions, memoryProbeSpecs };
     }
 
     _normalizeBoxCodeArray(rawCodes, fieldName) {
@@ -16060,7 +16264,7 @@ class PartnerBeliefIndividualBoxesController {
             });
         }
 
-        if (this.include_memory_probe_at_end) {
+        if (this.memoryProbeSpecs.length > 0) {
             this._appendMemoryProbeSection(queue);
         }
 
@@ -16084,31 +16288,29 @@ class PartnerBeliefIndividualBoxesController {
     }
 
     _appendMemoryProbeSection(queue) {
-        let fennimals = this._getProbeFennimals();
-        if (fennimals.length === 0) {
+        let allFennimals = this._getProbeFennimals();
+        if (allFennimals.length === 0) {
             console.error("PartnerBeliefIndividualBoxes: memory probes requested but no Fennimals are available.");
             return;
         }
 
-        let boxToFen = this._makeBoxToFennimalProbeTrials(fennimals);
-        let fenToToy = this._makeFennimalToToyProbeTrials(fennimals);
-
         let includeSackProbes = this._shouldIncludeSackMemoryProbes();
         this.TaskObj.include_sack_memory_probes = includeSackProbes;
-        let boxToSack = includeSackProbes ? this._makeBoxToSackProbeTrials(fennimals) : [];
-        let sackToToy = includeSackProbes ? this._makeSackToToyProbeTrials(fennimals) : [];
+        // Logged order follows questions[] probe declarations (after sack auto-gate skips).
+        this.TaskObj.memory_probe_block_order = [];
 
-        let blockOrder = (Math.random() < 0.5)
-            ? ["box_to_fennimal", "fennimal_to_toy"]
-            : ["fennimal_to_toy", "box_to_fennimal"];
-        this.TaskObj.memory_probe_block_order = blockOrder;
+        let blockIndex = 0;
+        this.memoryProbeSpecs.forEach((spec) => {
+            if (this.SACK_MEMORY_PROBE_KINDS.has(spec.kind) && !includeSackProbes) {
+                return;
+            }
 
-        blockOrder.forEach((probeType, blockOrd) => {
-            let blockIndex = blockOrd + 1;
-            let trials = (probeType === "box_to_fennimal")
-                ? [...boxToFen, ...boxToSack]
-                : [...fenToToy, ...sackToToy];
-            shuffleArray(trials).forEach((trial, i) => {
+            let trials = this._expandMemoryProbeSpec(spec, allFennimals);
+            if (trials.length === 0) return;
+
+            blockIndex += 1;
+            this.TaskObj.memory_probe_block_order.push(spec.kind);
+            trials.forEach((trial, i) => {
                 queue.push({
                     ...trial,
                     section: "memory_probe",
@@ -16118,6 +16320,112 @@ class PartnerBeliefIndividualBoxesController {
                 });
             });
         });
+    }
+
+    /**
+     * Expand one typed probe declaration. Foils use the full Fennimal pool;
+     * optional fennimals[] selects/order targets (except box_decorator: options = all heads).
+     */
+    _expandMemoryProbeSpec(spec, allFennimals) {
+        if (spec.kind === "memory_probe_box_decorator") {
+            return this._makeBoxDecoratorProbeTrials(spec, allFennimals);
+        }
+
+        let maker;
+        switch (spec.kind) {
+            case "memory_probe_box_to_fennimal":
+                maker = (fens) => this._makeBoxToFennimalProbeTrials(fens);
+                break;
+            case "memory_probe_fennimal_to_toy":
+                maker = (fens) => this._makeFennimalToToyProbeTrials(fens);
+                break;
+            case "memory_probe_box_to_sack":
+                maker = (fens) => this._makeBoxToSackProbeTrials(fens);
+                break;
+            case "memory_probe_sack_to_toy":
+                maker = (fens) => this._makeSackToToyProbeTrials(fens);
+                break;
+            default:
+                console.error(`PartnerBeliefIndividualBoxes: unhandled memory probe kind "${spec.kind}".`);
+                return [];
+        }
+
+        let trials = maker(allFennimals);
+        if (spec.fennimal_ids) {
+            let byId = new Map(trials.map((t) => [t.target_fennimal, t]));
+            let ordered = [];
+            spec.fennimal_ids.forEach((id) => {
+                if (byId.has(id)) {
+                    ordered.push(byId.get(id));
+                } else {
+                    console.warn(
+                        `PartnerBeliefIndividualBoxes: memory probe "${spec.kind}" requested Fennimal "${id}" ` +
+                        `but no eligible trial was built (missing toy/toybox/sack, or foil triad failed).`
+                    );
+                }
+            });
+            return ordered;
+        }
+        return shuffleArray(trials);
+    }
+
+    /**
+     * Cue = box; options = all experiment Fennimal heads; correct = WorldState decorator.
+     */
+    _makeBoxDecoratorProbeTrials(spec, allFennimals) {
+        let boxCode = spec.target_box_code;
+        let target_box = spec.target_box;
+        if (!boxCode || !target_box) {
+            console.error("PartnerBeliefIndividualBoxes: memory_probe_box_decorator missing mapped target_box.");
+            return [];
+        }
+
+        let decoratorId = (typeof WorldState !== "undefined" && WorldState.get_toybox_decorator)
+            ? WorldState.get_toybox_decorator(target_box)
+            : false;
+        if (!decoratorId) {
+            console.error(
+                `PartnerBeliefIndividualBoxes: no decorator recorded in WorldState for box "${boxCode}" ` +
+                `(mapped "${target_box}"). Run retrieve_lost_box / joint_box_decoration with decoration first.`
+            );
+            return [];
+        }
+
+        let optionIds = allFennimals
+            .filter((fen) => fen && fen.id)
+            .map((fen) => String(fen.id));
+        if (spec.fennimal_ids) {
+            optionIds = spec.fennimal_ids.filter((id) => optionIds.includes(id));
+        }
+        // Ensure correct answer is always present even if filtered.
+        if (!optionIds.includes(String(decoratorId))) {
+            optionIds.push(String(decoratorId));
+        }
+        if (optionIds.length < 2) {
+            console.error(
+                `PartnerBeliefIndividualBoxes: need at least 2 Fennimal head options for box-decorator probe ` +
+                `"${boxCode}" (got ${optionIds.length}).`
+            );
+            return [];
+        }
+
+        let option_roles = {};
+        optionIds.forEach((id) => {
+            option_roles[id] = (id === String(decoratorId)) ? "correct" : "foil";
+        });
+
+        let qid = spec.question_id || `probe_box_decorator_${boxCode}`;
+        return [{
+            trial_kind: "memory_probe_box_decorator",
+            question_id: qid,
+            trial_instance_id: qid,
+            target_box_code: boxCode,
+            target_box: target_box,
+            target_fennimal: String(decoratorId),
+            correct_option_id: String(decoratorId),
+            answer_options: shuffleArray([...optionIds]),
+            option_roles
+        }];
     }
 
     _shouldIncludeSackMemoryProbes() {
@@ -17620,6 +17928,8 @@ class PartnerBeliefIndividualBoxesController {
             await this.run_reality_trial(trial);
         } else if (trial.trial_kind === "memory_probe_box_to_fennimal") {
             await this.run_box_to_fennimal_probe_trial(trial);
+        } else if (trial.trial_kind === "memory_probe_box_decorator") {
+            await this.run_box_decorator_probe_trial(trial);
         } else if (trial.trial_kind === "memory_probe_fennimal_to_toy") {
             await this.run_fennimal_to_toy_probe_trial(trial);
         } else if (trial.trial_kind === "memory_probe_box_to_sack") {
@@ -18487,6 +18797,51 @@ class PartnerBeliefIndividualBoxesController {
             target_fennimal: trial.target_fennimal,
             probe_wave: trial.probe_wave,
             foil_ids: trial.foil_ids,
+            options: this._buildStoredOptions(
+                response.option_layout,
+                trial.answer_options.map((fenId) => ({
+                    id: fenId,
+                    role: (trial.option_roles && trial.option_roles[fenId]) || "unknown"
+                }))
+            ),
+            selected: response.selected_id,
+            correct: is_correct,
+            reaction_time_ms: response.reaction_time_ms
+        });
+
+        await wait(this.memory_probe_isi_ms);
+    }
+
+    async run_box_decorator_probe_trial(trial) {
+        this.place_target_box(trial.target_box);
+        let revealPromise = this.create_curtain_with_reveal_circle();
+        await this.fade_black(0, 350);
+
+        Interface.Prompt.show_message("Click on the circle to start the question");
+        await revealPromise;
+
+        Interface.Prompt.show_message(
+            "Which Fennimal helped decorate this box? Answer as quickly and accurately as you can."
+        );
+
+        let response = await this.show_radial_options_and_wait(trial.answer_options, {
+            mode: "heads",
+            showBox: true
+        });
+
+        Interface.Prompt.hide();
+        AudioCont.play_sound_effect("button_click");
+
+        let is_correct = (response.selected_id === trial.correct_option_id);
+
+        this.ParticipantAnswers.push({
+            trial_kind: "memory_probe_box_decorator",
+            question_id: trial.question_id,
+            block_index: trial.block_index,
+            trial_index: this.overall_presentation_index,
+            target_box: trial.target_box,
+            target_box_code: trial.target_box_code,
+            target_fennimal: trial.target_fennimal,
             options: this._buildStoredOptions(
                 response.option_layout,
                 trial.answer_options.map((fenId) => ({

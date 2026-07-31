@@ -11,6 +11,8 @@ class InstructionsController {
         this.currentInstructionType = null;
         this.currentInstructionsSVG = null;
         this.closingButton = null;
+        // True when the participant reopened help mid-phase (not the initial trial hint).
+        this.helpReopenActive = false;
 
         // Progress Elements
         this.progressForeign = null;
@@ -29,6 +31,8 @@ class InstructionsController {
         // Exploration Phase State
         this.explorationRoster = null;
         this.textElemMainInstructions = null;
+        this.retrieveLostBoxVisualGroup = null;
+        this._retrieveStormToken = null;
         this.fennimalsInPhase = [];
         this.explorationDayNum = 1;
         this.explorationFennefinderStatus = false;
@@ -46,6 +50,7 @@ class InstructionsController {
     }
 
     clearInstructions() {
+        this.stopRetrieveLostBoxStormAnimation();
         this.parentElem.style.display = "none";
         this.parentElem.innerHTML = "";
         if (this.currentInstructionsSVG) {
@@ -244,6 +249,23 @@ class InstructionsController {
                     // It is already built, just open it!
                     this.show_on_call_hint();
                 }
+                break;
+            case "phone_room":
+                // Reopen the last call hint if it is still in the DOM; never leave movement disabled.
+                if (this.currentInstructionsSVG && this.currentInstructionsSVG.parentNode) {
+                    this.helpReopenActive = true;
+                    this.showPhoneRoomHint();
+                } else {
+                    Interface.Prompt.show_message("No additional instructions right now.", 2500);
+                    if (this.expCont.waitingForManualPhoneRoomReturn) {
+                        this.expCont.mapCont.enable_map_interactions();
+                    }
+                }
+                break;
+            default:
+                // Safety: help always disables the map first — restore it if nothing can be shown.
+                Interface.Prompt.show_message("No additional instructions right now.", 2500);
+                this.expCont.mapCont.enable_map_interactions();
                 break;
         }
     }
@@ -680,10 +702,10 @@ class InstructionsController {
             domeText;
 
         this.setRetrieveLostBoxInstructionText(instructionText);
-        this.buildRetrieveLostBoxVisuals(this.fennimalsInPhase);
+        this.buildRetrieveLostBoxVisuals(this.fennimalsInPhase, { animateStorm: true });
         this.updateProgressNewDay(currentBlockNum);
         this.updateProgressWithinDay(false);
-        this.addClosingButtonToParent("bottom-center", true, undefined, 400);
+        // Continue button is added when the storm animation finishes.
     }
 
     setRetrieveLostBoxInstructionText(html) {
@@ -710,20 +732,35 @@ class InstructionsController {
         this.currentInstructionsSVG.appendChild(this.textElemMainInstructions);
     }
 
+    stopRetrieveLostBoxStormAnimation() {
+        if (!this._retrieveStormToken) return;
+        this._retrieveStormToken.cancelled = true;
+        (this._retrieveStormToken.timeouts || []).forEach((id) => clearTimeout(id));
+        (this._retrieveStormToken.intervals || []).forEach((id) => clearInterval(id));
+        this._retrieveStormToken = null;
+    }
+
     clearRetrieveLostBoxVisuals() {
+        this.stopRetrieveLostBoxStormAnimation();
         if (this.retrieveLostBoxVisualGroup && this.retrieveLostBoxVisualGroup.parentNode) {
             this.retrieveLostBoxVisualGroup.remove();
         }
         this.retrieveLostBoxVisualGroup = null;
     }
 
-    buildRetrieveLostBoxVisuals(fenList, { showTags = false } = {}) {
+    buildRetrieveLostBoxVisuals(fenList, { showTags = false, animateStorm = false } = {}) {
         this.clearRetrieveLostBoxVisuals();
         let unique = this.uniqueFennimalsById(fenList || []);
         if (unique.length === 0) return;
 
+        // Appended after instruction text so boxes / storm sit above the copy.
         this.retrieveLostBoxVisualGroup = create_SVG_group(0, 0, "instruction_element_nonbackground", undefined);
         this.currentInstructionsSVG.appendChild(this.retrieveLostBoxVisualGroup);
+
+        let fxLayer = create_SVG_group(0, 0);
+        let boxLayer = create_SVG_group(0, 0);
+        this.retrieveLostBoxVisualGroup.appendChild(fxLayer);
+        this.retrieveLostBoxVisualGroup.appendChild(boxLayer);
 
         let n = unique.length;
         let scale = n >= 3 ? 2.2 : 2.8;
@@ -732,18 +769,29 @@ class InstructionsController {
         let centerY = 0.48 * GenParam.SVG_height;
         let startX = centerX - ((n - 1) * spacing) / 2;
 
+        let boxEntries = [];
         unique.forEach((fen, i) => {
             if (!fen || !fen.toybox) return;
-            let boxTemplate = document.getElementById("toybox_" + fen.toybox);
+            let boxTemplate = (typeof get_toybox_template === "function")
+                ? get_toybox_template(fen.toybox)
+                : document.getElementById("toybox_" + fen.toybox);
             if (!boxTemplate) return;
 
+            let sx = startX + i * spacing;
+            let sy = centerY;
+
+            // Place via copy_scale_and_move first (no parent CSS transform — that breaks centering).
+            // Animate this returned group; fill-box origin keeps rotate/scale on the box itself.
             let boxIcon = copy_scale_and_move_object_to_position(
                 boxTemplate,
-                this.retrieveLostBoxVisualGroup,
-                startX + i * spacing,
-                centerY,
+                boxLayer,
+                sx,
+                sy,
                 scale
             );
+            // Content is zeroed to local (0,0); origin there keeps rotate/scale on the box.
+            boxIcon.style.transformOrigin = "0px 0px";
+            boxIcon.style.transformBox = "view-box";
             apply_toybox_decoration_visibility_to_element(boxIcon, fen.toybox);
 
             boxIcon.querySelectorAll(".lost_found_tag_loose").forEach((el) => {
@@ -763,7 +811,266 @@ class InstructionsController {
                     el.style.visibility = "hidden";
                 }
             });
+
+            boxEntries.push({ motion: boxIcon, sx, sy });
         });
+
+        if (animateStorm && boxEntries.length > 0) {
+            this.playRetrieveLostBoxStormAnimation(fxLayer, boxLayer, boxEntries, centerX, centerY);
+        }
+    }
+
+    _retrieveStormWait(ms, token) {
+        return new Promise((resolve) => {
+            let id = setTimeout(() => resolve(!token.cancelled), ms);
+            token.timeouts.push(id);
+        });
+    }
+
+    _spawnRetrieveStormRaincloud(cloudGroup, config) {
+        let cloudTemplate = document.getElementsByClassName("raincloud")[0];
+        if (!cloudTemplate) return null;
+
+        let cloud = cloudTemplate.cloneNode(true);
+        cloud.style.display = "inherit";
+        cloud.style.opacity = "0.72";
+        cloud.style.transformOrigin = "center";
+        cloud.style.transformBox = "fill-box";
+        cloudGroup.appendChild(cloud);
+
+        let box = cloud.getBBox();
+        let nativeCX = box.x + (box.width / 2);
+        let nativeCY = box.y + (box.height / 2);
+        let trueDx = config.dx - nativeCX;
+        let trueDy = config.dy - nativeCY;
+
+        cloud.style.transform = `translate(${trueDx}px, ${trueDy}px) scale(0)`;
+        setTimeout(() => {
+            cloud.style.transition = "transform 420ms cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+            cloud.style.transform = `translate(${trueDx}px, ${trueDy}px) scale(${config.scale})`;
+        }, 10);
+
+        let targets = Array.from(cloud.querySelectorAll("path, rect, circle, ellipse, polygon"));
+        if (cloud.tagName.toLowerCase() !== "g") targets.push(cloud);
+        targets.forEach((t) => {
+            t.animate([
+                { fill: "#5a6b7c" },
+                { fill: "#3d4a57" },
+                { fill: "#738699" },
+                { fill: "#4a5a6a" }
+            ], {
+                duration: 1500 + Math.random() * 500,
+                iterations: Infinity,
+                direction: "alternate",
+                delay: config.delay
+            });
+        });
+
+        cloud.animate([
+            { transform: `translate(${trueDx}px, ${trueDy}px) scale(${config.scale})` },
+            { transform: `translate(${trueDx}px, ${trueDy - 10}px) scale(${config.scale})` }
+        ], {
+            duration: 1200 + Math.random() * 300,
+            iterations: Infinity,
+            direction: "alternate",
+            easing: "ease-in-out",
+            delay: config.delay
+        });
+
+        return cloud;
+    }
+
+    _spawnRetrieveStormRainDrop(fxLayer, W, H) {
+        let drop = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        let x = 0.2 * W + Math.random() * 0.75 * W;
+        let y = 0.1 * H + Math.random() * 0.2 * H;
+        drop.setAttribute("x1", x);
+        drop.setAttribute("y1", y);
+        drop.setAttribute("x2", x - 10);
+        drop.setAttribute("y2", y + 30);
+        drop.setAttribute("stroke", "#6f879e");
+        drop.setAttribute("stroke-width", "2.2");
+        drop.setAttribute("stroke-linecap", "round");
+        drop.style.opacity = "0.55";
+        drop.style.pointerEvents = "none";
+        fxLayer.appendChild(drop);
+
+        let drift = -50 - Math.random() * 70;
+        let fall = 220 + Math.random() * 280;
+        drop.animate([
+            { transform: "translate(0px, 0px)", opacity: 0.55 },
+            { transform: `translate(${drift}px, ${fall}px)`, opacity: 0 }
+        ], {
+            duration: 420 + Math.random() * 380,
+            easing: "linear"
+        }).onfinish = () => drop.remove();
+    }
+
+    _spawnRetrieveStormWindStreak(fxLayer, W, H) {
+        let streak = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        let x = 0.35 * W + Math.random() * 0.55 * W;
+        let y = 0.22 * H + Math.random() * 0.5 * H;
+        let len = 40 + Math.random() * 90;
+        streak.setAttribute("x1", x);
+        streak.setAttribute("y1", y);
+        streak.setAttribute("x2", x - len);
+        streak.setAttribute("y2", y + (Math.random() * 8 - 2));
+        streak.setAttribute("stroke", "rgba(210, 225, 235, 0.55)");
+        streak.setAttribute("stroke-width", String(1.2 + Math.random() * 1.8));
+        streak.setAttribute("stroke-linecap", "round");
+        streak.style.pointerEvents = "none";
+        fxLayer.appendChild(streak);
+
+        streak.animate([
+            { transform: "translate(0px, 0px)", opacity: 0 },
+            { transform: "translate(-30px, 4px)", opacity: 0.7, offset: 0.2 },
+            { transform: `translate(${-180 - Math.random() * 160}px, ${8 + Math.random() * 16}px)`, opacity: 0 }
+        ], {
+            duration: 280 + Math.random() * 320,
+            easing: "ease-in"
+        }).onfinish = () => streak.remove();
+    }
+
+    _spawnRetrieveStormDebris(fxLayer, W, H) {
+        let debris = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+        let x = 0.45 * W + Math.random() * 0.45 * W;
+        let y = 0.28 * H + Math.random() * 0.4 * H;
+        let s = 4 + Math.random() * 7;
+        debris.setAttribute("points", `${x},${y} ${x + s},${y + s * 0.3} ${x + s * 0.2},${y + s}`);
+        debris.setAttribute("fill", Math.random() > 0.5 ? "#6b5a3e" : "#4e6a45");
+        debris.style.opacity = "0.75";
+        debris.style.pointerEvents = "none";
+        fxLayer.appendChild(debris);
+
+        let rot = 180 + Math.random() * 360;
+        debris.animate([
+            { transform: "translate(0px, 0px) rotate(0deg)", opacity: 0.8 },
+            { transform: `translate(${-220 - Math.random() * 200}px, ${-30 + Math.random() * 80}px) rotate(${rot}deg)`, opacity: 0 }
+        ], {
+            duration: 700 + Math.random() * 700,
+            easing: "ease-in"
+        }).onfinish = () => debris.remove();
+    }
+
+    async playRetrieveLostBoxStormAnimation(fxLayer, boxLayer, boxEntries, centerX, centerY) {
+        let token = { cancelled: false, timeouts: [], intervals: [] };
+        this._retrieveStormToken = token;
+
+        let W = GenParam.SVG_width;
+        let H = GenParam.SVG_height;
+        let midX = 0.42 * W;
+        let midY = 0.42 * H;
+
+        // Settle beat — boxes rest briefly before the weather hits.
+        if (!(await this._retrieveStormWait(1000, token)) || token.cancelled) return;
+
+        let dim = create_SVG_rect(0, 0, W, H);
+        dim.style.fill = "#1a2430";
+        dim.style.opacity = "0";
+        dim.style.pointerEvents = "none";
+        fxLayer.appendChild(dim);
+        dim.animate([
+            { opacity: 0 },
+            { opacity: 0.22 },
+            { opacity: 0.16 }
+        ], { duration: 900, fill: "forwards", easing: "ease-out" });
+
+        let cloudGroup = create_SVG_group(0, 0);
+        cloudGroup.style.transform = `translate(${centerX}px, ${centerY - 200}px)`;
+        fxLayer.appendChild(cloudGroup);
+
+        const cloudConfigs = [
+            { dx: -40, dy: -20, scale: 1.9, delay: 0 },
+            { dx: -150, dy: 5, scale: 1.45, delay: -400 },
+            { dx: 80, dy: 0, scale: 1.6, delay: -800 }
+        ];
+        cloudConfigs.forEach((config) => this._spawnRetrieveStormRaincloud(cloudGroup, config));
+
+        let particleInterval = setInterval(() => {
+            if (token.cancelled) return;
+            for (let i = 0; i < 3; i++) this._spawnRetrieveStormRainDrop(fxLayer, W, H);
+            this._spawnRetrieveStormWindStreak(fxLayer, W, H);
+            if (Math.random() < 0.45) this._spawnRetrieveStormDebris(fxLayer, W, H);
+        }, 70);
+        token.intervals.push(particleInterval);
+
+        if (this.textElemMainInstructions) {
+            this.textElemMainInstructions.animate([
+                { transform: "translate(0px, 0px)" },
+                { transform: "translate(-8px, 2px)" },
+                { transform: "translate(5px, -1px)" },
+                { transform: "translate(-3px, 1px)" },
+                { transform: "translate(0px, 0px)" }
+            ], { duration: 900, delay: 120, easing: "ease-in-out" });
+        }
+
+        let flash = create_SVG_rect(0, 0, W, H);
+        flash.style.fill = "#ffffff";
+        flash.style.opacity = "0";
+        flash.style.pointerEvents = "none";
+        this.retrieveLostBoxVisualGroup.appendChild(flash);
+        flash.animate([
+            { opacity: 0 },
+            { opacity: 0.42, offset: 0.12 },
+            { opacity: 0.04, offset: 0.28 },
+            { opacity: 0.3, offset: 0.45 },
+            { opacity: 0 }
+        ], { duration: 420, delay: 80 });
+
+        // Brief wobble, then loop through mid-screen and blow left while shrinking.
+        let flightPromises = boxEntries.map(({ motion, sx, sy }, index) => {
+            let stagger = index * 90;
+            let t = (x, y, rot, sc, op = 1) =>
+                ({ transform: `translate(${x}px, ${y}px) rotate(${rot}deg) scale(${sc})`, opacity: op });
+
+            return new Promise((resolve) => {
+                let anim = motion.animate([
+                    { ...t(sx, sy, 0, 1), offset: 0 },
+                    { ...t(sx + 10, sy - 6, 9, 1), offset: 0.08 },
+                    { ...t(sx - 12, sy + 5, -11, 1), offset: 0.14 },
+                    { ...t(sx + (midX - sx) * 0.45, sy + (midY - sy) * 0.35 - 55, -16, 1.04), offset: 0.32 },
+                    { ...t(midX + 70, midY - 45, 28, 1), offset: 0.46 },
+                    { ...t(midX - 55, midY + 65, -32, 0.9), offset: 0.58 },
+                    { ...t(midX * 0.55 - 40, midY - 10, -55, 0.62), offset: 0.74 },
+                    { ...t(-280, midY - 110, -85, 0.18, 0), offset: 1 }
+                ], {
+                    duration: 2800,
+                    delay: stagger,
+                    easing: "cubic-bezier(0.4, 0.05, 0.6, 1)",
+                    fill: "forwards"
+                });
+                anim.onfinish = () => resolve();
+                anim.oncancel = () => resolve();
+            });
+        });
+
+        await Promise.all(flightPromises);
+        if (token.cancelled) return;
+
+        clearInterval(particleInterval);
+        token.intervals = token.intervals.filter((id) => id !== particleInterval);
+
+        // Soft wind-down of weather FX, then show Continue.
+        dim.animate([{ opacity: 0.16 }, { opacity: 0 }], {
+            duration: 450,
+            fill: "forwards",
+            easing: "ease-out"
+        });
+        cloudGroup.animate([{ opacity: 1 }, { opacity: 0 }], {
+            duration: 450,
+            fill: "forwards",
+            easing: "ease-out"
+        });
+
+        if (!(await this._retrieveStormWait(480, token)) || token.cancelled) return;
+
+        if (this._retrieveStormToken === token) {
+            this._retrieveStormToken = null;
+        }
+
+        if (!this.closingButton && this.currentInstructionType === "retrieve_lost_box") {
+            this.addClosingButtonToParent("bottom-center", true);
+        }
     }
 
     showRetrieveLostBoxCompletionScreen() {
@@ -1631,6 +1938,7 @@ class InstructionsController {
 
     setupPhoneRoomHintElements(trialObj) {
         this.clearInstructions();
+        this.helpReopenActive = false;
 
         this.currentInstructionType = "phone_room";
         this.currentInstructionsSVG = this.createBasicInstructionElements();
@@ -1919,7 +2227,9 @@ class InstructionsController {
 
     createPhoneRoomBoxHintVisual(trialObj) {
         let boxId = trialObj.target_box || trialObj.toybox;
-        let boxTemplate = document.getElementById("toybox_" + boxId);
+        let boxTemplate = (typeof get_toybox_template === "function")
+            ? get_toybox_template(boxId)
+            : document.getElementById("toybox_" + boxId);
         if (!boxTemplate) {
             this.createPhoneRoomPlaceholderHintVisual({ type: "box" });
             return;
@@ -1964,7 +2274,9 @@ class InstructionsController {
 
         fens.forEach((fen, i) => {
             if (!fen || !fen.toybox) return;
-            let boxTemplate = document.getElementById("toybox_" + fen.toybox);
+            let boxTemplate = (typeof get_toybox_template === "function")
+                ? get_toybox_template(fen.toybox)
+                : document.getElementById("toybox_" + fen.toybox);
             if (!boxTemplate) return;
 
             let boxIcon = copy_scale_and_move_object_to_position(

@@ -395,6 +395,7 @@ class PhoneRoomController {
             if (this.parentLayer) this.parentLayer.style.display = "inherit";
             if (this.mapLayer) this.mapLayer.style.display = "none";
             if (this.interfaceLayer) this.interfaceLayer.style.display = "inherit";
+            if (this.expCont.mapCont) this.expCont.mapCont.hide_request_instructions_button();
             if (onComplete) onComplete();
             return;
         }
@@ -408,6 +409,8 @@ class PhoneRoomController {
                 if (this.mapLayer) this.mapLayer.style.display = "none";
                 // Keep Interface visible so prompts / locator still show during Home overlays.
                 if (this.interfaceLayer) this.interfaceLayer.style.display = "inherit";
+                // Help sits on Interface above Fennimals_Layer — keep it hidden mid-overlay.
+                if (this.expCont.mapCont) this.expCont.mapCont.hide_request_instructions_button();
                 if (this.parentLayer) this.parentLayer.style.display = "inherit";
                 if (onComplete) onComplete();
             }, GenParam.PhoneRoom.roomFadeTime);

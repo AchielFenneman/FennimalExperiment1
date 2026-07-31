@@ -511,8 +511,10 @@ WorldStateObject = function () {
     }
 
     // BOX DECORATIONS (all-or-nothing flag per box; default undecorated)
+    // Decorator = Fennimal id who did the decorating (not necessarily the box owner).
     /////////////////////////////////////////////////////////////////
     let ToyBoxDecorations = {}
+    let ToyBoxDecorators = {}
 
     this.get_toybox_is_decorated = function(boxtype){
         return ToyBoxDecorations[boxtype] === true
@@ -520,6 +522,22 @@ WorldStateObject = function () {
 
     this.change_toybox_is_decorated = function(boxtype, is_decorated){
         ToyBoxDecorations[boxtype] = is_decorated === true
+        // Cleaning / undecorating clears who decorated.
+        if (is_decorated !== true && Object.prototype.hasOwnProperty.call(ToyBoxDecorators, boxtype)) {
+            delete ToyBoxDecorators[boxtype]
+        }
+    }
+
+    this.get_toybox_decorator = function(boxtype){
+        return ToyBoxDecorators[boxtype] || false
+    }
+
+    this.change_toybox_decorator = function(boxtype, fennimal_id){
+        if (fennimal_id === false || fennimal_id === null || fennimal_id === undefined || fennimal_id === "") {
+            delete ToyBoxDecorators[boxtype]
+            return
+        }
+        ToyBoxDecorators[boxtype] = String(fennimal_id)
     }
 
     // LOST-AND-FOUND TAGS (all-or-nothing flag per box; default untagged)

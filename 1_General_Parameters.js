@@ -857,6 +857,9 @@ GENERALPARAM = function () {
 
         answerDimTime: 250,
         attentionPulseTime: 1100,
+        // Map #phone_room glow while the player walks home (manual proximity return).
+        mapReturnPulseTime: 1200,
+        mapReturnPulseColor: "#FFE566",
         phoneRippleInterval: 700,
         phoneRippleDuration: 1400,
         phoneRippleStartRadius: 28,

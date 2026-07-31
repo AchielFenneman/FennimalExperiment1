@@ -77,6 +77,27 @@ let StimulusSettings = function () {
     // ----------------------------------------------------
     let All_Experiment_Structures = {
         test: [
+            {
+                type: "phone_room",
+                partner_behavior: "active",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: true,
+                skip_instructions: false,
+                Fennimals_encountered: ["S1"],
+                interaction_type: ["switch_box_without_partner"],
+            },
+            {
+                type: "retrieve_lost_box",
+                n_trials_to_sample: 1,
+                randomization_id: "lost_box_manipulation",
+                include_decoration: true,
+                box_locations: [
+                 // { label: "boost", Fennimal_finding_box: "A", target_box: "A" },
+                  { label: "neutral", Fennimal_finding_box: "S1", target_box: "A" },
+                ],
+                partner_behavior: "active"
+            },
+
 
             // Belief DV overhaul — WorldState auto-seeds a false-belief layout when empty (test only).
             {
@@ -84,7 +105,6 @@ let StimulusSettings = function () {
                 include_practice_trial: true,
                 num_belief_blocks: 1,
                 include_reality_block_at_end: true,
-                include_memory_probe_at_end: true,
                 include_empty_box_choice_alternative: true,
                 bonus_stars_per_correct_answer: 1,
                 memory_probe_isi_ms: 1000,
@@ -93,6 +113,10 @@ let StimulusSettings = function () {
                 questions: [
                     { question_id: "belief_A", target_box: "A" },
                     { question_id: "belief_B", target_box: "B" },
+                    { kind: "memory_probe_box_to_fennimal" },
+                    { kind: "memory_probe_fennimal_to_toy" },
+                    { kind: "memory_probe_box_to_sack" },
+                    { kind: "memory_probe_sack_to_toy" },
                 ]
             },
 
@@ -255,14 +279,13 @@ let StimulusSettings = function () {
             },
 
             // BLOCK 5: Partner belief (individual boxes)
-            // Memory probes (when enabled): box→Fennimal / Fennimal→toy;
+            // Memory probes: declare kinds in questions[] (sack kinds auto-gated).
             // box→Fennimal uses other-box foils only; S/P IDs also get wave prompts.
             {
                 type: "partner_belief_individual_boxes",
                 include_practice_trial: true,
                 num_belief_blocks: 1,
                 include_reality_block_at_end: true,
-                include_memory_probe_at_end: true,
                 include_empty_box_choice_alternative: true,
                 bonus_stars_per_correct_answer: 1,
                 memory_probe_isi_ms: 1000,
@@ -271,7 +294,11 @@ let StimulusSettings = function () {
                 questions: [
                     { question_id: "belief_A", target_box: "A" },
                     { question_id: "belief_B", target_box: "B" },
-                    { question_id: "belief_C", target_box: "C" }
+                    { question_id: "belief_C", target_box: "C" },
+                    { kind: "memory_probe_box_to_fennimal" },
+                    { kind: "memory_probe_fennimal_to_toy" },
+                    { kind: "memory_probe_box_to_sack" },
+                    { kind: "memory_probe_sack_to_toy" },
                 ]
             },
 
@@ -403,14 +430,13 @@ let StimulusSettings = function () {
             },
 
             // BLOCK 5: Partner belief (individual boxes)
-            // Memory probes (when enabled): box→Fennimal / Fennimal→toy;
+            // Memory probes: declare kinds in questions[] (sack kinds auto-gated).
             // box→Fennimal uses other-box foils only; S/P IDs also get wave prompts.
             {
                 type: "partner_belief_individual_boxes",
                 include_practice_trial: true,
                 num_belief_blocks: 1,
                 include_reality_block_at_end: true,
-                include_memory_probe_at_end: true,
                 include_empty_box_choice_alternative: true,
                 bonus_stars_per_correct_answer: 1,
                 memory_probe_isi_ms: 1000,
@@ -419,6 +445,10 @@ let StimulusSettings = function () {
                 questions: [
                     { question_id: "belief_A", target_box: "A" },
                     { question_id: "belief_B", target_box: "B" },
+                    { kind: "memory_probe_box_to_fennimal" },
+                    { kind: "memory_probe_fennimal_to_toy" },
+                    { kind: "memory_probe_box_to_sack" },
+                    { kind: "memory_probe_sack_to_toy" },
                 ]
             },
 
@@ -513,14 +543,12 @@ let StimulusSettings = function () {
             },
 
             // BLOCK 5: Partner belief (individual boxes)
-            // Memory probes (when enabled): box→Fennimal / Fennimal→toy;
-            // plus box→sack / sack→toy when sacks are templated and toy_to_sack appears.
+            // Memory probes: declare kinds in questions[] (sack kinds auto-gated).
             {
                 type: "partner_belief_individual_boxes",
                 include_practice_trial: true,
                 num_belief_blocks: 1,
                 include_reality_block_at_end: true,
-                include_memory_probe_at_end: true,
                 include_empty_box_choice_alternative: true,
                 bonus_stars_per_correct_answer: 1,
                 memory_probe_isi_ms: 1000,
@@ -529,6 +557,10 @@ let StimulusSettings = function () {
                 questions: [
                     { question_id: "belief_A", target_box: "A" },
                     { question_id: "belief_B", target_box: "B" },
+                    { kind: "memory_probe_box_to_fennimal" },
+                    { kind: "memory_probe_fennimal_to_toy" },
+                    { kind: "memory_probe_box_to_sack" },
+                    { kind: "memory_probe_sack_to_toy" },
                 ]
             },
 
@@ -643,14 +675,12 @@ let StimulusSettings = function () {
             },
 
             // BLOCK 5: Partner belief (individual boxes)
-            // Memory probes (when enabled): box→Fennimal / Fennimal→toy;
-            // plus box→sack / sack→toy when sacks are templated and toy_to_sack appears.
+            // Memory probes: declare kinds in questions[] (sack kinds auto-gated).
             {
                 type: "partner_belief_individual_boxes",
                 include_practice_trial: true,
                 num_belief_blocks: 1,
                 include_reality_block_at_end: true,
-                include_memory_probe_at_end: true,
                 include_empty_box_choice_alternative: true,
                 bonus_stars_per_correct_answer: 1,
                 memory_probe_isi_ms: 1000,
@@ -659,6 +689,10 @@ let StimulusSettings = function () {
                 questions: [
                     { question_id: "belief_A", target_box: "A" },
                     { question_id: "belief_B", target_box: "B" },
+                    { kind: "memory_probe_box_to_fennimal" },
+                    { kind: "memory_probe_fennimal_to_toy" },
+                    { kind: "memory_probe_box_to_sack" },
+                    { kind: "memory_probe_sack_to_toy" },
                 ]
             },
 
@@ -724,6 +758,7 @@ let StimulusSettings = function () {
                 type: "retrieve_lost_box",
                 n_trials_to_sample: 1,
                 randomization_id: "lost_box_manipulation",
+                include_decoration: true,
                 box_locations: [
                   { label: "boost", Fennimal_finding_box: "A", target_box: "A" },
                   { label: "neutral", Fennimal_finding_box: "C", target_box: "A" },
@@ -744,14 +779,12 @@ let StimulusSettings = function () {
             },
 
             // BLOCK 5: Partner belief (individual boxes)
-            // Memory probes (when enabled): box→Fennimal / Fennimal→toy;
-            // plus box→sack / sack→toy when sacks are templated and toy_to_sack appears.
+            // Memory probes: declare kinds in questions[] (sack kinds auto-gated).
             {
                 type: "partner_belief_individual_boxes",
                 include_practice_trial: true,
                 num_belief_blocks: 1,
                 include_reality_block_at_end: true,
-                include_memory_probe_at_end: true,
                 include_empty_box_choice_alternative: true,
                 bonus_stars_per_correct_answer: 1,
                 memory_probe_isi_ms: 1000,
@@ -759,6 +792,11 @@ let StimulusSettings = function () {
                 action_prediction_toys: ["A"],
                 questions: [
                     { question_id: "belief_A", target_box: "A" },
+                    // Who decorated box A (retrieve_lost_box); options = all experiment heads.
+                    { kind: "memory_probe_box_decorator", target_box: "A" },
+                    { kind: "memory_probe_fennimal_to_toy" },
+                    { kind: "memory_probe_box_to_sack" },
+                    { kind: "memory_probe_sack_to_toy" },
                 ]
             },
 
@@ -771,6 +809,7 @@ let StimulusSettings = function () {
         mentalizing: ["demographics_questionnaire"],
         mentalizing_AB: ["demographics_questionnaire"],
         mentalizing_AC: ["demographics_questionnaire"],
+        mentalizing_between_subjects: ["demographics_questionnaire"],
     };
 
     const All_Allowed_Head_Lists = { test: false, mentalizing_1: false };
@@ -781,6 +820,7 @@ let StimulusSettings = function () {
         mentalizing: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
         mentalizing_AB: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
         mentalizing_AC: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"], //["alien", "donut", "radio", "jackolantern", "rhino",  "eagle", "brush"]
+        mentalizing_between_subjects: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
     };
 
     const All_Allowed_Head_Groups_List = { test: false, mentalizing_1: false };
@@ -1371,6 +1411,40 @@ let StimulusTransformer = function (StimTemplate) {
         return [...new Set(Arr)];
     };
 
+    /** All Fennimal template ids defined for this experiment. */
+    this.get_all_Fennimal_ids_in_experiment = function () {
+        return FennimalObjArr.map((fen) => fen.id);
+    };
+
+    /**
+     * All asset ids of a given type currently loaded in the SVG (software catalog).
+     * Used as the widest ask_* distractor fallback when the experiment only has one option.
+     */
+    this.get_all_software_options_of_type = function (type) {
+        if (type === "toy") {
+            return [...new Set(
+                Array.from(document.getElementsByClassName("toy"))
+                    .map((t) => (t.id || "").split("_")[1])
+                    .filter(Boolean)
+            )];
+        }
+        if (type === "toybox") {
+            return [...new Set(
+                Array.from(document.getElementsByClassName("toybox"))
+                    .map((b) => (b.id || "").split("_")[1])
+                    .filter(Boolean)
+            )];
+        }
+        if (type === "sack") {
+            return [...new Set(
+                Array.from(document.getElementsByClassName("sack"))
+                    .map((s) => s.id)
+                    .filter(Boolean)
+            )];
+        }
+        return [];
+    };
+
     this.get_assigned_names_of_code_array = function(type, Arr) {
         if (FeatureMap[type]) {
             return Arr.map(req => FeatureMap[type][req] ? JSON.parse(JSON.stringify(FeatureMap[type][req])) : false);
@@ -1435,6 +1509,60 @@ let StimulusTransformer = function (StimTemplate) {
         return this.fennimal_templates_include_sacks() && this.experiment_includes_interaction_type("toy_to_sack");
     };
 
+    this._isPartnerBeliefMemoryProbeKind = function (kind) {
+        return kind === "memory_probe_box_to_fennimal"
+            || kind === "memory_probe_box_decorator"
+            || kind === "memory_probe_fennimal_to_toy"
+            || kind === "memory_probe_box_to_sack"
+            || kind === "memory_probe_sack_to_toy";
+    };
+
+    this._isSackMemoryProbeKind = function (kind) {
+        return kind === "memory_probe_box_to_sack" || kind === "memory_probe_sack_to_toy";
+    };
+
+    /**
+     * Count expandable memory-probe trials from typed questions[] declarations.
+     * Mirrors PartnerBeliefIndividualBoxesController eligibility / sack auto-gate.
+     */
+    this._countPartnerBeliefMemoryProbeTrials = function (probeSpecs) {
+        if (!Array.isArray(probeSpecs) || probeSpecs.length === 0) return 0;
+        let fens = Array.isArray(FennimalObjArr) ? FennimalObjArr : [];
+        let includeSack = this.should_include_sack_memory_probes();
+        let total = 0;
+
+        probeSpecs.forEach((spec) => {
+            if (!spec || !this._isPartnerBeliefMemoryProbeKind(spec.kind)) return;
+            if (this._isSackMemoryProbeKind(spec.kind) && !includeSack) return;
+
+            let pool = fens;
+            if (Array.isArray(spec.fennimals) && spec.fennimals.length > 0) {
+                let wanted = new Set(spec.fennimals.map(String));
+                pool = fens.filter((f) => f && wanted.has(String(f.id)));
+            }
+
+            switch (spec.kind) {
+                case "memory_probe_box_to_fennimal":
+                    total += pool.filter((f) => f && f.toybox && f.toy).length;
+                    break;
+                case "memory_probe_box_decorator":
+                    // One trial per declaration (requires target_box in questions[]).
+                    total += (spec.target_box) ? 1 : 0;
+                    break;
+                case "memory_probe_fennimal_to_toy":
+                    total += pool.filter((f) => f && f.toy).length;
+                    break;
+                case "memory_probe_box_to_sack":
+                    total += pool.filter((f) => f && f.sack && f.toybox).length;
+                    break;
+                case "memory_probe_sack_to_toy":
+                    total += pool.filter((f) => f && f.sack && f.toy).length;
+                    break;
+            }
+        });
+        return total;
+    };
+
     this.get_Feature_maps = () => FeatureMapConstant;
     this.get_instruction_pages_arr = () => JSON.parse(JSON.stringify(StimTemplate.Instructions_at_start));
     this.get_questionnaire_pages_arr = () => JSON.parse(JSON.stringify(StimTemplate.Pages_at_end));
@@ -1453,7 +1581,13 @@ let StimulusTransformer = function (StimTemplate) {
                 let nBlocks = (typeof block.num_belief_blocks === "number" && block.num_belief_blocks > 0)
                     ? block.num_belief_blocks
                     : ((typeof block.num_repeated_blocks === "number" && block.num_repeated_blocks > 0) ? block.num_repeated_blocks : 1);
-                let nQuestions = (block.questions || []).length;
+                let beliefQuestions = (block.questions || []).filter((q) =>
+                    q && !this._isPartnerBeliefMemoryProbeKind(q.kind)
+                );
+                let memoryProbeSpecs = (block.questions || []).filter((q) =>
+                    q && this._isPartnerBeliefMemoryProbeKind(q.kind)
+                );
+                let nQuestions = beliefQuestions.length;
                 let nGating = (block.gating_boxes || []).length;
                 let nAction = (block.action_prediction_toys || []).length;
                 let nBeliefTrials = nQuestions * nBlocks;
@@ -1464,20 +1598,7 @@ let StimulusTransformer = function (StimTemplate) {
                     // Shape-match + color-match practice.
                     max_stars += bonus * 2;
                 }
-                if (block.include_memory_probe_at_end === true) {
-                    // Count only probes that will actually be built (missing toy/sack skips that trial).
-                    let fens = (typeof FennimalObjArr !== "undefined" && Array.isArray(FennimalObjArr))
-                        ? FennimalObjArr
-                        : [];
-                    let nBoxToFen = fens.filter((f) => f && f.toybox && f.toy).length;
-                    let nFenToToy = fens.filter((f) => f && f.toy).length;
-                    max_stars += bonus * (nBoxToFen + nFenToToy);
-                    if (this.should_include_sack_memory_probes()) {
-                        let nBoxToSack = fens.filter((f) => f && f.sack && f.toybox).length;
-                        let nSackToToy = fens.filter((f) => f && f.sack && f.toy).length;
-                        max_stars += bonus * (nBoxToSack + nSackToToy);
-                    }
-                }
+                max_stars += bonus * this._countPartnerBeliefMemoryProbeTrials(memoryProbeSpecs);
             }
 
             // FIX: Ensure the sorting task's stars are included in the global estimate
@@ -1512,4 +1633,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("P-READY")
+console.log("LOAD COMPLETED")

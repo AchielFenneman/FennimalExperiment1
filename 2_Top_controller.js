@@ -453,6 +453,11 @@ class TrialGenerator {
         mainTrials = this.applyPartnerBeliefInSituLureCycles(mainTrials, phaseData);
         orthogonalTrials = this.applyPartnerBeliefInSituLureCycles(orthogonalTrials, phaseData);
 
+        if (phaseData.type === "retrieve_lost_box") {
+            mainTrials = this.applyRetrieveLostBoxPhaseFlags(mainTrials, phaseData);
+            orthogonalTrials = this.applyRetrieveLostBoxPhaseFlags(orthogonalTrials, phaseData);
+        }
+
         if (Array.isArray(phaseData.trial_subblocks)) {
             // Subblock order is intentional; do not re-shuffle across subblock boundaries.
             return mainTrials;
@@ -1277,6 +1282,14 @@ class TrialGenerator {
         return trial;
     }
 
+    applyRetrieveLostBoxPhaseFlags(trials, phaseData) {
+        if (!trials || trials.length === 0) return trials;
+        if (phaseData.include_decoration === true) {
+            trials = set_property_to_all_elem_in_arr("include_decoration", true, trials);
+        }
+        return trials;
+    }
+
     applyAskToySettingsToTrials(trials, phaseData) {
         if (!phaseData.ask_toy || !trials || trials.length === 0) return trials;
 
@@ -1289,9 +1302,15 @@ class TrialGenerator {
             }
         } else {
             toysAskedMapped = this.collectUniqueAttributeFromPhaseFennimals(phaseData, "toy");
-            if (toysAskedMapped.length === 0) {
-                console.warn("ask_toy is true but no toys_asked / phase toys could be resolved");
-            }
+        }
+
+        toysAskedMapped = this.expandSingletonAskOptions(toysAskedMapped, {
+            experimentOptions: this.stimuli.get_all_x_encountered_during_experiment("toy"),
+            softwareOptions: this.stimuli.get_all_software_options_of_type("toy"),
+        });
+
+        if (toysAskedMapped.length === 0) {
+            console.warn("ask_toy is true but no toys_asked / phase toys could be resolved");
         }
 
         trials = set_property_to_all_elem_in_arr("ask_toy", true, trials);
@@ -1303,11 +1322,16 @@ class TrialGenerator {
      * Stamp distractor options for post-placement attention checks.
      * toy_to_sack: unique toys across all Fennimals in the phase (not just the subblock).
      * toy_to_box / sack_to_box: unique toys/sacks among sibling trials in the same subblock.
+     * Singleton option sets widen to experiment-wide, then software-wide (see expandSingletonAskOptions).
      */
     applyPlacementQuizOptionsToTrials(trials, phaseData) {
         if (!trials || trials.length === 0) return trials;
 
         let phaseToys = this.collectUniqueAttributeFromPhaseFennimals(phaseData, "toy");
+        let experimentToys = this.stimuli.get_all_x_encountered_during_experiment("toy");
+        let experimentSacks = this.stimuli.get_all_x_encountered_during_experiment("sack");
+        let softwareToys = this.stimuli.get_all_software_options_of_type("toy");
+        let softwareSacks = this.stimuli.get_all_software_options_of_type("sack");
 
         let bySubblock = {};
         trials.forEach((trial) => {
@@ -1329,23 +1353,35 @@ class TrialGenerator {
 
             cohort.forEach((trial) => {
                 if (trial.interaction_type === "toy_to_sack") {
-                    let opts = [...phaseToys];
-                    if (trial.toy && !opts.includes(trial.toy)) opts.push(trial.toy);
+                    let opts = this.expandSingletonAskOptions(phaseToys, {
+                        experimentOptions: experimentToys,
+                        softwareOptions: softwareToys,
+                        requiredValues: [trial.toy],
+                    });
                     trial.placement_quiz_options = opts;
                 } else if (trial.interaction_type === "toy_to_box") {
-                    let opts = [...toys];
-                    if (trial.toy && !opts.includes(trial.toy)) opts.push(trial.toy);
+                    let opts = this.expandSingletonAskOptions(toys, {
+                        experimentOptions: experimentToys,
+                        softwareOptions: softwareToys,
+                        requiredValues: [trial.toy],
+                    });
                     trial.placement_quiz_options = opts;
                 } else if (trial.interaction_type === "switch_box_without_partner") {
-                    let opts = [...toys];
-                    if (trial.toy && !opts.includes(trial.toy)) opts.push(trial.toy);
+                    let opts = this.expandSingletonAskOptions(toys, {
+                        experimentOptions: experimentToys,
+                        softwareOptions: softwareToys,
+                        requiredValues: [trial.toy],
+                    });
                     trial.placement_quiz_options = opts;
                     trial.boxes_in_subblock = cohort
                         .map((t) => t.toybox)
                         .filter((box, idx, arr) => box && arr.indexOf(box) === idx);
                 } else if (trial.interaction_type === "sack_to_box") {
-                    let opts = [...sacks];
-                    if (trial.sack && !opts.includes(trial.sack)) opts.push(trial.sack);
+                    let opts = this.expandSingletonAskOptions(sacks, {
+                        experimentOptions: experimentSacks,
+                        softwareOptions: softwareSacks,
+                        requiredValues: [trial.sack],
+                    });
                     trial.placement_quiz_options = opts;
                 }
             });
@@ -1376,9 +1412,15 @@ class TrialGenerator {
             }
         } else {
             boxesAskedMapped = this.collectUniqueAttributeFromPhaseFennimals(phaseData, "toybox");
-            if (boxesAskedMapped.length === 0) {
-                console.warn("ask_box is true but no boxes_asked / phase toyboxes could be resolved");
-            }
+        }
+
+        boxesAskedMapped = this.expandSingletonAskOptions(boxesAskedMapped, {
+            experimentOptions: this.stimuli.get_all_x_encountered_during_experiment("toybox"),
+            softwareOptions: this.stimuli.get_all_software_options_of_type("toybox"),
+        });
+
+        if (boxesAskedMapped.length === 0) {
+            console.warn("ask_box is true but no boxes_asked / phase toyboxes could be resolved");
         }
 
         trials = set_property_to_all_elem_in_arr("ask_box", true, trials);
@@ -1402,8 +1444,39 @@ class TrialGenerator {
     }
 
     /**
+     * When a block-level ask_* / placement option set has ≤1 unique entry, widen it:
+     * 1) all options of that type used in the experiment, then
+     * 2) all options loaded in the software (SVG catalog).
+     * Always ensures requiredValues (correct answer) are present.
+     */
+    expandSingletonAskOptions(options, { experimentOptions, softwareOptions, requiredValues } = {}) {
+        let opts = [...new Set((options || []).filter(Boolean))];
+
+        if (opts.length <= 1) {
+            let experimentWide = [...new Set((experimentOptions || []).filter(Boolean))];
+            if (experimentWide.length > 1) {
+                opts = experimentWide;
+            } else {
+                let softwareWide = [...new Set((softwareOptions || []).filter(Boolean))];
+                if (softwareWide.length > 0) {
+                    opts = softwareWide;
+                } else if (experimentWide.length > 0) {
+                    opts = experimentWide;
+                }
+            }
+        }
+
+        (requiredValues || []).forEach((value) => {
+            if (value && !opts.includes(value)) opts.push(value);
+        });
+
+        return opts;
+    }
+
+    /**
      * Stamp ask_Fennimal onto all trials. fennimals_asked defaults to every Fennimal id in the phase
      * (union across trial_subblocks when present). Also stamps fennimals_asked_objects for head UI.
+     * Singleton sets widen to all experiment Fennimals (no broader software catalog of identities).
      */
     applyAskFennimalSettingsToTrials(trials, phaseData) {
         if (!phaseData.ask_Fennimal || !trials || trials.length === 0) return trials;
@@ -1411,6 +1484,11 @@ class TrialGenerator {
         let ids = Array.isArray(phaseData.fennimals_asked) && phaseData.fennimals_asked.length > 0
             ? [...phaseData.fennimals_asked]
             : this.collectFennimalIdsInPhase(phaseData);
+
+        ids = this.expandSingletonAskOptions(ids, {
+            experimentOptions: this.stimuli.get_all_Fennimal_ids_in_experiment(),
+            softwareOptions: null,
+        });
 
         if (!ids || ids.length === 0) {
             console.warn("ask_Fennimal is true but no fennimals_asked / phase Fennimals could be resolved");
@@ -1741,7 +1819,9 @@ class ExperimentController {
                 this.instrCont.initializePartnerBeliefIndividualBoxesInstructions(
                     pbIndPartnerName,
                     this.currentPhaseData.bonus_stars_per_correct_answer,
-                    (this.currentPhaseData.questions || []).length,
+                    (this.currentPhaseData.questions || []).filter((q) =>
+                        q && !String(q.kind || "").startsWith("memory_probe_")
+                    ).length,
                     this.currentPhaseData.num_belief_blocks ?? this.currentPhaseData.num_repeated_blocks,
                     this.currentPhaseData.include_practice_trial === true,
                     this.currentPhaseData.include_reality_block_at_end === true,
@@ -2061,6 +2141,10 @@ class ExperimentController {
         let trial = this.currentTrial;
         let skipTravel = this.isHomeOverlayPhoneRoomTrial(trial);
 
+        // closeInstructions() only hides chrome — clear lingering toybox clones so their
+        // (legacy) ids cannot pollute later getElementById lookups.
+        if (this.instrCont) this.instrCont.clearInstructions();
+
         if (skipTravel) {
             // Stay at Home narratively: tear down the phone UI without revealing the map
             // (exitRoomBeforeMap would flash the map and look like travel is starting).
@@ -2091,6 +2175,9 @@ class ExperimentController {
     startPhoneRoomHomeOverlayTrial() {
         let fenObj = this.currentTrial;
         if (!fenObj) return;
+
+        // Interface stays visible for locator/prompts, but help has no reopen target mid-overlay.
+        this.mapCont.hide_request_instructions_button();
 
         if (fenObj.visited === false || fenObj.visited === undefined) {
             this.currentInteractionNumInPhase++;
@@ -2150,10 +2237,7 @@ class ExperimentController {
     phoneRoomReturnCompleted() {
         this.mapCont.disable_map_interactions();
         this.mapCont.remove_all_action_buttons();
-
-        if (this.mapCont.RequestInstructionsButton) {
-            this.mapCont.RequestInstructionsButton.style.display = "none";
-        }
+        this.mapCont.hide_request_instructions_button();
 
         this.startNextTrialInPhoneRoomPhase();
     }
@@ -2161,6 +2245,7 @@ class ExperimentController {
 
     startNextTrialInPhoneRoomPhase() {
         this.mapCont.disable_map_interactions();
+        this.mapCont.hide_request_instructions_button();
         Interface.FenneFinder.hide();
 
         if (this.executionQueue.length === 0) {
@@ -2281,6 +2366,10 @@ class ExperimentController {
                     this.mapCont.enable_map_interactions();
                     this.mapCont.show_request_instructions_button();
                     this.checkIfFennefinderShouldBeShown();
+                    if (this.currentPhaseType === "retrieve_lost_box") {
+                        // Icons may have been measured while Map was hidden after phone-room.
+                        this.mapCont.refresh_lost_box_icons_on_map();
+                    }
                 }
                 break;
             case "hint_and_search":
@@ -2344,6 +2433,12 @@ class ExperimentController {
                 } else if (this.waitingForPhoneRoomHintToClose) {
                     this.waitingForPhoneRoomHintToClose = false;
                     this.phoneRoomHintClosed();
+                } else if (this.instrCont.helpReopenActive) {
+                    // Mid-phase help reopen — do not restart travel / overlay.
+                    this.instrCont.helpReopenActive = false;
+                    if (this.waitingForManualPhoneRoomReturn) {
+                        this.mapCont.enable_map_interactions();
+                    }
                 }
                 break;
         }

@@ -96,41 +96,14 @@ ItemsCollectionFromWarehouseController = function(TaskData, outputfunc){
 
         let Flaps = InteractionElements.Backpack.getElementsByClassName("backpack_flap")
         for(let i =0;i<Flaps.length;i++){
-            if(Flaps[i].id === "backpack_flap_closed") {
-                Flaps[i].style.opacity = 1
-            }
-            if(Flaps[i].id === "backpack_flap_open") {
-                Flaps[i].style.opacity = 0
-            }
-
             Flaps[i].style.transition = "all 500ms ease-in-out"
-            Flaps[i].style.display = "inherit";
         }
+        set_backpack_flaps_open(InteractionElements.Backpack, false)
     }
 
     function open_or_close_backpack(option){
         AudioCont.play_sound_effect("zipper")
-        let Flaps = InteractionElements.Backpack.getElementsByClassName("backpack_flap")
-        if(option === "open"){
-            for(let i =0;i<Flaps.length;i++){
-                if(Flaps[i].id === "backpack_flap_closed") {
-                    Flaps[i].style.opacity = 0
-                }
-                if(Flaps[i].id === "backpack_flap_open") {
-                    Flaps[i].style.opacity = 1
-                }
-            }
-        }else{
-            for(let i =0;i<Flaps.length;i++){
-                if(Flaps[i].id === "backpack_flap_closed") {
-                    Flaps[i].style.opacity = 1
-                }
-                if(Flaps[i].id === "backpack_flap_open") {
-                    Flaps[i].style.opacity = 0
-                }
-            }
-
-        }
+        set_backpack_flaps_open(InteractionElements.Backpack, option === "open")
     }
 
     function add_items_on_screen(){

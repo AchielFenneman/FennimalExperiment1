@@ -723,7 +723,7 @@ class MapController {
         this.hide_all_locations();
         this.flash_location_transition_mask(this.current_region);
 
-        if(this.RequestInstructionsButton) this.RequestInstructionsButton.style.display = "none";
+        this.hide_request_instructions_button();
         Interface.FenneFinder.hide();
 
         setTimeout(() => {
@@ -765,7 +765,12 @@ class MapController {
                 this.ExpCont.checkIfFennefinderShouldBeShown();
 
             }, 0.5 * GenParam.map_to_location_transition_speed);
-            if(this.RequestInstructionsButton) this.RequestInstructionsButton.style.display = "inherit";
+            // phone_room uses autotravel / overlays — help reopen is not a map affordance there.
+            if (this.ExpCont.currentPhaseType === "phone_room") {
+                this.hide_request_instructions_button();
+            } else {
+                this.show_request_instructions_button();
+            }
         } else {
             this.Map_Layer.style.display = "inherit";
             this.hide_all_locations();
@@ -965,9 +970,7 @@ class MapController {
         Interface.Prompt.hide();
         Interface.FenneFinder.hide();
 
-        if (this.RequestInstructionsButton) {
-            this.RequestInstructionsButton.style.display = "none";
-        }
+        this.hide_request_instructions_button();
 
         this.current_action_key_status = false;
         this.previous_action_key_status = false;
@@ -1539,6 +1542,7 @@ class MapController {
         this.stopPhoneRoomProximityReturnWatch();
         this.awaitingPhoneRoomProximityReturn = true;
         this.phoneRoomProximityReturnCallback = onArrive;
+        this.startPhoneRoomMapReturnHighlight();
 
         const threshold = Math.max(GenParam.location_detection_distance * 1.4, 48);
         this.phoneRoomProximityReturnInterval = setInterval(() => {
@@ -1561,6 +1565,28 @@ class MapController {
             clearInterval(this.phoneRoomProximityReturnInterval);
             this.phoneRoomProximityReturnInterval = null;
         }
+        this.stopPhoneRoomMapReturnHighlight();
+    }
+
+    /** Pulsing drop-shadow on map #phone_room during manual walk-home. */
+    startPhoneRoomMapReturnHighlight() {
+        let phoneRoom = document.getElementById("phone_room");
+        if (!phoneRoom) return;
+
+        let color = (GenParam.PhoneRoomFlair && GenParam.PhoneRoomFlair.mapReturnPulseColor) || "#FFE566";
+        let pulseMs = (GenParam.PhoneRoomFlair && GenParam.PhoneRoomFlair.mapReturnPulseTime) || 1200;
+        phoneRoom.style.setProperty("--phone-room-map-return-color", color);
+        phoneRoom.style.setProperty("--phone-room-map-return-pulse-time", pulseMs + "ms");
+        phoneRoom.classList.add("phone_room_map_return_pulse");
+    }
+
+    stopPhoneRoomMapReturnHighlight() {
+        let phoneRoom = document.getElementById("phone_room");
+        if (!phoneRoom) return;
+        phoneRoom.classList.remove("phone_room_map_return_pulse");
+        phoneRoom.style.removeProperty("--phone-room-map-return-color");
+        phoneRoom.style.removeProperty("--phone-room-map-return-pulse-time");
+        phoneRoom.style.filter = "";
     }
 
     /**
@@ -1659,7 +1685,11 @@ class MapController {
     }
 
     show_request_instructions_button() {
-        if(this.RequestInstructionsButton) this.RequestInstructionsButton.style.display = "inherit";
+        if (this.RequestInstructionsButton) this.RequestInstructionsButton.style.display = "inherit";
+    }
+
+    hide_request_instructions_button() {
+        if (this.RequestInstructionsButton) this.RequestInstructionsButton.style.display = "none";
     }
 
     // ----------------------------------------------------
@@ -1687,11 +1717,26 @@ class MapController {
     // ----------------------------------------------------
     add_lost_box_icons_on_map(trials) {
         this.clear_all_lost_box_icons_from_map();
-        (trials || []).forEach((trial) => {
-            if (!trial || !trial.toybox || !trial.location) return;
-            this.CurrentLostBoxIconsOnMap.push(new this.LostBoxIconOnMap(trial, this.Map_Layer));
+        this._lostBoxIconTrials = (trials || []).filter((t) => t && t.toybox && t.location);
+        // Measure/place while Map is displayable — getBBox/getScreenCTM fail when Map is none
+        // (common after phone-room → retrieve handoff).
+        let mapWasHidden = this.Map_Layer && this.Map_Layer.style.display === "none";
+        if (mapWasHidden) this.Map_Layer.style.display = "inherit";
+
+        let parentLayer = document.getElementById("Map_player_level") || this.Map_Layer;
+        this._lostBoxIconTrials.forEach((trial) => {
+            this.CurrentLostBoxIconsOnMap.push(new this.LostBoxIconOnMap(trial, parentLayer));
         });
         this.display_all_lost_box_icons_on_map_for_region(this.current_region);
+
+        if (mapWasHidden) this.Map_Layer.style.display = "none";
+    }
+
+    /** Re-place markers once the map is definitely visible (after retrieve instructions). */
+    refresh_lost_box_icons_on_map() {
+        if (!this._lostBoxIconTrials || this._lostBoxIconTrials.length === 0) return;
+        let trials = this._lostBoxIconTrials.slice();
+        this.add_lost_box_icons_on_map(trials);
     }
 
     remove_lost_box_icon_at_location(location) {
@@ -1703,11 +1748,15 @@ class MapController {
             }
             return true;
         });
+        if (this._lostBoxIconTrials) {
+            this._lostBoxIconTrials = this._lostBoxIconTrials.filter((t) => t.location !== location);
+        }
     }
 
     clear_all_lost_box_icons_from_map() {
         this.CurrentLostBoxIconsOnMap.forEach((icon) => icon.remove());
         this.CurrentLostBoxIconsOnMap = [];
+        this._lostBoxIconTrials = [];
     }
 
     display_all_lost_box_icons_on_map_for_region(region) {
@@ -1841,6 +1890,8 @@ class MapController {
     /**
      * Tiny closed toybox marker for retrieve_lost_box: sits on the map location
      * where that lost box currently is.
+     * Placement mirrors FennimalIconOnMap (simple translate + scale) — not
+     * copy_scale_and_move — so CTM/centering quirks after phone-room cannot hide it.
      */
     LostBoxIconOnMap = class {
         constructor(trial, MapLayer) {
@@ -1848,10 +1899,11 @@ class MapController {
             this.location = trial.location;
             this.region = trial.region;
             this.toybox = trial.toybox;
-            this.targetSize = 44;
-            this.max_opacity = 0.95;
+            this.targetSize = 52;
+            this.max_opacity = 1;
             this.offset_x = 18;
             this.offset_y = -28;
+            this.IconGroup = null;
 
             switch (this.location) {
                 case "Lake": this.offset_x = -20; this.offset_y = 8; break;
@@ -1871,40 +1923,68 @@ class MapController {
             let marker = document.getElementById("location_marker_" + this.location);
             if (!marker) {
                 console.warn("LostBoxIconOnMap: missing location_marker_" + this.location);
-                this.IconGroup = null;
                 return;
             }
-            let template = document.getElementById("toybox_" + this.toybox);
+            let template = (typeof get_toybox_template === "function")
+                ? get_toybox_template(this.toybox)
+                : document.getElementById("toybox_" + this.toybox);
             if (!template) {
                 console.warn("LostBoxIconOnMap: missing toybox_" + this.toybox);
-                this.IconGroup = null;
                 return;
             }
 
-            let bbox = marker.getBBox();
-            let cx = bbox.x + 0.5 * bbox.width + this.offset_x;
-            let cy = bbox.y + 0.5 * bbox.height + this.offset_y;
+            let mapX = 0;
+            let mapY = 0;
+            try {
+                let bbox = marker.getBBox();
+                mapX = bbox.x + this.offset_x;
+                mapY = bbox.y + this.offset_y;
+            } catch (err) {
+                // Fallback: use cx/cy attributes on circle markers.
+                let cx = parseFloat(marker.getAttribute("cx") || "0");
+                let cy = parseFloat(marker.getAttribute("cy") || "0");
+                mapX = cx + this.offset_x;
+                mapY = cy + this.offset_y;
+                console.warn("LostBoxIconOnMap: getBBox failed for marker; used cx/cy", this.location, err);
+            }
 
-            this.IconGroup = copy_scale_and_move_object_to_position(
-                template,
-                MapLayer,
-                cx,
-                cy,
-                1
-            );
-            this.IconGroup.classList.add("lost_box_map_icon");
+            this.IconGroup = create_SVG_group(0, 0, "lost_box_map_icon", undefined);
             this.IconGroup.style.pointerEvents = "none";
             this.IconGroup.style.transition = "opacity 400ms ease-in-out";
 
-            apply_toybox_decoration_visibility_to_element(this.IconGroup, this.toybox);
-            Array.from(this.IconGroup.getElementsByClassName("alignment_field")).forEach((el) => el.remove());
+            let clone = template.cloneNode(true);
+            clone.removeAttribute("id");
+            clone.style.display = "inline";
+            // Strip descendant ids so map clones never steal future getElementById lookups.
+            clone.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
 
-            let rawBox = template.getBBox();
-            let scale = this.targetSize / Math.max(rawBox.width, rawBox.height, 1);
-            let scaleGroup = this.IconGroup.getElementsByClassName("scale_group")[0];
-            if (scaleGroup) {
-                scaleGroup.style.transform = `scale(${scale})`;
+            Array.from(clone.getElementsByClassName("alignment_field")).forEach((el) => el.remove());
+            Array.from(clone.getElementsByClassName("prep_element_hidden")).forEach((el) => {
+                el.style.display = "none";
+            });
+            apply_toybox_decoration_visibility_to_element(clone, this.toybox);
+
+            let scaleWrap = create_SVG_group(0, 0, "lost_box_map_scale", undefined);
+            scaleWrap.appendChild(clone);
+            this.IconGroup.appendChild(scaleWrap);
+            MapLayer.appendChild(this.IconGroup);
+
+            let rawBox = { width: 100, height: 100, x: 0, y: 0 };
+            try {
+                rawBox = clone.getBBox();
+            } catch (err) {
+                try { rawBox = template.getBBox(); } catch (err2) { /* keep defaults */ }
             }
+            let dim = Math.max(rawBox.width, rawBox.height, 1);
+            let scale = this.targetSize / dim;
+            let localCX = rawBox.x + 0.5 * rawBox.width;
+            let localCY = rawBox.y + 0.5 * rawBox.height;
+
+            // Zero the native box center to (0,0), scale, then park at the marker.
+            scaleWrap.style.transform =
+                `translate(${-localCX * scale}px, ${-localCY * scale}px) scale(${scale})`;
+            this.IconGroup.style.transform =
+                `translate(${Math.round(mapX)}px, ${Math.round(mapY)}px)`;
 
             this.IconGroup.style.opacity = this.max_opacity;
         }
@@ -1916,15 +1996,10 @@ class MapController {
             this.IconGroup = null;
         }
 
-        display_only_if_in_region(region) {
+        display_only_if_in_region(_region) {
+            // Quest markers: always visible from Home / any region.
             if (!this.IconGroup) return;
-            let should_display =
-                this.region === region
-                || region === "All"
-                || (GenParam.DisplayFoundFennimalIconsOnMap
-                    && GenParam.DisplayFoundFennimalIconsOnMap.display_all_icons_on_watchtower
-                    && region === "All");
-            this.IconGroup.style.opacity = should_display ? this.max_opacity : 0;
+            this.IconGroup.style.opacity = this.max_opacity;
         }
     };
 

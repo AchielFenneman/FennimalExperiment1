@@ -1199,9 +1199,77 @@ function set_location_background_image(imgElem, regionName, locationName) {
     imgElem.addEventListener("error", onError);
 }
 
+/**
+ * Resolve the canonical toybox template from #All_Boxes / #Fennimal_Templates_Layer.
+ * Prefer this over document.getElementById("toybox_*"): interaction clones historically
+ * kept the same id, and Map sits before Templates in Main.svg — so getElementById can
+ * return a map/instruction clone (or a BoxBase clone with front/lid stripped) instead.
+ */
+function get_toybox_template(boxId) {
+    if (!boxId) return null;
+    let id = "toybox_" + boxId;
+    let escapeId = (typeof CSS !== "undefined" && CSS.escape)
+        ? CSS.escape(id)
+        : String(id).replace(/([^a-zA-Z0-9_-])/g, "\\$1");
+    let boxes = document.getElementById("All_Boxes");
+    if (boxes) {
+        let scoped = boxes.querySelector("#" + escapeId);
+        if (scoped) return scoped;
+    }
+    let templates = document.getElementById("Fennimal_Templates_Layer");
+    if (templates) {
+        let scoped = templates.querySelector("#" + escapeId);
+        if (scoped) return scoped;
+    }
+    return document.getElementById(id);
+}
+
+/** Strip id attributes from a cloned subtree so templates stay uniquely addressable. */
+function strip_svg_ids_from_subtree(root) {
+    if (!root || root.nodeType !== 1) return;
+    // Only strip the clone root id (toybox_*, backpack, toy_*, …). Child ids such as
+    // backpack_flap_closed / backpack_flap_open are used for local state toggles.
+    root.removeAttribute("id");
+}
+
+/**
+ * Toggle backpack open/closed flaps on a cloned backpack group.
+ * Prefers id markers; falls back to class names / DOM order if ids were stripped.
+ * Uses display (not only opacity) because the template marks the open flap with
+ * the SVG presentation attribute display="none".
+ */
+function set_backpack_flaps_open(backpackRoot, open) {
+    if (!backpackRoot) return;
+    let flaps = backpackRoot.getElementsByClassName("backpack_flap");
+    for (let i = 0; i < flaps.length; i++) {
+        let flap = flaps[i];
+        let id = flap.id || "";
+        let isClosed = id.includes("closed") || flap.classList.contains("backpack_flap_closed");
+        let isOpen = id.includes("open") || flap.classList.contains("backpack_flap_open");
+        // Template order: closed first, open second — use as last resort.
+        if (!isClosed && !isOpen) {
+            isClosed = i === 0;
+            isOpen = i === 1;
+        }
+        // Clear the baked-in presentation attribute so CSS display wins.
+        flap.removeAttribute("display");
+        if (isClosed) {
+            flap.style.display = open ? "none" : "inline";
+            flap.style.opacity = open ? 0 : 1;
+        }
+        if (isOpen) {
+            flap.style.display = open ? "inline" : "none";
+            flap.style.opacity = open ? 1 : 0;
+        }
+    }
+}
+
 function copy_scale_and_move_object_to_position(Elem,Parent, center_x, center_y, scale_factor, optional_new_id){
     //Copying the object and creating the group structure
     let SVG = Elem.cloneNode(true);
+    // Clones must not keep the template root id — duplicate toybox_*/backpack ids break
+    // later lookups (Map is before Fennimal_Templates_Layer, so getElementById prefers map clones).
+    strip_svg_ids_from_subtree(SVG);
     let ZeroTranslationGroup = create_SVG_group(0,0,"zero_translate_group",undefined);
     let MainPosTranslationGroup = create_SVG_group(0,0,"main_translate_group",undefined);
     let ScaleGroup = create_SVG_group(0,0,"scale_group",undefined);
@@ -1213,7 +1281,14 @@ function copy_scale_and_move_object_to_position(Elem,Parent, center_x, center_y,
 
     //Zero the coordinates of the object first
     SVG.style.display = "inherit"
-    const BaseCenter = getSVGInternalCenter(ZeroTranslationGroup)
+    let BaseCenter;
+    try {
+        BaseCenter = getSVGInternalCenter(ZeroTranslationGroup);
+    } catch (err) {
+        // getScreenCTM() is null when the map/parent is display:none — fall back to local bbox.
+        let b = ZeroTranslationGroup.getBBox();
+        BaseCenter = { x: b.x + 0.5 * b.width, y: b.y + 0.5 * b.height };
+    }
     ZeroTranslationGroup.style.transform = "translate(" + (-BaseCenter.x) + "px, " + (-BaseCenter.y) + "px)";
 
     //Setting scale
@@ -1347,7 +1422,9 @@ function paint_all_toy_color_templates() {
 function paint_all_box_color_templates() {
     if (!GenParam || !GenParam.BoxColorSchemes) return;
     for (let box_id in GenParam.BoxColorSchemes) {
-        let template = document.getElementById("toybox_" + box_id);
+        let template = (typeof get_toybox_template === "function")
+            ? get_toybox_template(box_id)
+            : document.getElementById("toybox_" + box_id);
         if (template) set_box_color_scheme(template, box_id);
     }
 }
@@ -2880,12 +2957,19 @@ class BoxChoiceBar {
             btn_bg.style.transition = "all 150ms ease";
             BtnGroup.appendChild(btn_bg);
 
-            let template = document.getElementById("toybox_" + box_id);
+            let template = (typeof get_toybox_template === "function")
+                ? get_toybox_template(box_id)
+                : document.getElementById("toybox_" + box_id);
             if (!template) {
                 console.warn("BoxChoiceBar: missing toybox_" + box_id);
                 return;
             }
             let RawBox = template.cloneNode(true);
+            if (typeof strip_svg_ids_from_subtree === "function") {
+                strip_svg_ids_from_subtree(RawBox);
+            } else {
+                RawBox.removeAttribute("id");
+            }
             RawBox.style.display = "inherit";
             Array.from(RawBox.getElementsByClassName("prep_element_hidden")).forEach(el => {
                 el.style.display = "none";
