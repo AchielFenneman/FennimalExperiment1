@@ -92,8 +92,9 @@ let StimulusSettings = function () {
                 randomization_id: "lost_box_manipulation",
                 include_decoration: true,
                 box_locations: [
-                 // { label: "boost", Fennimal_finding_box: "A", target_box: "A" },
+                  { label: "boost", Fennimal_finding_box: "A", target_box: "A" },
                   { label: "neutral", Fennimal_finding_box: "S1", target_box: "A" },
+                  
                 ],
                 partner_behavior: "active"
             },
@@ -762,6 +763,8 @@ let StimulusSettings = function () {
                 box_locations: [
                   { label: "boost", Fennimal_finding_box: "A", target_box: "A" },
                   { label: "neutral", Fennimal_finding_box: "C", target_box: "A" },
+                  { label: "cost", Fennimal_finding_box: "B", target_box: "A" },
+                  { label: "cost", Fennimal_finding_box: "B", target_box: "A" },
                 ],
                 partner_behavior: "active"
             },
@@ -1633,4 +1636,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("LOAD COMPLETED")
+console.log("ABC-READY")
