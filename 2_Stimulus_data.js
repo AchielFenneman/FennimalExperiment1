@@ -186,7 +186,7 @@ let StimulusSettings = function () {
                 box_locations: [
                   { label: "boost", Fennimal_finding_box: "A", target_box: "A" },
                   { label: "neutral", Fennimal_finding_box: "C", target_box: "A" },
-                  { label: "cost", Fennimal_finding_box: "B", target_box: "A", weight: 2 },
+                  { label: "cost", Fennimal_finding_box: "B", target_box: "A", weight: 3 },
                 ],
                 partner_behavior: "active"
             },
@@ -1058,4 +1058,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("P-READY")
+console.log("UPDATED-READY 3")
