@@ -150,8 +150,8 @@ Specify trials with **either** `Fennimals_encountered` **or** `box_locations` (n
 | Field | Meaning |
 |---|---|
 | `Fennimals_encountered` | One missing box per Fennimal (home location); box is that Fennimal’s `toybox` |
-| `box_locations` | Explicit per-trial pool: `[{ label: "…", Fennimal_finding_box: "A", target_box: "A" }, …]` — place the finder Fennimal at a **different** location in their native region (not their home); tag the mapped `target_box`. Each `Fennimal_finding_box` may appear only once. Tiny box icons appear on those map locations until each box is retrieved |
-| `n_trials_to_sample` | Optional between-subjects draw: keep this many entries from `box_locations` at random. Requires a unique `label` on every pool entry |
+| `box_locations` | Explicit per-trial pool: `[{ label: "…", Fennimal_finding_box: "A", target_box: "A", weight?: 1 }, …]` — place the finder Fennimal at a **different** location in their native region (not their home); tag the mapped `target_box`. Each `Fennimal_finding_box` and each `label` may appear only once. Optional `weight` is a relative sampling weight (default **1**). Tiny box icons appear on those map locations until each box is retrieved |
+| `n_trials_to_sample` | Optional between-subjects draw: keep this many entries from `box_locations`. Requires a unique `label` on every pool entry. `n === 1` is a weighted choice (`P ∝ weight`). `n > 1` is sequential weighted sampling without replacement (console warning if any weight ≠ 1). If omitted, every row runs (one-of-each) and any explicit `weight` other than 1 fails loud |
 | `randomization_id` | Optional stable key for the draw (persisted in Layer 1 assignment). Defaults to `retrieve_lost_box__{phasenum}` |
 | `include_decoration` | Optional. If `true`, after cleaning (and before tagging) run the joint decoration pile/turns; decorations persist in WorldState (including **which Fennimal decorated** via `get_toybox_decorator`). No photo after decorate — photo is always at the end of the whole interaction |
 | `partner_behavior` | Optional; if present, partner helps with cleaning (and decoration turns when `include_decoration`) |
@@ -164,8 +164,10 @@ Specify trials with **either** `Fennimals_encountered` **or** `box_locations` (n
 |---|---|
 | `selected_box_location_label` / `manipulation_label` | Chosen label when `n_trials_to_sample === 1` |
 | `selected_box_location_labels` | All chosen labels |
-| `selected_box_locations` | Chosen `{ label, Fennimal_finding_box, target_box }` entries |
+| `selected_box_locations` | Chosen `{ label, Fennimal_finding_box, target_box, weight, weight_proportion }` entries. `weight_proportion` is `weight / pool sum` |
+| `box_location_pool_weights` / `box_location_pool_weight_sum` | Full pool table (same fields) plus the denominator, so the assignment mechanism is in the export |
 | trial `label` / `manipulation_label` | Same label on each completed interaction record in `Data[]` |
+| trial `weight` / `weight_proportion` | Same sampling weight fields on each completed interaction record |
 
 Flow per location: Fennimal intro → dirty found box + celebration → proud dance → joint clean → optional decorate (`include_decoration`) → drag lost-and-found tag onto box → partner photo tableau → “Somebody will come collect…” → leave (or phase complete when all retrieved). Attached tags (and decorations, when included) persist in WorldState.
 
@@ -179,7 +181,8 @@ Example — between-subjects, one random option:
   include_decoration: true,
   box_locations: [
     { label: "A_finds_A", Fennimal_finding_box: "A", target_box: "A" },
-    { label: "C_finds_A", Fennimal_finding_box: "C", target_box: "A" }
+    { label: "C_finds_A", Fennimal_finding_box: "C", target_box: "A" },
+    { label: "B_finds_A", Fennimal_finding_box: "B", target_box: "A", weight: 2 }
   ],
   partner_behavior: "active"
 }

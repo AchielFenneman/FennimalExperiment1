@@ -1,4 +1,75 @@
 // ----------------------------------------------------
+// retrieve_lost_box box_locations: weights (relative; default 1)
+// ----------------------------------------------------
+function boxLocationHasExplicitWeight(entry) {
+    return !!(entry && Object.prototype.hasOwnProperty.call(entry, "weight")
+        && entry.weight !== undefined
+        && entry.weight !== null
+        && entry.weight !== "");
+}
+
+function resolveRetrieveLostBoxWeight(entry, index) {
+    if (!boxLocationHasExplicitWeight(entry)) {
+        return 1;
+    }
+    let w = entry.weight;
+    if (typeof w !== "number" || !Number.isFinite(w) || w <= 0) {
+        throw new Error(
+            `TrialGenerator: retrieve_lost_box box_locations[${index}] weight must be a positive finite number ` +
+            `(got ${JSON.stringify(w)}).`
+        );
+    }
+    return w;
+}
+
+function annotateRetrieveLostBoxPool(locs) {
+    let entries = locs.map((e, i) => {
+        let weight = resolveRetrieveLostBoxWeight(e, i);
+        return {
+            label: (e.label !== undefined && e.label !== null && e.label !== "") ? e.label : null,
+            Fennimal_finding_box: e.Fennimal_finding_box,
+            target_box: e.target_box,
+            weight
+        };
+    });
+    let pool_weight_sum = entries.reduce((acc, e) => acc + e.weight, 0);
+    entries.forEach((e) => {
+        e.weight_proportion = pool_weight_sum > 0 ? e.weight / pool_weight_sum : null;
+    });
+    return { entries, pool_weight_sum };
+}
+
+function pickWeightedIndicesWithoutReplacement(weights, nSample) {
+    let remaining = weights.map((w, i) => ({ w, i }));
+    let picked = [];
+    for (let k = 0; k < nSample; k++) {
+        let sum = remaining.reduce((acc, x) => acc + x.w, 0);
+        let r = Math.random() * sum;
+        let chosen = remaining.length - 1;
+        for (let j = 0; j < remaining.length; j++) {
+            r -= remaining[j].w;
+            if (r < 0) {
+                chosen = j;
+                break;
+            }
+        }
+        picked.push(remaining[chosen].i);
+        remaining.splice(chosen, 1);
+    }
+    return picked;
+}
+
+function serializeBoxLocationWeightTable(annotatedEntries) {
+    return annotatedEntries.map((e) => ({
+        label: e.label,
+        Fennimal_finding_box: e.Fennimal_finding_box,
+        target_box: e.target_box,
+        weight: e.weight,
+        weight_proportion: e.weight_proportion
+    }));
+}
+
+// ----------------------------------------------------
 // 1. DATA CONTROLLER
 // ----------------------------------------------------
 class DataController {
@@ -241,6 +312,7 @@ class DataController {
     /**
      * Between-subjects box_locations draw for retrieve_lost_box.
      * Restores a prior draw from phaseRandomizations when present (Layer 1 refresh).
+     * Unequal weights: n=1 is a weighted choice; n>1 is sequential weighted without replacement.
      */
     getOrCreateBoxLocationSelection(randomizationKey, poolEntries, nSample) {
         if (!this.experimentData.phaseRandomizations
@@ -248,9 +320,11 @@ class DataController {
             this.experimentData.phaseRandomizations = {};
         }
 
+        let annotated = annotateRetrieveLostBoxPool(poolEntries);
+        let byLabel = new Map(annotated.entries.map((e) => [e.label, e]));
+
         let existing = this.experimentData.phaseRandomizations[randomizationKey];
         if (existing && Array.isArray(existing.labels) && existing.labels.length > 0) {
-            let byLabel = new Map(poolEntries.map((e) => [e.label, e]));
             let restoredEntries = [];
             for (let lab of existing.labels) {
                 let match = byLabel.get(lab);
@@ -263,26 +337,44 @@ class DataController {
                 restoredEntries.push({
                     label: match.label,
                     Fennimal_finding_box: match.Fennimal_finding_box,
-                    target_box: match.target_box
+                    target_box: match.target_box,
+                    weight: match.weight,
+                    weight_proportion: match.weight_proportion
                 });
             }
             return {
                 labels: existing.labels.slice(),
                 label: restoredEntries.length === 1 ? restoredEntries[0].label : (existing.label || null),
-                entries: restoredEntries
+                entries: restoredEntries,
+                pool_weight_sum: annotated.pool_weight_sum,
+                pool_weights: serializeBoxLocationWeightTable(annotated.entries)
             };
         }
 
-        let shuffled = shuffleArray(poolEntries.map((e) => ({
-            label: e.label,
-            Fennimal_finding_box: e.Fennimal_finding_box,
-            target_box: e.target_box
-        })));
-        let selected = shuffled.slice(0, nSample);
+        if (nSample > 1 && annotated.entries.some((e) => e.weight !== 1)) {
+            console.warn(
+                `TrialGenerator: retrieve_lost_box n_trials_to_sample is ${nSample} (> 1), but some ` +
+                `box_locations weights are not 1. Draws use sequential weighted sampling without replacement, ` +
+                `so a row's chance of being included is not simply weight/sum. Prefer n_trials_to_sample: 1 ` +
+                `when using unequal weights.`
+            );
+        }
+
+        let weights = annotated.entries.map((e) => e.weight);
+        let pickedIdx = pickWeightedIndicesWithoutReplacement(weights, nSample);
+        let selected = pickedIdx.map((i) => ({
+            label: annotated.entries[i].label,
+            Fennimal_finding_box: annotated.entries[i].Fennimal_finding_box,
+            target_box: annotated.entries[i].target_box,
+            weight: annotated.entries[i].weight,
+            weight_proportion: annotated.entries[i].weight_proportion
+        }));
         let record = {
             labels: selected.map((e) => e.label),
             label: selected.length === 1 ? selected[0].label : null,
-            entries: selected
+            entries: selected,
+            pool_weight_sum: annotated.pool_weight_sum,
+            pool_weights: serializeBoxLocationWeightTable(annotated.entries)
         };
         this.experimentData.phaseRandomizations[randomizationKey] = JSON.parse(JSON.stringify(record));
         // Persist immediately so a mid-phase refresh keeps the same between-subjects draw.
@@ -564,7 +656,9 @@ class TrialGenerator {
 
     /**
      * Fail loud on malformed retrieve_lost_box box_locations entries.
-     * Each entry: { Fennimal_finding_box, target_box, label? }.
+     * Each entry: { Fennimal_finding_box, target_box, label?, weight? }.
+     * Rows must be unique (finder + label). Omitted weight defaults to 1.
+     * When n_trials_to_sample is unset, every row runs — weight must be omitted or 1.
      * When n_trials_to_sample is set, every entry must have a unique label.
      */
     validateRetrieveLostBoxLocations(phaseData) {
@@ -636,12 +730,22 @@ class TrialGenerator {
                 }
                 seenLabels.add(entry.label);
             }
+
+            let weight = resolveRetrieveLostBoxWeight(entry, index);
+            if (!sampling && boxLocationHasExplicitWeight(entry) && weight !== 1) {
+                throw new Error(
+                    `TrialGenerator: retrieve_lost_box box_locations[${index}] has weight ${weight}, ` +
+                    `but n_trials_to_sample is not set (every location already runs). ` +
+                    `Omit weight or set it to 1, or set n_trials_to_sample to subsample.`
+                );
+            }
         });
     }
 
     /**
      * Between-subjects draw from box_locations when n_trials_to_sample is set.
-     * Stamps selected_box_location_label(s) / selected_box_locations onto phaseData for export.
+     * Stamps selected_box_location_label(s) / selected_box_locations onto phaseData for export,
+     * including weight and weight_proportion (weight / pool sum) for every pool row and the draw.
      */
     applyRetrieveLostBoxSampling(phaseData) {
         if (!Array.isArray(phaseData.box_locations) || phaseData.box_locations.length === 0) {
@@ -650,20 +754,22 @@ class TrialGenerator {
 
         let nSample = phaseData.n_trials_to_sample;
         if (nSample === undefined || nSample === null) {
-            // No sampling: run all options; still expose labels when present.
-            let labels = phaseData.box_locations
-                .map((e) => e && e.label)
+            // No sampling: run all options; still expose labels and default weights.
+            let annotated = annotateRetrieveLostBoxPool(phaseData.box_locations);
+            let labels = annotated.entries
+                .map((e) => e.label)
                 .filter((lab) => lab !== undefined && lab !== null && lab !== "");
             if (labels.length > 0) {
                 phaseData.selected_box_location_labels = labels.slice();
                 phaseData.selected_box_location_label = labels.length === 1 ? labels[0] : null;
             }
-            phaseData.selected_box_locations = phaseData.box_locations.map((e) => ({
-                label: e.label || null,
-                Fennimal_finding_box: e.Fennimal_finding_box,
-                target_box: e.target_box
+            phaseData.selected_box_locations = serializeBoxLocationWeightTable(annotated.entries);
+            phaseData.box_location_pool_weight_sum = annotated.pool_weight_sum;
+            phaseData.box_location_pool_weights = serializeBoxLocationWeightTable(annotated.entries);
+            return phaseData.box_locations.map((entry, i) => Object.assign({}, entry, {
+                weight: annotated.entries[i].weight,
+                weight_proportion: annotated.entries[i].weight_proportion
             }));
-            return phaseData.box_locations;
         }
 
         if (!this.dataCont || typeof this.dataCont.getOrCreateBoxLocationSelection !== "function") {
@@ -685,10 +791,26 @@ class TrialGenerator {
         phaseData.selected_box_location_labels = record.labels.slice();
         phaseData.selected_box_location_label = record.label;
         phaseData.selected_box_locations = record.entries.map((e) => ({ ...e }));
+        phaseData.box_location_pool_weight_sum = record.pool_weight_sum;
+        phaseData.box_location_pool_weights = (record.pool_weights || []).map((e) => ({ ...e }));
         // Convenient alias for the main between-subjects manipulation.
         phaseData.manipulation_label = record.label;
 
-        return phaseData.box_locations.filter((entry) => record.labels.includes(entry.label));
+        // Preserve draw order (do not re-filter the pool, which would restore spec order).
+        let byLabel = new Map(phaseData.box_locations.map((e) => [e.label, e]));
+        return record.entries.map((selected) => {
+            let match = byLabel.get(selected.label);
+            if (!match) {
+                throw new Error(
+                    `TrialGenerator: retrieve_lost_box selected label "${selected.label}" ` +
+                    `is not in box_locations.`
+                );
+            }
+            return Object.assign({}, match, {
+                weight: selected.weight,
+                weight_proportion: selected.weight_proportion
+            });
+        });
     }
 
     validateSubblockSpec(subblock, index, phaseType) {
@@ -818,6 +940,301 @@ class TrialGenerator {
                 `must be a non-empty array.`
             );
         }
+    }
+
+    /**
+     * Fail loud at experiment boot so a broken structure cannot pass a "does it load" test
+     * and then crash on a later phase. Checks sampling specs, Fennimal ids, feature codes,
+     * phase types, and interaction types. Does not generate trials (no randomization / WorldState).
+     */
+    validateExperimentStructure(structure) {
+        let expCode = this.stimuli && typeof this.stimuli.get_experiment_code === "function"
+            ? this.stimuli.get_experiment_code()
+            : "?";
+        let errors = [];
+
+        if (!Array.isArray(structure) || structure.length === 0) {
+            throw new Error(
+                `StimulusSpec: Experiment_Structure is missing or empty for experiment code "${expCode}". ` +
+                `Check Experiment_Code against All_Experiment_Structures.`
+            );
+        }
+
+        let knownIds = (this.stimuli && typeof this.stimuli.get_all_Fennimal_ids_in_experiment === "function")
+            ? this.stimuli.get_all_Fennimal_ids_in_experiment()
+            : [];
+        let knownIdSet = new Set(knownIds);
+        if (knownIdSet.size === 0) {
+            throw new Error(
+                `StimulusSpec: Fennimal set is empty for experiment code "${expCode}". ` +
+                `Check Experiment_Code against All_Fennimal_Sets.`
+            );
+        }
+
+        let knownPhaseTypes = this.getKnownPhaseTypes();
+        let trialBasedTypes = this.getTrialBasedPhaseTypes();
+        let knownInteractions = this.getKnownInteractionTypes();
+
+        structure.forEach((phase, index) => {
+            let label = `phase ${index + 1}`;
+            if (!phase || typeof phase !== "object" || Array.isArray(phase)) {
+                errors.push(`${label} must be an object with a type.`);
+                return;
+            }
+            label = `phase ${index + 1} (type "${phase.type}")`;
+
+            if (phase.type === undefined || phase.type === null || phase.type === "") {
+                errors.push(`phase ${index + 1} is missing type.`);
+            } else if (!knownPhaseTypes.has(phase.type)) {
+                errors.push(
+                    `${label} has unknown type "${phase.type}". Known types: ${[...knownPhaseTypes].join(", ")}.`
+                );
+            }
+
+            if (phase.box_locations !== undefined && phase.type !== "retrieve_lost_box") {
+                errors.push(`${label} sets box_locations, which is only allowed on retrieve_lost_box.`);
+            }
+            if (phase.n_trials_to_sample !== undefined && phase.type !== "retrieve_lost_box") {
+                errors.push(`${label} sets n_trials_to_sample, which is only allowed on retrieve_lost_box.`);
+            }
+
+            if (trialBasedTypes.has(phase.type)) {
+                try {
+                    let clone = JSON.parse(JSON.stringify(phase));
+                    if (clone.type === "retrieve_lost_box") {
+                        clone.interaction_type = "retrieve_lost_box";
+                        clone.include_Fennefinder = true;
+                    }
+                    this.validatePhaseTrialSpec(clone);
+                } catch (err) {
+                    errors.push(`${label}: ${err && err.message ? err.message : err}`);
+                }
+            }
+
+            this.collectFennimalIdRefsFromPhase(phase).forEach((ref) => {
+                if (!knownIdSet.has(ref.id)) {
+                    errors.push(
+                        `${label} ${ref.path} refers to Fennimal "${ref.id}", which is not in the Fennimal set ` +
+                        `(${knownIds.join(", ")}).`
+                    );
+                }
+            });
+
+            this.collectFeatureCodeRefsFromPhase(phase).forEach((ref) => {
+                let knownCodes = this.getKnownFeatureCodes(ref.type);
+                if (!knownCodes.includes(ref.code)) {
+                    let listed = knownCodes.length > 0 ? knownCodes.join(", ") : "(none — no Fennimal in this set has that property)";
+                    errors.push(
+                        `${label} ${ref.path} refers to ${ref.type} code "${ref.code}", which is not in this ` +
+                        `experiment's Fennimal set (${listed}).`
+                    );
+                }
+            });
+
+            this.collectInteractionTypeRefsFromPhase(phase).forEach((ref) => {
+                if (!knownInteractions.has(ref.type)) {
+                    errors.push(
+                        `${label} ${ref.path} has unknown interaction_type "${ref.type}".`
+                    );
+                }
+            });
+        });
+
+        if (errors.length > 0) {
+            throw new Error(
+                `StimulusSpec: ${errors.length} problem(s) in experiment "${expCode}" — fix these before running:\n- ` +
+                errors.join("\n- ")
+            );
+        }
+
+        console.log(
+            `%c StimulusSpec: structure OK — ${structure.length} phase(s), Fennimals [${knownIds.join(", ")}]`,
+            "color:green"
+        );
+    }
+
+    getKnownPhaseTypes() {
+        return new Set([
+            "partner_belief",
+            "partner_belief_multiple",
+            "partner_belief_individual_boxes",
+            "free_exploration",
+            "retrieve_lost_box",
+            "jump_to_trial",
+            "hint_and_search",
+            "on_call",
+            "phone_room",
+            "name_recall_task",
+            "card_sorting_task",
+            "Fennimal_attribute_sorting_task",
+            "pseudoday"
+        ]);
+    }
+
+    getTrialBasedPhaseTypes() {
+        return new Set([
+            "free_exploration",
+            "retrieve_lost_box",
+            "jump_to_trial",
+            "hint_and_search",
+            "on_call",
+            "phone_room"
+        ]);
+    }
+
+    getKnownInteractionTypes() {
+        return new Set([
+            "fly_swat",
+            "fly_swat_extended",
+            "reach_hat",
+            "find_box",
+            "find_box_extended",
+            "basic_intro",
+            "Fennimal_toy",
+            "toy_to_box",
+            "switch_box_without_partner",
+            "toy_to_sack",
+            "sack_to_box",
+            "box_room",
+            "partner_belief_in_situ",
+            "photo_box",
+            "photo_Fennimal",
+            "scan_box_home",
+            "scan_box_in_situ",
+            "check_box_contents",
+            "feed_Fennimal",
+            "joint_box_cleaning",
+            "joint_box_decoration",
+            "retrieve_lost_box",
+            "broken_toy_in_box",
+            "broken_toy_no_box",
+            "dirty_toy",
+            "dirty_and_broken_toy"
+        ]);
+    }
+
+    getKnownFeatureCodes(type) {
+        let maps = this.stimuli && typeof this.stimuli.get_Feature_maps === "function"
+            ? this.stimuli.get_Feature_maps()
+            : null;
+        if (!maps || !maps[type] || typeof maps[type] !== "object") return [];
+        return Object.keys(maps[type]);
+    }
+
+    collectFennimalIdRefsFromPhase(phase) {
+        let refs = [];
+        const add = (id, path) => {
+            if (id === undefined || id === null || id === "" || id === "all") return;
+            refs.push({ id: String(id), path });
+        };
+        const addList = (arr, path) => {
+            if (!Array.isArray(arr)) return;
+            arr.forEach((id, i) => add(id, `${path}[${i}]`));
+        };
+
+        addList(phase.Fennimals_encountered, "Fennimals_encountered");
+        addList(phase.Fennimals_asked, "Fennimals_asked");
+        addList(phase.fennimals_asked, "fennimals_asked");
+        addList(phase.displayed_icons, "displayed_icons");
+
+        if (Array.isArray(phase.box_locations)) {
+            phase.box_locations.forEach((entry, i) => {
+                if (entry) add(entry.Fennimal_finding_box, `box_locations[${i}].Fennimal_finding_box`);
+            });
+        }
+
+        if (Array.isArray(phase.trial_subblocks)) {
+            phase.trial_subblocks.forEach((sb, si) => {
+                if (!sb) return;
+                addList(sb.Fennimals_encountered, `trial_subblocks[${si}].Fennimals_encountered`);
+                if (Array.isArray(sb.trials)) {
+                    sb.trials.forEach((t, ti) => {
+                        if (!t) return;
+                        add(t.Fennimal, `trial_subblocks[${si}].trials[${ti}].Fennimal`);
+                        addList(t.Fennimals, `trial_subblocks[${si}].trials[${ti}].Fennimals`);
+                    });
+                }
+            });
+        }
+
+        if (Array.isArray(phase.questions)) {
+            phase.questions.forEach((q, qi) => {
+                if (q) addList(q.fennimals, `questions[${qi}].fennimals`);
+            });
+        }
+
+        return refs;
+    }
+
+    collectFeatureCodeRefsFromPhase(phase) {
+        let refs = [];
+        const add = (type, code, path) => {
+            if (code === undefined || code === null || code === "") return;
+            refs.push({ type, code, path });
+        };
+        const addList = (type, arr, path) => {
+            if (!Array.isArray(arr)) return;
+            arr.forEach((code, i) => add(type, code, `${path}[${i}]`));
+        };
+
+        addList("toybox", phase.target_boxes, "target_boxes");
+        addList("toybox", phase.gating_boxes, "gating_boxes");
+        addList("toybox", phase.toyboxes_asked, "toyboxes_asked");
+        addList("toy", phase.action_prediction_toys, "action_prediction_toys");
+        addList("toy", phase.toys_asked, "toys_asked");
+
+        if (Array.isArray(phase.box_locations)) {
+            phase.box_locations.forEach((entry, i) => {
+                if (entry) add("toybox", entry.target_box, `box_locations[${i}].target_box`);
+            });
+        }
+
+        if (Array.isArray(phase.trial_subblocks)) {
+            phase.trial_subblocks.forEach((sb, si) => {
+                if (!sb) return;
+                addList("toybox", sb.target_boxes, `trial_subblocks[${si}].target_boxes`);
+                if (Array.isArray(sb.trials)) {
+                    sb.trials.forEach((t, ti) => {
+                        if (t) add("toybox", t.target_box, `trial_subblocks[${si}].trials[${ti}].target_box`);
+                    });
+                }
+            });
+        }
+
+        if (Array.isArray(phase.questions)) {
+            phase.questions.forEach((q, qi) => {
+                if (q) add("toybox", q.target_box, `questions[${qi}].target_box`);
+            });
+        }
+
+        return refs;
+    }
+
+    collectInteractionTypeRefsFromPhase(phase) {
+        let refs = [];
+        const add = (value, path) => {
+            if (value === undefined || value === null || value === "") return;
+            if (Array.isArray(value)) {
+                value.forEach((v, i) => add(v, `${path}[${i}]`));
+                return;
+            }
+            refs.push({ type: value, path });
+        };
+
+        add(phase.interaction_type, "interaction_type");
+        add(phase.included_orthogonal_tasks, "included_orthogonal_tasks");
+        if (Array.isArray(phase.trial_subblocks)) {
+            phase.trial_subblocks.forEach((sb, si) => {
+                if (!sb) return;
+                add(sb.interaction_type, `trial_subblocks[${si}].interaction_type`);
+                if (Array.isArray(sb.trials)) {
+                    sb.trials.forEach((t, ti) => {
+                        if (t) add(t.interaction_type, `trial_subblocks[${si}].trials[${ti}].interaction_type`);
+                    });
+                }
+            });
+        }
+        return refs;
     }
 
     generateTrialsFromSubblocks(phaseData) {
@@ -993,6 +1410,10 @@ class TrialGenerator {
         if (entry.label !== undefined && entry.label !== null && entry.label !== "") {
             trial.label = entry.label;
             trial.manipulation_label = entry.label;
+        }
+        if (entry.weight !== undefined && entry.weight !== null) {
+            trial.weight = entry.weight;
+            trial.weight_proportion = entry.weight_proportion;
         }
 
         trial.home_location = trial.location;
@@ -1680,6 +2101,7 @@ class ExperimentController {
         // Otherwise a fresh randomization can delete heads that the restored session still needs.
         this.svgReducer = null;
         this.trialGenerator = new TrialGenerator(this.stimuli, this.dataCont);
+        this.trialGenerator.validateExperimentStructure(this.stimulusSettings.Experiment_Structure);
 
         WorldState.rebuild_state_from_available_locations(this.stimuli.get_all_locations_visited_during_experiment_with_regions());
 
@@ -1936,7 +2358,17 @@ class ExperimentController {
         let pLayer = document.getElementById("Fennimals_Layer");
         let pbPartnerPresent = WorldState.get_current_partner_role() === "active";
 
-        // PartnerBeliefMultipleController (PartnerBeliefTaskController remains a deprecated alias).
+        // PartnerBeliefMultipleController is archived in 3_InteractiveFennimalController_archive.js
+        // (not loaded by index.html). PartnerBeliefTaskController remains a deprecated alias there.
+        if (typeof PartnerBeliefMultipleController === "undefined") {
+            console.error(
+                '[TopController] Phase type "partner_belief_multiple" is archived ' +
+                "(PartnerBeliefMultipleController in 3_InteractiveFennimalController_archive.js, " +
+                "not loaded by index.html). Add that script tag after 3_InteractiveFennimalController.js to restore it."
+            );
+            return;
+        }
+
         let currentTask = new PartnerBeliefMultipleController(pLayer, this.currentPhaseData, pbPartnerPresent, () => {
 
             // FIX: Attach the answers, then delete the duplicate source array to prevent JSON bloat!
