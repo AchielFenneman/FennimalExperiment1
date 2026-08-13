@@ -1058,4 +1058,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("UPDATED-READY 3")
+console.log("P-READY")

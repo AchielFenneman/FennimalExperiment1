@@ -96,8 +96,17 @@ async function extract_SVG_elements_by_type(path, source_class_name, new_layer_i
     Parent.appendChild(SVG_Group)
 
     let RawArr = HiddenDiv.getElementsByClassName(source_class_name)
-    while ( RawArr.length >0) {
-        SVG_Group.appendChild(RawArr[0])
+    while (RawArr.length > 0) {
+        let el = RawArr[0];
+        // Toyboxes are class="item toybox". If they ride along in the "item" extract they
+        // land in #All_Items *and* a second copy is later placed in #All_Boxes. Paint
+        // only hits All_Boxes; getElementById then returns the unpainted All_Items node
+        // (yellow crate vs cyan-swapped crate). Skip them here so All_Boxes is canonical.
+        if (source_class_name === "item" && el.classList && el.classList.contains("toybox")) {
+            el.remove();
+            continue;
+        }
+        SVG_Group.appendChild(el);
     }
 
     HiddenDiv.remove()

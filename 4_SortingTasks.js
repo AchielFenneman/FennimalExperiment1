@@ -656,7 +656,9 @@ class FennimalSortingTargetSceneBox {
 
         // 4. Toybox (Bottom Right Quadrant)
         this.toyboxGroup = create_SVG_group(0, 0);
-        let toyboxSource = document.getElementById("toybox_" + this.fenObj.toybox) || document.getElementById(this.fenObj.toybox);
+        let toyboxSource = (typeof get_toybox_template === "function")
+            ? get_toybox_template(this.fenObj.toybox)
+            : (document.getElementById("toybox_" + this.fenObj.toybox) || document.getElementById(this.fenObj.toybox));
         if (toyboxSource) {
             let tboxClone = toyboxSource.cloneNode(true);
             tboxClone.style.display = "inherit";
@@ -838,7 +840,9 @@ class FennimalSortingCard {
                 }
             } else if (this.attribute === "toybox") {
                 let cleanId = this.fenObj.toybox.replace("toybox_", "");
-                sourceElem = document.getElementById("toybox_" + cleanId) || document.getElementById(cleanId);
+                sourceElem = (typeof get_toybox_template === "function")
+                    ? get_toybox_template(cleanId)
+                    : (document.getElementById("toybox_" + cleanId) || document.getElementById(cleanId));
                 if (sourceElem) {
                     clone = sourceElem.cloneNode(true);
                     apply_toybox_decoration_visibility_to_element(clone, cleanId);

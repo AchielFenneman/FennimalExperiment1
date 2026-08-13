@@ -3696,7 +3696,9 @@ class ToyToBoxTrialController {
     }
 
     getScaledTemplateHalfWidth(elementId, scale) {
-        let template = document.getElementById(elementId);
+        let template = (typeof resolve_svg_template === "function")
+            ? resolve_svg_template(elementId)
+            : document.getElementById(elementId);
         if (!template) return 180 * (scale / 4);
 
         let box = template.getBBox();
@@ -4198,7 +4200,9 @@ class SwitchBoxWithoutPartnerTrialController {
     }
 
     getScaledTemplateHalfWidth(elementId, scale) {
-        let template = document.getElementById(elementId);
+        let template = (typeof resolve_svg_template === "function")
+            ? resolve_svg_template(elementId)
+            : document.getElementById(elementId);
         if (!template) return 180 * (scale / 4);
         let box = template.getBBox();
         return (Math.max(box.width, 1) * scale) / 2;
@@ -4951,7 +4955,9 @@ class ToyToSackTrialController {
     }
 
     getScaledTemplateHalfWidth(elementId, scale) {
-        let template = document.getElementById(elementId);
+        let template = (typeof resolve_svg_template === "function")
+            ? resolve_svg_template(elementId)
+            : document.getElementById(elementId);
         if (!template) return 180 * (scale / 4);
 
         let box = template.getBBox();
@@ -5429,7 +5435,9 @@ class SackToBoxTrialController {
     }
 
     getScaledTemplateHalfWidth(elementId, scale) {
-        let template = document.getElementById(elementId);
+        let template = (typeof resolve_svg_template === "function")
+            ? resolve_svg_template(elementId)
+            : document.getElementById(elementId);
         if (!template) return 180 * (scale / 4);
 
         let box = template.getBBox();
@@ -7600,7 +7608,9 @@ class PhotoTrialController {
     }
 
     getScaledTemplateHalfWidth(elementId, scale) {
-        let template = document.getElementById(elementId);
+        let template = (typeof resolve_svg_template === "function")
+            ? resolve_svg_template(elementId)
+            : document.getElementById(elementId);
         if (!template) return 180 * (scale / 4);
 
         let box = template.getBBox();
@@ -7690,7 +7700,9 @@ class PhotoTrialController {
         }
 
         if (this.targetType === "toybox") {
-            let template = document.getElementById("toybox_" + this.FenObj.toybox);
+            let template = (typeof get_toybox_template === "function")
+                ? get_toybox_template(this.FenObj.toybox)
+                : document.getElementById("toybox_" + this.FenObj.toybox);
             if (!template) return null;
 
             // Full closed box: back + front + lid (do not strip front — that is the body).
@@ -8564,15 +8576,17 @@ class JointBoxCleaningTrialController {
     }
 
     sample_box_accent_color() {
-        let template = document.getElementById("toybox_" + this.FenObj.toybox);
+        let template = (typeof get_toybox_template === "function")
+            ? get_toybox_template(this.FenObj.toybox)
+            : document.getElementById("toybox_" + this.FenObj.toybox);
         if (!template) return null;
-        let nodes = template.querySelectorAll("[fill]");
+        let nodes = template.querySelectorAll("[fill], .box_color_light, .box_color_dark, .box_color_accent");
         let goldBest = null;
         let goldScore = -1;
         let brightBest = null;
         let brightLum = -1;
         for (let i = 0; i < nodes.length; i++) {
-            let fill = nodes[i].getAttribute("fill");
+            let fill = nodes[i].style.fill || nodes[i].getAttribute("fill");
             if (!fill || fill === "none" || fill === "transparent") continue;
             if (fill[0] === "#" && fill.length >= 7) {
                 let hex = fill.slice(0, 7);
@@ -9324,7 +9338,9 @@ class JointBoxCleaningTrialController {
     }
 
     create_joint_cleaning_polaroid_contents(groupScale, targetCircle) {
-        let template = document.getElementById("toybox_" + this.FenObj.toybox);
+        let template = (typeof get_toybox_template === "function")
+            ? get_toybox_template(this.FenObj.toybox)
+            : document.getElementById("toybox_" + this.FenObj.toybox);
         if (!template) return null;
 
         let contents = create_SVG_group(0, 0);
@@ -12016,7 +12032,9 @@ class PartnerBeliefIndividualBoxesController {
     }
 
     place_target_box(boxId) {
-        let template = document.getElementById("toybox_" + boxId);
+        let template = (typeof get_toybox_template === "function")
+            ? get_toybox_template(boxId)
+            : document.getElementById("toybox_" + boxId);
         if (!template) {
             console.error("PartnerBeliefIndividualBoxes: missing toybox_" + boxId);
             return null;
@@ -13223,7 +13241,9 @@ class PartnerBeliefIndividualBoxesController {
             let elem = null;
 
             if (item.option_type === "box") {
-                let template = document.getElementById("toybox_" + item.target_box);
+                let template = (typeof get_toybox_template === "function")
+                    ? get_toybox_template(item.target_box)
+                    : document.getElementById("toybox_" + item.target_box);
                 if (!template) {
                     console.error("PartnerBeliefIndividualBoxes: missing toybox_" + item.target_box);
                     return;

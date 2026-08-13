@@ -1204,9 +1204,14 @@ function set_location_background_image(imgElem, regionName, locationName) {
  * Prefer this over document.getElementById("toybox_*"): interaction clones historically
  * kept the same id, and Map sits before Templates in Main.svg — so getElementById can
  * return a map/instruction clone (or a BoxBase clone with front/lid stripped) instead.
+ * Also: #All_Items used to hold a second unpainted toybox copy (class "item toybox");
+ * getElementById would return that baked-yellow node instead of the painted All_Boxes one.
  */
 function get_toybox_template(boxId) {
     if (!boxId) return null;
+    if (typeof boxId === "string" && boxId.indexOf("toybox_") === 0) {
+        boxId = boxId.slice("toybox_".length);
+    }
     let id = "toybox_" + boxId;
     let escapeId = (typeof CSS !== "undefined" && CSS.escape)
         ? CSS.escape(id)
@@ -1222,6 +1227,15 @@ function get_toybox_template(boxId) {
         if (scoped) return scoped;
     }
     return document.getElementById(id);
+}
+
+/** Resolve a template id; toybox_* always goes through get_toybox_template. */
+function resolve_svg_template(elementId) {
+    if (!elementId) return null;
+    if (typeof elementId === "string" && elementId.indexOf("toybox_") === 0) {
+        return get_toybox_template(elementId);
+    }
+    return document.getElementById(elementId);
 }
 
 /** Strip id attributes from a cloned subtree so templates stay uniquely addressable. */
@@ -1421,12 +1435,24 @@ function paint_all_toy_color_templates() {
 /** Paint every box template that has an entry in BoxColorSchemes (call once after color assignment). */
 function paint_all_box_color_templates() {
     if (!GenParam || !GenParam.BoxColorSchemes) return;
+    let painted = new Set();
     for (let box_id in GenParam.BoxColorSchemes) {
         let template = (typeof get_toybox_template === "function")
             ? get_toybox_template(box_id)
             : document.getElementById("toybox_" + box_id);
-        if (template) set_box_color_scheme(template, box_id);
+        if (template) {
+            set_box_color_scheme(template, box_id);
+            painted.add(template);
+        }
     }
+    // Belt-and-suspenders: any leftover duplicate .toybox node (e.g. old All_Items copy).
+    Array.from(document.getElementsByClassName("toybox")).forEach((el) => {
+        if (!el || painted.has(el)) return;
+        let box_id = (el.id || "").replace(/^toybox_/, "");
+        if (box_id && GenParam.BoxColorSchemes[box_id]) {
+            set_box_color_scheme(el, box_id);
+        }
+    });
 }
 
 /**

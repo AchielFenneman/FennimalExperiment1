@@ -130,7 +130,10 @@ ItemsCollectionFromWarehouseController = function(TaskData, outputfunc){
             for(let boxnum =0; boxnum < Settings.Boxes.length; boxnum++){
                 let BoxGroup = create_SVG_group(0,0,undefined,undefined);
                 MainContainer.appendChild(BoxGroup)
-                let BoxObj = copy_scale_and_move_object_to_position(document.getElementById("toybox_" + Settings.Boxes[boxnum]), BoxGroup,pos_on_table[boxnum], CP.y - 0.06* GenParam.SVG_height, 2.5 )
+                let boxTemplate = (typeof get_toybox_template === "function")
+                    ? get_toybox_template(Settings.Boxes[boxnum])
+                    : document.getElementById("toybox_" + Settings.Boxes[boxnum]);
+                let BoxObj = copy_scale_and_move_object_to_position(boxTemplate, BoxGroup,pos_on_table[boxnum], CP.y - 0.06* GenParam.SVG_height, 2.5 )
                 apply_toybox_decoration_visibility_to_element(BoxObj, Settings.Boxes[boxnum]);
 
                 InteractionElements.Boxes[Settings.Boxes[boxnum]] = BoxGroup

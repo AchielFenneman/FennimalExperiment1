@@ -1427,8 +1427,12 @@ class InstructionsController {
             this.textElemMainInstructions = create_SVG_group(0, 0, undefined, undefined);
             this.currentInstructionsSVG.appendChild(this.textElemMainInstructions);
 
-            let id = hintType === "toy" ? "toy_" + fenObj.toy : "toybox_" + fenObj.toybox;
-            let elemIcon = copy_scale_and_move_object_to_position(document.getElementById(id), this.textElemMainInstructions, 0.5 * GenParam.SVG_width, 0.5 * GenParam.SVG_height, 4);
+            let source = hintType === "toy"
+                ? document.getElementById("toy_" + fenObj.toy)
+                : ((typeof get_toybox_template === "function")
+                    ? get_toybox_template(fenObj.toybox)
+                    : document.getElementById("toybox_" + fenObj.toybox));
+            let elemIcon = copy_scale_and_move_object_to_position(source, this.textElemMainInstructions, 0.5 * GenParam.SVG_width, 0.5 * GenParam.SVG_height, 4);
             if (hintType === "toy") set_toy_color_scheme(elemIcon, fenObj.toy, false);
 
             elemIcon.style.display = "none";
