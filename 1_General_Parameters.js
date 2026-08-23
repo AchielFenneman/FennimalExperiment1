@@ -702,6 +702,20 @@ GENERALPARAM = function () {
         return(sack)
     }
 
+    this.get_hat_printed_name = function(hat){
+        switch(hat){
+            case("partyhat"): return("party hat")
+            case("chefshat"): return("chef's hat")
+            case("fisherhat"): return("fisher hat")
+            case("tophat"): return("top hat")
+            case("baret"): return("baret")
+            case("fedora"): return("fedora")
+            case("baseballcap"): return("baseball cap")
+            case("beanie"): return("beanie")
+        }
+        return(hat || "hat")
+    }
+
     //ACTION BUTTON PARAMETERS
     // This is the action button if it is NOT shown on top of an object. (Presented on a fix location on the screen instead)
     // Note: this coordinate system is in the SCEEN space
@@ -812,7 +826,8 @@ GENERALPARAM = function () {
         buttonHeight: 70,
         buttonGap: 22,
         fadeTime: 280,
-        edgeMargin: 24
+        edgeMargin: 24,
+        highlightFilter: "brightness(1.18) drop-shadow(0px 0px 6px #fff6b0) drop-shadow(0px 0px 18px #ffe566) drop-shadow(0px 0px 42px rgba(255, 196, 0, 1))"
     }
 
     this.PhoneRoom = {
@@ -922,6 +937,25 @@ GENERALPARAM = function () {
         partnerBagOffsetX: -55,
         partnerBagOffsetY: -40,
         partnerHandoffLift: -50
+    }
+
+    // Match a hatless Fennimal with their hat from a laundry basket of phase hats.
+    this.HatLaundry = {
+        fennimalX: 0.68,
+        fennimalY: 0.80,
+        fennimalScale: 1.75,
+        basketX: 0.22,
+        basketY: 0.72,
+        basketScale: 4,
+        basketBottomOffset: 28,
+        basketLift: 200,
+        hatScaleMultiplier: 0.96, // 80% of the original 1.2× worn-hat size
+        columnTopY: 0.18,
+        columnBottomLift: 36,
+        hatPopStagger: 80,
+        hatMoveTime: 300,
+        hatFallTime: 380,
+        dropDistance: 280
     }
 
     // Joint Fennimal + box cleaning (memory binding, no toy)
@@ -1085,6 +1119,222 @@ GENERALPARAM = function () {
         partnerScanOffsetY: 30,
         powerIndicatorOpacity: 0.8,
         indicatorInactiveFill: "#d0d0d0"
+    }
+
+    // Hat binding / retraining phase (placeholder layouts; swap art later)
+    this.HatBinding = {
+        hatScale: 3.1,
+        hatHitPad: 28,
+        dropHitPad: 24,
+        snapBackMs: 280,
+        trialGapMs: 450,
+        occluderSize: 150,
+        flavourColors: {
+            lost_and_found: "#efe6d4",
+            laundry: "#dce8ef",
+            gift_shop: "#f3ddd6",
+            retraining: "#ece4d4"
+        },
+        flavourNames: {
+            lost_and_found: "Lost & found",
+            laundry: "Laundry room",
+            gift_shop: "Gift shop",
+            retraining: "Photo studio"
+        },
+        hatSpread: { left: 0.12, right: 0.88 },
+        flavourPrompts: {
+            lost_and_found: "Drag the correct hat into the shipping box.",
+            laundry: "Place the laundry tag on the correct hat.",
+            gift_shop: "Drag the correct hat into the shopping cart."
+        },
+        lostAndFound: {
+            hatY: 0.40,
+            boxScale: 2.5,
+            dropX: 0.50,
+            dropY: 0.78,
+            dropW: 260,
+            dropH: 200,
+            background: "./Locations/Home_lostfound.png",
+            overlayOpacity: 0.5,
+            floorHeight: 0.10,
+            floorColor: "#3E2723",
+            tableWidth: 0.58,
+            tableHeight: 70
+        },
+        laundry: {
+            background: "./Locations/Home_laundryroom.png",
+            overlayOpacity: 0.32,
+            wireLeft: 0.10,
+            wireRight: 0.90,
+            wireY: 0.10,
+            wireSag: 0.055,
+            tableY: 0.80,
+            tableWidth: 0.34,
+            tableHeight: 52,
+            tagFloorY: 0.92
+        },
+        giftShop: {
+            background: "./Locations/Home_warehouse.png",
+            overlayOpacity: 0.32,
+            cols: [0.26, 0.50, 0.74],
+            backRowY: 0.34,
+            frontRowY: 0.55,
+            tableWidth: 0.18,
+            tallTableHeight: 58,
+            shortTableHeight: 48,
+            dummyCount: 3,
+            stackDx: 22,
+            hatScale: 2.75,
+            cartX: 0.14,
+            cartY: 0.86,
+            cartScale: 3.055,
+            clipboardX: 0.88,
+            clipboardY: 0.84,
+            clipboardScale: 2.86,
+            tableYOffset: 20,
+            frontRowYOffset: 50
+        },
+        retraining: {
+            polaroidX: 0.26,
+            polaroidCenterY: 0.48,
+            polaroidScale: 0.78,
+            hatButtonScale: 3.6
+        }
+    }
+
+    this.ChimeraFeatureId = {
+        revealMs: 2000, // fallback if a chimera block omits trial_speed
+        startBlurPx: 24,
+        maxPoints: 100,
+        incorrectPenalty: 25,
+        pointsPerStar: 100,
+        freezeAfterMs: 1000,
+        tutorialDimOpacity: 0.1,
+        radialRadius: 300,
+        buttonW: 168,
+        buttonH: 72,
+        fennimalScale: 2.35,
+        fennimalX: 0.50,
+        fennimalY: 0.70,
+        polaroidScale: 0.90,
+        polaroidX: 0.50,
+        polaroidY: 0.48,
+        polaroidPaperFill: "#f4efe4",
+        polaroidCaptionFill: "#8a8680",
+        indoorBackground: "./Locations/Home_photoroom.png",
+        indoorOverlayOpacity: 0.22,
+        fogWashOpacity: 0.10,
+        barWidth: 68,
+        barLeftX: 0.25,
+        barRightX: 0.75,
+        barTop: 0.12,
+        barBottom: 0.92,
+        // Day N card copy (stimulus blocks may still override day_title / day_body)
+        dayTitle: "photos from this morning",
+        dayBody:
+            "This morning's polaroids are still developing. Some shots are close-ups; others show more of the Fennimal. The picture takes a moment to appear.<br><br>" +
+            "Click the question-mark box to start each trial, then choose the matching name as quickly as you can. Faster correct answers leave you with more points (100 points = 1 bonus star). An incorrect answer quietly costs points — there is no trial-by-trial feedback.",
+        patchyOverlayPad: 72,
+        patchyOverlayFill: "#c5d0dc",
+        patchyOverlayFillPolaroid: "#3e3a44",
+        // Reveal curve (holes + mosaic), independent of reveal_mode.
+        // "lingering" = longer ambiguous-but-possible window (default).
+        // "steep" = the original knife-edge curve (backup).
+        // Phase override: reveal_profile: "steep" | "lingering"
+        revealProfile: "lingering",
+        revealProfiles: {
+            steep: {
+                patchyHoleCount: 4,
+                patchyHoleSoftness: 10,
+                patchyMinBlurPx: 28,
+                patchyRMaxFactor: 1.15,
+                patchyGrowthPower: 3.2,
+                patchyColorPower: 1.7,
+                patchyHoleStagger: 0,
+                patchyPixelSizeStart: 36,
+                patchyPixelSizeEnd: 2,
+                patchyPixelPower: 1.6
+            },
+            lingering: {
+                // More, staggered, mixed-size bubbles so some diagnostic
+                // patches appear early while most of the photo stays covered.
+                // Mosaic sits in a mid grain for a long stretch instead of
+                // snapping sharp the moment a hole finally opens.
+                patchyHoleCount: 7,
+                patchyHoleSoftness: 14,
+                patchyMinBlurPx: 32,
+                patchyRMaxFactor: 1.12,
+                patchyGrowthPower: 1.45,
+                patchyColorPower: 1.22,
+                patchyHoleStagger: 0.32,
+                patchyHoleScales: [0.50, 0.88, 0.62, 1.08, 0.46, 0.94, 0.70],
+                patchyPixelSizeStart: 40,
+                patchyPixelSizeEnd: 2,
+                patchyPixelPower: 1.6,
+                patchyPixelStops: [
+                    { t: 0, size: 40 },
+                    { t: 0.32, size: 22 },
+                    { t: 0.70, size: 12 },
+                    { t: 0.88, size: 6 },
+                    { t: 1, size: 2 }
+                ]
+            }
+        },
+        // Lead-lag print (easy to forget — see INTERACTION_AND_PHASE_TYPES.md
+        // and the header of 4_ChimeraFeatureIdTask.js).
+        // After "?" the PRIME part (body or head) prints first; the TARGET
+        // part (the feature named in the question) stays under an undeveloped
+        // photo veil until targetLagFrac of trial_speed, then prints over a
+        // fresh trial_speed window. Fractions of trial_speed, not extra ms.
+        // Score clock (bars + points) is frozen until lag, then decays over
+        // that same full trial_speed window. Practice / head-only skip the lag.
+        primeEndFrac: 0.40,
+        targetLagFrac: 0.35,
+        targetVeilPad: 22
+    }
+
+    this.HatDrop = {
+        nReps: 1,
+        instructionOrder: ["most_similar", "cousin", "neighbour"],
+        gngInstructionOrder: ["neighbour", "cousin"],
+        maxPoints: 100,
+        minPoints: 25,
+        pointsPerStar: 100,
+        totalFallTime: 4000,
+        previewMs: 750,
+        previewTravelMs: 320,
+        previewHatScale: 1.35,
+        practiceFallScale: 1.5,
+        warningMs: 600,
+        lockDropMs: 250,
+        freezeAfterMs: 800,
+        tutorialDimOpacity: 0.1,
+        indoorBackground: "./Locations/Home_machineroom.png",
+        indoorOverlayOpacity: 0.5,
+        columnX: 0.50,
+        slotGap: 260,
+        promptY: 0.035,
+        promptH: 72,
+        spigotY: 0.135,
+        boxY: 0.80,
+        arrowY: 0.945,
+        boxW: 300,
+        boxH: 240,
+        boxHatScale: 2.45,
+        fallingHatScale: 2.56,
+        pipeHalfW: 52,
+        nozzleHalfW: 155,
+        // Day N card copy. Stimulus blocks may still override with day_title / day_body.
+        dayTitle: "the warehouse chute",
+        dayBody:
+            "Hats are coming down the warehouse chute. First a small window beside the chute shows which hat is about to drop; the boxes stay covered. Then that hat is pulled into the chute, the boxes open, and you move the sled with the arrow buttons or arrow keys so the hat lands in the box you choose. Press space (or Lock) to freeze the sled and keep your remaining points — the hat then drops at once.<br><br>" +
+            "You start each trial at 100 points. They count down as the hat falls, down to 25. A correct landing earns the remaining points; an incorrect landing earns none. Faster correct answers leave more points (100 points = 1 bonus star). You will not be told whether you were right until the end of the experiment.<br><br>" +
+            "We will start with two practice rounds using simple shapes.",
+        gngDayTitle: "keep or slide",
+        gngDayBody:
+            "Hats are coming down the chute. First a small window beside the chute shows which hat is about to drop; the box stays covered. Then that hat is pulled into the chute, the box opens, and you choose. One box starts under the chute. Keep the box there if it matches the rule; otherwise slide the box out of the way with the arrow keys. You can move it back. Press space to lock in and keep your remaining points — or wait, and the hat lands wherever the box then is.<br><br>" +
+            "You start each trial at 100 points. They count down as the hat falls, down to 25. A correct action earns the remaining points; an incorrect action earns none. Faster correct answers leave more points (100 points = 1 bonus star). You will not be told whether you were right until the end of the experiment.<br><br>" +
+            "We will start with two practice rounds using simple shapes."
     }
 }
 

@@ -14,9 +14,18 @@ class PromptController {
 
         this.PromptBox.style.transition = `all ${this.base_speed}ms ease-in-out`;
         this.PromptTextElem.style.transition = `all ${0.5 * this.base_speed}ms ease-in-out`;
-        this.PromptBox.style.pointerEvents = "none";
+        this.make_click_through();
 
         this.hide();
+    }
+
+    make_click_through() {
+        // SVG children still receive hits unless they themselves are none.
+        [this.PromptBox, this.PromptTextElem].forEach((el) => {
+            if (!el) return;
+            el.style.pointerEvents = "none";
+            el.setAttribute("pointer-events", "none");
+        });
     }
 
     hide() {
@@ -32,6 +41,7 @@ class PromptController {
     appear_from_hidden() {
         this.PromptBox.style.display = "inherit";
         this.PromptTextElem.style.display = "inherit";
+        this.make_click_through();
 
         // Force reflow
         window.getComputedStyle(this.PromptBox).opacity;
@@ -551,11 +561,15 @@ class PartnerSpeechBubbleController {
      * @param {SVGElement} opts.target - Element to point at (partner icon group, etc.)
      * @param {string} opts.text
      * @param {string} [opts.buttonLabel="Continue"]
+     * @param {boolean} [opts.hideButton=false] Skip the Continue button (caller dismisses).
      * @param {"map"|"location"} [opts.context="location"]
+     * @param {number} [opts.dimOpacity] Overlay dim (0–1). Defaults to GenParam.PartnerSpeechBubble.dimOpacity
      * @param {Function} [opts.onConfirm]
+     * @param {"left"|"right"|"up"|"down"} [opts.preferredSide] Prefer this side if it fits. "up" = bubble above, pointing down at the target.
+     * @param {number} [opts.tipGap] Override GenParam tipGap for this bubble.
      * @returns {Promise<void>}
      */
-    show({ target, text, buttonLabel = "Continue", context = "location", onConfirm = null } = {}) {
+    show({ target, text, buttonLabel = "Continue", context = "location", dimOpacity = null, onConfirm = null, preferredSide = null, tipGap = null, hideButton = false } = {}) {
         this.hide(true);
 
         return new Promise((resolve) => {
@@ -575,24 +589,29 @@ class PartnerSpeechBubbleController {
 
             this.targetElement = target;
             this.targetPrevFilter = target.style.filter || "";
-            target.style.filter =
-                "drop-shadow(0px 4px 10px rgba(0,0,0,0.45)) drop-shadow(0px 0px 6px rgba(250, 200, 80, 0.55))";
+            target.style.filter = p.highlightFilter ||
+                "brightness(1.18) drop-shadow(0px 0px 6px #fff6b0) drop-shadow(0px 0px 18px #ffe566) drop-shadow(0px 0px 42px rgba(255, 196, 0, 1))";
 
             let tipPoint = this.resolveTipTargetPoint(target, context);
-            let layout = this.computeLayout(tipPoint, text, buttonLabel, p);
+            let layout = this.computeLayout(tipPoint, text, hideButton ? "" : buttonLabel, p, {
+                preferredSide,
+                tipGap,
+                hideButton
+            });
 
             this.root = create_SVG_group(0, 0, "partner_speech_bubble_root", "PartnerSpeechBubbleRoot");
             this.root.style.opacity = 0;
             this.root.style.transition = `opacity ${p.fadeTime || 280}ms ease-in-out`;
-            this.root.style.pointerEvents = "auto";
+            this.root.style.pointerEvents = hideButton ? "none" : "auto";
 
             let dim = create_SVG_rect(0, 0, GenParam.SVG_width, GenParam.SVG_height, "partner_speech_bubble_dim", undefined);
-            dim.style.fill = `rgba(0,0,0,${p.dimOpacity != null ? p.dimOpacity : 0.2})`;
-            dim.style.pointerEvents = "all";
+            let dimAmt = dimOpacity != null ? dimOpacity : (p.dimOpacity != null ? p.dimOpacity : 0.2);
+            dim.style.fill = `rgba(0,0,0,${dimAmt})`;
+            dim.style.pointerEvents = hideButton ? "none" : "all";
             this.root.appendChild(dim);
 
             let bubbleGroup = create_SVG_group(0, 0, "partner_speech_bubble_group", undefined);
-            bubbleGroup.style.pointerEvents = "auto";
+            bubbleGroup.style.pointerEvents = hideButton ? "none" : "auto";
 
             let body = create_SVG_rect(
                 layout.bubbleX,
@@ -648,22 +667,23 @@ class PartnerSpeechBubbleController {
             fo.appendChild(textDiv);
             bubbleGroup.appendChild(fo);
 
-            let button = create_SVG_buttonElement(
-                layout.buttonCenterX,
-                layout.buttonCenterY,
-                p.buttonWidth || 320,
-                p.buttonHeight || 70,
-                buttonLabel,
-                34
-            );
-            button.style.pointerEvents = "auto";
-            button.onpointerdown = (evt) => {
-                if (evt) evt.stopPropagation();
-                this.confirm();
-            };
-
             this.root.appendChild(bubbleGroup);
-            this.root.appendChild(button);
+            if (!hideButton) {
+                let button = create_SVG_buttonElement(
+                    layout.buttonCenterX,
+                    layout.buttonCenterY,
+                    p.buttonWidth || 320,
+                    p.buttonHeight || 70,
+                    buttonLabel,
+                    34
+                );
+                button.style.pointerEvents = "auto";
+                button.onpointerdown = (evt) => {
+                    if (evt) evt.stopPropagation();
+                    this.confirm();
+                };
+                this.root.appendChild(button);
+            }
             parent.appendChild(this.root);
 
             void this.root.getBoundingClientRect();
@@ -747,16 +767,18 @@ class PartnerSpeechBubbleController {
         };
     }
 
-    computeLayout(tipTarget, text, buttonLabel, p) {
+    computeLayout(tipTarget, text, buttonLabel, p, opts) {
+        opts = opts || {};
         let W = GenParam.SVG_width;
         let H = GenParam.SVG_height;
-        let tipGap = p.tipGap != null ? p.tipGap : 100;
+        let tipGap = opts.tipGap != null ? opts.tipGap : (p.tipGap != null ? p.tipGap : 100);
         let margin = p.edgeMargin != null ? p.edgeMargin : 24;
         let padX = p.paddingX || 28;
         let padY = p.paddingY || 22;
-        let buttonW = p.buttonWidth || 320;
-        let buttonH = p.buttonHeight || 70;
-        let buttonGap = p.buttonGap || 22;
+        let hideButton = !!opts.hideButton;
+        let buttonW = hideButton ? 0 : (p.buttonWidth || 320);
+        let buttonH = hideButton ? 0 : (p.buttonHeight || 70);
+        let buttonGap = hideButton ? 0 : (p.buttonGap || 22);
         let triBase = p.triangleBase || 36;
         let triDepth = p.triangleDepth || 28;
 
@@ -770,7 +792,7 @@ class PartnerSpeechBubbleController {
 
         // Shrink until the chosen side can host bubble + button.
         for (let shrink = 0; shrink < 8; shrink++) {
-            let sides = this.rankSides(tipTarget, tipGap, margin, W, H);
+            let sides = this.rankSides(tipTarget, tipGap, margin, W, H, opts.preferredSide);
             let chosen = null;
             for (let i = 0; i < sides.length; i++) {
                 let side = sides[i];
@@ -828,7 +850,7 @@ class PartnerSpeechBubbleController {
         );
     }
 
-    rankSides(tipTarget, tipGap, margin, W, H) {
+    rankSides(tipTarget, tipGap, margin, W, H, preferredSide) {
         let sides = [
             { id: "left", free: tipTarget.x - tipGap - margin, tie: 0 },
             { id: "right", free: W - tipTarget.x - tipGap - margin, tie: 1 },
@@ -836,6 +858,10 @@ class PartnerSpeechBubbleController {
             { id: "down", free: H - tipTarget.y - tipGap - margin, tie: 3 }
         ];
         sides.sort((a, b) => {
+            if (preferredSide) {
+                if (a.id === preferredSide && b.id !== preferredSide) return -1;
+                if (b.id === preferredSide && a.id !== preferredSide) return 1;
+            }
             if (b.free !== a.free) return b.free - a.free;
             return a.tie - b.tie;
         });

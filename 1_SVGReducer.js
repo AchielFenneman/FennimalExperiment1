@@ -111,7 +111,12 @@ SVGREDUCER = function (Stimuli) {
         }
 
         let Heads_in_exp = Stimuli.get_all_x_encountered_during_experiment("head")
-        let Unused_heads = ALl_head_Ids.filter(x => x && !Heads_in_exp.includes(x))
+        let forcedHeads = (typeof Stimuli.get_forced_heads === "function")
+            ? (Stimuli.get_forced_heads() || [])
+            : []
+        let keepHeads = new Set([...(Heads_in_exp || []), ...forcedHeads].filter(Boolean))
+        // Keep assigned Fennimal heads AND leftover forced_heads (chimera strangers, etc.).
+        let Unused_heads = ALl_head_Ids.filter(x => x && !keepHeads.has(x))
 
         for (let i = 0; i < Unused_heads.length; i++) {
             let el = document.getElementById("Fennimal_head_" + Unused_heads[i])

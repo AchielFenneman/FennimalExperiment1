@@ -295,6 +295,8 @@ class DataController {
             delete fenObj.ask_toy;
             delete fenObj.ask_box;
             delete fenObj.ask_Fennimal;
+            delete fenObj.ask_name;
+            delete fenObj.names_asked;
 
             return fenObj;
         };
@@ -381,6 +383,43 @@ class DataController {
         this.storeAllData(false);
         this.writeSessionClaim(false);
         return record;
+    }
+
+    /**
+     * Between-subjects binding-search condition (pair_based / group_based / control).
+     * Restores a prior draw from phaseRandomizations when present.
+     * conditionPool is sampled with replacement-style weighting (duplicates raise odds).
+     */
+    getOrCreateBindingSearchCondition(randomizationKey, conditionPool) {
+        if (!this.experimentData.phaseRandomizations
+            || typeof this.experimentData.phaseRandomizations !== "object") {
+            this.experimentData.phaseRandomizations = {};
+        }
+
+        let allowed = ["pair_based", "group_based", "control"];
+        let existing = this.experimentData.phaseRandomizations[randomizationKey];
+        if (existing && allowed.includes(existing.condition)) {
+            if (Array.isArray(conditionPool) && conditionPool.length
+                && !conditionPool.includes(existing.condition)) {
+                console.warn(
+                    `HatBindingTask: restored condition "${existing.condition}" for "${randomizationKey}" ` +
+                    `(not in current condition pool so refresh stays consistent).`
+                );
+            }
+            return existing.condition;
+        }
+
+        let pool = (Array.isArray(conditionPool) ? conditionPool : []).filter((c) => allowed.includes(c));
+        if (!pool.length) {
+            throw new Error(
+                'HatBindingTask: condition must be a non-empty array of "pair_based" | "group_based" | "control".'
+            );
+        }
+        let condition = pool[Math.floor(Math.random() * pool.length)];
+        this.experimentData.phaseRandomizations[randomizationKey] = { condition };
+        this.storeAllData(false);
+        this.writeSessionClaim(false);
+        return condition;
     }
 
     storeAllData(bool_experiment_completed) {
@@ -528,19 +567,29 @@ class TrialGenerator {
             }
         }
 
-        // Stamp block-level ask_toy / ask_box / ask_Fennimal onto every trial in the block (main + orthogonal).
+        // Stamp block-level ask_toy / ask_box / ask_Fennimal / ask_name onto every trial in the block (main + orthogonal).
         mainTrials = this.applyAskToySettingsToTrials(mainTrials, phaseData);
         orthogonalTrials = this.applyAskToySettingsToTrials(orthogonalTrials, phaseData);
         mainTrials = this.applyAskBoxSettingsToTrials(mainTrials, phaseData);
         orthogonalTrials = this.applyAskBoxSettingsToTrials(orthogonalTrials, phaseData);
         mainTrials = this.applyAskFennimalSettingsToTrials(mainTrials, phaseData);
         orthogonalTrials = this.applyAskFennimalSettingsToTrials(orthogonalTrials, phaseData);
+        mainTrials = this.applyAskNameSettingsToTrials(mainTrials, phaseData);
+        orthogonalTrials = this.applyAskNameSettingsToTrials(orthogonalTrials, phaseData);
+        mainTrials = this.applyAskHatSettingsToTrials(mainTrials, phaseData);
+        orthogonalTrials = this.applyAskHatSettingsToTrials(orthogonalTrials, phaseData);
+        mainTrials = this.applyIntroduceNameOnPolaroidToTrials(mainTrials, phaseData);
+        orthogonalTrials = this.applyIntroduceNameOnPolaroidToTrials(orthogonalTrials, phaseData);
         mainTrials = this.stripAskFlagsForSpecialRoles(mainTrials);
         orthogonalTrials = this.stripAskFlagsForSpecialRoles(orthogonalTrials);
         mainTrials = this.applyPlacementQuizOptionsToTrials(mainTrials, phaseData);
         orthogonalTrials = this.applyPlacementQuizOptionsToTrials(orthogonalTrials, phaseData);
         mainTrials = this.applySwitchBoxWithoutPartnerSettingsToTrials(mainTrials);
         orthogonalTrials = this.applySwitchBoxWithoutPartnerSettingsToTrials(orthogonalTrials);
+        mainTrials = this.applyHideAndSeekFennimalPartnerDefault(mainTrials, phaseData);
+        orthogonalTrials = this.applyHideAndSeekFennimalPartnerDefault(orthogonalTrials, phaseData);
+        mainTrials = this.applyHatLaundryHatsToTrials(mainTrials);
+        orthogonalTrials = this.applyHatLaundryHatsToTrials(orthogonalTrials);
 
         mainTrials = this.applyPartnerBeliefInSituLureCycles(mainTrials, phaseData);
         orthogonalTrials = this.applyPartnerBeliefInSituLureCycles(orthogonalTrials, phaseData);
@@ -998,6 +1047,187 @@ class TrialGenerator {
                 errors.push(`${label} sets n_trials_to_sample, which is only allowed on retrieve_lost_box.`);
             }
 
+            if (phase.type === "hat_binding_task") {
+                if (!Array.isArray(phase.searched_triad) || phase.searched_triad.length !== 3) {
+                    errors.push(`${label} requires searched_triad: [F1, F2, F3].`);
+                }
+                if (!Array.isArray(phase.singletons) || phase.singletons.length === 0) {
+                    errors.push(`${label} requires a non-empty singletons array.`);
+                }
+                if (!Array.isArray(phase.binding_trials) || phase.binding_trials.length === 0) {
+                    errors.push(`${label} requires a non-empty binding_trials array.`);
+                }
+                if (!Array.isArray(phase.blocks) || phase.blocks.length === 0) {
+                    errors.push(`${label} requires a non-empty blocks array.`);
+                }
+                let allowedBinding = ["pair_based", "group_based", "control"];
+                if (!Array.isArray(phase.condition) || phase.condition.length === 0) {
+                    errors.push(
+                        `${label} requires condition: a non-empty array of "pair_based" | "group_based" | "control".`
+                    );
+                } else {
+                    phase.condition.forEach((c, i) => {
+                        if (!allowedBinding.includes(c)) {
+                            errors.push(
+                                `${label} condition[${i}] must be "pair_based", "group_based", or "control" (got "${c}").`
+                            );
+                        }
+                    });
+                    let uniqueConditions = [...new Set(phase.condition.filter((c) => allowedBinding.includes(c)))];
+                    uniqueConditions.forEach((cond) => {
+                        let n = phase.binding_trials.filter((trial) => {
+                            if (!trial) return false;
+                            if (Array.isArray(trial.conditions) && trial.conditions.length
+                                && !trial.conditions.includes(cond)) {
+                                return false;
+                            }
+                            let hasNested = !!(trial.pair_based || trial.group_based || trial.control);
+                            if (hasNested && !trial[cond] && (trial.cue == null || trial.cue === "")) {
+                                return false;
+                            }
+                            return true;
+                        }).length;
+                        if (n === 0) {
+                            errors.push(`${label} has no binding_trials for condition "${cond}".`);
+                        }
+                    });
+                }
+            }
+
+            if (phase.type === "chimera_feature_id") {
+                if (phase.names_options !== undefined && !Array.isArray(phase.names_options)) {
+                    errors.push(`${label} names_options must be an array of Fennimal ids when set.`);
+                }
+                if (!Array.isArray(phase.trials) || phase.trials.length === 0) {
+                    errors.push(`${label} requires a non-empty trials array (chimera trialset lives in stimulus settings).`);
+                } else {
+                    phase.trials.forEach((trial, i) => {
+                        if (!trial || !trial.id) {
+                            errors.push(`${label} trials[${i}] is missing an id.`);
+                        }
+                    });
+                }
+                let revealMode = phase.reveal_mode || "blur-silhouette";
+                let allowedReveal = ["blur-silhouette", "patchy-holes", "patchy-holes-with-pixalation"];
+                if (!allowedReveal.includes(revealMode)) {
+                    errors.push(
+                        `${label} reveal_mode must be ${allowedReveal.map((m) => `"${m}"`).join(" | ")} ` +
+                        `(got "${phase.reveal_mode}").`
+                    );
+                }
+                if (phase.skip_practice !== undefined && typeof phase.skip_practice !== "boolean") {
+                    errors.push(`${label} skip_practice must be true or false when set.`);
+                }
+                if (phase.trial_speed !== undefined && phase.trial_speed !== null && phase.trial_speed !== "") {
+                    let speed = Number(phase.trial_speed);
+                    if (!Number.isFinite(speed) || speed <= 0) {
+                        errors.push(`${label} trial_speed must be a positive number of milliseconds (got "${phase.trial_speed}").`);
+                    }
+                }
+            }
+
+            if (phase.type === "hat_drop_task" || phase.type === "hat_drop_gonogo") {
+                if (!Array.isArray(phase.trials) || phase.trials.length === 0) {
+                    errors.push(`${label} requires a non-empty trials array (hat-drop trialset lives in stimulus settings).`);
+                } else {
+                    let allowedInst = phase.type === "hat_drop_gonogo"
+                        ? ["cousin", "neighbour"]
+                        : ["most_similar", "cousin", "neighbour"];
+                    phase.trials.forEach((trial, i) => {
+                        if (!trial || !trial.id) {
+                            errors.push(`${label} trials[${i}] is missing an id.`);
+                        }
+                        if (!trial || !allowedInst.includes(trial.instruction)) {
+                            errors.push(`${label} trials[${i}] instruction must be ${allowedInst.map((k) => `"${k}"`).join(" | ")}.`);
+                        }
+                        if (!trial || !trial.dropped) {
+                            errors.push(`${label} trials[${i}] dropped must be a Fennimal id.`);
+                        }
+                        if (phase.type === "hat_drop_gonogo") {
+                            if (!trial || !trial.box) {
+                                errors.push(`${label} trials[${i}] box must be a Fennimal id.`);
+                            }
+                            let resp = trial && (trial.response != null ? trial.response : trial.correct);
+                            if (resp !== "go" && resp !== "nogo") {
+                                errors.push(`${label} trials[${i}] correct/response must be "go" or "nogo".`);
+                            }
+                        } else {
+                            let lure = trial && (trial.lure != null ? trial.lure : trial.incorrect);
+                            if (!trial || !trial.correct) {
+                                errors.push(`${label} trials[${i}] correct must be a Fennimal id.`);
+                            }
+                            if (!lure) {
+                                errors.push(`${label} trials[${i}] lure must be a Fennimal id.`);
+                            }
+                        }
+                    });
+                }
+                if (phase.skip_practice !== undefined && typeof phase.skip_practice !== "boolean") {
+                    errors.push(`${label} skip_practice must be true or false when set.`);
+                }
+                if (phase.n_reps !== undefined && phase.n_reps !== null && phase.n_reps !== "") {
+                    let reps = Number(phase.n_reps);
+                    if (!Number.isInteger(reps) || reps < 1) {
+                        errors.push(`${label} n_reps must be an integer >= 1 (got "${phase.n_reps}").`);
+                    }
+                }
+                if (phase.instruction_order !== undefined) {
+                    let allowed = phase.type === "hat_drop_gonogo"
+                        ? ["cousin", "neighbour"]
+                        : ["most_similar", "cousin", "neighbour"];
+                    if (!Array.isArray(phase.instruction_order) || phase.instruction_order.length === 0) {
+                        errors.push(`${label} instruction_order must be a non-empty array.`);
+                    } else {
+                        phase.instruction_order.forEach((key, i) => {
+                            if (!allowed.includes(key)) {
+                                errors.push(`${label} instruction_order[${i}] must be ${allowed.map((k) => `"${k}"`).join(" | ")} (got "${key}").`);
+                            }
+                        });
+                    }
+                }
+                ["min_points", "max_points", "total_fall_time", "preview_ms", "preview_travel_ms"].forEach((field) => {
+                    if (phase[field] !== undefined && phase[field] !== null && phase[field] !== "") {
+                        let n = Number(phase[field]);
+                        if (!Number.isFinite(n) || n < 0) {
+                            errors.push(`${label} ${field} must be a non-negative number (got "${phase[field]}").`);
+                        }
+                    }
+                });
+            }
+
+            if (phase.type === "Fennimal_attribute_sorting_task" && phase.on_fail) {
+                if (!phase.on_fail || typeof phase.on_fail !== "object" || Array.isArray(phase.on_fail)) {
+                    errors.push(`${label} on_fail must be an object.`);
+                } else {
+                    let failType = phase.on_fail.type || "phone_room";
+                    if (failType !== "phone_room") {
+                        errors.push(`${label} on_fail.type must be "phone_room" (got "${failType}").`);
+                    }
+                    if (phase.on_fail.interaction_type === undefined || phase.on_fail.interaction_type === null || phase.on_fail.interaction_type === "") {
+                        errors.push(`${label} on_fail.interaction_type is required.`);
+                    }
+                    if (phase.pass_if_errors_at_most !== undefined
+                        && (typeof phase.pass_if_errors_at_most !== "number" || phase.pass_if_errors_at_most < 0)) {
+                        errors.push(`${label} pass_if_errors_at_most must be a non-negative number.`);
+                    }
+                    if (phase.max_attempts !== undefined
+                        && (typeof phase.max_attempts !== "number" || phase.max_attempts < 1)) {
+                        errors.push(`${label} max_attempts must be a positive number.`);
+                    }
+                    try {
+                        let failSpec = JSON.parse(JSON.stringify(phase.on_fail));
+                        failSpec.type = failType;
+                        failSpec.Fennimals_encountered = failSpec.Fennimals_encountered
+                            || failSpec.Fennimals_asked
+                            || phase.Fennimals_asked
+                            || phase.Fennimals_encountered;
+                        this.validatePhaseTrialSpec(failSpec);
+                    } catch (err) {
+                        errors.push(`${label} on_fail: ${err && err.message ? err.message : err}`);
+                    }
+                }
+            }
+
             if (trialBasedTypes.has(phase.type)) {
                 try {
                     let clone = JSON.parse(JSON.stringify(phase));
@@ -1067,6 +1297,10 @@ class TrialGenerator {
             "name_recall_task",
             "card_sorting_task",
             "Fennimal_attribute_sorting_task",
+            "hat_binding_task",
+            "chimera_feature_id",
+            "hat_drop_task",
+            "hat_drop_gonogo",
             "pseudoday"
         ]);
     }
@@ -1086,7 +1320,9 @@ class TrialGenerator {
         return new Set([
             "fly_swat",
             "fly_swat_extended",
-            "reach_hat",
+            "hat_blown_away",
+            "hat_laundry",
+            "hide_and_seek_Fennimal",
             "find_box",
             "find_box_extended",
             "basic_intro",
@@ -1134,8 +1370,18 @@ class TrialGenerator {
 
         addList(phase.Fennimals_encountered, "Fennimals_encountered");
         addList(phase.Fennimals_asked, "Fennimals_asked");
+        if (phase.on_fail) {
+            addList(phase.on_fail.Fennimals_encountered, "on_fail.Fennimals_encountered");
+            addList(phase.on_fail.Fennimals_asked, "on_fail.Fennimals_asked");
+        }
         addList(phase.fennimals_asked, "fennimals_asked");
         addList(phase.displayed_icons, "displayed_icons");
+        addList(phase.searched_triad, "searched_triad");
+        addList(phase.unsearched_triad, "unsearched_triad");
+        addList(phase.singletons, "singletons");
+        addList(phase.names_options, "names_options");
+        addList(phase.hats, "hats");
+        addList(phase.retraining_fennimals, "retraining_fennimals");
 
         if (Array.isArray(phase.box_locations)) {
             phase.box_locations.forEach((entry, i) => {
@@ -1160,6 +1406,52 @@ class TrialGenerator {
         if (Array.isArray(phase.questions)) {
             phase.questions.forEach((q, qi) => {
                 if (q) addList(q.fennimals, `questions[${qi}].fennimals`);
+            });
+        }
+
+        if (Array.isArray(phase.binding_trials)) {
+            phase.binding_trials.forEach((trial, ti) => {
+                if (!trial) return;
+                add(trial.cue, `binding_trials[${ti}].cue`);
+                if (trial.pair_based) add(trial.pair_based.cue, `binding_trials[${ti}].pair_based.cue`);
+                if (trial.group_based) add(trial.group_based.cue, `binding_trials[${ti}].group_based.cue`);
+                if (trial.control) add(trial.control.cue, `binding_trials[${ti}].control.cue`);
+            });
+        }
+
+        if (phase.type === "hat_drop_task" || phase.type === "hat_drop_gonogo") {
+            (phase.trials || []).forEach((trial, i) => {
+                if (!trial) return;
+                add(trial.dropped, `trials[${i}].dropped`);
+                add(trial.lure, `trials[${i}].lure`);
+                add(trial.incorrect, `trials[${i}].incorrect`);
+                add(trial.box, `trials[${i}].box`);
+                if (trial.correct && trial.correct !== "go" && trial.correct !== "nogo") {
+                    add(trial.correct, `trials[${i}].correct`);
+                }
+            });
+        }
+
+        if (phase.type === "chimera_feature_id") {
+            const skipToken = (val) => {
+                if (val === undefined || val === null || val === "") return true;
+                let s = String(val).trim().toLowerCase();
+                return s === "none" || s === "neutral" || s === "null";
+            };
+            (phase.trials || []).forEach((trial, i) => {
+                if (!trial) return;
+                if (!skipToken(trial.region)) add(trial.region, `trials[${i}].region`);
+                if (!skipToken(trial.head)) add(trial.head, `trials[${i}].head`);
+                if (!skipToken(trial.object != null ? trial.object : trial.hat)) {
+                    add(trial.object != null ? trial.object : trial.hat, `trials[${i}].object`);
+                }
+                if (!skipToken(trial.answer)) add(trial.answer, `trials[${i}].answer`);
+            });
+        }
+
+        if (Array.isArray(phase.blocks)) {
+            phase.blocks.forEach((block, bi) => {
+                if (block) addList(block.retraining_fennimals, `blocks[${bi}].retraining_fennimals`);
             });
         }
 
@@ -1223,6 +1515,10 @@ class TrialGenerator {
 
         add(phase.interaction_type, "interaction_type");
         add(phase.included_orthogonal_tasks, "included_orthogonal_tasks");
+        if (phase.on_fail) {
+            add(phase.on_fail.interaction_type, "on_fail.interaction_type");
+            add(phase.on_fail.included_orthogonal_tasks, "on_fail.included_orthogonal_tasks");
+        }
         if (Array.isArray(phase.trial_subblocks)) {
             phase.trial_subblocks.forEach((sb, si) => {
                 if (!sb) return;
@@ -1300,6 +1596,12 @@ class TrialGenerator {
 
             let trial = JSON.parse(JSON.stringify(fenArr[0]));
             trial.interaction_type = trialSpec.interaction_type;
+            if (trialSpec.interaction_type === "hat_laundry" && !trial.hat) {
+                throw new Error(
+                    `TrialGenerator: interaction_type "hat_laundry" requires a Fennimal with a hat ` +
+                    `(phase type "${phaseData.type}", trials[${trialIndex}], Fennimal "${trialSpec.Fennimal}").`
+                );
+            }
             if (trialSpec.interaction_type === "scan_box_home") {
                 trial.skip_phone_room_autotravel = true;
             }
@@ -1684,6 +1986,15 @@ class TrialGenerator {
                 type,
                 JSON.parse(JSON.stringify(baseFennimalSet))
             );
+            if (type === "hat_laundry") {
+                newSet = newSet.filter((trial) => !!trial.hat);
+                if (newSet.length === 0) {
+                    throw new Error(
+                        `TrialGenerator: interaction_type "hat_laundry" requires Fennimals with hats ` +
+                        `(phase type "${phaseData.type}").`
+                    );
+                }
+            }
             newSet.forEach(trial => {
                 this.applyPhaseHintTypeIfNeeded(trial, phaseData);
                 if (type === "scan_box_home") {
@@ -1821,6 +2132,48 @@ class TrialGenerator {
         return trials;
     }
 
+    applyHideAndSeekFennimalPartnerDefault(trials, phaseData) {
+        if (!trials || trials.length === 0) return trials;
+        trials.forEach((trial) => {
+            if (!trial || trial.interaction_type !== "hide_and_seek_Fennimal") return;
+            if (trial.partner_behavior === undefined && phaseData && phaseData.partner_behavior !== undefined) {
+                trial.partner_behavior = phaseData.partner_behavior;
+            }
+        });
+        return trials;
+    }
+
+    /**
+     * Unique hats among Fennimals in the same subblock/cohort, stamped onto hat_laundry trials.
+     */
+    applyHatLaundryHatsToTrials(trials) {
+        if (!trials || trials.length === 0) return trials;
+
+        let bySubblock = {};
+        trials.forEach((trial) => {
+            if (!trial) return;
+            let key = (trial.trial_subblock_index != null) ? String(trial.trial_subblock_index) : "all";
+            if (!bySubblock[key]) bySubblock[key] = [];
+            bySubblock[key].push(trial);
+        });
+
+        Object.keys(bySubblock).forEach((key) => {
+            let cohort = bySubblock[key];
+            let hats = [];
+            cohort.forEach((trial) => {
+                if (trial.hat && !hats.includes(trial.hat)) hats.push(trial.hat);
+            });
+            cohort.forEach((trial) => {
+                if (trial.interaction_type !== "hat_laundry") return;
+                let list = hats.slice();
+                if (trial.hat && !list.includes(trial.hat)) list.push(trial.hat);
+                trial.laundry_hats = list;
+            });
+        });
+
+        return trials;
+    }
+
     applyAskBoxSettingsToTrials(trials, phaseData) {
         if (!phaseData.ask_box || !trials || trials.length === 0) return trials;
 
@@ -1925,6 +2278,73 @@ class TrialGenerator {
     }
 
     /**
+     * Photo trials: withhold the name in camera prompts; the polaroid caption introduces it.
+     */
+    applyIntroduceNameOnPolaroidToTrials(trials, phaseData) {
+        if (!phaseData.introduce_name_on_polaroid || !trials || trials.length === 0) return trials;
+        return set_property_to_all_elem_in_arr("introduce_name_on_polaroid", true, trials);
+    }
+
+    /**
+     * Stamp ask_name onto all trials. names_asked defaults to unique names of Fennimals in the phase.
+     * Singleton sets widen to all experiment Fennimal names.
+     */
+    applyAskNameSettingsToTrials(trials, phaseData) {
+        if (!phaseData.ask_name || !trials || trials.length === 0) return trials;
+
+        let names = Array.isArray(phaseData.names_asked) && phaseData.names_asked.length > 0
+            ? [...phaseData.names_asked]
+            : this.collectUniqueAttributeFromPhaseFennimals(phaseData, "name");
+
+        names = this.expandSingletonAskOptions(names, {
+            experimentOptions: this.stimuli.get_all_x_encountered_during_experiment("name"),
+            softwareOptions: null,
+        });
+
+        if (!names || names.length === 0) {
+            console.warn("ask_name is true but no names_asked / phase Fennimal names could be resolved");
+            names = [];
+        }
+
+        trials = set_property_to_all_elem_in_arr("ask_name", true, trials);
+        trials = set_property_to_all_elem_in_arr("names_asked", names, trials);
+        return trials;
+    }
+
+    /**
+     * Stamp ask_hat onto all trials. hats_asked defaults to unique hats of Fennimals in the phase.
+     * Explicit hats_asked codes are mapped via FeatureMap. Singleton sets widen to experiment hats,
+     * then the SVG hat catalog.
+     */
+    applyAskHatSettingsToTrials(trials, phaseData) {
+        if (!phaseData.ask_hat || !trials || trials.length === 0) return trials;
+
+        let hatsAskedMapped;
+        if (Array.isArray(phaseData.hats_asked) && phaseData.hats_asked.length > 0) {
+            hatsAskedMapped = this.stimuli.get_assigned_names_of_code_array("hat", phaseData.hats_asked);
+            if (!hatsAskedMapped || hatsAskedMapped.includes(false) || hatsAskedMapped.some((h) => !h)) {
+                console.warn("ask_hat: failed to map hats_asked codes", phaseData.hats_asked);
+                hatsAskedMapped = (hatsAskedMapped || []).filter((h) => h);
+            }
+        } else {
+            hatsAskedMapped = this.collectUniqueAttributeFromPhaseFennimals(phaseData, "hat");
+        }
+
+        hatsAskedMapped = this.expandSingletonAskOptions(hatsAskedMapped, {
+            experimentOptions: this.stimuli.get_all_x_encountered_during_experiment("hat"),
+            softwareOptions: this.stimuli.get_all_software_options_of_type("hat"),
+        });
+
+        if (hatsAskedMapped.length === 0) {
+            console.warn("ask_hat is true but no hats_asked / phase hats could be resolved");
+        }
+
+        trials = set_property_to_all_elem_in_arr("ask_hat", true, trials);
+        trials = set_property_to_all_elem_in_arr("hats_asked", hatsAskedMapped, trials);
+        return trials;
+    }
+
+    /**
      * found_toy trials introduce a new Fennimal for packing only — skip identity/toy quizzes.
      */
     stripAskFlagsForSpecialRoles(trials) {
@@ -1933,6 +2353,8 @@ class TrialGenerator {
             if (trial && trial.special_role === "found_toy") {
                 trial.ask_Fennimal = false;
                 trial.ask_toy = false;
+                trial.ask_name = false;
+                trial.ask_hat = false;
             }
         });
         return trials;
@@ -1991,53 +2413,82 @@ class TrialGenerator {
         return oTrials;
     }
 
-    smartShuffleTrials(mainTrials, orthogonalTrials) {
-        // 1. Dump EVERYTHING into one single pool right away and shuffle it completely
-        let combinedPool = [...mainTrials, ...orthogonalTrials];
-        let remainingPool = shuffleArray(combinedPool);
+    trialsShareIdentityCue(a, b) {
+        if (!a || !b) return false;
+        if (a.id != null && b.id != null && String(a.id) === String(b.id)) return true;
+        if (a.region != null && b.region != null && String(a.region) === String(b.region)) return true;
+        if (a.head != null && b.head != null && String(a.head) === String(b.head)) return true;
+        return false;
+    }
 
+    countAdjacentIdentityCueConflicts(sequence) {
+        let n = 0;
+        for (let i = 1; i < sequence.length; i++) {
+            if (this.trialsShareIdentityCue(sequence[i - 1], sequence[i])) n++;
+        }
+        return n;
+    }
+
+    greedyShuffleAvoidingAdjacentIdentityCues(shuffledPool) {
+        let remainingPool = shuffledPool.slice();
         let sequence = [];
 
-        // 2. Smart Shuffle Loop
         while (remainingPool.length > 0) {
-            let lastId = sequence.length > 0 ? sequence[sequence.length - 1].id : null;
-            let nextIndex = remainingPool.findIndex(item => item.id !== lastId);
+            let lastItem = sequence.length > 0 ? sequence[sequence.length - 1] : null;
+            let nextIndex = remainingPool.findIndex((item) => !this.trialsShareIdentityCue(item, lastItem));
 
             if (nextIndex !== -1) {
-                // Perfect fit: We found a trial with a different Fennimal ID
                 sequence.push(remainingPool.splice(nextIndex, 1)[0]);
-            } else {
-                // Collision! All remaining items in the pool belong to the exact same Fennimal.
-                let problematicItem = remainingPool.shift();
-                let swapped = false;
+                continue;
+            }
 
-                // Look backwards through our already built sequence to find a safe place to swap it into
-                for (let j = 0; j < sequence.length - 1; j++) {
-                    let prevId = j > 0 ? sequence[j - 1].id : null;
-                    let nextId = sequence[j + 1].id;
-                    let candidateToMoveToEnd = sequence[j];
+            let problematicItem = remainingPool.shift();
+            let swapped = false;
+            let lastIdItem = sequence.length > 0 ? sequence[sequence.length - 1] : null;
 
-                    // Can we safely wedge the problematic item between index j-1 and j+1?
-                    if (problematicItem.id !== prevId && problematicItem.id !== nextId) {
-                        // If we move the item currently sitting at j to the very end, will it collide?
-                        if (candidateToMoveToEnd.id !== lastId) {
-                            // Swap successful!
-                            sequence.splice(j, 1, problematicItem);
-                            sequence.push(candidateToMoveToEnd);
-                            swapped = true;
-                            break;
-                        }
-                    }
-                }
+            for (let j = 0; j < sequence.length - 1; j++) {
+                let prevItem = j > 0 ? sequence[j - 1] : null;
+                let nextItem = sequence[j + 1];
+                let candidateToMoveToEnd = sequence[j];
 
-                if (!swapped) {
-                    // Give up: It is mathematically impossible to separate them (e.g. four S1s in a 6-item list)
-                    sequence.push(problematicItem);
+                if (
+                    !this.trialsShareIdentityCue(problematicItem, prevItem)
+                    && !this.trialsShareIdentityCue(problematicItem, nextItem)
+                    && !this.trialsShareIdentityCue(candidateToMoveToEnd, lastIdItem)
+                ) {
+                    sequence.splice(j, 1, problematicItem);
+                    sequence.push(candidateToMoveToEnd);
+                    swapped = true;
+                    break;
                 }
             }
+
+            if (!swapped) sequence.push(problematicItem);
         }
 
         return sequence;
+    }
+
+    smartShuffleTrials(mainTrials, orthogonalTrials) {
+        // Avoid consecutive trials that share a Fennimal id, region, or head.
+        let combinedPool = [...mainTrials, ...orthogonalTrials];
+        if (combinedPool.length <= 1) return combinedPool;
+
+        let best = null;
+        let bestConflicts = Infinity;
+        let attempts = Math.min(48, Math.max(12, combinedPool.length * 4));
+
+        for (let i = 0; i < attempts; i++) {
+            let sequence = this.greedyShuffleAvoidingAdjacentIdentityCues(shuffleArray(combinedPool.slice()));
+            let conflicts = this.countAdjacentIdentityCueConflicts(sequence);
+            if (conflicts < bestConflicts) {
+                best = sequence;
+                bestConflicts = conflicts;
+                if (conflicts === 0) break;
+            }
+        }
+
+        return best || combinedPool;
     }
 }
 
@@ -2121,6 +2572,7 @@ class ExperimentController {
 
         this.currentTrial = null;
         this.currentFennimal = null;
+        this.sortingCriterionState = null;
 
         this.flagExplorationPhaseCompleted = false;
         this.flagHintAndSearchInstructionsShown = false;
@@ -2319,16 +2771,48 @@ class ExperimentController {
                 this.instrCont.startCardSortingTask(this.currentDayNum, this.currentPhaseData.SpecialSettings);
                 break;
             case "Fennimal_attribute_sorting_task":
-                let fensToAsk = this.currentPhaseData.Fennimals_asked || this.currentPhaseData.Fennimals_encountered;
-                let maxStars = this.currentPhaseData.maximum_bonus_stars_earned !== undefined ? this.currentPhaseData.maximum_bonus_stars_earned : this.currentPhaseData.maximum_earnable_stars;
-
-                this.instrCont.startFennimalAttributeSortingTask(
-                    this.currentDayNum,
-                    this.stimuli.get_Fennimals_in_array(fensToAsk),
-                    this.currentPhaseData.attribute_order,
-                    maxStars,
-                    this.currentPhaseData.presentation
-                );
+                this.launchFennimalAttributeSortingTask();
+                break;
+            case "hat_binding_task":
+                this.flagHatBindingInstructionsShown = false;
+                if (this.currentPhaseData.skip_instructions === true) {
+                    this.flagHatBindingInstructionsShown = true;
+                    this.setupHatBindingPhase();
+                } else {
+                    this.instrCont.initializeHatBindingInstructions(
+                        this.currentDayNum,
+                        this.currentPhaseData.day_title,
+                        this.currentPhaseData.day_body
+                    );
+                }
+                break;
+            case "chimera_feature_id":
+                this.flagChimeraFeatureIdInstructionsShown = false;
+                if (this.currentPhaseData.skip_instructions === true) {
+                    this.flagChimeraFeatureIdInstructionsShown = true;
+                    this.setupChimeraFeatureIdPhase();
+                } else {
+                    this.instrCont.initializeChimeraFeatureIdInstructions(
+                        this.currentDayNum,
+                        this.currentPhaseData.day_title,
+                        this.currentPhaseData.day_body
+                    );
+                }
+                break;
+            case "hat_drop_task":
+            case "hat_drop_gonogo":
+                this.flagHatDropInstructionsShown = false;
+                if (this.currentPhaseData.skip_instructions === true) {
+                    this.flagHatDropInstructionsShown = true;
+                    this.setupHatDropPhase();
+                } else {
+                    this.instrCont.initializeHatDropInstructions(
+                        this.currentDayNum,
+                        this.currentPhaseData.day_title,
+                        this.currentPhaseData.day_body,
+                        this.currentPhaseData.type
+                    );
+                }
                 break;
             case "pseudoday":
                 if (this.currentPhaseData.information === "new_Fennimals_spotted") {
@@ -2438,6 +2922,136 @@ class ExperimentController {
             this
         );
         currentTask.start_sequence();
+    }
+
+    setupHatBindingPhase() {
+        this.mapCont.disable_map_interactions();
+        document.getElementById("Map").style.display = "inherit";
+        if (typeof Interface !== "undefined" && Interface.FenneFinder && Interface.FenneFinder.hide) {
+            Interface.FenneFinder.hide();
+        }
+
+        this.currentPhaseData.Data = [];
+        let pLayer = document.getElementById("Fennimals_Layer");
+        let currentTask = new HatBindingTaskController(
+            pLayer,
+            this.currentPhaseData,
+            () => {
+                this.currentPhaseData.Data = this.currentPhaseData.answers || [];
+                currentTask.clean_up();
+                clear_Fennimals_interaction_layer();
+                document.getElementById("Map").style.display = "inherit";
+                this.phaseCompleted();
+            },
+            this
+        );
+        currentTask.start_sequence();
+    }
+
+    setupChimeraFeatureIdPhase() {
+        this.mapCont.disable_map_interactions();
+        if (this.mapCont.hide_request_instructions_button) this.mapCont.hide_request_instructions_button();
+        document.getElementById("Map").style.display = "none";
+        let iface = document.getElementById("Interface");
+        if (iface) iface.style.display = "inherit";
+        if (typeof Interface !== "undefined" && Interface.FenneFinder && Interface.FenneFinder.hide) {
+            Interface.FenneFinder.hide();
+        }
+
+        this.currentPhaseData.Data = [];
+        let pLayer = document.getElementById("Fennimals_Layer");
+        if (pLayer) pLayer.style.display = "inherit";
+        if (this.mapCont && this.mapCont.Map_Layer) this.mapCont.Map_Layer.style.display = "none";
+        this.mapCont.hide_all_locations();
+        this.mapCont.currently_in_location = false;
+
+        let currentTask = new ChimeraFeatureIdController(
+            pLayer,
+            this.currentPhaseData,
+            () => {
+                this.currentPhaseData.Data = this.currentPhaseData.answers || [];
+                currentTask.clean_up();
+                this.chimeraCont = null;
+                clear_Fennimals_interaction_layer();
+                document.getElementById("Map").style.display = "inherit";
+                this.phaseCompleted();
+            },
+            this
+        );
+        this.chimeraCont = currentTask;
+        currentTask.start_sequence();
+    }
+
+    setupHatDropPhase() {
+        this.mapCont.disable_map_interactions();
+        if (this.mapCont.hide_request_instructions_button) this.mapCont.hide_request_instructions_button();
+        document.getElementById("Map").style.display = "none";
+        let iface = document.getElementById("Interface");
+        if (iface) iface.style.display = "inherit";
+        if (typeof Interface !== "undefined" && Interface.FenneFinder && Interface.FenneFinder.hide) {
+            Interface.FenneFinder.hide();
+        }
+
+        this.currentPhaseData.Data = [];
+        let pLayer = document.getElementById("Fennimals_Layer");
+        if (pLayer) pLayer.style.display = "inherit";
+        if (this.mapCont && this.mapCont.Map_Layer) this.mapCont.Map_Layer.style.display = "none";
+        this.mapCont.hide_all_locations();
+        this.mapCont.currently_in_location = false;
+
+        let currentTask = new HatDropTaskController(
+            pLayer,
+            this.currentPhaseData,
+            () => {
+                this.currentPhaseData.Data = this.currentPhaseData.answers || [];
+                currentTask.clean_up();
+                this.hatDropCont = null;
+                clear_Fennimals_interaction_layer();
+                document.getElementById("Map").style.display = "inherit";
+                this.phaseCompleted();
+            },
+            this
+        );
+        this.hatDropCont = currentTask;
+        currentTask.start_sequence();
+    }
+
+    _chimeraRevealMapThen(next) {
+        this.mapCont.disable_map_interactions();
+        if (this.mapCont.hide_request_instructions_button) this.mapCont.hide_request_instructions_button();
+        if (this.mapCont.remove_all_action_buttons) this.mapCont.remove_all_action_buttons();
+        let layer = document.getElementById("Fennimals_Layer");
+        if (layer) layer.style.display = "none";
+
+        const showMap = () => {
+            this.mapCont.Map_Layer.style.display = "inherit";
+            this.mapCont.hide_all_locations();
+            this.mapCont.currently_in_location = false;
+            next();
+        };
+
+        if (this.mapCont.currently_in_location) {
+            this.mapCont.flash_location_transition_mask(this.mapCont.current_region);
+            setTimeout(showMap, 0.5 * GenParam.map_to_location_transition_speed);
+        } else {
+            showMap();
+        }
+    }
+
+    prepareChimeraTrialTravel(trial, prevTrial) {
+        return new Promise((resolve) => {
+            this.mapCont.disable_map_interactions();
+            if (this.mapCont.hide_request_instructions_button) this.mapCont.hide_request_instructions_button();
+            this.mapCont.Map_Layer.style.display = "none";
+            this.mapCont.hide_all_locations();
+            this.mapCont.currently_in_location = false;
+            let layer = document.getElementById("Fennimals_Layer");
+            if (layer) layer.style.display = "inherit";
+            if (typeof Interface !== "undefined" && Interface.player_moved_to_new_region) {
+                Interface.player_moved_to_new_region("Home");
+            }
+            resolve("overlay");
+        });
     }
 
     checkIfFennefinderShouldBeShown() {
@@ -2667,6 +3281,7 @@ class ExperimentController {
     }
 
     phoneRoomReturnCompleted() {
+        this.mapCont.autoTravelActive = false;
         this.mapCont.disable_map_interactions();
         this.mapCont.remove_all_action_buttons();
         this.mapCont.hide_request_instructions_button();
@@ -2701,6 +3316,11 @@ class ExperimentController {
             this.currentFennimal = null;
         }
         clear_Fennimals_interaction_layer();
+
+        if (this.sortingCriterionState && this.sortingCriterionState.awaitingRemedial) {
+            this.finishSortingCriterionRemedial();
+            return;
+        }
 
         // Legacy star logic for trial-based phases
         let totalBonusStarsEarned = 0, maxBonusStars = 0;
@@ -2843,6 +3463,25 @@ class ExperimentController {
                     this.setupPartnerBeliefIndividualBoxesPhase();
                 }
                 break;
+            case "hat_binding_task":
+                if (!this.flagHatBindingInstructionsShown) {
+                    this.flagHatBindingInstructionsShown = true;
+                    this.setupHatBindingPhase();
+                }
+                break;
+            case "chimera_feature_id":
+                if (!this.flagChimeraFeatureIdInstructionsShown) {
+                    this.flagChimeraFeatureIdInstructionsShown = true;
+                    this.setupChimeraFeatureIdPhase();
+                }
+                break;
+            case "hat_drop_task":
+            case "hat_drop_gonogo":
+                if (!this.flagHatDropInstructionsShown) {
+                    this.flagHatDropInstructionsShown = true;
+                    this.setupHatDropPhase();
+                }
+                break;
             case "pseudoday":
                 this.startNextExperimentPhase();
                 break;
@@ -2882,6 +3521,17 @@ class ExperimentController {
     }
 
     enteringLocation(location) {
+        if (this.currentPhaseType === "chimera_feature_id") {
+            let layer = document.getElementById("Fennimals_Layer");
+            if (layer) layer.style.display = "inherit";
+            if (this._chimeraEnterResolve) {
+                let done = this._chimeraEnterResolve;
+                this._chimeraEnterResolve = null;
+                done();
+            }
+            return;
+        }
+
         let fennimalObject = WorldState.get_reference_to_Fennimal_object_at_location(location);
         if (fennimalObject) {
             if (fennimalObject.visited === false || fennimalObject.visited === undefined) {
@@ -3155,10 +3805,16 @@ class ExperimentController {
     }
 
     sortingTaskCompleted(data) {
-        this.currentPhaseData.Errors = JSON.parse(JSON.stringify(data));
+        let errors = JSON.parse(JSON.stringify(data || []));
+        this.currentPhaseData.Errors = errors;
+
+        if (this.isSortingCriterionPhase(this.currentPhaseData)) {
+            this.handleSortingCriterionAttempt(errors);
+            return;
+        }
 
         if (this.currentPhaseData.maximum_earnable_stars > 0) {
-            let starsEarned = Math.max(0, this.currentPhaseData.maximum_earnable_stars - data.length);
+            let starsEarned = Math.max(0, this.currentPhaseData.maximum_earnable_stars - errors.length);
             this.dataCont.recordStarsEarned(this.currentDayNum, "Sorting Task", starsEarned, this.currentPhaseData.maximum_earnable_stars);
             this.currentPhaseData.bonus_stars_earned = starsEarned; // Good practice to attach it here too
         }
@@ -3166,6 +3822,152 @@ class ExperimentController {
         // Store AFTER calculating stars
         this.dataCont.storePhaseData(this.currentPhaseData);
         this.startNextExperimentPhase();
+    }
+
+    isSortingCriterionPhase(phase) {
+        return !!(phase && phase.type === "Fennimal_attribute_sorting_task" && (phase.on_fail || phase.max_attempts));
+    }
+
+    launchFennimalAttributeSortingTask() {
+        let fensToAsk = this.currentPhaseData.Fennimals_asked || this.currentPhaseData.Fennimals_encountered;
+        let maxStars = this.currentPhaseData.maximum_bonus_stars_earned !== undefined
+            ? this.currentPhaseData.maximum_bonus_stars_earned
+            : this.currentPhaseData.maximum_earnable_stars;
+
+        this.instrCont.startFennimalAttributeSortingTask(
+            this.currentDayNum,
+            this.stimuli.get_Fennimals_in_array(fensToAsk),
+            this.currentPhaseData.attribute_order,
+            maxStars,
+            this.currentPhaseData.presentation
+        );
+    }
+
+    handleSortingCriterionAttempt(errors) {
+        let phase = this.currentPhaseData;
+        if (!Array.isArray(phase.quiz_attempts)) phase.quiz_attempts = [];
+
+        let passAtMost = (typeof phase.pass_if_errors_at_most === "number") ? phase.pass_if_errors_at_most : 0;
+        let maxAttempts = (typeof phase.max_attempts === "number") ? phase.max_attempts : 3;
+        let passed = errors.length <= passAtMost;
+        let attemptIndex = phase.quiz_attempts.length + 1;
+
+        phase.quiz_attempts.push({
+            attempt: attemptIndex,
+            n_errors: errors.length,
+            passed: passed,
+            errors: errors
+        });
+
+        if (passed) {
+            this.finishSortingCriterion(true);
+            return;
+        }
+
+        if (attemptIndex < maxAttempts && phase.on_fail) {
+            this.instrCont.showSortingCriterionRetryPage();
+            return;
+        }
+
+        this.finishSortingCriterion(false);
+    }
+
+    finishSortingCriterion(passed) {
+        let phase = this.currentPhaseData;
+        let maxStars = (typeof phase.maximum_earnable_stars === "number") ? phase.maximum_earnable_stars : 0;
+        let starsEarned = passed ? maxStars : 0;
+
+        phase.quiz_passed = passed;
+        phase.bonus_stars_earned = starsEarned;
+        this.sortingCriterionState = null;
+
+        if (maxStars > 0) {
+            this.dataCont.recordStarsEarned(this.currentDayNum, "Sorting Task", starsEarned, maxStars);
+        }
+        this.dataCont.storePhaseData(phase);
+
+        if (passed) {
+            this.startNextExperimentPhase();
+            return;
+        }
+
+        this.instrCont.showSortingCriterionFailPage();
+    }
+
+    startSortingCriterionRemedial() {
+        if (this.instrCont) this.instrCont.clearInstructions();
+
+        let host = this.currentPhaseData;
+        let spec = JSON.parse(JSON.stringify(host.on_fail || {}));
+        spec.type = spec.type || "phone_room";
+        spec.interaction_type = spec.interaction_type || "photo_Fennimal";
+        spec.Fennimals_encountered = spec.Fennimals_encountered
+            || spec.Fennimals_asked
+            || host.Fennimals_asked
+            || host.Fennimals_encountered;
+        if (spec.skip_instructions !== false) spec.skip_instructions = true;
+        if (spec.include_Fennefinder !== true) spec.include_Fennefinder = false;
+        if (spec.return_to_phone_room_after_final_trial !== false) spec.return_to_phone_room_after_final_trial = true;
+        if (spec.partner_behavior === undefined) spec.partner_behavior = "absent";
+
+        this.sortingCriterionState = {
+            hostPhase: host,
+            hostDayNum: this.currentDayNum,
+            hostPhaseNum: this.currentPhaseNum,
+            awaitingRemedial: true
+        };
+
+        this.currentPhaseData = spec;
+        this.currentPhaseType = spec.type;
+        this.currentInteractionNumInPhase = 0;
+        this.waitingForPhoneRoomHintToClose = false;
+
+        WorldState.clear_all_locations(true);
+        WorldState.change_partner_role_behavior(spec.partner_behavior || null);
+        if (this.mapCont && this.mapCont.Partner && this.mapCont.Partner.update_behavior) {
+            this.mapCont.Partner.update_behavior();
+        }
+
+        this.setupTrialBasedPhase();
+        this.flagPhoneRoomInstructionsShown = true;
+        this.startNextTrialInPhoneRoomPhase();
+    }
+
+    finishSortingCriterionRemedial() {
+        let state = this.sortingCriterionState;
+        let host = state && state.hostPhase;
+        if (!host) {
+            this.sortingCriterionState = null;
+            this.startNextExperimentPhase();
+            return;
+        }
+
+        let remedial = this.currentPhaseData;
+        if (!Array.isArray(host.remedial_runs)) host.remedial_runs = [];
+        host.remedial_runs.push({
+            after_attempt: (host.quiz_attempts || []).length,
+            type: remedial.type,
+            interaction_type: remedial.interaction_type,
+            Data: remedial.Data || []
+        });
+
+        this.currentPhaseData = host;
+        this.currentPhaseType = "Fennimal_attribute_sorting_task";
+        this.currentDayNum = state.hostDayNum;
+        this.currentPhaseNum = state.hostPhaseNum;
+        this.sortingCriterionState.awaitingRemedial = false;
+
+        this.mapCont.reset_map_to_player_in_center();
+        this.mapCont.disable_map_interactions();
+        this.launchFennimalAttributeSortingTask();
+    }
+
+    sortingCriterionFailedContinue() {
+        this.remainingExperimentPhases = [];
+        if (this.dataCont && this.dataCont.experimentData) {
+            this.dataCont.experimentData.quiz_criterion_failed = true;
+        }
+        this.startPostExperimentQuestionnaire();
     }
 
     questionnairePageCompleted(pageData) {
@@ -3178,7 +3980,12 @@ class ExperimentController {
             return false;
         }
 
-        return this.stimulusSettings.Experiment_Structure.some(phase => phase.type === phaseType);
+        return this.stimulusSettings.Experiment_Structure.some((phase) => {
+            if (!phase) return false;
+            if (phase.type === phaseType) return true;
+            if (phase.on_fail && phase.on_fail.type === phaseType) return true;
+            return false;
+        });
     }
 
     submitExperiment() {

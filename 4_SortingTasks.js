@@ -1,4 +1,32 @@
 // --- HELPER FUNCTIONS ---
+function getVisualBBoxInSvg(element) {
+    let svg = element.ownerSVGElement;
+    try {
+        if (!svg || !svg.getScreenCTM) return element.getBBox();
+        let r = element.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0) return element.getBBox();
+        let inv = svg.getScreenCTM().inverse();
+        let a = svg.createSVGPoint();
+        a.x = r.left;
+        a.y = r.top;
+        let b = svg.createSVGPoint();
+        b.x = r.right;
+        b.y = r.bottom;
+        a = a.matrixTransform(inv);
+        b = b.matrixTransform(inv);
+        let x = Math.min(a.x, b.x);
+        let y = Math.min(a.y, b.y);
+        return {
+            x: x,
+            y: y,
+            width: Math.abs(b.x - a.x),
+            height: Math.abs(b.y - a.y)
+        };
+    } catch (e) {
+        return element.getBBox();
+    }
+}
+
 function alignSVGElementToTarget(element, targetCx, targetCy, maxW, maxH, anchorMode = "center") {
     let retryCount = 0;
 
@@ -7,7 +35,11 @@ function alignSVGElementToTarget(element, targetCx, targetCy, maxW, maxH, anchor
         element.removeAttribute("transform");
         element.style.transform = "";
 
-        let box = element.getBBox();
+        // Prefer the painted box (includes CSS transforms on Fennimal head/hat).
+        let box = getVisualBBoxInSvg(element);
+        if (!box || box.width <= 0 || box.height <= 0) {
+            try { box = element.getBBox(); } catch (e) { box = { width: 0, height: 0 }; }
+        }
 
         // If the browser has actually rendered the SVG and given it dimensions...
         if (box.width > 0 && box.height > 0) {
@@ -22,6 +54,8 @@ function alignSVGElementToTarget(element, targetCx, targetCy, maxW, maxH, anchor
                 scale *= 1.4;
             } else if (anchorMode === "head") {
                 scale *= 0.9;
+            } else if (anchorMode === "hat") {
+                scale *= 1.05;
             } else if (anchorMode === "bottom_edge") {
                 // Ignore internal 0,0 and anchor the absolute lowest measured pixel
                 boxCy = box.y + box.height;
@@ -85,6 +119,7 @@ class FennimalAttributeSortingTaskBase {
         this.mainDiv.style.width = "100%";
         this.mainDiv.style.height = "100%";
         this.mainDiv.style.position = "relative";
+        this.mainDiv.style.overflow = "visible";
         this.mainForeign.appendChild(this.mainDiv);
 
         this.reservoirDiv = document.createElement("div");
@@ -110,6 +145,7 @@ class FennimalAttributeSortingTaskBase {
         this.targetDiv.style.justifyContent = "center";
         this.targetDiv.style.alignContent = "flex-start";
         this.targetDiv.style.gap = "20px";
+        this.targetDiv.style.overflow = "visible";
         this.mainDiv.appendChild(this.targetDiv);
 
         if (this.maxEarnableStars > 0) {
@@ -527,19 +563,63 @@ class FennimalAttributeSortingSingleTask extends FennimalAttributeSortingTaskBas
     completeCurrentFennimalPage() {
         this.setCardsLocked(true);
         this.clearReservoirCards();
-        this.celebrateBoxes(this.targetBoxes, () => {
+        if (this.titleElem) {
+            this.titleElem.innerHTML = `Well done — that's ${this.currentFenObj.name}!`;
+        }
+        AudioCont.play_sound_effect("positive");
+        this.celebrateCompletedCard(() => {
+            this.dismissCelebratedCard();
             this.currentFennimalIndex++;
             if (this.currentFennimalIndex >= this.pageOrder.length) {
                 this.showContinueButtonAndFinish();
                 return;
             }
-            // Extra beat after celebration so participants can reflect before the next Fennimal.
-            setTimeout(() => {
-                this.currentAttributeIndex = 0;
-                this.buildCurrentFennimalPage();
-                this.startNextAttribute();
-            }, 2000);
+            this.currentAttributeIndex = 0;
+            this.buildCurrentFennimalPage();
+            this.startNextAttribute();
         });
+    }
+
+    dismissCelebratedCard() {
+        if (this.targetDiv) this.targetDiv.innerHTML = "";
+        this.targetBoxes = [];
+    }
+
+    celebrateCompletedCard(thenContinue) {
+        let box = this.targetBoxes[0];
+        if (!box || !box.boxDiv) {
+            this.celebrateBoxes(this.targetBoxes, thenContinue);
+            return;
+        }
+
+        let card = box.boxDiv;
+        // Stay in the original flex layout so size/position stay in SVG CSS space.
+        card.style.transformOrigin = "center center";
+        card.style.zIndex = "200";
+        card.style.opacity = "1";
+        card.style.transition = "transform 480ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 480ms ease, border-color 300ms ease, opacity 400ms ease";
+
+        requestAnimationFrame(() => {
+            card.style.transform = "translateY(-22%) scale(1.2)";
+            card.style.borderColor = "gold";
+            card.style.boxShadow = "0px 24px 48px rgba(255, 215, 0, 0.55)";
+        });
+
+        if (typeof spawn_confetti_burst === "function") {
+            spawn_confetti_burst(
+                this.parentElem,
+                0.5 * GenParam.SVG_width,
+                0.48 * GenParam.SVG_height,
+                { count: 22, awaitPopMs: 0 }
+            );
+        }
+
+        setTimeout(() => {
+            card.style.opacity = "0";
+            setTimeout(() => {
+                if (thenContinue) thenContinue();
+            }, 420);
+        }, 1400);
     }
 }
 
@@ -577,9 +657,15 @@ class FennimalSortingTargetSceneBox {
         this.sceneState = {
             bg: !this.attributesToAsk.includes("region") && !this.attributesToAsk.includes("location"),
             fennimal: !this.attributesToAsk.includes("Fennimal"),
+            hat: !this.attributesToAsk.includes("hat"),
             toy: !this.attributesToAsk.includes("toy"),
             toybox: !this.attributesToAsk.includes("toybox")
         };
+
+        this.showsAccessoryItems = this.attributesToAsk.includes("toy")
+            || this.attributesToAsk.includes("toybox")
+            || !!this.fenObj.toy
+            || !!this.fenObj.toybox;
 
         this.regionDarkColor = GenParam.RegionData[this.fenObj.region] ? GenParam.RegionData[this.fenObj.region].darker_color : "#4CAF50";
 
@@ -616,10 +702,15 @@ class FennimalSortingTargetSceneBox {
         this.nameBanner.style.transition = "background 300ms ease";
         this.boxDiv.appendChild(this.nameBanner);
 
-        // The Scene Canvas
+        // The Scene Canvas — explicit viewBox so alignment uses the painted pixel box,
+        // not the SVG default 300×150 coordinate system.
         this.sceneSvg = document.createElementNS("http://www.w3.org/2000/svg", 'svg');
+        this.sceneSvg.setAttribute("width", "100%");
+        this.sceneSvg.setAttribute("height", "100%");
+        this.sceneSvg.setAttribute("preserveAspectRatio", "none");
         this.sceneSvg.style.width = "100%";
         this.sceneSvg.style.height = "100%";
+        this.sceneSvg.style.display = "block";
         this.boxDiv.appendChild(this.sceneSvg);
 
         parentDiv.appendChild(this.boxDiv);
@@ -694,18 +785,23 @@ class FennimalSortingTargetSceneBox {
             return;
         }
 
-        if (this.sceneState.fennimal) {
-            // THE SCALING FIX: If two rows, anchor to 100% of the box bottom and allow full 100% height!
-            let targetY = this.isTwoRows ? h * 1.0 : h * 0.85;
-            let maxH = this.isTwoRows ? h * 1.0 : h * 0.85;
-            let maxW = this.isTwoRows ? w * 0.50 : w * 0.45;
+        this.sceneSvg.setAttribute("viewBox", `0 0 ${w} ${h}`);
 
-            alignSVGElementToTarget(this.fennimalGroup, w * 0.25, targetY, maxW, maxH, "bottom_edge");
+        if (this.sceneState.fennimal) {
+            if (!this.showsAccessoryItems) {
+                alignSVGElementToTarget(this.fennimalGroup, w * 0.5, h * 0.52, w * 0.88, h * 0.92, "center");
+            } else {
+                // Left column when a toy / toybox shares the box.
+                let targetY = this.isTwoRows ? h * 1.0 : h * 0.85;
+                let maxH = this.isTwoRows ? h * 1.0 : h * 0.85;
+                let maxW = this.isTwoRows ? w * 0.50 : w * 0.45;
+                alignSVGElementToTarget(this.fennimalGroup, w * 0.25, targetY, maxW, maxH, "bottom_edge");
+            }
         }
-        if (this.sceneState.toy) {
+        if (this.showsAccessoryItems && this.sceneState.toy) {
             alignSVGElementToTarget(this.toyGroup, w * 0.75, h * 0.30, w * 0.40, h * 0.40, "toy");
         }
-        if (this.sceneState.toybox) {
+        if (this.showsAccessoryItems && this.sceneState.toybox) {
             alignSVGElementToTarget(this.toyboxGroup, w * 0.75, h * 0.75, w * 0.40, h * 0.40, "toybox");
         }
     }
@@ -713,6 +809,7 @@ class FennimalSortingTargetSceneBox {
     acceptAttribute(attribute) {
         if (attribute === "region" || attribute === "location") this.sceneState.bg = true;
         if (attribute === "Fennimal") this.sceneState.fennimal = true;
+        if (attribute === "hat") this.sceneState.hat = true;
         if (attribute === "toy") this.sceneState.toy = true;
         if (attribute === "toybox") this.sceneState.toybox = true;
 
@@ -729,6 +826,11 @@ class FennimalSortingTargetSceneBox {
         this.toyGroup.style.display = this.sceneState.toy ? "inherit" : "none";
         this.toyboxGroup.style.display = this.sceneState.toybox ? "inherit" : "none";
         this.fennimalGroup.style.display = this.sceneState.fennimal ? "inherit" : "none";
+
+        let hatEl = this.fennimalGroup ? this.fennimalGroup.querySelector(".hat") : null;
+        if (hatEl) {
+            hatEl.style.display = this.sceneState.hat ? "inherit" : "none";
+        }
 
         let needsBgToColorize = this.attributesToAsk.includes("region") || this.attributesToAsk.includes("location");
 
@@ -816,7 +918,7 @@ class FennimalSortingCard {
             this.cardDiv.style.background = color;
             this.cardDiv.innerHTML = `<span style="font-size:32px; font-weight:bold; color:white; text-align:center;">${displayName}</span>`;
         }
-        else if (this.attribute === "toy" || this.attribute === "toybox" || this.attribute === "Fennimal") {
+        else if (this.attribute === "toy" || this.attribute === "toybox" || this.attribute === "Fennimal" || this.attribute === "hat") {
             let svgElem = document.createElementNS("http://www.w3.org/2000/svg", 'svg');
             svgElem.style.width = "100%";
             svgElem.style.height = "100%";
@@ -847,6 +949,13 @@ class FennimalSortingCard {
                     clone = sourceElem.cloneNode(true);
                     apply_toybox_decoration_visibility_to_element(clone, cleanId);
                     mode = "toybox";
+                }
+            } else if (this.attribute === "hat") {
+                let cleanId = this.fenObj.hat ? String(this.fenObj.hat).replace(/^hat_/, "") : null;
+                sourceElem = cleanId ? document.getElementById("hat_" + cleanId) : null;
+                if (sourceElem) {
+                    clone = sourceElem.cloneNode(true);
+                    mode = "hat";
                 }
             } else if (this.attribute === "Fennimal") {
                 clone = create_Fennimal_SVG_object_head_only(this.fenObj, false);

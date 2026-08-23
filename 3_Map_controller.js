@@ -158,6 +158,7 @@ class MapController {
         this.CurrentFennimalIconsOnMap = [];
         this.Arr_IDs_of_Fennimals_currently_on_map = [];
         this.CurrentLostBoxIconsOnMap = [];
+        this.autoTravelActive = false;
 
         // Initialize Sub-Controllers
         this.DomeCont = new this.DomeController();
@@ -288,8 +289,25 @@ class MapController {
     // ----------------------------------------------------
     // PLAYER PROXIMITY & INTERACTION
     // ----------------------------------------------------
+    isAutoTravelActive() {
+        return !!this.autoTravelActive
+            || !!this.autoTravelOptions
+            || !!this.autoTravelFrameId
+            || !!this.autoTravelStartTimeout
+            || !!this.autoTravelWash;
+    }
+
     test_player_proximity_to_map_elements() {
         if (this.currently_in_location || this.current_region === "All") return;
+        if (this.isAutoTravelActive()) {
+            if (this.current_action_key_status) {
+                this.current_action_key_status = false;
+                this.previous_action_key_status = false;
+                this.remove_all_action_buttons();
+                if (typeof Interface !== "undefined" && Interface.Prompt) Interface.Prompt.hide();
+            }
+            return;
+        }
 
         if (this.current_region === "Home") {
             this.home_area_set_opacity_masks();
@@ -413,6 +431,12 @@ class MapController {
     // ACTION BUTTON MANAGEMENT
     // ----------------------------------------------------
     update_action_button() {
+        if (this.isAutoTravelActive()) {
+            this.current_action_key_status = false;
+            this.previous_action_key_status = false;
+            this.remove_all_action_buttons();
+            return;
+        }
         if (this.previous_action_key_status !== this.current_action_key_status) {
             this.remove_all_action_buttons();
 
@@ -458,6 +482,7 @@ class MapController {
     }
 
     show_action_button(button_icon, TargetObject, keyboard_shortcuts_arr, warmup_time) {
+        if (this.isAutoTravelActive()) return;
         this.remove_all_action_buttons();
         if (button_icon !== false) {
             this.ActiveActionButtonArr.push(new ActionButton(this.Interface_Layer, button_icon, TargetObject, warmup_time, keyboard_shortcuts_arr, () => this.action_key_pressed()));
@@ -471,6 +496,10 @@ class MapController {
     }
 
     action_key_pressed() {
+        if (this.isAutoTravelActive()) {
+            this.remove_all_action_buttons();
+            return;
+        }
         this.remove_all_action_buttons();
         switch (this.current_action_key_status) {
             case "watchtower": this.Player.climb_watchtower(); break;
@@ -720,6 +749,8 @@ class MapController {
 
     enter_location(location, optional_switched_region) {
         this.currently_in_location = true;
+        this.autoTravelActive = false;
+        this.remove_all_action_buttons();
         this.hide_all_locations();
         this.flash_location_transition_mask(this.current_region);
 
@@ -964,16 +995,17 @@ class MapController {
 
     prepareForAutoTravel(startPoint, options = {}) {
         this.autoTravelOptions = this.resolveAutoTravelOptions(options);
+        this.autoTravelActive = true;
 
         this.disable_map_interactions();
         this.remove_all_action_buttons();
+        this.current_action_key_status = false;
+        this.previous_action_key_status = false;
         Interface.Prompt.hide();
         Interface.FenneFinder.hide();
 
         this.hide_request_instructions_button();
 
-        this.current_action_key_status = false;
-        this.previous_action_key_status = false;
         this.current_nearest_location = false;
         this.update_nearest_location_highlights();
 
@@ -1106,7 +1138,7 @@ class MapController {
             "auto_travel_wash",
             "AutoTravelWash"
         );
-        this.autoTravelWash.style.pointerEvents = "none";
+        this.autoTravelWash.style.pointerEvents = "all";
         this.Interface_Layer.appendChild(this.autoTravelWash);
 
         this.autoTravelStatusText = create_SVG_text_elem(
@@ -1479,6 +1511,93 @@ class MapController {
         }, { regionAtRoutePoint: regionAtRoutePoint });
     }
 
+    autoTravelFromCurrentToLocation(trialObj, onComplete, travelOptions = {}) {
+        let start = {
+            x: this.Player.CurrentPlayerPos.x,
+            y: this.Player.CurrentPlayerPos.y
+        };
+        let dest = this.getLocationMarkerPoint(trialObj.location);
+        let destRegion = trialObj.region;
+        if (EUDistPoints(start, dest) < 40) {
+            this.forceAutoTravelRegion(destRegion);
+            if (onComplete) onComplete();
+            return;
+        }
+
+        let route = [];
+        let regionAtRoutePoint = {};
+        const push = (pt) => {
+            if (!pt) return;
+            let last = route[route.length - 1];
+            if (last && EUDistPoints(last, pt) < 12) return;
+            route.push({ x: pt.x, y: pt.y });
+        };
+
+        push(start);
+
+        let fromRegion = this.current_region;
+        let leavingRegion = fromRegion && fromRegion !== "Home" && fromRegion !== "All";
+        if (leavingRegion) {
+            let exitWps = this.getRegionWaypoints(fromRegion).slice().reverse();
+            exitWps.forEach(push);
+            if (fromRegion !== destRegion) {
+                push(this.getHomeCenterPoint());
+                regionAtRoutePoint[route.length - 1] = "Home";
+                if (route.length >= 2) regionAtRoutePoint[route.length - 2] = "Home";
+            }
+        }
+
+        if (destRegion && destRegion !== "Home") {
+            let enterWps = this.getRegionWaypoints(destRegion);
+            if (enterWps.length) {
+                regionAtRoutePoint[route.length] = destRegion;
+                enterWps.forEach(push);
+            }
+        }
+        push(dest);
+        regionAtRoutePoint[route.length - 1] = destRegion;
+
+        let opts = Object.assign({
+            leader: "player",
+            statusLabel: (GenParam.AutoTravel && GenParam.AutoTravel.travellingLabel) || "Travelling..."
+        }, travelOptions);
+        this.prepareForAutoTravel(route[0], opts);
+        this.autoTravelAlongRoute(route, () => {
+            this.forceAutoTravelRegion(destRegion);
+            if (onComplete) onComplete();
+        }, { regionAtRoutePoint: regionAtRoutePoint });
+    }
+
+    autoTravelFromCurrentToHomeCenter(onComplete, travelOptions = {}) {
+        let start = {
+            x: this.Player.CurrentPlayerPos.x,
+            y: this.Player.CurrentPlayerPos.y
+        };
+        let dest = this.getHomeCenterPoint();
+        let waypoints = [];
+        if (this.current_region && this.current_region !== "Home" && this.current_region !== "All") {
+            waypoints = this.getRegionWaypoints(this.current_region).reverse();
+        }
+        if (EUDistPoints(start, dest) < 50 && waypoints.length === 0) {
+            this.forceAutoTravelRegion("Home");
+            if (onComplete) onComplete();
+            return;
+        }
+        let route = [start, ...waypoints, dest];
+        let opts = Object.assign({
+            leader: "player",
+            statusLabel: (GenParam.AutoTravel && GenParam.AutoTravel.travellingLabel) || "Travelling..."
+        }, travelOptions);
+        this.prepareForAutoTravel(route[0], opts);
+        let regionAtRoutePoint = {};
+        regionAtRoutePoint[route.length - 1] = "Home";
+        if (route.length > 2) regionAtRoutePoint[route.length - 2] = "Home";
+        this.autoTravelAlongRoute(route, () => {
+            this.forceAutoTravelRegion("Home");
+            if (onComplete) onComplete();
+        }, { regionAtRoutePoint: regionAtRoutePoint });
+    }
+
     autoTravelBackToPhoneRoom(trialObj, onComplete, travelOptions = {}) {
         let route = this.buildAutoRouteBackToPhoneRoom(trialObj);
         this.prepareForAutoTravel(route[0], travelOptions);
@@ -1594,6 +1713,7 @@ class MapController {
      * then fade icons like a normal autotravel arrival before continuing the phone-room queue.
      */
     runManualPhoneRoomArrivalSequence(onComplete) {
+        this.autoTravelActive = true;
         this.disable_map_interactions();
         this.remove_all_action_buttons();
 
@@ -1655,6 +1775,7 @@ class MapController {
     }
 
     enable_map_interactions() {
+        this.autoTravelActive = false;
         this.resetAutoTravelCharacterIconOpacity();
         this.clearAutoTravelChrome();
         if (this.Partner) {
@@ -1857,7 +1978,7 @@ class MapController {
 
             let Icon = GenParam.DisplayFoundFennimalIconsOnMap.icon_type === "full" ?
                 create_Fennimal_SVG_object(FenObj, GenParam.Fennimal_head_size, false) :
-                create_Fennimal_SVG_object_head_only(FenObj, false);
+                create_Fennimal_SVG_object_head_only(FenObj, false, true);
 
 
             this.FennimalIconGroup.appendChild(Outer);
@@ -2079,6 +2200,7 @@ class MapController {
 
         allow_movement() {
             this.MapCont.player_allowed_to_move = true;
+            if (this.Check_Proximity_Interval) clearInterval(this.Check_Proximity_Interval);
             this.Check_Proximity_Interval = setInterval(() => this.MapCont.test_player_proximity_to_map_elements(), 250);
             this.start_render_loop();
         }

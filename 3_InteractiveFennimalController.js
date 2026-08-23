@@ -206,7 +206,7 @@ class BasicElementsModule {
         });
     }
 
-    create_and_appear_Fennimal(Parent, center_x, base_y, scale, fade_in_time) {
+    create_and_appear_Fennimal(Parent, center_x, base_y, scale, fade_in_time, beforeFadeIn) {
         return new Promise(resolve => {
             this.Fennimal = create_Fennimal_SVG_object(this.FenObj, GenParam.Fennimal_head_size, false);
             this.Fennimal.id = "task_Fennimal";
@@ -229,6 +229,7 @@ class BasicElementsModule {
             let delta_x = (center_x) - (BBox.x + 0.5 * BBox.width);
             let delta_y = (base_y)- (BBox.y + BBox.height);
             this.Fennimal.style.transform = "translate(" + delta_x + "px, " + delta_y + "px)";
+            if (typeof beforeFadeIn === "function") beforeFadeIn();
             window.getComputedStyle(this.Fennimal).opacity;
 
             this.Fennimal.style.transition = "all " + fade_in_time + "ms ease-in-out";
@@ -436,8 +437,9 @@ class BasicElementsModule {
         this.animation_frame_id = requestAnimationFrame((t) => this.render_character_frame(t));
     }
 
-    trigger_comfort_checkin() {
+    trigger_comfort_checkin(options = {}) {
         return new Promise(resolve => {
+            const clickDelayMs = (options && options.clickDelayMs) ? options.clickDelayMs : 0;
             // Drop into sad posture and look at the floor
             this.is_slumped = true;
             this.targetGazeX = 0;
@@ -517,14 +519,16 @@ class BasicElementsModule {
             // ----------------------------------------------------
             // 2. The Comfort Interaction
             // ----------------------------------------------------
-            this.Fennimal.style.cursor = "pointer";
-            this.Fennimal.style.filter = "drop-shadow(0px 0px 8px rgba(255, 255, 255, 0.5))";
+            const enableClick = () => {
+                if (!this.Fennimal) return;
+                this.Fennimal.style.cursor = "pointer";
+                this.Fennimal.style.filter = "drop-shadow(0px 0px 8px rgba(255, 255, 255, 0.5))";
 
-            this.Fennimal.onpointerdown = () => {
-                this.Fennimal.onpointerdown = null;
-                this.Fennimal.style.cursor = "auto";
-                this.Fennimal.style.filter = "none";
-                this.Fennimal.classList.remove("is-slumped");
+                this.Fennimal.onpointerdown = () => {
+                    this.Fennimal.onpointerdown = null;
+                    this.Fennimal.style.cursor = "auto";
+                    this.Fennimal.style.filter = "none";
+                    this.Fennimal.classList.remove("is-slumped");
 
                 // Clear the clouds
                 if (this.CloudGroup) {
@@ -546,7 +550,11 @@ class BasicElementsModule {
                     }
                     setTimeout(() => resolve(), 600);
                 });
+                };
             };
+
+            if (clickDelayMs > 0) setTimeout(enableClick, clickDelayMs);
+            else enableClick();
         });
     }
 
@@ -722,7 +730,7 @@ class BoxModule {
         this.boxname = GenParam.get_box_printed_name(FenObj.toybox);
     }
 
-    create_and_appear_box(ParentBase, ParentTop, center_x, center_y, scale, fade_in_time) {
+    create_and_appear_box(ParentBase, ParentTop, center_x, center_y, scale, fade_in_time, beforeFadeIn) {
         return new Promise(resolve => {
             this.boxScale = (typeof scale === "number") ? scale : 1;
             let template = (typeof get_toybox_template === "function")
@@ -748,6 +756,7 @@ class BoxModule {
 
             // Decorations are baked into the SVG as visible; honour WorldState by default.
             this.apply_worldstate_decoration_visibility();
+            if (typeof beforeFadeIn === "function") beforeFadeIn();
 
             window.getComputedStyle(this.BoxBase).opacity;
             this.BoxTop.style.transition = "all " + fade_in_time + "ms ease-in-out";
@@ -6718,23 +6727,54 @@ class FoliageModule {
         this.foliage_base_health = partner_is_present ? 7 : 5;
     }
 
+    pick_foliage_template() {
+        const region = this.FenObj && this.FenObj.region;
+        if (!region) return null;
+        const main = document.getElementById("foliage_" + region);
+        const alt = document.getElementById("foliage_" + region + "_alt");
+        if (main && alt) return Math.random() < 0.5 ? alt : main;
+        return main || alt || null;
+    }
+
     spawn_foliage(ItemLayers, Spots, layer_y_pos, FoliageSizes) {
         for (let layer in Spots) {
             for (let spotnum in Spots[layer]) {
                 let x_pos = Spots[layer][spotnum] * GenParam.SVG_width;
+                let row_y = layer_y_pos[layer] * GenParam.SVG_height;
+                let baseSize = FoliageSizes[layer];
+                // Scale jitter around the row size; feet stay on the row (see align_plant_feet_to_row).
+                let actualSize = baseSize * (0.82 + Math.random() * 0.40);
                 let FoliageCont = new this.FoliageSubController(
                     this,
                     ItemLayers[layer],
                     layer,
                     x_pos,
-                    layer_y_pos[layer] * GenParam.SVG_height,
-                    FoliageSizes[layer],
+                    row_y,
+                    actualSize,
                     ItemLayers.Plus2 // Target layer for particles
                 );
+                if (!FoliageCont.Foliage) continue;
+                this.align_plant_feet_to_row(FoliageCont, row_y, baseSize, actualSize);
                 this.AllFoliageControllers.push(FoliageCont);
                 this.RemainingFoliageControllersByLocation[layer][x_pos] = FoliageCont;
             }
         }
+    }
+
+    // copy_scale_and_move places by center. Shift y so a jittered plant keeps the
+    // same ground line as the row's base size would have had.
+    align_plant_feet_to_row(cont, rowY, baseSize, actualSize) {
+        if (!cont || !cont.Foliage) return;
+        const zero = cont.Foliage.getElementsByClassName("zero_translate_group")[0];
+        if (!zero) return;
+        let box;
+        try {
+            box = zero.getBBox();
+        } catch (err) {
+            return;
+        }
+        const dy = (box.height / 2) * (baseSize - actualSize);
+        cont.Foliage.style.transform = `translate(${cont.xpos}px, ${rowY + dy}px)`;
     }
 
     spawn_foliage_around_target(ItemLayers, target_x, target_y) {
@@ -6785,6 +6825,43 @@ class FoliageModule {
         this.AllFoliageControllers.push(FoliageCont);
         this.RemainingFoliageControllersByLocation.Plus2[actual_x] = FoliageCont;
         return FoliageCont;
+    }
+
+    spawn_one_plant_at(ItemLayers, x, y, size, layer = "Plus2") {
+        let key = x;
+        const bucket = this.RemainingFoliageControllersByLocation[layer] || {};
+        while (bucket[key]) key += 1;
+
+        let FoliageCont = new this.FoliageSubController(
+            this,
+            ItemLayers[layer],
+            layer,
+            key,
+            y,
+            size,
+            ItemLayers.Plus2
+        );
+        if (!FoliageCont.Foliage) return null;
+        this.align_plant_feet_to_row(FoliageCont, y, size, size);
+        this.AllFoliageControllers.push(FoliageCont);
+        this.RemainingFoliageControllersByLocation[layer][key] = FoliageCont;
+        return FoliageCont;
+    }
+
+    covers_svg_point(svgPoint) {
+        const svg = GenParam.SVGObject;
+        if (!svg || !svgPoint || !svg.getScreenCTM) return false;
+        const ctm = svg.getScreenCTM();
+        if (!ctm) return false;
+        const pt = svg.createSVGPoint();
+        pt.x = svgPoint.x;
+        pt.y = svgPoint.y;
+        const screen = pt.matrixTransform(ctm);
+        const hit = document.elementFromPoint(screen.x, screen.y);
+        if (!hit) return false;
+        return this.AllFoliageControllers.some((cont) =>
+            cont && cont.Foliage && (cont.Foliage === hit || cont.Foliage.contains(hit))
+        );
     }
 
     /** Apply one cut hit to a remaining plant (NPC / Fennimal turn). */
@@ -6910,14 +6987,20 @@ class FoliageModule {
             this.layer_name = layer_name;
             this.xpos = xpos;
 
-            this.Foliage = copy_scale_and_move_object_to_position(document.getElementById("foliage_" + ParentModule.FenObj.region), LayerElement, xpos, ypos, size);
+            let template = ParentModule.pick_foliage_template();
+            if (!template) {
+                console.warn("FoliageModule: missing foliage template for region " + ParentModule.FenObj.region);
+                this.Foliage = null;
+                return;
+            }
+            this.Foliage = copy_scale_and_move_object_to_position(template, LayerElement, xpos, ypos, size);
             this.Foliage.style.cursor = "pointer";
 
             this.Cut_Elem = this.Foliage.getElementsByClassName("cut_foliage")[0];
             this.Uncut_Elem = this.Foliage.getElementsByClassName("uncut_foliage")[0];
 
-            this.Cut_Elem.style.opacity = 0;
-            this.Uncut_Elem.style.transition = "all 300ms ease-out";
+            if (this.Cut_Elem) this.Cut_Elem.style.opacity = 0;
+            if (this.Uncut_Elem) this.Uncut_Elem.style.transition = "all 300ms ease-out";
 
             this.foliage_health = ParentModule.foliage_base_health;
             this.is_cuttable = false;
@@ -6967,8 +7050,8 @@ class FoliageModule {
             } else {
                 this.foliage_health = 0;
                 this.has_been_cut = true;
-                this.Cut_Elem.style.opacity = 1;
-                this.Uncut_Elem.style.opacity = 0;
+                if (this.Cut_Elem) this.Cut_Elem.style.opacity = 1;
+                if (this.Uncut_Elem) this.Uncut_Elem.style.opacity = 0;
                 this.Foliage.style.pointerEvents = "none";
                 this.Foliage.style.cursor = "auto";
                 delete this.ParentModule.RemainingFoliageControllersByLocation[this.layer_name][this.xpos];
@@ -6983,10 +7066,12 @@ class FoliageModule {
         get_health() { return this.foliage_health; }
 
         remove() {
+            if (!this.Foliage) return;
             this.Foliage.style.transition = "all 300ms ease-in";
             this.Foliage.style.opacity = 0;
             this.is_cuttable = false;
-            setTimeout(() => this.Foliage.remove(), 400);
+            const node = this.Foliage;
+            setTimeout(() => node.remove(), 400);
         }
     }
 }
@@ -7660,7 +7745,8 @@ class PhotoTrialController {
             place.x,
             place.y,
             place.scale,
-            250
+            250,
+            () => AskHatOverlay.hideWornHat(this)
         );
 
         this.photoTargetElements = [this.basics.Fennimal].filter(Boolean);
@@ -7674,6 +7760,9 @@ class PhotoTrialController {
 
     get_intro_prompt() {
         if (this.targetType === "fennimal") {
+            if (this.FenObj.introduce_name_on_polaroid) {
+                return "Please take a photo of this Fennimal!";
+            }
             return "Please take a photo of " + this.get_target_label();
         }
         return "Take a photo of the " + this.get_target_label() + " to check if its still in good shape";
@@ -7681,6 +7770,9 @@ class PhotoTrialController {
 
     get_retry_prompt() {
         if (this.targetType === "fennimal") {
+            if (this.FenObj.introduce_name_on_polaroid) {
+                return "Take a photo of this Fennimal";
+            }
             return "Take a photo of " + this.get_target_label();
         }
         return "Take a photo of the " + this.get_target_label();
@@ -8240,7 +8332,16 @@ class PhotoTrialController {
             this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
         }
 
+        if (this.targetType === "fennimal") {
+            await AskFennimalOverlay.run(this);
+        }
+
         await this.spawn_target();
+        if (this.targetType === "fennimal") {
+            await TypedNameAskOverlay.run(this);
+            await AskHatOverlay.run(this);
+            await AskHatOverlay.revealWornHat(this);
+        }
 
         Interface.Prompt.show_message(this.get_intro_prompt());
         AudioCont.play_sound_effect("alert_minor");
@@ -10334,6 +10435,1531 @@ class RetrieveLostBoxTrialController extends JointBoxDecorationTrialController {
 }
 
 
+// Hat blows onto a region pole. Click the hat to shake the pole until it
+// comes free; the Fennimal then walks over, picks it up, and puts it on.
+class HatBlownAwayTrialController {
+    constructor(FenObj, partner_is_present, returnfunc) {
+        this.FenObj = FenObj;
+        this.returnfunc = returnfunc;
+
+        this.basics = new BasicElementsModule(FenObj);
+        this.partner = new PartnerModule(partner_is_present);
+
+        this.baseline_y = 0.85 * this.basics.H;
+        this.Fen_base_x = 0.1 * this.basics.W;
+        this.pole_dx = 0.7 * this.basics.W;
+
+        this.number_of_shakes = 4;
+        this.shake_count = 0;
+        this.hat_is_clickable = false;
+        this.idle_shake_ms = 30000;
+        this.idleShakeTimeout = null;
+
+        const AllPoleNames = {
+            North: "Pine tree",
+            Mountains: "rock",
+            Village: "telephone pole",
+            Swamp: "dead tree",
+            Desert: "ruin",
+            Beach: "palm tree",
+            Jungle: "tree",
+            Flowerfields: "pillar",
+        };
+        this.polename = AllPoleNames[this.FenObj.region];
+    }
+
+    create_pole() {
+        this.Pole = copy_scale_and_move_object_to_position(
+            document.getElementById("tall_post_" + this.FenObj.region),
+            this.basics.ItemLayers.Neg1,
+            this.Fen_base_x,
+            0.4 * this.basics.H,
+            6
+        );
+        let BBox = this.Pole.getBBox();
+        this.PoleHatTarget = this.Pole.getElementsByClassName("tall_post_target")[0];
+
+        let TargetBox = getSVGInternalCenter(this.PoleHatTarget);
+        let delta_x = (this.Fen_base_x + this.pole_dx) - TargetBox.x;
+        let delta_y = this.baseline_y - (BBox.y + BBox.height);
+
+        this.Pole.style.transform = `translate(${delta_x}px, ${delta_y - 20}px)`;
+        this.wrap_pole_for_sway();
+    }
+
+    wrap_pole_for_sway() {
+        if (!this.Pole || !this.Pole.ownerSVGElement) return;
+        const svg = this.Pole.ownerSVGElement;
+        const ctm = svg.getScreenCTM();
+        if (!ctm) return;
+        const rect = this.Pole.getBoundingClientRect();
+        const pt = svg.createSVGPoint();
+        pt.x = rect.left + rect.width / 2;
+        pt.y = rect.bottom;
+        const world = pt.matrixTransform(ctm.inverse());
+        this.poleBase = { x: world.x, y: world.y };
+
+        this.PolePivot = create_SVG_group(0, 0);
+        this.Pole.parentNode.insertBefore(this.PolePivot, this.Pole);
+        this.PolePivot.appendChild(this.Pole);
+    }
+
+    rotate_point_around(point, origin, angleDeg) {
+        const a = angleDeg * Math.PI / 180;
+        const dx = point.x - origin.x;
+        const dy = point.y - origin.y;
+        return {
+            x: origin.x + dx * Math.cos(a) - dy * Math.sin(a),
+            y: origin.y + dx * Math.sin(a) + dy * Math.cos(a)
+        };
+    }
+
+    set_hat_world_pos(x, y, rotation = 0) {
+        if (!this.Hat) return;
+        this.hatWorldPos = { x, y };
+        this.Hat.setAttribute("transform", `translate(${x}, ${y})`);
+        if (this.HatRotGroup) {
+            this.HatRotGroup.setAttribute("transform", `rotate(${rotation})`);
+        }
+    }
+
+    get_worn_hat_attachment_point() {
+        let wornHat = this.basics.Fennimal && this.basics.Fennimal.getElementsByClassName("hat")[0];
+        let attach = wornHat && wornHat.getElementsByClassName("hat_attachment_point")[0];
+        if (attach) return getSVGInternalCenter(attach);
+        let headPoint = this.basics.Fennimal && this.basics.Fennimal.getElementsByClassName("Fennimal_head_hat_point")[0];
+        if (headPoint) return getSVGInternalCenter(headPoint);
+        return getSVGInternalCenter(this.basics.Fennimal);
+    }
+
+    hide_worn_hat() {
+        let wornHat = this.basics.Fennimal && this.basics.Fennimal.getElementsByClassName("hat")[0];
+        if (wornHat) wornHat.style.opacity = 0;
+    }
+
+    show_worn_hat() {
+        let wornHat = this.basics.Fennimal && this.basics.Fennimal.getElementsByClassName("hat")[0];
+        if (wornHat) wornHat.style.opacity = 1;
+    }
+
+    set_fennimal_sad_expression() {
+        this.basics.is_slumped = true;
+        if (this.basics.Fennimal) this.basics.Fennimal.classList.add("is-slumped");
+    }
+
+    clear_fennimal_sad_expression() {
+        this.basics.is_slumped = false;
+        if (this.basics.Fennimal) this.basics.Fennimal.classList.remove("is-slumped");
+    }
+
+    create_flying_hat_at(worldX, worldY, parent) {
+        let template = document.getElementById("hat_" + this.FenObj.hat);
+        if (!template) {
+            console.warn("HatBlownAwayTrialController: missing hat_" + this.FenObj.hat);
+            return;
+        }
+        let svg = template.cloneNode(true);
+        if (typeof strip_svg_ids_from_subtree === "function") strip_svg_ids_from_subtree(svg);
+        else svg.removeAttribute("id");
+        svg.style.display = "inherit";
+
+        let attach = svg.getElementsByClassName("hat_attachment_point")[0];
+        let ax = attach ? parseFloat(attach.getAttribute("cx")) : 0;
+        let ay = attach ? parseFloat(attach.getAttribute("cy")) : 0;
+
+        let offsetGroup = create_SVG_group(0, 0);
+        offsetGroup.appendChild(svg);
+        offsetGroup.setAttribute("transform", `translate(${-ax}, ${-ay})`);
+
+        // Worn hats sit inside Fennimal scale × head scale × (2 / head scale) = Fennimal scale × 2.
+        this.hatStartScale = (this.basics.baseScale || 1.5) * 2;
+        this.hatEndScale = this.hatStartScale * 0.8;
+        this.HatScaleGroup = create_SVG_group(0, 0);
+        this.HatScaleGroup.appendChild(offsetGroup);
+        this.HatScaleGroup.setAttribute("transform", `scale(${this.hatStartScale})`);
+
+        this.HatRotGroup = create_SVG_group(0, 0);
+        this.HatRotGroup.appendChild(this.HatScaleGroup);
+
+        this.Hat = create_SVG_group(0, 0);
+        this.Hat.appendChild(this.HatRotGroup);
+        this.Hat.setAttribute("transform", `translate(${worldX}, ${worldY})`);
+        this.Hat.style.pointerEvents = "none";
+        parent.appendChild(this.Hat);
+        this.hatWorldPos = { x: worldX, y: worldY };
+    }
+
+    hat_flight_point(t, start, end) {
+        let travel = t * t * (3 - 2 * t);
+        let x = start.x + (end.x - start.x) * travel;
+        let y = start.y + (end.y - start.y) * travel;
+
+        let envelope = Math.sin(t * Math.PI);
+        let span = Math.hypot(end.x - start.x, end.y - start.y) || 1;
+        let nx = -(end.y - start.y) / span;
+        let ny = (end.x - start.x) / span;
+
+        let heave = Math.sin(t * Math.PI * 2.05) * 95 * envelope
+            + Math.sin(t * Math.PI * 4.6) * 32 * envelope;
+        let loft = Math.sin(t * Math.PI) * 40;
+        let sway = Math.sin(t * Math.PI * 3.05 + 0.5) * 22 * envelope;
+        x += nx * sway;
+        y += -heave - loft + ny * sway * 0.3;
+        return { x, y };
+    }
+
+    hat_flight_rotation(t) {
+        let envelope = Math.sin(t * Math.PI);
+        return -18 * envelope + 12 * Math.sin(t * Math.PI * 3.3) * envelope;
+    }
+
+    hat_flight_scale(t) {
+        let travel = t * t * (3 - 2 * t);
+        let startScale = this.hatStartScale || 3;
+        let endScale = this.hatEndScale != null ? this.hatEndScale : startScale * 0.8;
+        return startScale + (endScale - startScale) * travel;
+    }
+
+    animate_hat_flight(start, end, duration) {
+        return new Promise(resolve => {
+            let t0 = performance.now();
+            const step = (now) => {
+                if (!this.Hat) {
+                    this.hatFlightRaf = null;
+                    resolve();
+                    return;
+                }
+                let t = Math.min(1, (now - t0) / duration);
+                let p = this.hat_flight_point(t, start, end);
+                this.set_hat_world_pos(p.x, p.y, this.hat_flight_rotation(t));
+                if (this.HatScaleGroup) {
+                    this.HatScaleGroup.setAttribute("transform", `scale(${this.hat_flight_scale(t)})`);
+                }
+                if (t < 1) {
+                    this.hatFlightRaf = requestAnimationFrame(step);
+                } else {
+                    this.hatFlightRaf = null;
+                    this.set_hat_world_pos(end.x, end.y, 0);
+                    if (this.HatScaleGroup) {
+                        this.HatScaleGroup.setAttribute("transform", `scale(${this.hatEndScale})`);
+                    }
+                    resolve();
+                }
+            };
+            this.hatFlightRaf = requestAnimationFrame(step);
+        });
+    }
+
+    get_region_dust_colors() {
+        let rd = GenParam.RegionData && GenParam.RegionData[this.FenObj.region];
+        let raw = rd
+            ? [rd.lighter_color, rd.color, rd.darker_color, rd.surrounding_color]
+            : ["#D3D3D3", "#C0C0C0", "#A9A9A9"];
+        return raw.map((c) => {
+            if (typeof c !== "string") return "#C0C0C0";
+            if (c[0] === "#" && c.length === 9) return c.slice(0, 7);
+            return c;
+        });
+    }
+
+    spawn_gust_streaks(parent, startX, startY, targetX, targetY, count = 10) {
+        for (let i = 0; i < count; i++) {
+            let streak = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            streak.setAttribute("width", 110 + Math.random() * 70);
+            streak.setAttribute("height", 7 + Math.random() * 6);
+            streak.setAttribute("rx", 5);
+            streak.setAttribute("fill", "rgba(255, 255, 255, 0.9)");
+            streak.setAttribute("x", 0);
+            streak.setAttribute("y", 0);
+            streak.style.pointerEvents = "none";
+
+            let dx = targetX - startX;
+            let dy = targetY - startY;
+            let angle = Math.atan2(dy, dx) * (180 / Math.PI) + (Math.random() - 0.5) * 14;
+            let ox = startX + (Math.random() - 0.5) * 80;
+            let oy = startY + (Math.random() - 0.5) * 60;
+
+            streak.style.transformOrigin = "left center";
+            streak.style.transformBox = "fill-box";
+            streak.style.opacity = "0.9";
+            streak.style.transform = `translate(${ox}px, ${oy}px) rotate(${angle}deg) scaleX(0.25)`;
+            parent.appendChild(streak);
+
+            setTimeout(() => {
+                streak.style.transition = "transform 340ms ease-out";
+                streak.style.transform = `translate(${ox + dx * 0.92}px, ${oy + dy * 0.92}px) rotate(${angle}deg) scaleX(1.15)`;
+                setTimeout(() => {
+                    streak.style.transition = "opacity 200ms ease-in";
+                    streak.style.opacity = 0;
+                }, 160);
+                setTimeout(() => streak.remove(), 380);
+            }, 10 + i * 24);
+        }
+    }
+
+    spawn_gust_dust(parent, startX, startY) {
+        let colors = this.get_region_dust_colors();
+        for (let i = 0; i < 15; i++) {
+            const particle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            particle.setAttribute("r", Math.random() * 10 + 8);
+            particle.setAttribute("cx", startX + (Math.random() - 0.5) * 45);
+            particle.setAttribute("cy", startY + (Math.random() - 0.5) * 35);
+            particle.setAttribute("fill", colors[Math.floor(Math.random() * colors.length)]);
+            particle.style.pointerEvents = "none";
+            particle.style.opacity = "0.85";
+            particle.style.transformOrigin = "center";
+            particle.style.transformBox = "fill-box";
+            particle.style.transform = "translate(0px, 0px) scale(0.7)";
+            parent.appendChild(particle);
+
+            let dx = 75 + Math.random() * 155;
+            let dy = -(40 + Math.random() * 110);
+            let s = 1.4 + Math.random() * 1.2;
+            setTimeout(() => {
+                particle.style.transition = "transform 900ms ease-out, opacity 900ms ease-in";
+                particle.style.transform = `translate(${dx}px, ${dy}px) scale(${s})`;
+                particle.style.opacity = 0;
+                setTimeout(() => particle.remove(), 950);
+            }, 10 + i * 18);
+        }
+    }
+
+    async fennimal_gust_flinch() {
+        let base = this.FennimalBaseTransform;
+        this.basics.Fennimal.style.transition = "transform 90ms ease-out";
+        this.basics.Fennimal.style.transform = base + " translate(-30px, 16px) rotate(-8deg)";
+        await wait(120);
+        this.basics.Fennimal.style.transition = "transform 280ms cubic-bezier(0.2, 1.4, 0.4, 1)";
+        this.basics.Fennimal.style.transform = base;
+        await wait(280);
+    }
+
+    async blow_hat_onto_pole() {
+        let start = this.get_worn_hat_attachment_point();
+        let end = getSVGInternalCenter(this.PoleHatTarget);
+        let fxParent = this.basics.ItemLayers.Plus2;
+
+        this.spawn_gust_streaks(fxParent, start.x - 130, start.y + 15, start.x + 450, start.y - 70, 10);
+        this.spawn_gust_dust(fxParent, start.x, start.y);
+        setTimeout(() => {
+            this.spawn_gust_streaks(fxParent, start.x + 20, start.y - 10, end.x, end.y - 20, 8);
+            this.spawn_gust_dust(fxParent, start.x + 160, start.y - 30);
+        }, 220);
+
+        this.hide_worn_hat();
+        this.set_fennimal_sad_expression();
+        this.create_flying_hat_at(start.x, start.y, fxParent);
+        this.fennimal_gust_flinch();
+
+        // Sit a tinge below the pole tip so the prompt cannot cover the hat.
+        end = { x: end.x, y: end.y + 28 };
+        await this.animate_hat_flight(start, end, 1500);
+        AudioCont.play_sound_effect("thud");
+        this.basics.ItemLayers.Plus1.appendChild(this.Hat);
+        this.hatOriginalStuckPos = { x: end.x, y: end.y };
+        this.hatStuckPos = { x: end.x, y: end.y };
+        this.hatStuckRot = 0;
+        this.set_hat_world_pos(end.x, end.y, 0);
+        if (this.basics.set_gaze_target) this.basics.set_gaze_target(this.Hat);
+    }
+
+    async show_first_attempt_to_reach_hat() {
+        await wait(1000);
+
+        let dx = getSVGInternalCenter(this.PoleHatTarget).x - getSVGInternalCenter(this.basics.Fennimal).x;
+        await this.basics.Fennimal_move_relative(dx, 0, 500);
+
+        await this.basics.Fennimal_jump(200);
+        await this.basics.Fennimal_jump(275);
+        await this.basics.Fennimal_jump(250);
+
+        Interface.Prompt.show_message(`Oh no, ${this.FenObj.name} can't reach the ${this.FenObj.hat}!`);
+        AudioCont.play_sound_effect("sad");
+
+        this.basics.Fennimal.style.transition = "all 700ms ease-in-out";
+        this.basics.Fennimal.style.transform = this.FennimalBaseTransform;
+        await wait(850);
+
+        Interface.Prompt.show_message(`${this.FenObj.name} looks so sad! Click to cheer ${this.FenObj.name}  up.`);
+        await this.basics.trigger_comfort_checkin();
+        await wait(500);
+
+        Interface.Prompt.show_message(`Click ${this.FenObj.name}'s ${this.FenObj.hat} to shake it loose!`);
+        this.enable_hat_clicking();
+    }
+
+    enable_hat_clicking() {
+        if (!this.Hat) return;
+        this.hat_is_clickable = true;
+        this.Hat.style.pointerEvents = "auto";
+        this.Hat.style.cursor = "pointer";
+
+        if (!this.HatHit) {
+            this.HatHit = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            this.HatHit.setAttribute("r", 80);
+            this.HatHit.setAttribute("cx", 0);
+            this.HatHit.setAttribute("cy", 0);
+            this.HatHit.setAttribute("fill", "transparent");
+            this.HatHit.style.cursor = "pointer";
+            this.HatHit.style.pointerEvents = "all";
+            this.Hat.appendChild(this.HatHit);
+        }
+
+        this.show_hat_click_hint();
+        this.Hat.onpointerdown = (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            this.handle_hat_click();
+        };
+        this.arm_idle_shake_watchdog();
+    }
+
+    disable_hat_clicking() {
+        this.clear_idle_shake_watchdog();
+        this.hat_is_clickable = false;
+        if (this.Hat) {
+            this.Hat.onpointerdown = null;
+            this.Hat.style.pointerEvents = "none";
+            this.Hat.style.cursor = "default";
+        }
+        this.hide_hat_click_hint();
+    }
+
+    clear_idle_shake_watchdog() {
+        if (this.idleShakeTimeout) {
+            clearTimeout(this.idleShakeTimeout);
+            this.idleShakeTimeout = null;
+        }
+    }
+
+    arm_idle_shake_watchdog() {
+        this.clear_idle_shake_watchdog();
+        this.idleShakeTimeout = setTimeout(() => {
+            this.idleShakeTimeout = null;
+            if (this.hat_is_clickable) this.handle_hat_click();
+        }, this.idle_shake_ms);
+    }
+
+    show_hat_click_hint() {
+        this.hide_hat_click_hint();
+        if (!this.Hat || typeof create_SVG_outline_of_group_ID !== "function") return;
+        const outlineSrc = this.HatScaleGroup || this.Hat;
+        this.HatOutline = create_SVG_outline_of_group_ID(outlineSrc);
+        this.Hat.appendChild(this.HatOutline);
+        this.HatOutline.classList.add("focus_on_SVG_outline");
+        this.HatOutline.style.pointerEvents = "none";
+    }
+
+    hide_hat_click_hint() {
+        if (this.HatOutline) {
+            this.HatOutline.remove();
+            this.HatOutline = null;
+        }
+    }
+
+    async handle_hat_click() {
+        if (!this.hat_is_clickable) return;
+        this.clear_idle_shake_watchdog();
+        this.hat_is_clickable = false;
+        this.hide_hat_click_hint();
+        if (this.Hat) {
+            this.Hat.style.pointerEvents = "none";
+            this.Hat.style.cursor = "default";
+        }
+
+        this.shake_count++;
+        const isLast = this.shake_count >= this.number_of_shakes;
+
+        AudioCont.play_sound_effect("thud");
+        await this.animate_pole_and_hat_shake({ drop: isLast });
+
+        if (isLast) {
+            this.Hat.onpointerdown = null;
+            Interface.Prompt.hide();
+            await this.drop_hat_to_ground();
+            await this.fennimal_retrieves_hat();
+            Interface.Prompt.show_message(`${this.FenObj.name} really appreciates your help!`);
+            await this.basics.perform_success_celebration(null);
+            await wait(1750);
+            this.returnfunc();
+            return;
+        }
+
+        await this.animate_hat_settle_shift();
+
+        this.hat_is_clickable = true;
+        if (this.Hat) {
+            this.Hat.style.pointerEvents = "auto";
+            this.Hat.style.cursor = "pointer";
+        }
+        this.show_hat_click_hint();
+        this.arm_idle_shake_watchdog();
+    }
+
+    animate_pole_and_hat_shake({ drop = false } = {}) {
+        return new Promise(resolve => {
+            const duration = drop ? 560 : 500;
+            const t0 = performance.now();
+            const maxAngle = drop ? 14 : 10;
+            const jx = (Math.random() - 0.5) * (drop ? 28 : 16);
+            const jy = Math.random() * (drop ? 22 : 12);
+            const jr = (Math.random() - 0.5) * (drop ? 18 : 10);
+            const stuck = this.hatStuckPos || this.hatWorldPos || { x: 0, y: 0 };
+            const stuckRot = this.hatStuckRot || 0;
+            const base = this.poleBase || stuck;
+
+            const step = (now) => {
+                const t = Math.min(1, (now - t0) / duration);
+                const wiggle = Math.sin(t * Math.PI * 5);
+                const decay = 1 - t * (drop ? 0.2 : 0.45);
+                const angle = wiggle * maxAngle * decay;
+
+                if (this.PolePivot) {
+                    this.PolePivot.setAttribute("transform", `rotate(${angle}, ${base.x}, ${base.y})`);
+                }
+
+                const hatPos = this.rotate_point_around(stuck, base, angle);
+                const jitterAmt = Math.sin(t * Math.PI);
+                this.set_hat_world_pos(
+                    hatPos.x + jx * jitterAmt,
+                    hatPos.y + jy * jitterAmt,
+                    stuckRot + jr * jitterAmt
+                );
+
+                if (t < 1) {
+                    this.shakeRaf = requestAnimationFrame(step);
+                } else {
+                    this.shakeRaf = null;
+                    if (this.PolePivot) this.PolePivot.setAttribute("transform", "");
+                    if (!drop) this.set_hat_world_pos(stuck.x, stuck.y, stuckRot);
+                    resolve();
+                }
+            };
+            this.shakeRaf = requestAnimationFrame(step);
+        });
+    }
+
+    animate_hat_settle_shift() {
+        const origin = this.hatOriginalStuckPos || this.hatStuckPos || this.hatWorldPos || { x: 0, y: 0 };
+        const from = this.hatStuckPos || this.hatWorldPos || origin;
+        const fromRot = this.hatStuckRot || 0;
+        const loosen = this.shake_count || 1;
+        const radius = 24 + loosen * 8;
+        const dx = (Math.random() * 2 - 1) * radius;
+        const dy = Math.random() * radius * 0.75;
+        const to = {
+            x: origin.x + dx,
+            y: origin.y + dy
+        };
+        const toRot = (Math.random() - 0.5) * (18 + loosen * 6);
+
+        return new Promise(resolve => {
+            const duration = 420;
+            const t0 = performance.now();
+            const step = (now) => {
+                const t = Math.min(1, (now - t0) / duration);
+                const ease = 1 - Math.pow(1 - t, 3);
+                const wiggle = Math.sin(t * Math.PI * 4) * (1 - t);
+                const x = from.x + (to.x - from.x) * ease + wiggle * 10;
+                const y = Math.max(origin.y, from.y + (to.y - from.y) * ease + wiggle * 7);
+                const r = fromRot + (toRot - fromRot) * ease + wiggle * 8;
+                this.set_hat_world_pos(x, y, r);
+                if (t < 1) {
+                    this.hatSettleRaf = requestAnimationFrame(step);
+                } else {
+                    this.hatSettleRaf = null;
+                    this.hatStuckPos = to;
+                    this.hatStuckRot = toRot;
+                    this.set_hat_world_pos(to.x, to.y, toRot);
+                    resolve();
+                }
+            };
+            this.hatSettleRaf = requestAnimationFrame(step);
+        });
+    }
+
+    drop_hat_to_ground() {
+        const start = this.hatWorldPos || this.hatStuckPos || { x: this.pole_dx, y: this.baseline_y };
+        const base = this.poleBase || start;
+        const end = {
+            x: base.x - 90,
+            y: this.baseline_y - 28
+        };
+        if (this.PolePivot) this.PolePivot.setAttribute("transform", "");
+        if (this.basics.ItemLayers.Plus1 && this.Hat) {
+            this.basics.ItemLayers.Plus1.appendChild(this.Hat);
+        }
+
+        return new Promise(resolve => {
+            const duration = 720;
+            const t0 = performance.now();
+            const spin = 40 + Math.random() * 50;
+            const startRot = 0;
+            const step = (now) => {
+                const t = Math.min(1, (now - t0) / duration);
+                const easeY = t * t;
+                const x = start.x + (end.x - start.x) * t;
+                const y = start.y + (end.y - start.y) * easeY;
+                this.set_hat_world_pos(x, y, startRot + spin * t);
+                if (t < 1) {
+                    this.hatFallRaf = requestAnimationFrame(step);
+                } else {
+                    this.hatFallRaf = null;
+                    this.set_hat_world_pos(end.x, end.y, startRot + spin);
+                    this.hatGroundPos = end;
+                    AudioCont.play_sound_effect("thud");
+                    resolve();
+                }
+            };
+            this.hatFallRaf = requestAnimationFrame(step);
+        });
+    }
+
+    async fennimal_retrieves_hat() {
+        await wait(350);
+        const hatPos = this.hatGroundPos || this.hatWorldPos;
+        const fen = getSVGInternalCenter(this.basics.Fennimal);
+        const dx = (hatPos.x - 50) - fen.x;
+        await this.basics.Fennimal_move_relative(dx, 0, 700);
+        await wait(120);
+
+        const standTransform = this.basics.Fennimal.style.transform;
+        this.basics.Fennimal.style.transition = "transform 160ms ease-in";
+        this.basics.Fennimal.style.transform = standTransform + " translateY(18px)";
+        await wait(180);
+
+        const head = this.get_worn_hat_attachment_point();
+        const from = this.hatWorldPos || hatPos;
+        const startScale = this.hatEndScale || 2.4;
+        const endScale = this.hatStartScale || startScale;
+        const startRot = 40;
+        await new Promise(resolve => {
+            const duration = 380;
+            const t0 = performance.now();
+            const step = (now) => {
+                const t = Math.min(1, (now - t0) / duration);
+                const ease = t * t * (3 - 2 * t);
+                const x = from.x + (head.x - from.x) * ease;
+                const y = from.y + (head.y - from.y) * ease;
+                this.set_hat_world_pos(x, y, startRot * (1 - ease));
+                if (this.HatScaleGroup) {
+                    const s = startScale + (endScale - startScale) * ease;
+                    this.HatScaleGroup.setAttribute("transform", `scale(${s})`);
+                }
+                if (t < 1) requestAnimationFrame(step);
+                else resolve();
+            };
+            requestAnimationFrame(step);
+        });
+
+        if (this.Hat) this.Hat.style.opacity = 0;
+        this.show_worn_hat();
+        this.clear_fennimal_sad_expression();
+        AudioCont.play_sound_effect("success");
+
+        this.basics.Fennimal.style.transition = "transform 180ms ease-out";
+        this.basics.Fennimal.style.transform = standTransform;
+        await wait(220);
+    }
+
+    async start_sequence() {
+        this.basics.create_svg_sublayers();
+
+        if (this.partner.is_present) {
+            this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        }
+
+        await this.basics.create_background_mask(true, 500);
+
+        await AskFennimalOverlay.run(this);
+
+        await this.basics.create_and_appear_Fennimal(
+            this.basics.ItemLayers.Plus2,
+            this.Fen_base_x,
+            this.baseline_y,
+            1.5,
+            250,
+            () => AskHatOverlay.hideWornHat(this)
+        );
+        this.FennimalBaseTransform = this.basics.Fennimal.style.transform;
+        await TypedNameAskOverlay.run(this);
+        await AskHatOverlay.run(this);
+        await AskHatOverlay.revealWornHat(this);
+
+        this.create_pole();
+
+        this.basics.ItemLayers.Plus2.appendChild(this.basics.Fennimal);
+
+        await wait(1000);
+        await this.blow_hat_onto_pole();
+
+        Interface.Prompt.show_message(`Oh no! ${this.FenObj.name}'s ${this.FenObj.hat} has blown onto a ${this.polename}`);
+        AudioCont.play_sound_effect("sad");
+
+        this.show_first_attempt_to_reach_hat();
+    }
+
+    clean_up() {
+        this.clear_idle_shake_watchdog();
+        this.hat_is_clickable = false;
+        if (this.hatFlightRaf) {
+            cancelAnimationFrame(this.hatFlightRaf);
+            this.hatFlightRaf = null;
+        }
+        if (this.shakeRaf) {
+            cancelAnimationFrame(this.shakeRaf);
+            this.shakeRaf = null;
+        }
+        if (this.hatFallRaf) {
+            cancelAnimationFrame(this.hatFallRaf);
+            this.hatFallRaf = null;
+        }
+        if (this.hatSettleRaf) {
+            cancelAnimationFrame(this.hatSettleRaf);
+            this.hatSettleRaf = null;
+        }
+        this.basics.clean_up();
+        if (this.HatOutline) this.HatOutline.remove();
+        if (this.Hat) this.Hat.remove();
+        if (this.PolePivot) this.PolePivot.remove();
+        else if (this.Pole) this.Pole.remove();
+        if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
+        else if (this.partner.PartnerTranslateGroup) this.partner.PartnerTranslateGroup.remove();
+    }
+}
+
+class HideAndSeekFennimalTrialController {
+    // Solo unless the phase/trial explicitly asks for a partner (partner_behavior or force_partner_present).
+    static should_include_partner(FenObj) {
+        if (!FenObj) return false;
+        if (FenObj.force_partner_present === true) return true;
+        const pb = FenObj.partner_behavior;
+        return pb === "active" || pb === "present" || pb === "passive" || pb === true;
+    }
+
+    constructor(FenObj, partner_is_present, returnfunc) {
+        this.FenObj = FenObj;
+        this.returnfunc = returnfunc;
+        this.is_task_active = true;
+
+        this.basics = new BasicElementsModule(FenObj);
+        const includePartner = HideAndSeekFennimalTrialController.should_include_partner(FenObj);
+        this.partner = new PartnerModule(includePartner);
+        this.foliageLogic = new FoliageModule(FenObj, includePartner);
+
+        // Fewer, larger plants so each one actually covers the hiding Fennimal.
+        this.Spots = {
+            Main:  [.16, .38, .62, .86],
+            Plus1: [.12, .40, .68, .92],
+            Plus2: [.24, .54, .84],
+        };
+        this.layer_y_pos = { Main: .60, Plus1: .70, Plus2: .72 };
+        this.FoliageSizes = { Main: 3.4, Plus1: 4.3, Plus2: 5.1 };
+
+        this.hide_scale = 0.8;
+        this.found_scale = 1.75;
+        this.found_x = 0.40 * this.basics.W;
+        this.found_y = 0.80 * this.basics.H;
+    }
+
+    pick_hide_spot() {
+        // Middle 80% of width; feet in the upper part of the bottom third (further-away pose).
+        this.hide_x = (0.10 + Math.random() * 0.80) * this.basics.W;
+        this.hide_y = (0.68 + Math.random() * 0.12) * this.basics.H;
+    }
+
+    get_fennimal_feet_in_svg() {
+        const el = this.basics.Fennimal;
+        const svg = el.ownerSVGElement;
+        const bbox = el.getBBox();
+        const localPoint = svg.createSVGPoint();
+        localPoint.x = bbox.x + bbox.width / 2;
+        localPoint.y = bbox.y + bbox.height;
+        const matrixToSVG = svg.getScreenCTM().inverse().multiply(el.getScreenCTM());
+        return localPoint.matrixTransform(matrixToSVG);
+    }
+
+    enable_fennimal_click() {
+        const fen = this.basics.Fennimal;
+        fen.style.cursor = "pointer";
+        fen.style.pointerEvents = "auto";
+        fen.onpointerdown = (event) => {
+            if (this.click_is_on_worn_hat(event)) return;
+            this.handle_fennimal_found();
+        };
+    }
+
+    click_is_on_worn_hat(event) {
+        const fen = this.basics.Fennimal;
+        if (!fen) return false;
+        const hat = fen.getElementsByClassName("hat")[0];
+        if (!hat) return false;
+        let node = event && event.target;
+        while (node && node !== fen) {
+            if (node === hat || (node.classList && node.classList.contains("hat"))) return true;
+            node = node.parentNode;
+        }
+        return false;
+    }
+
+    disable_fennimal_click() {
+        const fen = this.basics.Fennimal;
+        if (!fen) return;
+        fen.onpointerdown = null;
+        fen.style.cursor = "auto";
+    }
+
+    animate_scale_to(targetScale, ms) {
+        const start = this.basics.baseScale != null ? this.basics.baseScale : 1;
+        const t0 = performance.now();
+        return new Promise((resolve) => {
+            const tick = (now) => {
+                const u = Math.min(1, (now - t0) / ms);
+                this.basics.baseScale = start + (targetScale - start) * u;
+                if (u < 1) requestAnimationFrame(tick);
+                else resolve();
+            };
+            requestAnimationFrame(tick);
+        });
+    }
+
+    async bring_fennimal_to_foreground() {
+        this.basics.ItemLayers.Plus2.appendChild(this.basics.Fennimal);
+        const feet = this.get_fennimal_feet_in_svg();
+        const dx = this.found_x - feet.x;
+        const dy = this.found_y - feet.y;
+        const moveMs = 550;
+        const scalePromise = this.animate_scale_to(this.found_scale, moveMs);
+        await this.basics.Fennimal_move_relative(dx, dy, moveMs);
+        await scalePromise;
+    }
+
+    async handle_fennimal_found() {
+        if (!this.is_task_active) return;
+        this.is_task_active = false;
+        this.disable_fennimal_click();
+        this.foliageLogic.stop_partner_cutting();
+
+        AudioCont.play_sound_effect("success");
+        await this.foliageLogic.fade_out_all(400);
+
+        if (this.partner.is_present) {
+            await this.partner.return_to_start(this.hide_x);
+        }
+
+        Interface.Prompt.show_message(`Yay! You found ${this.FenObj.name}!`);
+        await this.bring_fennimal_to_foreground();
+        await TypedNameAskOverlay.run(this);
+        await AskHatOverlay.run(this);
+        await AskHatOverlay.revealWornHat(this);
+        if (!this.FenObj.ask_name && !this.FenObj.ask_hat) await wait(250);
+
+        AudioCont.play_sound_effect("positive");
+        Interface.Prompt.show_message(`${this.FenObj.name} is happy you found them!`);
+        await this.basics.perform_success_celebration(null);
+        await wait(750);
+        this.returnfunc();
+    }
+
+    get_hide_cover_points() {
+        const fen = this.basics.Fennimal;
+        if (!fen) return [];
+        const classNames = [
+            "Fennimal_body_center_point",
+            "Fennimal_body_neck_point",
+            "Fennimal_head_neck_point",
+            "Fennimal_head_mouth_point"
+        ];
+        const points = [];
+        classNames.forEach((name) => {
+            const el = fen.getElementsByClassName(name)[0];
+            if (!el) return;
+            try {
+                points.push(getSVGInternalCenter(el));
+            } catch (err) { /* skip unmeasurable landmarks */ }
+        });
+        return points;
+    }
+
+    foliage_covers_hide_landmarks() {
+        if (this.basics.Fennimal && this.basics.Fennimal.getBoundingClientRect) {
+            this.basics.Fennimal.getBoundingClientRect();
+        }
+        const points = this.get_hide_cover_points();
+        if (points.length === 0) return true;
+        return points.every((pt) => this.foliageLogic.covers_svg_point(pt));
+    }
+
+    ensure_fennimal_hidden_by_foliage() {
+        if (this.foliage_covers_hide_landmarks()) return;
+        const body = this.basics.TargetPoints.Fennimal_body_center;
+        let coverX = this.hide_x;
+        try {
+            if (body) coverX = getSVGInternalCenter(body).x;
+        } catch (err) { /* keep hide_x */ }
+        this.foliageLogic.spawn_one_plant_at(
+            this.basics.ItemLayers,
+            coverX,
+            this.layer_y_pos.Plus2 * this.basics.H,
+            this.FoliageSizes.Plus2,
+            "Plus2"
+        );
+    }
+
+    async start_sequence() {
+        this.basics.create_svg_sublayers();
+        await this.basics.create_background_mask(true, 500);
+
+        await AskFennimalOverlay.run(this);
+
+        if (this.partner.is_present) {
+            this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        }
+
+        this.pick_hide_spot();
+        await this.basics.create_and_appear_Fennimal(
+            this.basics.ItemLayers.Main,
+            this.hide_x,
+            this.hide_y,
+            this.hide_scale,
+            0,
+            () => AskHatOverlay.hideWornHat(this)
+        );
+
+        // Spawn after the Fennimal so same-layer plants sit in front of it.
+        this.foliageLogic.spawn_foliage(
+            this.basics.ItemLayers,
+            this.Spots,
+            this.layer_y_pos,
+            this.FoliageSizes
+        );
+        this.ensure_fennimal_hidden_by_foliage();
+
+        const keepNameless = !!(this.FenObj.ask_name || this.FenObj.ask_Fennimal);
+        Interface.Prompt.show_message(
+            keepNameless
+                ? "Let's play hide-and-seek! A Fennimal is hiding in the plants."
+                : `Let's play hide-and-seek! ${this.FenObj.name} is hiding in the plants.`
+        );
+        AudioCont.play_sound_effect("alert");
+        await wait(1500);
+        Interface.Prompt.show_message(
+            keepNameless
+                ? "Cut down the plants until you find them, then click on them."
+                : `Cut down the plants until you find ${this.FenObj.name}, then click on them.`
+        );
+
+        this.enable_fennimal_click();
+        this.foliageLogic.make_foliage_cuttable();
+
+        if (this.partner.is_present) {
+            this.foliageLogic.start_partner_cutting(this.partner, this.hide_x);
+        }
+    }
+
+    clean_up() {
+        this.is_task_active = false;
+        this.foliageLogic.stop_partner_cutting();
+        this.disable_fennimal_click();
+        this.basics.clean_up();
+        this.foliageLogic.clean_up();
+        if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
+    }
+}
+
+
+/**
+ * Hat laundry: optional identity quiz → hatless Fennimal → comfort →
+ * match the correct hat from a basket of phase hats.
+ */
+class HatLaundryTrialController {
+    constructor(FenObj, partner_is_present, returnfunc) {
+        this.FenObj = FenObj;
+        this.returnfunc = returnfunc;
+
+        this.basics = new BasicElementsModule(FenObj);
+        this.partner = new PartnerModule(partner_is_present);
+        this.params = GenParam.HatLaundry;
+
+        this.hats = [];
+        this.dragControllers = [];
+        this.activeHat = null;
+        this.matchingComplete = false;
+        this.BasketBack = null;
+        this.BasketFront = null;
+        this.basketX = 0;
+        this.hatBasketBounds = null;
+        this.hatScale = 4.2;
+        this._hatMoveGen = 0;
+
+        this.FenObj.hat_errors_made = [];
+    }
+
+    get_laundry_hat_ids() {
+        let ids = Array.isArray(this.FenObj.laundry_hats)
+            ? this.FenObj.laundry_hats.filter(Boolean)
+            : [];
+        if (this.FenObj.hat && !ids.includes(this.FenObj.hat)) ids.unshift(this.FenObj.hat);
+        ids = [...new Set(ids)];
+        if (ids.length === 0) {
+            console.error("HatLaundryTrialController: no hats available for the current phase.");
+        }
+        return ids;
+    }
+
+    get_worn_hat() {
+        return this.basics.Fennimal && this.basics.Fennimal.getElementsByClassName("hat")[0];
+    }
+
+    hide_worn_hat() {
+        let wornHat = this.get_worn_hat();
+        if (!wornHat) return;
+        wornHat.style.opacity = 0;
+        wornHat.style.pointerEvents = "none";
+    }
+
+    fade_in_worn_hat(ms = 350) {
+        let wornHat = this.get_worn_hat();
+        if (!wornHat) return wait(ms);
+        wornHat.style.transition = `opacity ${ms}ms ease-out`;
+        wornHat.style.opacity = 1;
+        return wait(ms);
+    }
+
+    get_svg_bounds(element) {
+        const svg = element && element.ownerSVGElement;
+        if (!element || !svg) {
+            return { x: 0, y: 0, right: 0, bottom: 0, width: 0, height: 0, cx: 0, cy: 0, top: 0, left: 0 };
+        }
+        try {
+            const r = element.getBoundingClientRect();
+            const screenCTM = svg.getScreenCTM();
+            if (!screenCTM) throw new Error("no screen CTM");
+            const inv = screenCTM.inverse();
+            const toSvg = (x, y) => {
+                const pt = svg.createSVGPoint();
+                pt.x = x;
+                pt.y = y;
+                return pt.matrixTransform(inv);
+            };
+            const a = toSvg(r.left, r.top);
+            const b = toSvg(r.right, r.bottom);
+            const x = Math.min(a.x, b.x);
+            const y = Math.min(a.y, b.y);
+            const right = Math.max(a.x, b.x);
+            const bottom = Math.max(a.y, b.y);
+            return {
+                x, y, right, bottom,
+                width: right - x,
+                height: bottom - y,
+                cx: (x + right) / 2,
+                cy: (y + bottom) / 2,
+                top: y,
+                left: x
+            };
+        } catch (err) {
+            let b = element.getBBox();
+            return {
+                x: b.x, y: b.y, right: b.x + b.width, bottom: b.y + b.height,
+                width: b.width, height: b.height,
+                cx: b.x + b.width / 2, cy: b.y + b.height / 2,
+                top: b.y, left: b.x
+            };
+        }
+    }
+
+    begin_hat_move_generation() {
+        this._hatMoveGen = (this._hatMoveGen || 0) + 1;
+        return this._hatMoveGen;
+    }
+
+    sync_hat_transform_to_visual_center(hatInfo) {
+        if (!hatInfo || !hatInfo.elem) return;
+        let c;
+        try {
+            c = getSVGInternalCenter(hatInfo.elem);
+        } catch (err) {
+            return;
+        }
+        hatInfo.elem.style.transition = "none";
+        hatInfo.elem.style.transform = `translate(${c.x}px, ${c.y}px)`;
+        void window.getComputedStyle(hatInfo.elem).transform;
+    }
+
+    unwrap_hat(hatInfo) {
+        if (!hatInfo || !hatInfo.elem) return;
+        let center = null;
+        try {
+            center = getSVGInternalCenter(hatInfo.elem);
+        } catch (err) { /* keep previous transform */ }
+        if (hatInfo.dragController && hatInfo.dragController.destroy) {
+            let controller = hatInfo.dragController;
+            hatInfo.dragController.destroy();
+            this.dragControllers = this.dragControllers.filter((c) => c !== controller);
+            hatInfo.dragController = null;
+        }
+        hatInfo.elem.style.transition = "none";
+        if (center) {
+            hatInfo.elem.style.transform = `translate(${center.x}px, ${center.y}px)`;
+        }
+        void window.getComputedStyle(hatInfo.elem).transform;
+    }
+
+    async set_hat_position(hatInfo, x, y, time = 0, easing = "ease-in-out", moveGen = null) {
+        if (!hatInfo || !hatInfo.elem) return;
+        if (moveGen != null && moveGen !== this._hatMoveGen) return;
+
+        void window.getComputedStyle(hatInfo.elem).transform;
+        if (time > 0) {
+            hatInfo.elem.style.transition = `transform ${time}ms ${easing}`;
+            void window.getComputedStyle(hatInfo.elem).transform;
+            hatInfo.elem.style.transform = `translate(${x}px, ${y}px)`;
+            await wait(time);
+            if (moveGen != null && moveGen !== this._hatMoveGen) return;
+            hatInfo.elem.style.transition = "";
+        } else {
+            hatInfo.elem.style.transition = "none";
+            hatInfo.elem.style.transform = `translate(${x}px, ${y}px)`;
+            void window.getComputedStyle(hatInfo.elem).transform;
+        }
+    }
+
+    send_hat_to_basket_layer(hatInfo) {
+        if (!hatInfo || !hatInfo.elem) return;
+        this.basics.ItemLayers.Plus1.appendChild(hatInfo.elem);
+        if (this.BasketFront) this.basics.ItemLayers.Plus1.appendChild(this.BasketFront);
+    }
+
+    send_hat_to_air_layer(hatInfo) {
+        if (!hatInfo || !hatInfo.elem) return;
+        this.basics.ItemLayers.Plus2.appendChild(hatInfo.elem);
+    }
+
+    get_hat_basket_bounds() {
+        return this.hatBasketBounds || (this.BasketBack ? this.get_svg_bounds(this.BasketBack) : null);
+    }
+
+    random_basket_pos() {
+        const b = this.get_hat_basket_bounds();
+        return {
+            x: b.cx + (Math.random() - 0.5) * b.width * 0.45,
+            y: b.top + b.height * (0.18 + Math.random() * 0.28)
+        };
+    }
+
+    get_column_slots(count) {
+        const p = this.params;
+        const top = p.columnTopY * this.basics.H;
+        const basket = this.get_hat_basket_bounds();
+        const lift = p.columnBottomLift != null ? p.columnBottomLift : 36;
+        const bottom = Math.max(top + 48, basket.top - lift);
+        const ys = [];
+        if (count <= 1) {
+            ys.push((top + bottom) / 2);
+        } else {
+            for (let i = 0; i < count; i++) {
+                ys.push(top + (i / (count - 1)) * (bottom - top));
+            }
+        }
+
+        const maxXSpread = Math.min(0.14 * this.basics.W, Math.max(24, (count - 1) * 22));
+        const fenLimit = (p.fennimalX * this.basics.W) - 220;
+        return ys.map((y, i) => {
+            let t = count <= 1 ? 0 : (i / (count - 1)) - 0.5;
+            let x = this.basketX + t * 2 * maxXSpread;
+            x = Math.min(Math.max(x, 0.06 * this.basics.W), fenLimit);
+            return { x, y };
+        });
+    }
+
+    create_laundry_hat(hatId, x, y) {
+        let template = document.getElementById("hat_" + hatId);
+        if (!template) {
+            console.warn("HatLaundryTrialController: missing hat_" + hatId);
+            return null;
+        }
+        let hat = copy_scale_and_move_object_to_position(
+            template,
+            this.basics.ItemLayers.Plus1,
+            x,
+            y,
+            this.hatScale,
+            "laundry_hat_" + hatId
+        );
+        hat.dataset.laundryHat = hatId;
+        hat.style.pointerEvents = "auto";
+        return hat;
+    }
+
+    async appear_fennimal() {
+        const p = this.params;
+        await this.basics.create_and_appear_Fennimal(
+            this.basics.ItemLayers.Plus2,
+            p.fennimalX * this.basics.W,
+            p.fennimalY * this.basics.H,
+            p.fennimalScale,
+            250,
+            () => this.hide_worn_hat()
+        );
+        this.hatScale = (this.basics.baseScale || p.fennimalScale) * 2 * (p.hatScaleMultiplier || 1.2);
+    }
+
+    async run_sad_and_comfort() {
+        const name = this.FenObj.name;
+        await wait(1000);
+
+        Interface.Prompt.show_message(name + " is sad because they don't have their hat");
+        let comfort = this.basics.trigger_comfort_checkin({ clickDelayMs: 1500 });
+        await wait(1500);
+        Interface.Prompt.show_message("Click on " + name + " to comfort them!");
+        await comfort;
+        await wait(350);
+    }
+
+    async reveal_laundry_basket() {
+        const p = this.params;
+        this.basketX = p.basketX * this.basics.W;
+        let spawnY = p.basketY * this.basics.H;
+
+        let template = document.getElementById("laundry_basket");
+        if (!template) {
+            console.error("HatLaundryTrialController: missing laundry_basket asset.");
+            return;
+        }
+
+        this.BasketBack = copy_scale_and_move_object_to_position(
+            template,
+            this.basics.ItemLayers.Main,
+            this.basketX,
+            spawnY,
+            p.basketScale
+        );
+        let frontOnBack = this.BasketBack.getElementsByClassName("laundry_basket_front")[0];
+        if (frontOnBack) frontOnBack.remove();
+
+        this.BasketFront = copy_scale_and_move_object_to_position(
+            template,
+            this.basics.ItemLayers.Plus1,
+            this.basketX,
+            spawnY,
+            p.basketScale
+        );
+        let backOnFront = this.BasketFront.getElementsByClassName("laundry_basket_back")[0];
+        if (backOnFront) backOnFront.remove();
+
+        let bounds = this.get_svg_bounds(this.BasketBack);
+        let targetBottom = p.fennimalY * this.basics.H + (p.basketBottomOffset != null ? p.basketBottomOffset : 28);
+        let dy = targetBottom - bounds.bottom;
+        if (Math.abs(dy) > 1) {
+            spawnY += dy;
+            [this.BasketBack, this.BasketFront].forEach((el) => {
+                el.style.transform = `translate(${this.basketX}px, ${spawnY}px)`;
+            });
+        }
+
+        // Freeze hat pile / column targets at this alignment, then lift only the basket graphic.
+        this.hatBasketBounds = this.get_svg_bounds(this.BasketBack);
+        let basketLift = p.basketLift != null ? p.basketLift : 90;
+        if (basketLift) {
+            spawnY -= basketLift;
+            [this.BasketBack, this.BasketFront].forEach((el) => {
+                el.style.transform = `translate(${this.basketX}px, ${spawnY}px)`;
+            });
+        }
+
+        [this.BasketBack, this.BasketFront].forEach((el) => {
+            el.style.opacity = 0;
+            el.style.pointerEvents = "none";
+        });
+        window.getComputedStyle(this.BasketBack).opacity;
+        [this.BasketBack, this.BasketFront].forEach((el) => {
+            el.style.transition = "opacity 300ms ease-out";
+            el.style.opacity = 1;
+        });
+        await wait(300);
+    }
+
+    async spawn_hats_in_basket() {
+        const p = this.params;
+        let hatIds = shuffleArray(this.get_laundry_hat_ids());
+        this.hats = [];
+
+        for (let i = 0; i < hatIds.length; i++) {
+            let pos = this.random_basket_pos();
+            let elem = this.create_laundry_hat(hatIds[i], pos.x, pos.y);
+            if (!elem) continue;
+            elem.style.opacity = 0;
+            let entry = {
+                elem,
+                hatId: hatIds[i],
+                isCorrect: hatIds[i] === this.FenObj.hat,
+                inColumn: false,
+                homeX: pos.x,
+                homeY: pos.y,
+                pileX: pos.x,
+                pileY: pos.y,
+                dragController: null
+            };
+            this.hats.push(entry);
+            this.send_hat_to_basket_layer(entry);
+            window.getComputedStyle(elem).opacity;
+            elem.style.transition = "opacity 220ms ease-out";
+            elem.style.opacity = 1;
+        }
+
+        await wait(280);
+        await this.pop_hats_into_column(p.hatMoveTime, p.hatPopStagger);
+    }
+
+    async pop_hats_into_column(moveTime, stagger) {
+        let moveGen = this.begin_hat_move_generation();
+        let slots = this.get_column_slots(this.hats.length);
+        for (let i = 0; i < this.hats.length; i++) {
+            if (moveGen !== this._hatMoveGen) return;
+            let hatInfo = this.hats[i];
+            hatInfo.homeX = slots[i].x;
+            hatInfo.homeY = slots[i].y;
+            hatInfo.inColumn = true;
+            this.sync_hat_transform_to_visual_center(hatInfo);
+            this.send_hat_to_air_layer(hatInfo);
+            await this.set_hat_position(
+                hatInfo,
+                hatInfo.homeX,
+                hatInfo.homeY,
+                moveTime,
+                "ease-out",
+                moveGen
+            );
+            if (stagger) await wait(stagger);
+        }
+    }
+
+    async drop_other_hats_into_basket(exceptHat) {
+        const p = this.params;
+        let moveGen = this.begin_hat_move_generation();
+        let others = this.hats.filter((h) => h !== exceptHat && h.elem);
+        await Promise.all(others.map(async (hatInfo) => {
+            hatInfo.inColumn = false;
+            this.unwrap_hat(hatInfo);
+            this.send_hat_to_air_layer(hatInfo);
+            let pos = {
+                x: hatInfo.pileX != null ? hatInfo.pileX : hatInfo.homeX,
+                y: hatInfo.pileY != null ? hatInfo.pileY : hatInfo.homeY
+            };
+            hatInfo.basketX = pos.x;
+            hatInfo.basketY = pos.y;
+            await this.set_hat_position(
+                hatInfo,
+                pos.x,
+                pos.y,
+                p.hatFallTime || 380,
+                "cubic-bezier(0.4, 0.0, 0.8, 0.6)",
+                moveGen
+            );
+            if (moveGen !== this._hatMoveGen) return;
+            this.send_hat_to_basket_layer(hatInfo);
+        }));
+    }
+
+    async respread_column_hats() {
+        const p = this.params;
+        let moveGen = this.begin_hat_move_generation();
+        let active = this.hats.filter((h) => h.elem);
+        active.forEach((h) => {
+            this.unwrap_hat(h);
+            this.sync_hat_transform_to_visual_center(h);
+            this.send_hat_to_air_layer(h);
+            h.inColumn = true;
+        });
+        let slots = shuffleArray(this.get_column_slots(active.length));
+        await Promise.all(active.map((hatInfo, i) => {
+            hatInfo.homeX = slots[i].x;
+            hatInfo.homeY = slots[i].y;
+            return this.set_hat_position(
+                hatInfo,
+                hatInfo.homeX,
+                hatInfo.homeY,
+                p.hatMoveTime,
+                "ease-out",
+                moveGen
+            );
+        }));
+    }
+
+    destroy_all_drag_controllers() {
+        this.hats.forEach((h) => this.unwrap_hat(h));
+        this.dragControllers.forEach((c) => {
+            if (c && c.destroy) c.destroy();
+        });
+        this.dragControllers = [];
+        this.hats.forEach((h) => { h.dragController = null; });
+    }
+
+    enable_hat_dragging() {
+        this.destroy_all_drag_controllers();
+        this.hats.forEach((hatInfo) => {
+            if (!hatInfo.elem || !hatInfo.elem.parentNode) return;
+            this.sync_hat_transform_to_visual_center(hatInfo);
+            this.send_hat_to_air_layer(hatInfo);
+            let controller = MakeObjectDraggableObject(
+                this.basics.ItemLayers.Plus2,
+                this.basics.ItemLayers.Questions,
+                hatInfo.elem,
+                this.basics.Fennimal,
+                this.params.dropDistance,
+                (elem) => this.on_hat_dropped_on_fennimal(elem),
+                {
+                    onStart: (elem) => this.on_hat_drag_start(elem),
+                    onMiss: (elem) => this.on_hat_drag_miss(elem),
+                    validateDrop: (dist, event) => this.hat_is_over_fennimal(event)
+                }
+            );
+            this.dragControllers.push(controller);
+            hatInfo.dragController = controller;
+        });
+    }
+
+    hat_is_over_fennimal(event) {
+        if (!this.basics.Fennimal) return false;
+        let mouse = getMousePosition(event);
+        let b = this.get_svg_bounds(this.basics.Fennimal);
+        const pad = 36;
+        return mouse.x >= b.left - pad && mouse.x <= b.right + pad
+            && mouse.y >= b.top - pad && mouse.y <= b.bottom + pad;
+    }
+
+    find_hat_info(elem) {
+        return this.hats.find((h) => h.elem === elem);
+    }
+
+    on_hat_drag_start(elem) {
+        if (this.matchingComplete) return;
+        let info = this.find_hat_info(elem);
+        if (!info) return;
+        this.activeHat = info;
+        info.inColumn = false;
+
+        this.hats.forEach((h) => {
+            if (h === info) return;
+            this.unwrap_hat(h);
+        });
+        this.dragControllers = this.dragControllers.filter((c) => info.dragController === c);
+        this.drop_other_hats_into_basket(info);
+    }
+
+    async on_hat_drag_miss(elem) {
+        if (this.matchingComplete) return;
+        let info = this.find_hat_info(elem);
+        if (!info) return;
+        this.destroy_all_drag_controllers();
+        info.inColumn = true;
+        await this.respread_column_hats();
+        this.enable_hat_dragging();
+        this.activeHat = null;
+    }
+
+    async on_hat_dropped_on_fennimal(elem) {
+        if (this.matchingComplete) return;
+        let info = this.find_hat_info(elem);
+        if (!info) return;
+
+        if (!info.isCorrect) {
+            AudioCont.play_sound_effect("rejected");
+            this.FenObj.hat_errors_made.push(info.hatId);
+            Interface.Prompt.show_message("Oops! That's not " + this.FenObj.name + "'s hat!");
+            this.destroy_all_drag_controllers();
+            this.send_hat_to_air_layer(info);
+            info.inColumn = true;
+            await this.respread_column_hats();
+            Interface.Prompt.show_message("Drag " + this.FenObj.name + "'s hat onto " + this.FenObj.name + "!");
+            this.enable_hat_dragging();
+            this.activeHat = null;
+            return;
+        }
+
+        this.matchingComplete = true;
+        this.destroy_all_drag_controllers();
+        await this.handle_correct_hat(info);
+    }
+
+    async handle_correct_hat(correctHat) {
+        const name = this.FenObj.name;
+        const hatName = (typeof GenParam !== "undefined" && GenParam.get_hat_printed_name)
+            ? GenParam.get_hat_printed_name(this.FenObj.hat)
+            : (this.FenObj.hat || "hat");
+        AudioCont.play_sound_effect("success");
+        Interface.Prompt.show_message(name + " is very happy that you returned the " + hatName + "!");
+
+        if (correctHat.elem) {
+            correctHat.elem.style.transition = "opacity 320ms ease-out";
+            correctHat.elem.style.opacity = 0;
+            correctHat.elem.style.pointerEvents = "none";
+        }
+        await Promise.all([
+            this.fade_in_worn_hat(350),
+            wait(320)
+        ]);
+        if (correctHat.elem && correctHat.elem.parentNode) correctHat.elem.remove();
+        correctHat.elem = null;
+
+        this.fade_out_basket_and_remaining_hats();
+        await this.basics.perform_success_celebration(null);
+        await wait(1000);
+        this.returnfunc();
+    }
+
+    fade_out_basket_and_remaining_hats() {
+        let fadeTargets = this.hats.map((h) => h.elem).filter(Boolean);
+        if (this.BasketBack) fadeTargets.push(this.BasketBack);
+        if (this.BasketFront) fadeTargets.push(this.BasketFront);
+
+        fadeTargets.forEach((el) => {
+            el.style.transition = "opacity 400ms ease-out";
+            el.style.opacity = 0;
+            el.style.pointerEvents = "none";
+        });
+        setTimeout(() => {
+            fadeTargets.forEach((el) => { if (el && el.parentNode) el.remove(); });
+        }, 450);
+    }
+
+    async start_sequence() {
+        this.basics.create_svg_sublayers();
+        if (this.partner.is_present) {
+            this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        }
+        await this.basics.create_background_mask(true, 500);
+
+        await AskFennimalOverlay.run(this);
+
+        await this.appear_fennimal();
+        await TypedNameAskOverlay.run(this);
+        await AskHatOverlay.run(this);
+        await this.run_sad_and_comfort();
+
+        Interface.Prompt.hide();
+        await this.reveal_laundry_basket();
+        await this.spawn_hats_in_basket();
+
+        Interface.Prompt.show_message(
+            "Drag " + this.FenObj.name + "'s hat onto " + this.FenObj.name + "!"
+        );
+        this.enable_hat_dragging();
+    }
+
+    clean_up() {
+        this.matchingComplete = true;
+        this.destroy_all_drag_controllers();
+        this.hats.forEach((h) => { if (h.elem && h.elem.parentNode) h.elem.remove(); });
+        if (this.BasketBack) this.BasketBack.remove();
+        if (this.BasketFront) this.BasketFront.remove();
+        this.basics.clean_up();
+        if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
+        else if (this.partner.PartnerTranslateGroup) this.partner.PartnerTranslateGroup.remove();
+    }
+}
+
+
 class TrialFactory {
     // Archived interaction types live in 3_InteractiveFennimalController_archive.js
     // (not loaded by index.html). The cases below stay wired; loading that script
@@ -10364,11 +11990,14 @@ class TrialFactory {
                 }
                 return new FlySwatExtendedTrialController(FenObj, partner_is_present, returnfunc);
 
-            case "reach_hat":
-                if (typeof ReachHatTrialController === "undefined") {
-                    return TrialFactory.missingArchived(interaction_type, "ReachHatTrialController");
-                }
-                return new ReachHatTrialController(FenObj, partner_is_present, returnfunc);
+            case "hat_blown_away":
+                return new HatBlownAwayTrialController(FenObj, partner_is_present, returnfunc);
+
+            case "hat_laundry":
+                return new HatLaundryTrialController(FenObj, partner_is_present, returnfunc);
+
+            case "hide_and_seek_Fennimal":
+                return new HideAndSeekFennimalTrialController(FenObj, partner_is_present, returnfunc);
 
             case "find_box":
                 if (typeof FindBoxTrialController === "undefined") {

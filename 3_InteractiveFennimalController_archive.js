@@ -9,13 +9,17 @@
  *     <script type="text/javascript" src="3_InteractiveFennimalController_archive.js"></script>
  *   TrialFactory cases (and the partner_belief_multiple phase in Top_controller)
  *   are still wired; they construct these classes once this file is loaded.
+ *   Exception: hat_blown_away_drag_box is a sunset snapshot only — not wired.
  *
  * MANIFEST
  *   interaction_type              class
  *   ----------------------------- ------------------------------------
  *   fly_swat                      FlySwatTrialController
  *   fly_swat_extended             FlySwatExtendedTrialController
+ *   hat_blown_away_drag_box       HatBlownAwayDragBoxTrialController
+ *     (sunset snapshot of the box-as-step-stool hat_blown_away; not wired)
  *   reach_hat                     ReachHatTrialController
+ *     (older precursor; unused. live hat_blown_away is now click-to-shake)
  *   find_box                      FindBoxTrialController
  *   find_box_extended             FindBoxExtendedTrialController
  *   broken_toy_in_box             BrokenToyInBoxTrialController
@@ -665,6 +669,608 @@ class ReachHatTrialController {
         if (this.Hat) this.Hat.remove();
         if (this.BoxOutline) this.BoxOutline.remove();
         if (this.partner.PartnerTranslateGroup) this.partner.PartnerTranslateGroup.remove();
+    }
+}
+
+
+// SUNSET SNAPSHOT (Aug 2026): hat_blown_away_drag_box
+// Former live hat_blown_away / HatBlownAwayTrialController — drag a closed box
+// as a step-stool (crate prop if FenObj.toybox is missing). Not wired in TrialFactory.
+// Copy this class back into 3_InteractiveFennimalController.js to revive.
+class HatBlownAwayDragBoxTrialController {
+    constructor(FenObj, partner_is_present, returnfunc) {
+        this.FenObj = FenObj;
+        this.returnfunc = returnfunc;
+
+        this.using_fallback_crate = !FenObj.toybox;
+        this.boxFenObj = this.using_fallback_crate ? { toybox: "crate" } : FenObj;
+
+        this.basics = new BasicElementsModule(FenObj);
+        this.box = new BoxModule(this.boxFenObj);
+        this.partner = new PartnerModule(partner_is_present);
+
+        this.baseline_y = 0.85 * this.basics.H;
+        this.Fen_base_x = 0.1 * this.basics.W;
+        this.pole_dx = 0.7 * this.basics.W;
+
+        this.number_of_dragging_steps = partner_is_present ? 9 : 5;
+        this.draggin_step_counter = 0;
+        this.drag_time = 500;
+        this.box_is_movable = false;
+
+        const AllPoleNames = {
+            North: "Pine tree",
+            Mountains: "rock",
+            Village: "telephone pole",
+            Swamp: "dead tree",
+            Desert: "ruin",
+            Beach: "palm tree",
+            Jungle: "tree",
+            Flowerfields: "pillar",
+        };
+        this.polename = AllPoleNames[this.FenObj.region];
+    }
+
+    create_pole() {
+        this.Pole = copy_scale_and_move_object_to_position(
+            document.getElementById("tall_post_" + this.FenObj.region),
+            this.basics.ItemLayers.Neg1,
+            this.Fen_base_x,
+            0.4 * this.basics.H,
+            6
+        );
+        let BBox = this.Pole.getBBox();
+        this.PoleHatTarget = this.Pole.getElementsByClassName("tall_post_target")[0];
+
+        let TargetBox = getSVGInternalCenter(this.PoleHatTarget);
+        let delta_x = (this.Fen_base_x + this.pole_dx) - TargetBox.x;
+        let delta_y = this.baseline_y - (BBox.y + BBox.height);
+
+        this.Pole.style.transform = `translate(${delta_x}px, ${delta_y - 20}px)`;
+    }
+
+    get_worn_hat_attachment_point() {
+        let wornHat = this.basics.Fennimal && this.basics.Fennimal.getElementsByClassName("hat")[0];
+        let attach = wornHat && wornHat.getElementsByClassName("hat_attachment_point")[0];
+        if (attach) return getSVGInternalCenter(attach);
+        let headPoint = this.basics.Fennimal && this.basics.Fennimal.getElementsByClassName("Fennimal_head_hat_point")[0];
+        if (headPoint) return getSVGInternalCenter(headPoint);
+        return getSVGInternalCenter(this.basics.Fennimal);
+    }
+
+    hide_worn_hat() {
+        let wornHat = this.basics.Fennimal && this.basics.Fennimal.getElementsByClassName("hat")[0];
+        if (wornHat) wornHat.style.opacity = 0;
+    }
+
+    set_fennimal_sad_expression() {
+        this.basics.is_slumped = true;
+        if (this.basics.Fennimal) this.basics.Fennimal.classList.add("is-slumped");
+    }
+
+    create_flying_hat_at(worldX, worldY, parent) {
+        let template = document.getElementById("hat_" + this.FenObj.hat);
+        if (!template) {
+            console.warn("HatBlownAwayTrialController: missing hat_" + this.FenObj.hat);
+            return;
+        }
+        let svg = template.cloneNode(true);
+        if (typeof strip_svg_ids_from_subtree === "function") strip_svg_ids_from_subtree(svg);
+        else svg.removeAttribute("id");
+        svg.style.display = "inherit";
+
+        let attach = svg.getElementsByClassName("hat_attachment_point")[0];
+        let ax = attach ? parseFloat(attach.getAttribute("cx")) : 0;
+        let ay = attach ? parseFloat(attach.getAttribute("cy")) : 0;
+
+        let offsetGroup = create_SVG_group(0, 0);
+        offsetGroup.appendChild(svg);
+        offsetGroup.setAttribute("transform", `translate(${-ax}, ${-ay})`);
+
+        // Worn hats sit inside Fennimal scale × head scale × (2 / head scale) = Fennimal scale × 2.
+        this.hatStartScale = (this.basics.baseScale || 1.5) * 2;
+        this.hatEndScale = this.hatStartScale * 0.8;
+        this.HatScaleGroup = create_SVG_group(0, 0);
+        this.HatScaleGroup.appendChild(offsetGroup);
+        this.HatScaleGroup.setAttribute("transform", `scale(${this.hatStartScale})`);
+
+        this.HatRotGroup = create_SVG_group(0, 0);
+        this.HatRotGroup.appendChild(this.HatScaleGroup);
+
+        this.Hat = create_SVG_group(0, 0);
+        this.Hat.appendChild(this.HatRotGroup);
+        this.Hat.setAttribute("transform", `translate(${worldX}, ${worldY})`);
+        this.Hat.style.pointerEvents = "none";
+        parent.appendChild(this.Hat);
+    }
+
+    hat_flight_point(t, start, end) {
+        let travel = t * t * (3 - 2 * t);
+        let x = start.x + (end.x - start.x) * travel;
+        let y = start.y + (end.y - start.y) * travel;
+
+        let envelope = Math.sin(t * Math.PI);
+        let span = Math.hypot(end.x - start.x, end.y - start.y) || 1;
+        let nx = -(end.y - start.y) / span;
+        let ny = (end.x - start.x) / span;
+
+        let heave = Math.sin(t * Math.PI * 2.05) * 95 * envelope
+            + Math.sin(t * Math.PI * 4.6) * 32 * envelope;
+        let loft = Math.sin(t * Math.PI) * 40;
+        let sway = Math.sin(t * Math.PI * 3.05 + 0.5) * 22 * envelope;
+        x += nx * sway;
+        y += -heave - loft + ny * sway * 0.3;
+        return { x, y };
+    }
+
+    hat_flight_rotation(t) {
+        let envelope = Math.sin(t * Math.PI);
+        return -18 * envelope + 12 * Math.sin(t * Math.PI * 3.3) * envelope;
+    }
+
+    hat_flight_scale(t) {
+        let travel = t * t * (3 - 2 * t);
+        let startScale = this.hatStartScale || 3;
+        let endScale = this.hatEndScale != null ? this.hatEndScale : startScale * 0.8;
+        return startScale + (endScale - startScale) * travel;
+    }
+
+    animate_hat_flight(start, end, duration) {
+        return new Promise(resolve => {
+            let t0 = performance.now();
+            const step = (now) => {
+                if (!this.Hat) {
+                    this.hatFlightRaf = null;
+                    resolve();
+                    return;
+                }
+                let t = Math.min(1, (now - t0) / duration);
+                let p = this.hat_flight_point(t, start, end);
+                this.Hat.setAttribute("transform", `translate(${p.x}, ${p.y})`);
+                if (this.HatRotGroup) {
+                    this.HatRotGroup.setAttribute("transform", `rotate(${this.hat_flight_rotation(t)})`);
+                }
+                if (this.HatScaleGroup) {
+                    this.HatScaleGroup.setAttribute("transform", `scale(${this.hat_flight_scale(t)})`);
+                }
+                if (t < 1) {
+                    this.hatFlightRaf = requestAnimationFrame(step);
+                } else {
+                    this.hatFlightRaf = null;
+                    this.Hat.setAttribute("transform", `translate(${end.x}, ${end.y})`);
+                    if (this.HatRotGroup) this.HatRotGroup.setAttribute("transform", "rotate(0)");
+                    if (this.HatScaleGroup) {
+                        this.HatScaleGroup.setAttribute("transform", `scale(${this.hatEndScale})`);
+                    }
+                    resolve();
+                }
+            };
+            this.hatFlightRaf = requestAnimationFrame(step);
+        });
+    }
+
+    get_region_dust_colors() {
+        let rd = GenParam.RegionData && GenParam.RegionData[this.FenObj.region];
+        let raw = rd
+            ? [rd.lighter_color, rd.color, rd.darker_color, rd.surrounding_color]
+            : ["#D3D3D3", "#C0C0C0", "#A9A9A9"];
+        return raw.map((c) => {
+            if (typeof c !== "string") return "#C0C0C0";
+            if (c[0] === "#" && c.length === 9) return c.slice(0, 7);
+            return c;
+        });
+    }
+
+    spawn_gust_streaks(parent, startX, startY, targetX, targetY, count = 10) {
+        for (let i = 0; i < count; i++) {
+            let streak = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            streak.setAttribute("width", 110 + Math.random() * 70);
+            streak.setAttribute("height", 7 + Math.random() * 6);
+            streak.setAttribute("rx", 5);
+            streak.setAttribute("fill", "rgba(255, 255, 255, 0.9)");
+            streak.setAttribute("x", 0);
+            streak.setAttribute("y", 0);
+            streak.style.pointerEvents = "none";
+
+            let dx = targetX - startX;
+            let dy = targetY - startY;
+            let angle = Math.atan2(dy, dx) * (180 / Math.PI) + (Math.random() - 0.5) * 14;
+            let ox = startX + (Math.random() - 0.5) * 80;
+            let oy = startY + (Math.random() - 0.5) * 60;
+
+            streak.style.transformOrigin = "left center";
+            streak.style.transformBox = "fill-box";
+            streak.style.opacity = "0.9";
+            streak.style.transform = `translate(${ox}px, ${oy}px) rotate(${angle}deg) scaleX(0.25)`;
+            parent.appendChild(streak);
+
+            setTimeout(() => {
+                streak.style.transition = "transform 340ms ease-out";
+                streak.style.transform = `translate(${ox + dx * 0.92}px, ${oy + dy * 0.92}px) rotate(${angle}deg) scaleX(1.15)`;
+                setTimeout(() => {
+                    streak.style.transition = "opacity 200ms ease-in";
+                    streak.style.opacity = 0;
+                }, 160);
+                setTimeout(() => streak.remove(), 380);
+            }, 10 + i * 24);
+        }
+    }
+
+    spawn_gust_dust(parent, startX, startY) {
+        let colors = this.get_region_dust_colors();
+        for (let i = 0; i < 15; i++) {
+            const particle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            particle.setAttribute("r", Math.random() * 10 + 8);
+            particle.setAttribute("cx", startX + (Math.random() - 0.5) * 45);
+            particle.setAttribute("cy", startY + (Math.random() - 0.5) * 35);
+            particle.setAttribute("fill", colors[Math.floor(Math.random() * colors.length)]);
+            particle.style.pointerEvents = "none";
+            particle.style.opacity = "0.85";
+            particle.style.transformOrigin = "center";
+            particle.style.transformBox = "fill-box";
+            particle.style.transform = "translate(0px, 0px) scale(0.7)";
+            parent.appendChild(particle);
+
+            let dx = 75 + Math.random() * 155;
+            let dy = -(40 + Math.random() * 110);
+            let s = 1.4 + Math.random() * 1.2;
+            setTimeout(() => {
+                particle.style.transition = "transform 900ms ease-out, opacity 900ms ease-in";
+                particle.style.transform = `translate(${dx}px, ${dy}px) scale(${s})`;
+                particle.style.opacity = 0;
+                setTimeout(() => particle.remove(), 950);
+            }, 10 + i * 18);
+        }
+    }
+
+    async fennimal_gust_flinch() {
+        let base = this.FennimalBaseTransform;
+        this.basics.Fennimal.style.transition = "transform 90ms ease-out";
+        this.basics.Fennimal.style.transform = base + " translate(-30px, 16px) rotate(-8deg)";
+        await wait(120);
+        this.basics.Fennimal.style.transition = "transform 280ms cubic-bezier(0.2, 1.4, 0.4, 1)";
+        this.basics.Fennimal.style.transform = base;
+        await wait(280);
+    }
+
+    async blow_hat_onto_pole() {
+        let start = this.get_worn_hat_attachment_point();
+        let end = getSVGInternalCenter(this.PoleHatTarget);
+        let fxParent = this.basics.ItemLayers.Plus2;
+
+        this.spawn_gust_streaks(fxParent, start.x - 130, start.y + 15, start.x + 450, start.y - 70, 10);
+        this.spawn_gust_dust(fxParent, start.x, start.y);
+        setTimeout(() => {
+            this.spawn_gust_streaks(fxParent, start.x + 20, start.y - 10, end.x, end.y - 20, 8);
+            this.spawn_gust_dust(fxParent, start.x + 160, start.y - 30);
+        }, 220);
+
+        this.hide_worn_hat();
+        this.set_fennimal_sad_expression();
+        this.create_flying_hat_at(start.x, start.y, fxParent);
+        this.fennimal_gust_flinch();
+
+        await this.animate_hat_flight(start, end, 1500);
+        AudioCont.play_sound_effect("thud");
+        this.basics.ItemLayers.Plus1.appendChild(this.Hat);
+        if (this.basics.set_gaze_target) this.basics.set_gaze_target(this.Hat);
+    }
+
+    get_region_box_palette() {
+        let hue = (typeof get_region_hue_family === "function")
+            ? get_region_hue_family(this.FenObj.region)
+            : null;
+        if (!hue) hue = "gray";
+        let palette = GenParam.ColorHuePalettes && GenParam.ColorHuePalettes[hue];
+        if (!palette) {
+            console.warn("HatBlownAwayTrialController: no ColorHuePalettes entry for hue '" + hue + "'");
+            return null;
+        }
+        let region = GenParam.RegionData && GenParam.RegionData[this.FenObj.region];
+        let swap = GenParam.BoxSwapPalettes && GenParam.BoxSwapPalettes[hue];
+        return {
+            light_color: palette.light_color,
+            dark_color: palette.dark_color,
+            recolor_accents: true,
+            accent_color: (swap && swap.mid_color)
+                || (region && region.contrast_color)
+                || palette.dark_color
+        };
+    }
+
+    paint_fallback_crate() {
+        let scheme = this.get_region_box_palette();
+        if (!scheme) return;
+        [this.box.BoxBase, this.box.BoxTop].forEach((el) => {
+            if (el) set_box_color_scheme(el, scheme);
+        });
+    }
+
+    hide_prop_box_overlays() {
+        [this.box.BoxBase, this.box.BoxTop].forEach((root) => {
+            if (!root) return;
+            root.querySelectorAll(".box_decoration, .lost_found_tag_loose, .lost_found_tag_attached").forEach((el) => {
+                el.style.transition = "";
+                el.style.opacity = "0";
+                el.style.visibility = "hidden";
+                el.style.pointerEvents = "none";
+            });
+        });
+    }
+
+    spawnDust(clickX, clickY, svgElement) {
+        const colors = ['#D3D3D3', '#C0C0C0', '#A9A9A9', '#E5E4E2', "#000000"];
+        const numParticles = 6;
+
+        for (let i = 0; i < numParticles; i++) {
+            const particle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+
+            const radius = Math.random() * 20 + 20;
+            particle.setAttribute('r', radius);
+            particle.setAttribute('cx', clickX);
+            particle.setAttribute('cy', clickY);
+            particle.setAttribute('fill', colors[Math.floor(Math.random() * colors.length)]);
+            particle.classList.add('dust-cloud');
+
+            const endX = ((Math.random() - 0.5) * 120) - 200;
+            const endY = -(Math.random() * 50 + 40);
+            const finalScale = Math.random() * 1.5 + 2.5;
+
+            particle.style.setProperty('--x', `${endX}px`);
+            particle.style.setProperty('--y', `${endY}px`);
+            particle.style.setProperty('--s', finalScale);
+
+            svgElement.appendChild(particle);
+            setTimeout(() => particle.remove(), 800);
+        }
+    }
+
+    async show_first_attempt_to_reach_box() {
+        await wait(1000);
+
+        let dx = getSVGInternalCenter(this.PoleHatTarget).x - getSVGInternalCenter(this.basics.Fennimal).x;
+        await this.basics.Fennimal_move_relative(dx, 0, 500);
+
+        await this.basics.Fennimal_jump(200);
+        await this.basics.Fennimal_jump(275);
+        await this.basics.Fennimal_jump(250);
+
+        Interface.Prompt.show_message(`Oh no, ${this.FenObj.name} can't reach the ${this.FenObj.hat}!`);
+        AudioCont.play_sound_effect("sad");
+
+        this.basics.Fennimal.style.transition = "all 700ms ease-in-out";
+        this.basics.Fennimal.style.transform = this.FennimalBaseTransform;
+        await wait(850);
+
+        Interface.Prompt.show_message(`${this.FenObj.name} looks so sad! Click to cheer ${this.FenObj.name}  up.`);
+        await this.basics.trigger_comfort_checkin();
+        await wait(500);
+
+        Interface.Prompt.show_message(`The ${this.box.boxname} can be used as a step-stool!`);
+        await wait(1500);
+
+        if (this.partner.is_present) {
+            Interface.Prompt.show_message(`Take turns with ${this.partner.partnername} to move the ${this.box.boxname} to the ${this.polename}`);
+        } else {
+            Interface.Prompt.show_message(`Help ${this.FenObj.name} by moving the ${this.box.boxname} to the ${this.polename}`);
+        }
+
+        this.allow_box_being_moved();
+    }
+
+    allow_box_being_moved() {
+        this.box_is_movable = true;
+        this.box.BoxBase.style.cursor = "pointer";
+        this.box.BoxTop.style.cursor = "pointer";
+
+        this.box_moving_step_distance = Math.round(
+            (getSVGInternalCenter(this.PoleHatTarget).x - getSVGInternalCenter(this.box.BoxBase).x)
+            / this.number_of_dragging_steps
+        );
+
+        this.BoxOutline = create_SVG_outline_of_multiple_groups(this.box.BoxBase, this.box.BoxTop);
+        this.box.BoxBase.parentNode.insertBefore(this.BoxOutline, this.box.BoxBase);
+        this.BoxOutline.classList.add("focus_on_SVG_outline");
+
+        this.box.BoxBase.style.transition = `all ${this.drag_time}ms ease-in-out`;
+        this.box.BoxTop.style.transition = `all ${this.drag_time}ms ease-in-out`;
+        this.BoxOutline.style.transition = `all ${this.drag_time}ms ease-in-out`;
+
+        const box_clicked = () => this.try_moving_box();
+        this.box.BoxBase.onpointerdown = box_clicked;
+        this.box.BoxTop.onpointerdown = box_clicked;
+    }
+
+    async try_moving_box() {
+        if (!this.box_is_movable) return;
+
+        this.box_is_movable = false;
+        this.BoxOutline.classList.remove("focus_on_SVG_outline");
+        await this.move_box();
+
+        if (this.draggin_step_counter >= this.number_of_dragging_steps) {
+            this.box_moved_to_final_position();
+        } else {
+            if (this.partner.is_present) {
+                await this.partner.move_to_element_and_act(this.box.BoxBase, () => this.move_box());
+            }
+
+            if (this.draggin_step_counter >= this.number_of_dragging_steps) {
+                this.box_moved_to_final_position();
+            } else {
+                this.box_is_movable = true;
+                this.BoxOutline.classList.add("focus_on_SVG_outline");
+            }
+        }
+    }
+
+    move_box() {
+        return new Promise(resolve => {
+            AudioCont.play_sound_effect("drag_wood");
+            this.draggin_step_counter++;
+
+            this.box.BoxBase.style.transform += `translateX(${this.box_moving_step_distance}px)`;
+            this.box.BoxTop.style.transform += `translateX(${this.box_moving_step_distance}px)`;
+            this.BoxOutline.style.transform += `translateX(${this.box_moving_step_distance}px)`;
+
+            let Boxpos = getSVGInternalCenter(this.box.BoxBase);
+            this.spawnDust(Boxpos.x, Boxpos.y + 0.45 * this.box.BoxBase.getBBox().height, this.basics.ItemLayers.Main);
+
+            setTimeout(() => resolve(), 750);
+        });
+    }
+
+    Fennimal_jump_on_box(amount) {
+        return new Promise(resolve => {
+            AudioCont.play_sound_effect("jump");
+            this.basics.Fennimal.style.transition = "all 200ms ease-out";
+            this.basics.Fennimal.style.transform += `translateY(-${2 * amount}px)`;
+
+            setTimeout(() => {
+                this.basics.Fennimal.style.transition = "all 100ms ease-out";
+                this.basics.Fennimal.style.transform += `translateY(${amount}px)`;
+            }, 200);
+
+            setTimeout(() => resolve(), 500);
+        });
+    }
+
+    Fennimal_grabs_hat() {
+        return new Promise(resolve => {
+            let start_transform = this.basics.Fennimal.style.transform;
+            let wornHat = this.basics.Fennimal.getElementsByClassName("hat")[0];
+
+            AudioCont.play_sound_effect("jump");
+            this.basics.Fennimal.style.transition = "all 200ms ease-out";
+            this.basics.Fennimal.style.transform += `translateY(-250px)`;
+
+            setTimeout(() => {
+                this.Hat.style.transition = "all 50ms ease-out";
+                this.Hat.style.opacity = 0;
+                this.basics.Fennimal.style.transition = "all 100ms ease-out";
+                this.basics.Fennimal.style.transform = start_transform;
+            }, 200);
+
+            setTimeout(() => {
+                AudioCont.play_sound_effect("success");
+                if (wornHat) wornHat.style.opacity = 1;
+            }, 300);
+
+            setTimeout(() => resolve(), 500);
+        });
+    }
+
+    Fennimal_jumps_back_to_ground(ground_transform) {
+        return new Promise(resolve => {
+            AudioCont.play_sound_effect("jump");
+            this.basics.Fennimal.style.transition = "all 200ms ease-out";
+            this.basics.Fennimal.style.transform += `translateY(-50px)`;
+            setTimeout(() => {
+                this.basics.Fennimal.style.transform = ground_transform;
+            }, 200);
+            setTimeout(() => resolve(), 500);
+        });
+    }
+
+    async box_moved_to_final_position() {
+        this.box.BoxBase.onpointerdown = null;
+        this.box.BoxTop.onpointerdown = null;
+        if (this.BoxOutline) this.BoxOutline.remove();
+
+        AudioCont.play_sound_effect("success");
+        Interface.Prompt.hide();
+        await wait(1000);
+
+        let dx = getSVGInternalCenter(this.PoleHatTarget).x - getSVGInternalCenter(this.basics.Fennimal).x;
+        await this.basics.Fennimal_move_relative(dx, 0, 750);
+
+        let prejump_transform = this.basics.Fennimal.style.transform;
+
+        await this.Fennimal_jump_on_box(175);
+        await wait(500);
+        await this.basics.Fennimal_jump(250);
+        await wait(100);
+        await this.Fennimal_grabs_hat();
+        await wait(300);
+        await this.Fennimal_jumps_back_to_ground(prejump_transform);
+        await wait(200);
+
+        Interface.Prompt.show_message(`${this.FenObj.name} really appreciates your help!`);
+        await this.basics.perform_success_celebration(this.box.BoxBase);
+
+        this.returnfunc();
+    }
+
+    async start_sequence() {
+        this.basics.create_svg_sublayers();
+
+        if (this.partner.is_present) {
+            this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        }
+
+        await this.basics.create_background_mask(true, 500);
+
+        await AskFennimalOverlay.run(this);
+
+        await this.basics.create_and_appear_Fennimal(
+            this.basics.ItemLayers.Plus2,
+            this.Fen_base_x,
+            this.baseline_y,
+            1.5,
+            250,
+            () => AskHatOverlay.hideWornHat(this)
+        );
+        this.FennimalBaseTransform = this.basics.Fennimal.style.transform;
+        await TypedNameAskOverlay.run(this);
+        await AskHatOverlay.run(this);
+        await AskHatOverlay.revealWornHat(this);
+
+        this.create_pole();
+
+        await this.box.create_and_appear_box(
+            this.basics.ItemLayers.Plus1,
+            this.basics.ItemLayers.Plus2,
+            0.2 * this.basics.W,
+            this.baseline_y,
+            3,
+            200,
+            () => {
+                if (this.using_fallback_crate) {
+                    this.paint_fallback_crate();
+                    this.hide_prop_box_overlays();
+                }
+                // Half of the old bottom-align lift: spawn already sitting there (no slide).
+                let BoxCenterpoint = getSVGInternalCenter(this.box.BoxBase);
+                let box_delta_y = this.baseline_y - (BoxCenterpoint.y + 0.5 * this.box.BoxBase.getBBox().height);
+                let settle = box_delta_y * 0.5;
+                this.box.BoxBase.style.transform += ` translateY(${settle}px)`;
+                this.box.BoxTop.style.transform += ` translateY(${settle}px)`;
+            }
+        );
+
+        this.basics.ItemLayers.Plus2.appendChild(this.basics.Fennimal);
+
+        await wait(1000);
+        await this.blow_hat_onto_pole();
+
+        Interface.Prompt.show_message(`Oh no! ${this.FenObj.name}'s ${this.FenObj.hat} has blown onto a ${this.polename}`);
+        AudioCont.play_sound_effect("sad");
+
+        this.show_first_attempt_to_reach_box();
+    }
+
+    clean_up() {
+        if (this.hatFlightRaf) {
+            cancelAnimationFrame(this.hatFlightRaf);
+            this.hatFlightRaf = null;
+        }
+        this.basics.clean_up();
+        this.box.clean_up();
+        if (this.Pole) this.Pole.remove();
+        if (this.Hat) this.Hat.remove();
+        if (this.BoxOutline) this.BoxOutline.remove();
+        if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
+        else if (this.partner.PartnerTranslateGroup) this.partner.PartnerTranslateGroup.remove();
     }
 }
 
@@ -4576,7 +5182,9 @@ class PartnerBeliefInSituTrialController {
     }
 
     place_target_box(boxId) {
-        let template = document.getElementById("toybox_" + boxId);
+        let template = (typeof get_toybox_template === "function")
+            ? get_toybox_template(boxId)
+            : document.getElementById("toybox_" + boxId);
         if (!template) {
             throw new Error(`partner_belief_in_situ: missing toybox_${boxId}`);
         }
@@ -5163,7 +5771,14 @@ class PartnerBeliefMultipleController {
             let target_x = table_x + (spacing * (index + 1));
             let target_y = table_y - 10;
 
-            let BoxObj = copy_scale_and_move_object_to_position(document.getElementById("toybox_" + box_id), this.ItemLayers.Main, target_x, target_y, 2.5);
+            let template = (typeof get_toybox_template === "function")
+                ? get_toybox_template(box_id)
+                : document.getElementById("toybox_" + box_id);
+            if (!template) {
+                console.error("PartnerBeliefMultipleController: missing toybox_" + box_id);
+                return;
+            }
+            let BoxObj = copy_scale_and_move_object_to_position(template, this.ItemLayers.Main, target_x, target_y, 2.5);
             apply_toybox_decoration_visibility_to_element(BoxObj, box_id);
             let trash = Array.from(BoxObj.getElementsByClassName("alignment_field"));
             trash.forEach(t => t.remove());

@@ -976,41 +976,7 @@ function create_Fennimal_SVG_object(FenObj, head_scale_factor, outline_only) {
     // ----------------------------------------------------
     // 3. HAT SETUP
     // ----------------------------------------------------
-    if (typeof FenObj.hat !== "undefined") {
-        if (HeadSVG.getElementsByClassName("Fennimal_head_hat_point").length > 0) {
-            let HatGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
-            let HatScaleGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g');
-
-            HatGroup.classList.add("hat");
-            HatGroup.appendChild(HatScaleGroup);
-            HeadScaleGroup.appendChild(HatGroup);
-
-            let HatSVG = document.getElementById("hat_" + FenObj.hat).cloneNode(true);
-            HatSVG.style.display = "inherit";
-            HatScaleGroup.appendChild(HatSVG);
-
-            let HeadHatPoint = {
-                x: parseFloat(HeadSVG.getElementsByClassName("Fennimal_head_hat_point")[0].getAttribute("cx")),
-                y: parseFloat(HeadSVG.getElementsByClassName("Fennimal_head_hat_point")[0].getAttribute("cy"))
-            };
-            let HatConnectionPoint = {
-                x: parseFloat(HatSVG.getElementsByClassName("hat_attachment_point")[0].getAttribute("cx")),
-                y: parseFloat(HatSVG.getElementsByClassName("hat_attachment_point")[0].getAttribute("cy"))
-            };
-
-            let hat_translate_x_delta = HeadHatPoint.x - HatConnectionPoint.x;
-            let hat_translate_y_delta = HeadHatPoint.y - HatConnectionPoint.y;
-            HatGroup.style.transform = `translate(${hat_translate_x_delta}px, ${hat_translate_y_delta}px)`;
-
-            HatScaleGroup.style.transformOrigin = `${HatConnectionPoint.x}px ${HatConnectionPoint.y}px`;
-
-            // THE HAT SCALE FIX: Because it inherits the head's scale, we divide the original target
-            // scale (2) by the head's scale to guarantee it stays the exact size you intended!
-            HatScaleGroup.style.transform = `scale(${2 / head_scale_factor})`;
-        } else {
-            console.warn("Attempting to place a hat on an invalid Fennimal.");
-        }
-    }
+    attach_hat_to_fennimal_head(HeadScaleGroup, HeadSVG, FenObj, head_scale_factor);
 
     // ----------------------------------------------------
     // 4. COLORING & FINISHING
@@ -1041,7 +1007,54 @@ function create_Fennimal_SVG_object(FenObj, head_scale_factor, outline_only) {
     return TranslationGroup;
 }
 
-function create_Fennimal_SVG_object_head_only(FenObj, outline_only) {
+function attach_hat_to_fennimal_head(HeadScaleGroup, HeadSVG, FenObj, head_scale_factor, hat_visual_scale) {
+    if (!FenObj || FenObj.hat === undefined || FenObj.hat === null || FenObj.hat === "") return null;
+    if (!HeadSVG || HeadSVG.getElementsByClassName("Fennimal_head_hat_point").length === 0) {
+        console.warn("Attempting to place a hat on an invalid Fennimal.");
+        return null;
+    }
+
+    let hatId = "hat_" + String(FenObj.hat).replace(/^hat_/, "");
+    let HatTemplate = document.getElementById(hatId);
+    if (!HatTemplate) {
+        console.warn("Missing SVG hat template #" + hatId + " for Fennimal id=\"" + (FenObj.id || "") + "\".");
+        return null;
+    }
+
+    let HatGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    let HatScaleGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    HatGroup.classList.add("hat");
+    HatGroup.appendChild(HatScaleGroup);
+    HeadScaleGroup.appendChild(HatGroup);
+
+    let HatSVG = HatTemplate.cloneNode(true);
+    HatSVG.removeAttribute("id");
+    HatSVG.style.display = "inherit";
+    HatScaleGroup.appendChild(HatSVG);
+
+    let HeadHatPoint = {
+        x: parseFloat(HeadSVG.getElementsByClassName("Fennimal_head_hat_point")[0].getAttribute("cx")),
+        y: parseFloat(HeadSVG.getElementsByClassName("Fennimal_head_hat_point")[0].getAttribute("cy"))
+    };
+    let HatConnectionPoint = {
+        x: parseFloat(HatSVG.getElementsByClassName("hat_attachment_point")[0].getAttribute("cx")),
+        y: parseFloat(HatSVG.getElementsByClassName("hat_attachment_point")[0].getAttribute("cy"))
+    };
+
+    HatGroup.style.transform = `translate(${HeadHatPoint.x - HatConnectionPoint.x}px, ${HeadHatPoint.y - HatConnectionPoint.y}px)`;
+    HatScaleGroup.style.transformOrigin = `${HatConnectionPoint.x}px ${HatConnectionPoint.y}px`;
+    // Hat lives inside the head scale group, so divide out that scale to keep a constant visual size (default 2).
+    let headScale = (head_scale_factor && isFinite(head_scale_factor) && head_scale_factor !== 0)
+        ? head_scale_factor
+        : 1;
+    let visualHatScale = (hat_visual_scale && isFinite(hat_visual_scale) && hat_visual_scale !== 0)
+        ? hat_visual_scale
+        : 2;
+    HatScaleGroup.style.transform = `scale(${visualHatScale / headScale})`;
+    return HatGroup;
+}
+
+function create_Fennimal_SVG_object_head_only(FenObj, outline_only, include_hat) {
     //Create the Fennimal SVG container. There are two layers here, one for transform (top), one for scale (second)
     let TranslationGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g')
     let ScaleGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g')
@@ -1065,6 +1078,10 @@ function create_Fennimal_SVG_object_head_only(FenObj, outline_only) {
     HeadSVG.removeAttribute("id") // avoid duplicate ids with the template in #All_Heads
     HeadSVG.style.display = "inherit"
     HeadScaleGroup.appendChild(HeadSVG)
+
+    if (include_hat) {
+        attach_hat_to_fennimal_head(HeadScaleGroup, HeadSVG, FenObj, 1, 3);
+    }
 
     //Adding colors
     if (outline_only) {
@@ -1402,9 +1419,15 @@ function set_toy_color_scheme(ToySVG, toy_type, use_alternate_color){
     }
 }
 
-function set_box_color_scheme(BoxSVG, box_type){
-    if (!BoxSVG || !GenParam.BoxColorSchemes || !GenParam.BoxColorSchemes[box_type]) return;
-    let scheme = GenParam.BoxColorSchemes[box_type];
+function set_box_color_scheme(BoxSVG, box_type_or_scheme){
+    if (!BoxSVG) return;
+    let scheme = null;
+    if (box_type_or_scheme && typeof box_type_or_scheme === "object") {
+        scheme = box_type_or_scheme;
+    } else if (box_type_or_scheme && GenParam.BoxColorSchemes && GenParam.BoxColorSchemes[box_type_or_scheme]) {
+        scheme = GenParam.BoxColorSchemes[box_type_or_scheme];
+    }
+    if (!scheme) return;
 
     let LightElem = BoxSVG.getElementsByClassName("box_color_light");
     for (let i = 0; i < LightElem.length; i++) {
@@ -3388,5 +3411,870 @@ class FennimalChoiceBar {
         window.getComputedStyle(this.UIGroup).opacity;
         this.UIGroup.style.transform = "scale(1)";
         this.UIGroup.style.opacity = 1;
+    }
+}
+
+/**
+ * Hat-choice bar for `ask_hat`. Clones `#hat_*` templates into gold buttons.
+ */
+class HatChoiceBar {
+    constructor(parentLayer, W, H, options = {}) {
+        this.parentLayer = parentLayer;
+        this.W = W;
+        this.H = H;
+        this.bonus_stars = options.bonus_stars || 0;
+        this.panel_y_ratio = options.panel_y_ratio != null ? options.panel_y_ratio : 0.76;
+        this.btn_size = options.btn_size || 150;
+        this.spacing = options.spacing || 18;
+        this.UIGroup = null;
+        this._selectionHandler = null;
+        this._disabled = false;
+    }
+
+    destroy() {
+        this._disabled = true;
+        this._selectionHandler = null;
+        if (this.UIGroup && this.UIGroup.parentNode) this.UIGroup.remove();
+        this.UIGroup = null;
+    }
+
+    async hide(fade_ms = 200) {
+        this._disabled = true;
+        this._selectionHandler = null;
+        if (!this.UIGroup) return;
+        this.UIGroup.style.transition = `all ${fade_ms}ms ease-in`;
+        this.UIGroup.style.opacity = 0;
+        this.UIGroup.style.transform = "scale(0.8)";
+        await wait(fade_ms);
+        this.destroy();
+    }
+
+    waitForSelection(hatIds) {
+        return new Promise(resolve => {
+            this.show(hatIds, (hat_id) => resolve(hat_id));
+        });
+    }
+
+    show(hatIds, onSelect) {
+        this.destroy();
+        this._disabled = false;
+        this._selectionHandler = onSelect;
+
+        this.UIGroup = create_SVG_group(0, 0);
+        this.parentLayer.appendChild(this.UIGroup);
+
+        const n = (hatIds || []).length;
+        const btn_size = n >= 6 ? 140 : this.btn_size;
+        const spacing = n >= 6 ? 16 : this.spacing;
+        const total_width = (n * btn_size) + (Math.max(0, n - 1) * spacing);
+        const start_x = (this.W - total_width) / 2;
+        const panel_y = this.panel_y_ratio * this.H;
+
+        let panel_height = btn_size + 40;
+        if (this.bonus_stars > 0) panel_height += 40;
+
+        let panel = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        panel.setAttribute("x", start_x - 30);
+        panel.setAttribute("y", panel_y - 20);
+        panel.setAttribute("width", total_width + 60);
+        panel.setAttribute("height", panel_height);
+        panel.setAttribute("rx", 20);
+        panel.setAttribute("fill", "rgba(255, 215, 0, 0.45)");
+        panel.setAttribute("stroke", "#d4af37");
+        panel.setAttribute("stroke-width", "4");
+        this.UIGroup.appendChild(panel);
+
+        (hatIds || []).forEach((hat_id, index) => {
+            let btn_x = start_x + (index * (btn_size + spacing));
+            let btn_y = panel_y;
+
+            let BtnGroup = create_SVG_group(0, 0);
+            this.UIGroup.appendChild(BtnGroup);
+
+            let btn_bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            btn_bg.setAttribute("x", btn_x);
+            btn_bg.setAttribute("y", btn_y);
+            btn_bg.setAttribute("width", btn_size);
+            btn_bg.setAttribute("height", btn_size);
+            btn_bg.setAttribute("rx", 15);
+            btn_bg.setAttribute("fill", "#d8c381");
+            btn_bg.setAttribute("stroke", "#b89f5d");
+            btn_bg.setAttribute("stroke-width", "3");
+            btn_bg.style.transition = "all 150ms ease";
+            BtnGroup.appendChild(btn_bg);
+
+            let template = document.getElementById("hat_" + hat_id);
+            if (!template) {
+                console.warn("HatChoiceBar: missing hat_" + hat_id);
+                return;
+            }
+            let RawHat = template.cloneNode(true);
+            if (typeof strip_svg_ids_from_subtree === "function") strip_svg_ids_from_subtree(RawHat);
+            else RawHat.removeAttribute("id");
+            RawHat.style.display = "inherit";
+            BtnGroup.appendChild(RawHat);
+
+            let TBox = RawHat.getBBox();
+            let max_dim = Math.max(TBox.width, TBox.height) || 100;
+            let scale = (btn_size * 0.78) / max_dim;
+            let raw_cx = TBox.x + (TBox.width / 2);
+            let raw_cy = TBox.y + (TBox.height / 2);
+            let target_cx = btn_x + (btn_size / 2);
+            let target_cy = btn_y + (btn_size / 2);
+            RawHat.style.transformOrigin = `${raw_cx}px ${raw_cy}px`;
+            RawHat.style.transform = `translate(${target_cx - raw_cx}px, ${target_cy - raw_cy}px) scale(${scale})`;
+
+            let click_catcher = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            click_catcher.setAttribute("x", btn_x);
+            click_catcher.setAttribute("y", btn_y);
+            click_catcher.setAttribute("width", btn_size);
+            click_catcher.setAttribute("height", btn_size);
+            click_catcher.setAttribute("fill", "transparent");
+            click_catcher.style.cursor = "pointer";
+            BtnGroup.appendChild(click_catcher);
+
+            click_catcher.onpointerenter = () => {
+                if (this._disabled) return;
+                btn_bg.setAttribute("fill", "#ebd89b");
+                btn_bg.setAttribute("stroke", "gold");
+            };
+            click_catcher.onpointerleave = () => {
+                btn_bg.setAttribute("fill", "#d8c381");
+                btn_bg.setAttribute("stroke", "#b89f5d");
+            };
+            click_catcher.onpointerdown = () => {
+                if (this._disabled) return;
+                this._disabled = true;
+                AudioCont.play_sound_effect("button_click");
+                let handler = this._selectionHandler;
+                this._selectionHandler = null;
+                if (handler) handler(hat_id);
+            };
+        });
+
+        this.UIGroup.style.transformOrigin = "center";
+        this.UIGroup.style.transformBox = "fill-box";
+        this.UIGroup.style.transform = "scale(0.8)";
+        this.UIGroup.style.opacity = 0;
+        this.UIGroup.style.transition = "all 300ms cubic-bezier(0.34, 1.56, 0.64, 1)";
+        void window.getComputedStyle(this.UIGroup).opacity;
+        this.UIGroup.style.transform = "scale(1)";
+        this.UIGroup.style.opacity = 1;
+    }
+}
+
+/**
+ * Face-choice bar for `ask_Fennimal` (region → head). Unique heads only.
+ *
+ * Trial controllers: before the trial Fennimal is visible, call
+ *   await AskFennimalOverlay.run(this);
+ * Optional `{ prompt }` overrides "Which Fennimal lives here?".
+ * No-ops unless `FenObj.ask_Fennimal` is true.
+ */
+class AskFennimalOverlay {
+    static uniqueOptionsByHead(optionObjs, trialFen) {
+        let byHead = new Map();
+        (optionObjs || []).forEach((f) => {
+            if (!f) return;
+            let key = f.head != null ? String(f.head) : ("id:" + f.id);
+            let existing = byHead.get(key);
+            if (!existing || (trialFen && f.id === trialFen.id)) {
+                byHead.set(key, f);
+            }
+        });
+        return Array.from(byHead.values());
+    }
+
+    static async run(trial, options = {}) {
+        let fen = trial && trial.FenObj;
+        if (!fen || !fen.ask_Fennimal) return null;
+
+        let basics = trial.basics;
+        if (!basics) {
+            console.warn("ask_Fennimal: missing trial.basics; skipping question.");
+            return null;
+        }
+
+        let layers = basics.ItemLayers || {};
+        let layer = options.parentLayer || layers.Plus2 || layers.Main || layers.Partner;
+        if (!layer) {
+            console.warn("ask_Fennimal: no SVG layer to attach choice bar; skipping question.");
+            return null;
+        }
+
+        fen.fennimal_errors_made = [];
+
+        let optionObjs = Array.isArray(fen.fennimals_asked_objects)
+            ? fen.fennimals_asked_objects.map((f) => JSON.parse(JSON.stringify(f)))
+            : [];
+
+        if (!optionObjs.some((f) => f.id === fen.id)) {
+            optionObjs.push(JSON.parse(JSON.stringify(fen)));
+            console.warn("ask_Fennimal: trial Fennimal was missing from fennimals_asked; added it.");
+        }
+
+        optionObjs = AskFennimalOverlay.uniqueOptionsByHead(optionObjs, fen);
+
+        if (optionObjs.length === 0) {
+            console.warn("ask_Fennimal: no fennimals_asked options; skipping question.");
+            return null;
+        }
+
+        let bar = new FennimalChoiceBar(layer, basics.W, basics.H);
+        let prompt = options.prompt || "Which Fennimal lives here?";
+
+        while (true) {
+            Interface.Prompt.show_message(prompt);
+            let selected = await bar.waitForSelection(shuffleArray([...optionObjs]));
+            let selectedObj = optionObjs.find((f) => f.id === selected);
+            let headMatches = selectedObj && selectedObj.head === fen.head;
+            if (selected === fen.id || headMatches) {
+                AudioCont.play_sound_effect("positive");
+                await bar.hide();
+                Interface.Prompt.hide();
+                return { correct: true, selected };
+            }
+            AudioCont.play_sound_effect("rejected");
+            fen.fennimal_errors_made.push(selected);
+            Interface.Prompt.show_message("Oops, you picked the wrong Fennimal!");
+            await bar.hide();
+            await wait(1000);
+        }
+    }
+}
+
+/**
+ * Hat-choice overlay for `ask_hat`. Unique hats from the phase.
+ *
+ * Trial controllers: after the Fennimal is visible and after `ask_name`, call
+ *   await AskHatOverlay.run(this);
+ * Optional `{ prompt }` overrides "What hat did [name] wear?".
+ * No-ops unless `FenObj.ask_hat` is true.
+ *
+ * When `ask_hat` is set, hide the worn hat before `ask_name` with
+ *   AskHatOverlay.hideWornHat(this);
+ * then reveal after a correct pick (except hat_laundry matching) with
+ *   await AskHatOverlay.revealWornHat(this);
+ */
+class AskHatOverlay {
+    static getWornHat(trial) {
+        let fen = trial && trial.basics && trial.basics.Fennimal;
+        return fen && fen.getElementsByClassName("hat")[0];
+    }
+
+    static hideWornHat(trial) {
+        if (!trial || !trial.FenObj || !trial.FenObj.ask_hat) return;
+        let hat = AskHatOverlay.getWornHat(trial);
+        if (!hat) return;
+        hat.style.opacity = 0;
+        hat.style.pointerEvents = "none";
+    }
+
+    static revealWornHat(trial, ms = 350) {
+        if (!trial || !trial.FenObj || !trial.FenObj.ask_hat) return wait(0);
+        let hat = AskHatOverlay.getWornHat(trial);
+        if (!hat) return wait(0);
+        hat.style.pointerEvents = "none";
+        hat.style.transition = `opacity ${ms}ms ease-out`;
+        hat.style.opacity = 1;
+        return wait(ms);
+    }
+
+    static async run(trial, options = {}) {
+        let fen = trial && trial.FenObj;
+        if (!fen || !fen.ask_hat) return null;
+
+        let basics = trial.basics;
+        if (!basics) {
+            console.warn("ask_hat: missing trial.basics; skipping question.");
+            return null;
+        }
+        if (!fen.hat) {
+            console.warn("ask_hat: trial Fennimal has no hat; skipping question.");
+            return null;
+        }
+
+        let layers = basics.ItemLayers || {};
+        let layer = options.parentLayer || layers.Plus2 || layers.Main || layers.Partner;
+        if (!layer) {
+            console.warn("ask_hat: no SVG layer to attach choice bar; skipping question.");
+            return null;
+        }
+
+        fen.ask_hat_errors_made = [];
+
+        let hatIds = Array.isArray(fen.hats_asked) && fen.hats_asked.length > 0
+            ? [...fen.hats_asked]
+            : [fen.hat];
+        if (!hatIds.includes(fen.hat)) {
+            hatIds.unshift(fen.hat);
+            console.warn("ask_hat: trial hat was missing from hats_asked; added it.");
+        }
+        hatIds = [...new Set(hatIds.filter(Boolean))];
+
+        if (hatIds.length === 0) {
+            console.warn("ask_hat: no hats_asked options; skipping question.");
+            return null;
+        }
+
+        let bar = new HatChoiceBar(layer, basics.W, basics.H);
+        let prompt = options.prompt || ("What hat did " + (fen.name || "this Fennimal") + " wear?");
+
+        while (true) {
+            Interface.Prompt.show_message(prompt);
+            let selected = await bar.waitForSelection(shuffleArray([...hatIds]));
+            if (selected === fen.hat) {
+                AudioCont.play_sound_effect("positive");
+                await bar.hide();
+                Interface.Prompt.hide();
+                return { correct: true, selected };
+            }
+            AudioCont.play_sound_effect("rejected");
+            fen.ask_hat_errors_made.push(selected);
+            Interface.Prompt.show_message("Oops, you picked the wrong hat!");
+            await bar.hide();
+            await wait(1000);
+        }
+    }
+}
+
+/**
+ * Instruction-style overlay for typing a Fennimal name (`ask_name`).
+ * Case-insensitive match; close misses use LevenshteinDistance.
+ * After three failed attempts the correct name is shown; they must still type it.
+ *
+ * Trial controllers: after the Fennimal is visible, call
+ *   await TypedNameAskOverlay.run(this);
+ * No-ops unless `FenObj.ask_name` is true.
+ */
+class TypedNameAskOverlay {
+    constructor(parentLayer, W, H, options = {}) {
+        this.parentLayer = parentLayer;
+        this.W = W;
+        this.H = H;
+        this.maxFailedAttempts = options.maxFailedAttempts != null ? options.maxFailedAttempts : 3;
+        this.closeDistance = options.closeDistance != null ? options.closeDistance : 2;
+        this.onWrongAttempt = typeof options.onWrongAttempt === "function" ? options.onWrongAttempt : null;
+        this.anchorElement = options.anchorElement || null;
+        this.getQuestionHtml = typeof options.getQuestionHtml === "function" ? options.getQuestionHtml : null;
+        this.largePanel = options.largePanel === true;
+        this.panelTop = (typeof options.panelTop === "number") ? options.panelTop : null;
+        this.panelFill = options.panelFill || "rgba(247, 241, 228, 0.72)";
+        this.UIGroup = null;
+        this.panel = null;
+        this.questionWrap = null;
+        this.questionP = null;
+        this.inputWrap = null;
+        this.inputText = null;
+        this.submitHolder = null;
+        this.submitButton = null;
+        this._placement = null;
+        this._onKeyDown = null;
+        this._disabled = false;
+        this._resolve = null;
+        this.correctName = "";
+        this.failedAttempts = 0;
+        this.lastSubmittedGuess = "";
+        this.nameRevealed = false;
+        this.feedbackKind = null;
+        this.lastSubmitAt = 0;
+    }
+
+    static async run(trial, options = {}) {
+        let fen = trial && trial.FenObj;
+        if (!fen || !fen.ask_name) return null;
+        if (!fen.name) {
+            console.warn("ask_name: trial Fennimal has no name; skipping question.");
+            return null;
+        }
+        let basics = trial.basics;
+        if (!basics) {
+            console.warn("ask_name: missing trial.basics; skipping question.");
+            return null;
+        }
+
+        let layers = basics.ItemLayers || {};
+        let layer = options.parentLayer || layers.Plus2 || layers.Main || layers.Partner;
+        if (!layer) {
+            console.warn("ask_name: no SVG layer to attach overlay; skipping question.");
+            return null;
+        }
+
+        let pauseMs = options.pauseMs != null ? options.pauseMs : 400;
+        if (pauseMs > 0) await wait(pauseMs);
+
+        fen.name_errors_made = [];
+        fen.name_was_revealed = false;
+        if (typeof Interface !== "undefined" && Interface.Prompt) Interface.Prompt.hide();
+
+        let overlay = new TypedNameAskOverlay(layer, basics.W, basics.H, {
+            maxFailedAttempts: options.maxFailedAttempts != null ? options.maxFailedAttempts : 3,
+            closeDistance: options.closeDistance != null ? options.closeDistance : 2,
+            anchorElement: options.anchorElement || basics.Fennimal,
+            onWrongAttempt: (typed, dist) => {
+                fen.name_errors_made.push({ ans: typed, LSdist: dist });
+            }
+        });
+
+        let result = await overlay.waitForCorrectName(fen.name);
+        fen.name_was_revealed = !!(result && result.nameRevealed);
+
+        if (options.playSuccess !== false) {
+            AudioCont.play_sound_effect("positive");
+            await TypedNameAskOverlay.playNameplateReveal(trial, fen.name, {
+                parentLayer: layer
+            });
+        }
+        return result;
+    }
+
+    static get_element_svg_bounds(element) {
+        const svg = element && element.ownerSVGElement;
+        if (!element || !svg) return null;
+        try {
+            const r = element.getBoundingClientRect();
+            const screenCTM = svg.getScreenCTM();
+            if (!screenCTM) return null;
+            const inv = screenCTM.inverse();
+            const toSvg = (x, y) => {
+                const pt = svg.createSVGPoint();
+                pt.x = x;
+                pt.y = y;
+                return pt.matrixTransform(inv);
+            };
+            const a = toSvg(r.left, r.top);
+            const b = toSvg(r.right, r.bottom);
+            const left = Math.min(a.x, b.x);
+            const top = Math.min(a.y, b.y);
+            const right = Math.max(a.x, b.x);
+            const bottom = Math.max(a.y, b.y);
+            return { left, top, right, bottom, width: right - left, height: bottom - top };
+        } catch (err) {
+            return null;
+        }
+    }
+
+    static async playNameplateReveal(trial, name, options = {}) {
+        let basics = trial && trial.basics;
+        if (!basics) return;
+
+        let layers = basics.ItemLayers || {};
+        let layer = options.parentLayer || layers.Plus2 || layers.Main;
+        if (!layer) return;
+
+        let nameStr = String(name || "").trim();
+        if (!nameStr) return;
+
+        let head = basics.FennimalHead
+            || (basics.Fennimal && basics.Fennimal.getElementsByClassName("Fennimal_head")[0]);
+        let headBounds = TypedNameAskOverlay.get_element_svg_bounds(head || basics.Fennimal);
+        let fenBounds = TypedNameAskOverlay.get_element_svg_bounds(basics.Fennimal);
+        let cx = headBounds ? (headBounds.left + headBounds.right) / 2 : (basics.W / 2);
+        let headTop = headBounds ? headBounds.top : (fenBounds ? fenBounds.top : basics.H * 0.3);
+        if (fenBounds) headTop = Math.min(headTop, fenBounds.top);
+
+        let fontSize = nameStr.length > 10 ? 56 : 72;
+        let lettersY = Math.max(fontSize + 18, headTop - 28);
+        cx = Math.max(80, Math.min(basics.W - 80, cx));
+
+        let group = create_SVG_group(0, 0, undefined, "fennimal_nameplate");
+        group.style.pointerEvents = "none";
+        layer.appendChild(group);
+
+        let probe = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        probe.setAttribute("font-family", "Arial, sans-serif");
+        probe.setAttribute("font-weight", "bold");
+        probe.setAttribute("font-size", String(fontSize));
+        probe.setAttribute("visibility", "hidden");
+        group.appendChild(probe);
+
+        let widths = [];
+        for (let i = 1; i <= nameStr.length; i++) {
+            probe.textContent = nameStr.slice(0, i);
+            widths.push(probe.getComputedTextLength() || (i * fontSize * 0.55));
+        }
+        probe.remove();
+
+        let totalW = widths[widths.length - 1] || fontSize;
+        let startX = cx - totalW / 2;
+        startX = Math.max(20, Math.min(basics.W - totalW - 20, startX));
+
+        let underline = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        underline.setAttribute("x1", startX);
+        underline.setAttribute("y1", lettersY + fontSize * 0.42);
+        underline.setAttribute("x2", startX);
+        underline.setAttribute("y2", lettersY + fontSize * 0.42);
+        underline.setAttribute("stroke", "#d4af37");
+        underline.setAttribute("stroke-width", "6");
+        underline.setAttribute("stroke-linecap", "round");
+        underline.style.opacity = "0.9";
+        underline.style.transition = "all 90ms linear";
+        group.appendChild(underline);
+
+        const spawnSparkle = (x, y) => {
+            let sparkle = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+            sparkle.setAttribute("points", "0,-14 4,-4 14,0 4,4 0,14 -4,4 -14,0 -4,-4");
+            sparkle.setAttribute("fill", "#FFE566");
+            sparkle.setAttribute("stroke", "#E6B800");
+            sparkle.setAttribute("stroke-width", "1.5");
+            sparkle.style.pointerEvents = "none";
+            sparkle.style.transformOrigin = "0px 0px";
+            sparkle.style.transform = `translate(${x}px, ${y}px) scale(0.2) rotate(-20deg)`;
+            sparkle.style.opacity = "1";
+            group.appendChild(sparkle);
+            window.getComputedStyle(sparkle).opacity;
+            sparkle.style.transition = "transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 280ms ease-out";
+            sparkle.style.transform = `translate(${x}px, ${y - 18}px) scale(1.15) rotate(25deg)`;
+            setTimeout(() => {
+                sparkle.style.transition = "transform 220ms ease-in, opacity 220ms ease-in";
+                sparkle.style.transform = `translate(${x}px, ${y - 36}px) scale(0.2) rotate(50deg)`;
+                sparkle.style.opacity = "0";
+                setTimeout(() => sparkle.remove(), 240);
+            }, 180);
+        };
+
+        let perLetter = Math.max(70, Math.min(130, 850 / Math.max(1, nameStr.length)));
+        for (let i = 0; i < nameStr.length; i++) {
+            let ch = nameStr[i];
+            let left = i === 0 ? 0 : widths[i - 1];
+            let right = widths[i];
+            let letterX = startX + (left + right) / 2;
+
+            if (ch !== " ") {
+                let letter = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                letter.setAttribute("x", letterX);
+                letter.setAttribute("y", lettersY);
+                letter.setAttribute("text-anchor", "middle");
+                letter.setAttribute("dominant-baseline", "middle");
+                letter.setAttribute("font-family", "Arial, sans-serif");
+                letter.setAttribute("font-weight", "bold");
+                letter.setAttribute("font-size", String(fontSize));
+                letter.setAttribute("fill", "#FFF6D8");
+                letter.setAttribute("stroke", "#8A6A1A");
+                letter.setAttribute("stroke-width", "2.5");
+                letter.setAttribute("paint-order", "stroke fill");
+                letter.style.filter = "drop-shadow(0px 3px 5px rgba(0,0,0,0.35))";
+                letter.textContent = ch;
+                letter.style.transformOrigin = `${letterX}px ${lettersY}px`;
+                letter.style.transform = "translateY(22px) scale(0.35)";
+                letter.style.opacity = "0";
+                group.appendChild(letter);
+                window.getComputedStyle(letter).opacity;
+                letter.style.transition = "transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 140ms ease-out";
+                letter.style.transform = "translateY(0px) scale(1)";
+                letter.style.opacity = "1";
+                spawnSparkle(letterX, lettersY - fontSize * 0.55);
+            }
+
+            underline.setAttribute("x2", startX + right);
+            await wait(perLetter);
+        }
+
+        if (basics.Fennimal_jump) {
+            basics.Fennimal_jump(56, { ms: 150, resolveMs: 300 });
+        }
+        spawn_confetti_burst(layer, cx, lettersY + 10, { count: 14, awaitPopMs: 0 });
+
+        await wait(1100);
+        group.style.transition = "transform 320ms ease-in, opacity 320ms ease-in";
+        group.style.transformOrigin = `${cx}px ${lettersY}px`;
+        group.style.transform = "scale(0.86)";
+        group.style.opacity = "0";
+        await wait(320);
+        if (group.parentNode) group.remove();
+    }
+
+    destroy() {
+        this._disabled = true;
+        if (this.inputText && this._onKeyDown) {
+            this.inputText.removeEventListener("keydown", this._onKeyDown);
+        }
+        this._onKeyDown = null;
+        this.inputText = null;
+        this.inputWrap = null;
+        this.questionP = null;
+        this.questionWrap = null;
+        this.panel = null;
+        this.submitHolder = null;
+        this.submitButton = null;
+        this._placement = null;
+        this.lastSubmitAt = 0;
+        if (this.UIGroup && this.UIGroup.parentNode) this.UIGroup.remove();
+        this.UIGroup = null;
+    }
+
+    waitForCorrectName(correctName) {
+        return new Promise((resolve) => {
+            this.correctName = correctName;
+            this._resolve = resolve;
+            this.failedAttempts = 0;
+            this.lastSubmittedGuess = "";
+            this.nameRevealed = false;
+            this.feedbackKind = null;
+            this.lastSubmitAt = 0;
+            this.show();
+        });
+    }
+
+    show() {
+        this.destroy();
+        this._disabled = false;
+
+        this.UIGroup = create_SVG_group(0, 0, undefined, "typed_name_ask_overlay");
+        this.parentLayer.appendChild(this.UIGroup);
+
+        this._placement = this.resolve_placement(this.anchorElement);
+        let layout = this.get_panel_layout(this._placement);
+
+        let catcher = create_SVG_rect(0, 0, this.W, this.H);
+        catcher.setAttribute("fill", "#111");
+        catcher.style.opacity = 0.12;
+        catcher.style.pointerEvents = "all";
+        this.UIGroup.appendChild(catcher);
+
+        this.panel = create_SVG_rect(layout.panel.x, layout.panel.y, layout.panel.w, layout.panel.h);
+        this.panel.setAttribute("rx", 24);
+        this.panel.setAttribute("fill", this.panelFill);
+        this.panel.setAttribute("stroke", "rgba(184, 159, 93, 0.85)");
+        this.panel.setAttribute("stroke-width", "6");
+        this.UIGroup.appendChild(this.panel);
+
+        this.questionWrap = create_SVG_foreignElement(
+            layout.question.x,
+            layout.question.y,
+            layout.question.w,
+            layout.question.h
+        );
+        this.questionP = document.createElement("p");
+        this.questionP.classList.add("instruction_element_text");
+        this.questionP.style.width = "100%";
+        this.questionP.style.height = "auto";
+        this.questionP.style.margin = "0";
+        this.questionP.style.fontSize = layout.fontSize + "px";
+        this.questionP.style.textAlign = "center";
+        this.questionP.style.lineHeight = "125%";
+        this.questionP.style.color = "#3b2f14";
+        this.questionP.style.overflow = "visible";
+        this.questionWrap.appendChild(this.questionP);
+        this.UIGroup.appendChild(this.questionWrap);
+
+        this.inputWrap = create_SVG_foreignElement(
+            layout.input.x,
+            layout.input.y,
+            layout.input.w,
+            layout.input.h
+        );
+        this.inputText = document.createElement("input");
+        this.inputText.type = "text";
+        this.inputText.maxLength = 32;
+        this.inputText.placeholder = "Enter name here";
+        this.inputText.autocomplete = "off";
+        this.inputText.spellcheck = false;
+        this.inputText.style.width = "100%";
+        this.inputText.style.height = "100%";
+        this.inputText.style.boxSizing = "border-box";
+        this.inputText.style.fontSize = "34px";
+        this.inputText.style.fontFamily = "Arial, sans-serif";
+        this.inputText.style.textAlign = "center";
+        this.inputText.style.border = "3px solid #b89f5d";
+        this.inputText.style.borderRadius = "12px";
+        this.inputText.style.padding = "6px 14px";
+        this.inputText.style.background = "rgba(255, 253, 246, 0.92)";
+        this.inputText.style.color = "#3b2f14";
+        this._onKeyDown = (event) => {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                this.submit();
+            }
+        };
+        this.inputText.addEventListener("keydown", this._onKeyDown);
+        this.inputWrap.appendChild(this.inputText);
+        this.UIGroup.appendChild(this.inputWrap);
+
+        this.submitHolder = create_SVG_group(0, 0);
+        this.submitButton = create_SVG_buttonElement(
+            layout.submit.cx,
+            0,
+            layout.submit.w,
+            layout.submit.h,
+            "Submit",
+            40
+        );
+        this.submitButton.style.cursor = "pointer";
+        this.submitButton.onpointerdown = () => this.submit();
+        this.submitHolder.appendChild(this.submitButton);
+        this.UIGroup.appendChild(this.submitHolder);
+
+        this.update_question_copy();
+        requestAnimationFrame(() => this.layoutToContent());
+
+        setTimeout(() => {
+            if (this.inputText) this.inputText.focus();
+        }, 50);
+    }
+
+    resolve_placement(anchorElement) {
+        let midX = this.W / 2;
+        let b = this.get_element_svg_bounds(anchorElement);
+        if (!b || !b.width) return "top";
+        if (b.right <= midX) return "right";
+        if (b.left >= midX) return "left";
+        return "top";
+    }
+
+    get_element_svg_bounds(element) {
+        return TypedNameAskOverlay.get_element_svg_bounds(element);
+    }
+
+    get_panel_layout(placement) {
+        const W = this.W;
+        const H = this.H;
+        let panel;
+        if (this.largePanel) {
+            let top = (this.panelTop != null) ? this.panelTop : 0.03 * H;
+            panel = { x: 0.10 * W, y: top, w: 0.80 * W, h: 0.55 * H };
+        } else if (placement === "left") {
+            panel = { x: 0.03 * W, y: 0.14 * H, w: 0.44 * W, h: 0.72 * H };
+        } else if (placement === "right") {
+            panel = { x: 0.53 * W, y: 0.14 * H, w: 0.44 * W, h: 0.72 * H };
+        } else {
+            panel = { x: 0.12 * W, y: 0.03 * H, w: 0.76 * W, h: 0.46 * H };
+        }
+
+        let padX = 0.06 * panel.w;
+        let padY = 0.05 * panel.h;
+        return {
+            placement,
+            fontSize: this.largePanel ? 34 : (placement === "top" ? 36 : 32),
+            panel,
+            question: {
+                x: panel.x + padX,
+                y: panel.y + padY,
+                w: panel.w - 2 * padX,
+                h: this.largePanel ? 0.50 * panel.h : 0.42 * panel.h
+            },
+            input: {
+                x: panel.x + 0.10 * panel.w,
+                y: panel.y + (this.largePanel ? 0.58 : 0.54) * panel.h,
+                w: 0.80 * panel.w,
+                h: Math.max(70, Math.min(0.10 * panel.h, 0.085 * H))
+            },
+            submit: {
+                cx: panel.x + 0.5 * panel.w,
+                cy: panel.y + (this.largePanel ? 0.86 : 0.84) * panel.h,
+                w: Math.min(280, 0.58 * panel.w),
+                h: 70
+            }
+        };
+    }
+
+    layoutToContent() {
+        if (!this.panel || !this.questionP || !this.questionWrap || !this.inputWrap) return;
+        let layout = this.get_panel_layout(this._placement || "top");
+        let panel = layout.panel;
+        let padX = 0.06 * panel.w;
+        let padTop = 22;
+        let padBot = 22;
+        let gap = 16;
+        let inputH = layout.input.h;
+        let submitH = layout.submit.h;
+
+        this.questionWrap.setAttribute("x", panel.x + padX);
+        this.questionWrap.setAttribute("width", panel.w - 2 * padX);
+        this.questionWrap.setAttribute("y", panel.y + padTop);
+        this.questionWrap.setAttribute("height", Math.max(160, 0.55 * this.H));
+        this.questionP.style.height = "auto";
+        this.questionP.style.overflow = "visible";
+        void this.questionP.offsetHeight;
+        let qH = Math.max(this.questionP.scrollHeight, 44);
+        let maxQH = this.H - panel.y - padTop - gap - inputH - gap - submitH - padBot - 8;
+        qH = Math.min(qH, Math.max(44, maxQH));
+        this.questionWrap.setAttribute("height", qH);
+        if (this.questionP.scrollHeight > qH + 2) {
+            this.questionP.style.height = "100%";
+            this.questionP.style.overflow = "auto";
+        }
+
+        let inputY = panel.y + padTop + qH + gap;
+        this.inputWrap.setAttribute("x", layout.input.x);
+        this.inputWrap.setAttribute("y", inputY);
+        this.inputWrap.setAttribute("width", layout.input.w);
+        this.inputWrap.setAttribute("height", inputH);
+
+        let submitCy = inputY + inputH + gap + submitH / 2;
+        if (this.submitHolder) {
+            this.submitHolder.style.transform = "translate(0px, " + submitCy + "px)";
+        }
+
+        let panelH = (submitCy + submitH / 2 + padBot) - panel.y;
+        panelH = Math.min(Math.max(panelH, 220), this.H - panel.y - 12);
+        this.panel.setAttribute("x", panel.x);
+        this.panel.setAttribute("y", panel.y);
+        this.panel.setAttribute("width", panel.w);
+        this.panel.setAttribute("height", panelH);
+    }
+
+    update_question_copy() {
+        if (!this.questionP) return;
+        if (this.getQuestionHtml) {
+            this.questionP.innerHTML = this.getQuestionHtml({
+                feedbackKind: this.feedbackKind,
+                nameRevealed: this.nameRevealed,
+                correctName: this.correctName
+            });
+        } else {
+            let html = "What is this Fennimal's name?<br>Please type down the name below.";
+            if (this.feedbackKind === "close") {
+                html += "<br><br>Close, but not quite yet";
+            } else if (this.feedbackKind === "far") {
+                html += "<br><br>Oops, that's not it!";
+            }
+            if (this.nameRevealed && this.correctName) {
+                html += "<br><br><span style='display:inline-block;padding:8px 14px;background:#ffe566;border-radius:10px;'>This Fennimal is called <b>"
+                    + this.correctName + "</b>. Please type it below.</span>";
+            }
+            this.questionP.innerHTML = html;
+        }
+        this.layoutToContent();
+    }
+
+    submit() {
+        if (this._disabled) return;
+        let raw = (this.inputText && this.inputText.value) ? this.inputText.value.trim() : "";
+        if (!raw) return;
+
+        let guess = raw.toLowerCase();
+        let target = String(this.correctName || "").trim().toLowerCase();
+        let now = (typeof performance !== "undefined") ? performance.now() : Date.now();
+        // Ignore only accidental double-submits; repeated wrong guesses still count toward reveal.
+        if (guess === this.lastSubmittedGuess && (now - (this.lastSubmitAt || 0)) < 350) return;
+        this.lastSubmitAt = now;
+
+        let dist = LevenshteinDistance(guess, target);
+
+        if (dist === 0) {
+            this._disabled = true;
+            let resolve = this._resolve;
+            this._resolve = null;
+            let result = {
+                nameRevealed: this.nameRevealed,
+                failedAttempts: this.failedAttempts
+            };
+            this.destroy();
+            if (resolve) resolve(result);
+            return;
+        }
+
+        this.lastSubmittedGuess = guess;
+        AudioCont.play_sound_effect("rejected");
+        this.failedAttempts += 1;
+        this.feedbackKind = dist <= this.closeDistance ? "close" : "far";
+        if (this.failedAttempts >= this.maxFailedAttempts) this.nameRevealed = true;
+        if (this.onWrongAttempt) this.onWrongAttempt(raw, dist);
+        this.update_question_copy();
+        if (this.inputText) {
+            this.inputText.focus();
+            this.inputText.select();
+        }
     }
 }

@@ -1956,3 +1956,79 @@ html, body {
     60% { transform: translateX(-12px) rotate(-1deg); }
     80% { transform: translateX(10px) rotate(1deg); }
 }
+
+.hat_choice_button_shake {
+    animation: hat_choice_button_shake 420ms ease-in-out;
+    transform-box: fill-box;
+    transform-origin: center;
+}
+
+@keyframes hat_choice_button_shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-10px); }
+    40% { transform: translateX(10px); }
+    60% { transform: translateX(-6px); }
+    80% { transform: translateX(6px); }
+}
+
+.chimera_fog_blob {
+    animation: chimera-fog-drift 14s ease-in-out infinite alternate;
+}
+
+@keyframes chimera-fog-drift {
+    from { transform: translate(0px, 0px); }
+    to { transform: translate(36px, -16px); }
+}
+
+.chimera_time_bar {
+    opacity: 0;
+}
+
+.chimera_time_bar.is-on {
+    opacity: 1;
+}
+
+.chimera_time_bar.pulse {
+    animation: chimera-bar-pulse 700ms ease-in-out infinite;
+}
+
+.chimera_time_bar.hold {
+    animation: chimera-bar-hold 900ms ease-in-out infinite;
+    transform-origin: center center;
+    transform-box: fill-box;
+}
+
+@keyframes chimera-bar-hold {
+    0%, 100% {
+        opacity: 1;
+        fill: #43a047;
+        transform: scaleX(1);
+    }
+    50% {
+        opacity: 0.7;
+        fill: #81c784;
+        transform: scaleX(0.72);
+    }
+}
+
+@keyframes chimera-bar-pulse {
+    0%, 100% { fill: #c62828; }
+    50% { fill: #7b1fa2; }
+}
+
+.hat_drop_root {
+    pointer-events: all;
+}
+
+.hat_drop_key:hover:not(.is-pressed) .hat_drop_key_face {
+    fill: #fff6e0;
+}
+
+.hat_drop_key.is-pressed .hat_drop_key_face {
+    fill: #5c5c5c;
+    stroke: #2f2f2f;
+}
+
+.hat_drop_key.is-pressed .hat_drop_key_glyph {
+    fill: #f2f2f2;
+}

@@ -1,15 +1,12 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["mentalizing_between_subjects"];
+    this.Experiment_Code = ["semantic_learning"];
 
     const All_Instructions_At_Start = {
         test: [],
-        mentalizing_network: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
-        mentalizing: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
-        mentalizing_AB: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
-        mentalizing_AC: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
-        mentalizing_sack_AC: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
+        semantic_learning: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview"],
         mentalizing_between_subjects: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
+
     };
 
     // ----------------------------------------------------
@@ -26,12 +23,21 @@ let StimulusSettings = function () {
     // ----------------------------------------------------
     const All_Fennimal_Sets = {
         test: {
-            "S1": { head: "A", region: "A", toy: "A", toybox: "A", sack: "A" },
-            "S2": { head: "B", region: "B", toy: "B", toybox: "B", sack: "B" },
+            "A": { head: "A", region: "A", hat: "A" },
+            "B": { head: "A", region: "B", hat: "B" },
+            "C": { head: "C", region: "B", hat: "C" },
+            "D1": { head: "D", region: "D", hat: "D" },
+            "D2": { head: "E", region: "E", hat: "E" },
+        },
 
-            "P1": { head: "D", region: "D", toy: "D", toybox: "A", sack: "C" },
-            "P2": { head: "E", region: "E", toy: "E", toybox: "B", sack: "A" },
-
+        semantic_learning: {
+            "A": { head: "A", region: "A", hat: "A" },
+            "B": { head: "A", region: "B", hat: "B" },
+            "C": { head: "C", region: "B", hat: "C" },
+            "D1": { head: "D", region: "D", hat: "D" },
+            "D2": { head: "E", region: "E", hat: "E" },
+            
+           
         },
 
      
@@ -44,83 +50,115 @@ let StimulusSettings = function () {
         
     };
 
-    // ----------------------------------------------------
-    // EXPERIMENT STRUCTURE (BLOCKS & TRIALS)
-    // ----------------------------------------------------
     let All_Experiment_Structures = {
         test: [
             {
-                type: "phone_room",
-                partner_behavior: "active",
-                include_Fennefinder: false,
-                return_to_phone_room_after_final_trial: true,
+                type: "chimera_feature_id",
                 skip_instructions: false,
-                Fennimals_encountered: ["S1"],
-                interaction_type: ["switch_box_without_partner"],
-            },
-            {
-                type: "retrieve_lost_box",
-                n_trials_to_sample: 1,
-                randomization_id: "lost_box_manipulation",
-                include_decoration: true,
-                box_locations: [
-                  { label: "boost", Fennimal_finding_box: "A", target_box: "A" },
-                  { label: "neutral", Fennimal_finding_box: "S1", target_box: "A" },
-                  
-                ],
-                partner_behavior: "active"
-            },
-
-
-            // Belief DV overhaul — WorldState auto-seeds a false-belief layout when empty (test only).
-            {
-                type: "partner_belief_individual_boxes",
-                include_practice_trial: true,
-                num_belief_blocks: 1,
-                include_reality_block_at_end: true,
-                include_empty_box_choice_alternative: true,
-                bonus_stars_per_correct_answer: 1,
-                memory_probe_isi_ms: 1000,
-                gating_boxes: ["A", "B"],
-                action_prediction_toys: ["A", "B"],
-                questions: [
-                    { question_id: "belief_A", target_box: "A" },
-                    { question_id: "belief_B", target_box: "B" },
-                    { kind: "memory_probe_box_to_fennimal" },
-                    { kind: "memory_probe_fennimal_to_toy" },
-                    { kind: "memory_probe_box_to_sack" },
-                    { kind: "memory_probe_sack_to_toy" },
+                skip_practice: false,
+                partner_behavior: "absent",
+                // "blur-silhouette" | "patchy-holes" | "patchy-holes-with-pixalation"
+                // patchy-holes ≈ Gosselin & Schyns (2001, Vision Research) "bubbles"
+                // Curve: GenParam.ChimeraFeatureId.revealProfile. Backup: reveal_profile: "steep"
+                reveal_mode: "patchy-holes-with-pixalation",
+                trial_speed: 6000,
+                // Lead-lag is NOT a block field. Prime prints by primeEndFrac of
+                // trial_speed; the questioned part stays veiled until targetLagFrac
+                // (GenParam.ChimeraFeatureId). Logged RTs: reaction_time_ms from "?"
+                // and reaction_time_from_target_onset_ms from target print.
+                names_options: ["A", "B", "C", "D1", "D2"],
+                // region / head / object / answer are Fennimal ids.
+                // region: "neutral" = close-up (no body). object: "none" = no hat.
+                // Block 1 (shuffled): true-head polaroids, one per name.
+                // Block 2 (shuffled): keys + leftover fillers.
+                trials: [
+                    { id: "Face_A", region: "A", head: "A", object: "none", q: "Whose head?", answer: "A", role: "true_head", kind: "face" },
+                    { id: "Face_B", region: "B", head: "B", object: "none", q: "Whose head?", answer: "B", role: "true_head", kind: "face" },
+                    { id: "Face_C", region: "C", head: "C", object: "none", q: "Whose head?", answer: "C", role: "true_head", kind: "face" },
+                    { id: "Face_D1", region: "D1", head: "D1", object: "none", q: "Whose head?", answer: "D1", role: "true_head", kind: "face" },
+                    { id: "Face_D2", region: "D2", head: "D2", object: "none", q: "Whose head?", answer: "D2", role: "true_head", kind: "face" },
+                    { id: "S1", region: "A", head: "C", object: "none", q: "Whose head?", answer: "C", role: "test_mixup", kind: "key" },
+                    { id: "S4", region: "neutral", head: "C", object: "A", q: "Whose hat?", answer: "A", role: "test_card", kind: "key" },
+                    { id: "C1", region: "D1", head: "D2", object: "none", q: "Whose head?", answer: "D2", role: "control_mixup", kind: "key" },
+                    { id: "C4", region: "neutral", head: "D2", object: "D1", q: "Whose hat?", answer: "D1", role: "control_card", kind: "key" },
+                    { id: "Fill_C", region: "B", head: "A", object: "none", q: "Whose head?", answer: "B", role: "filler_B_same_face", kind: "filler" },
+                    { id: "Fill_E", region: "neutral", head: "A", object: "B", q: "Whose hat?", answer: "B", role: "filler_trained_card", kind: "filler" }
                 ]
+                // Day card copy: GenParam.ChimeraFeatureId.dayTitle / dayBody
+                // Reveal curve: GenParam.ChimeraFeatureId.revealProfile ("lingering").
+                // Backup of the old punchy curve: reveal_profile: "steep"
             },
-
-            // Optional downstream phone_room checks (comment in/out as needed):
-            /*
+            {type: "hat_drop_task",
+                skip_instructions: false,
+                skip_practice: false,
+                partner_behavior: "absent",
+                n_reps: 1,
+                instruction_order: ["most_similar", "cousin", "neighbour"],
+                min_points: 25,
+                max_points: 100,
+                total_fall_time: 2000,
+                preview_ms: 750,
+                preview_travel_ms: 320,
+                // Trial dropped/correct/lure are Fennimal ids.
+                //TODO: CHECK TRIALS FOR CORRECTNESS
+                trials: [
+                    { id: "MS1", instruction: "most_similar", dropped: "A", correct: "C", lure: "D2", role: "help_test" },
+                    { id: "MS2", instruction: "most_similar", dropped: "C", correct: "A", lure: "D1", role: "help_reverse" },
+                    { id: "C1", instruction: "cousin", dropped: "A", correct: "B", lure: "C", role: "hurt_lure_endpoint" },
+                    { id: "N1", instruction: "neighbour", dropped: "C", correct: "B", lure: "A", role: "hurt" },
+                    { id: "C2", instruction: "cousin", dropped: "A", correct: "B", lure: "D2", role: "easy_cousin" },
+                    { id: "N2", instruction: "neighbour", dropped: "C", correct: "B", lure: "D2", role: "easy_neighbour" }
+                ]
+                // Day card copy: GenParam.HatDrop.dayTitle / dayBody
+            },
+            {type: "hat_drop_gonogo",
+                skip_instructions: false,
+                skip_practice: false,
+                partner_behavior: "absent",
+                n_reps: 1,
+                instruction_order: ["neighbour", "cousin"],
+                min_points: 25,
+                max_points: 100,
+                total_fall_time: 2000,
+                preview_ms: 750,
+                preview_travel_ms: 320,
+                trials: [
+                    { id: "R01", instruction: "neighbour", dropped: "A", box: "C", correct: "nogo", role: "hurt" },
+                    { id: "R02", instruction: "neighbour", dropped: "C", box: "A", correct: "nogo", role: "hurt_reverse" },
+                    { id: "R03", instruction: "neighbour", dropped: "D1", box: "D2", correct: "nogo", role: "control_unmatched" },
+                    { id: "R04", instruction: "neighbour", dropped: "D2", box: "D1", correct: "nogo", role: "control_reverse" },
+                    { id: "R05", instruction: "neighbour", dropped: "A", box: "B", correct: "nogo", role: "secondary_hurt_cousins_as_neighbours" },
+                    { id: "R06", instruction: "neighbour", dropped: "B", box: "A", correct: "nogo", role: "secondary_hurt_reverse" },
+                    { id: "R07", instruction: "neighbour", dropped: "B", box: "C", correct: "go", role: "neighbour_spoke" },
+                    { id: "R08", instruction: "neighbour", dropped: "C", box: "B", correct: "go", role: "neighbour_spoke_reverse" },
+                    { id: "H01", instruction: "cousin", dropped: "A", box: "B", correct: "go", role: "cousin_spoke" },
+                    { id: "H02", instruction: "cousin", dropped: "B", box: "A", correct: "go", role: "cousin_spoke_reverse" },
+                    { id: "H03", instruction: "cousin", dropped: "A", box: "C", correct: "nogo", role: "hurt_not_cousins" },
+                    { id: "H04", instruction: "cousin", dropped: "C", box: "A", correct: "nogo", role: "hurt_not_cousins_reverse" },
+                    { id: "H07", instruction: "cousin", dropped: "B", box: "C", correct: "nogo", role: "secondary_hurt_neighbours_as_cousins" },
+                    { id: "H08", instruction: "cousin", dropped: "C", box: "B", correct: "nogo", role: "secondary_hurt_reverse" }
+                ]
+                // Day card copy: GenParam.HatDrop.gngDayTitle / gngDayBody
+            },
             {
-                type: "phone_room",
-                partner_behavior: "active",
-                include_Fennefinder: false,
-                return_to_phone_room_after_final_trial: false,
+                type: "hint_and_search",
+                hint_type: "name",
+                interaction_type: ["hat_blown_away"],
+                Fennimals_encountered: ["A", "B", "C", "D1", "D2"],
+                partner_behavior: "absent",
+                include_Fennefinder: true,
                 ask_Fennimal: true,
-                ask_toy: true,
-                ask_box: true,
-                trial_subblocks: [
-                    {
-                        Fennimals_encountered: ["S1", "S2"],
-                        interaction_type: "toy_to_box"
-                    },
-                ]
+                ask_name: false,
+                ask_hat: false
             },
+           
             {
-                type: "phone_room",
-                partner_behavior: "active",
-                include_Fennefinder: false,
-                return_to_phone_room_after_final_trial: true,
-                skip_instructions: true,
-                Fennimals_encountered: ["P1", "P2"],
-                interaction_type: ["switch_box_without_partner"],
-                hint_type: ["icon"]
+                type: "name_recall_task",
+                bonus_stars_per_correct_answer: 1,
+                allowed_Levenshtein_distance_for_match: 2
             },
-            */
+            
+            
         ],
 
         mentalizing_between_subjects: [
@@ -186,7 +224,7 @@ let StimulusSettings = function () {
                 box_locations: [
                   { label: "boost", Fennimal_finding_box: "A", target_box: "A" },
                   { label: "neutral", Fennimal_finding_box: "C", target_box: "A" },
-                  { label: "cost", Fennimal_finding_box: "B", target_box: "A", weight: 3 },
+                  { label: "cost", Fennimal_finding_box: "B", target_box: "A", weight: 2 },
                 ],
                 partner_behavior: "active"
             },
@@ -225,11 +263,241 @@ let StimulusSettings = function () {
                 ]
             },
 
+        ],
+
+        semantic_learning: [
+
+            // TRAINING PHASE
+            // Block 1: free exploration — photograph each Fennimal; polaroid introduces the name
+            {
+                type: "free_exploration",
+                interaction_type: ["photo_Fennimal"],
+                Fennimals_encountered: ["A", "B", "C", "D1", "D2"],
+                partner_behavior: "absent",
+                include_Fennefinder: true,
+                force_climbing_tower_first: true,
+                introduce_name_on_polaroid: true
+            },
+            
+            // Blocks 2–4 in one phone-room day: hide_and_seek, hat_laundry, hat_blown_away
+            // (cartesian: one trial per Fennimal × each interaction_type, then smart-shuffled)
+            {
+                type: "hint_and_search",
+                hint_type: "name",
+                interaction_type: ["hide_and_seek_Fennimal"],
+                Fennimals_encountered: ["A", "B", "C", "D1", "D2"],
+                partner_behavior: "absent",
+                include_Fennefinder: true,
+                ask_Fennimal: true,
+                ask_name: false,
+                ask_hat: false
+            },
+            {
+                type: "phone_room",
+                interaction_type: [ "hat_laundry", "hat_blown_away"],
+                Fennimals_encountered: ["A", "B", "C", "D1", "D2"],
+                partner_behavior: "absent",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: true,
+                ask_Fennimal: true,
+                ask_name: true,
+                ask_hat: true
+            },
+
+
+
+            // QUIZ
+            {type: "Fennimal_attribute_sorting_task",
+                Fennimals_asked: ["A", "B", "C", "D1", "D2"],
+                attribute_order: ["region", "head", "hat"],
+                presentation: "single",
+                maximum_earnable_stars: 5,
+                pass_if_errors_at_most: 3,
+                max_attempts: 3,
+                on_fail: {
+                    type: "phone_room",
+                    interaction_type: "photo_Fennimal",
+                    partner_behavior: "absent",
+                    include_Fennefinder: false,
+                    return_to_phone_room_after_final_trial: true,
+                    skip_instructions: true,
+                    ask_hat: true
+                }
+            },
+
+            //BINDING PHASE
+            {type: "hat_binding_task",
+                skip_instructions: false,
+                randomization_id: "binding_search_condition",
+                // Weighted by duplicates. One value is drawn per participant and persisted.
+                condition: ["group_based"], //["group_based", "pair_based", "control"],
+                searched_triad: ["A", "B", "C"],
+                singletons: ["D1", "D2"],
+                hats: ["A", "B", "C", "D1", "D2"],
+                binding_trials: [
+                    {
+                        id: "searched_to_C",
+                        conditions: ["pair_based", "group_based"],
+                        pair_based: { cue: "B", path: ["neighbour"] },
+                        group_based: { cue: "A", path: ["cousin", "neighbour"] }
+                    },
+                    {
+                        id: "searched_to_A",
+                        conditions: ["pair_based", "group_based"],
+                        pair_based: { cue: "B", path: ["cousin"] },
+                        group_based: { cue: "C", path: ["neighbour", "cousin"] }
+                    },
+                    { id: "self_A", conditions: ["control"], cue: "A", path: [] },
+                    { id: "self_B", conditions: ["control"], cue: "B", path: [] },
+                    { id: "self_C", conditions: ["control"], cue: "C", path: [] },
+                    { id: "self_D1", cue: "D1", path: [] },
+                    { id: "self_D2", cue: "D2", path: [] }
+                ],
+                retraining_fennimals: ["A", "B", "C", "D1", "D2"],
+                day_title: "odd jobs in the Center of Fenneland",
+                day_body: "Today you are tasked with various odd jobs in the Center of Fenneland.",
+                blocks: [
+                    {
+                        kind: "binding",
+                        flavour: "lost_and_found",
+                        hop_catch_after_errors: 2,
+                        cover_story: "Oh no, the Fennimals have lost their hats! Let's help return these hats to their correct owner. Unfortunately, the post office forgot to print the names on the boxes. Instead, we need to rely on your memories. One hat at a time, we will give you a description of a Fennimal. Your task is to first visualize this Fennimal. You then have to place this Fennimal's hat in the shipping box."
+                    },
+                    {
+                        kind: "retraining",
+                        cover_story: "Let's double-check that we can still match each Fennimal to their hat. You will see a photo of a Fennimal — pick the hat that belongs to them."
+                    },
+                    {
+                        kind: "binding",
+                        flavour: "laundry",
+                        hop_catch_after_errors: 3,
+                        cover_story: "It's laundry day! All the Fennimals have had their hats washed and dried. Unfortunately, the name-tags also got washed and are now unusable. Instead, you will have to help match a new tag to the correct hat."
+                    },
+                    {
+                        kind: "retraining",
+                        cover_story: "Another quick check: match each Fennimal to their hat."
+                    },
+                    {
+                        kind: "binding",
+                        flavour: "gift_shop",
+                        hop_catch_after_errors: 3,
+                        cover_story: "Let's buy some new hats for the Fennimals! One hat at a time, we will give you a description of a Fennimal. Your task is to first visualize this Fennimal. You then have to place a new version of this Fennimal's hat in the shopping cart."
+                    }
+                ]
+            },
+
+            //TEST PHASE
+            {type: "name_recall_task",
+                bonus_stars_per_correct_answer: 1,
+                allowed_Levenshtein_distance_for_match: 2
+            },
+            {type: "chimera_feature_id",
+                skip_instructions: false,
+                skip_practice: false,
+                partner_behavior: "absent",
+                // "blur-silhouette" | "patchy-holes" | "patchy-holes-with-pixalation"
+                // patchy-holes ≈ Gosselin & Schyns (2001, Vision Research) "bubbles"
+                // Curve: GenParam.ChimeraFeatureId.revealProfile. Backup: reveal_profile: "steep"
+                reveal_mode: "patchy-holes-with-pixalation",
+                trial_speed: 7500,
+                // Lead-lag is NOT a block field. Prime prints by primeEndFrac of
+                // trial_speed; the questioned part stays veiled until targetLagFrac
+                // (GenParam.ChimeraFeatureId). Logged RTs: reaction_time_ms from "?"
+                // and reaction_time_from_target_onset_ms from target print.
+                names_options: ["A", "B", "C", "D1", "D2"],
+                // region / head / object / answer are Fennimal ids.
+                // region: "neutral" = close-up (no body). object: "none" = no hat.
+                // Block 1 (shuffled): true-head polaroids, one per name.
+                // Block 2 (shuffled): keys + leftover fillers.
+                trials: [
+                    { id: "Face_A", region: "A", head: "A", object: "none", q: "Whose head?", answer: "A", role: "true_head", kind: "face" },
+                    { id: "Face_B", region: "B", head: "B", object: "none", q: "Whose head?", answer: "B", role: "true_head", kind: "face" },
+                    { id: "Face_C", region: "C", head: "C", object: "none", q: "Whose head?", answer: "C", role: "true_head", kind: "face" },
+                    { id: "Face_D1", region: "D1", head: "D1", object: "none", q: "Whose head?", answer: "D1", role: "true_head", kind: "face" },
+                    { id: "Face_D2", region: "D2", head: "D2", object: "none", q: "Whose head?", answer: "D2", role: "true_head", kind: "face" },
+                    { id: "S1", region: "A", head: "C", object: "none", q: "Whose head?", answer: "C", role: "test_mixup", kind: "key" },
+                    { id: "S4", region: "neutral", head: "C", object: "A", q: "Whose hat?", answer: "A", role: "test_card", kind: "key" },
+                    { id: "Fill_C", region: "B", head: "A", object: "none", q: "Whose head?", answer: "B", role: "filler_B_same_face", kind: "filler" },
+                    { id: "Fill_E", region: "neutral", head: "A", object: "B", q: "Whose hat?", answer: "B", role: "filler_trained_card", kind: "filler" }
+                ]
+                // Day card copy: GenParam.ChimeraFeatureId.dayTitle / dayBody
+                // Reveal curve: GenParam.ChimeraFeatureId.revealProfile ("lingering").
+                // Backup of the old punchy curve: reveal_profile: "steep"
+            },
+            {type: "hat_drop_task",
+                skip_instructions: false,
+                skip_practice: false,
+                partner_behavior: "absent",
+                // Testing gates — bump n_reps to add extra full passes.
+                // Rep 1 uses instruction_order as written; extra reps rotate
+                // that order (Latin square) and reshuffle trials inside each subblock.
+                n_reps: 1,
+                instruction_order: ["most_similar", "cousin", "neighbour"],
+                min_points: 25,
+                max_points: 100,
+                total_fall_time: 2000,
+                // Cue hat sits in the chute window, then is sucked in; boxes stay covered until then.
+                preview_ms: 1000,
+                preview_travel_ms: 320,
+                // Trial dropped/correct/lure are Fennimal ids.
+                // 2AFC: dropped = falling hat; correct = Box 1 (paid); lure = Box 2.
+                // Left/right of correct vs lure is counterbalanced in the controller.
+                //TODO: CHECK TRIALS FOR CORRECTNESS
+                trials: [
+                    { id: "MS1", instruction: "most_similar", dropped: "A", correct: "C", lure: "D2", role: "help_test" },
+                    { id: "MS2", instruction: "most_similar", dropped: "C", correct: "A", lure: "D1", role: "help_reverse" },
+                   
+                    { id: "C1", instruction: "cousin", dropped: "A", correct: "B", lure: "C", role: "hurt_lure_endpoint" },
+                    { id: "N1", instruction: "neighbour", dropped: "C", correct: "B", lure: "A", role: "hurt" },
+                    { id: "C2", instruction: "cousin", dropped: "A", correct: "B", lure: "D2", role: "easy_cousin" },
+                    { id: "N2", instruction: "neighbour", dropped: "C", correct: "B", lure: "D2", role: "easy_neighbour" }
+                ]
+                // Day card copy: GenParam.HatDrop.dayTitle / dayBody
+            },
+            {type: "hat_drop_gonogo",
+                skip_instructions: false,
+                skip_practice: false,
+                partner_behavior: "absent",
+                n_reps: 1,
+                instruction_order: ["neighbour", "cousin"],
+                min_points: 25,
+                max_points: 100,
+                total_fall_time: 2000,
+                // Cue hat sits in the chute window, then is sucked in; boxes stay covered until then.
+                preview_ms: 1000,
+                preview_travel_ms: 320,
+                // Region block = neighbour instruction; Head block = cousin instruction.
+                // correct: "go" = keep box under chute; "nogo" = slide it aside.
+                trials: [
+                    // Region (neighbour)
+                    { id: "R01", instruction: "neighbour", dropped: "A", box: "C", correct: "nogo", role: "hurt" },
+                    { id: "R02", instruction: "neighbour", dropped: "C", box: "A", correct: "nogo", role: "hurt_reverse" },
+                
+                    { id: "R05", instruction: "neighbour", dropped: "A", box: "B", correct: "nogo", role: "secondary_hurt_cousins_as_neighbours" },
+                    { id: "R06", instruction: "neighbour", dropped: "B", box: "A", correct: "nogo", role: "secondary_hurt_reverse" },
+                    { id: "R07", instruction: "neighbour", dropped: "B", box: "C", correct: "go", role: "neighbour_spoke" },
+                    { id: "R08", instruction: "neighbour", dropped: "C", box: "B", correct: "go", role: "neighbour_spoke_reverse" },
+                    // Head (cousin)
+                    { id: "H01", instruction: "cousin", dropped: "A", box: "B", correct: "go", role: "cousin_spoke" },
+                    { id: "H02", instruction: "cousin", dropped: "B", box: "A", correct: "go", role: "cousin_spoke_reverse" },
+                    { id: "H03", instruction: "cousin", dropped: "A", box: "C", correct: "nogo", role: "hurt_not_cousins" },
+                    { id: "H04", instruction: "cousin", dropped: "C", box: "A", correct: "nogo", role: "hurt_not_cousins_reverse" },
+                
+                    { id: "H07", instruction: "cousin", dropped: "B", box: "C", correct: "nogo", role: "secondary_hurt_neighbours_as_cousins" },
+                    { id: "H08", instruction: "cousin", dropped: "C", box: "B", correct: "nogo", role: "secondary_hurt_reverse" }
+                ]
+                // Day card copy: GenParam.HatDrop.gngDayTitle / gngDayBody
+            },
+            
+            
+
+            
         ]
     };
 
     const All_Questionnaire_Page_sets = {
         test: [],
+        semantic_learning: ["demographics_questionnaire"],
       
         mentalizing: ["demographics_questionnaire"],
         mentalizing_AB: ["demographics_questionnaire"],
@@ -241,11 +509,13 @@ let StimulusSettings = function () {
     const All_Banned_Head_Lists = { test: false, mentalizing_1: false };
     const All_Forced_Head_Lists = {
         test: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
+        semantic_learning: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
 
         mentalizing: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
         mentalizing_AB: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
         mentalizing_AC: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"], //["alien", "donut", "radio", "jackolantern", "rhino",  "eagle", "brush"]
         mentalizing_between_subjects: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
+        semantic_learning: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
     };
 
     const All_Allowed_Head_Groups_List = { test: false, mentalizing_1: false };
@@ -867,6 +1137,16 @@ let StimulusTransformer = function (StimTemplate) {
                     .filter(Boolean)
             )];
         }
+        if (type === "hat") {
+            return [...new Set(
+                Array.from(document.getElementsByClassName("hat"))
+                    .map((h) => {
+                        let id = h.id || "";
+                        return id.startsWith("hat_") ? id.slice(4) : null;
+                    })
+                    .filter(Boolean)
+            )];
+        }
         return [];
     };
 
@@ -989,6 +1269,13 @@ let StimulusTransformer = function (StimTemplate) {
     };
 
     this.get_Feature_maps = () => FeatureMapConstant;
+    this.get_forced_heads = function () {
+        return Array.isArray(StimTemplate.forced_heads) ? StimTemplate.forced_heads.slice() : [];
+    };
+    this.get_leftover_forced_heads = function () {
+        let used = this.get_all_x_encountered_during_experiment("head") || [];
+        return this.get_forced_heads().filter((h) => h && !used.includes(h));
+    };
     this.get_instruction_pages_arr = () => JSON.parse(JSON.stringify(StimTemplate.Instructions_at_start));
     this.get_questionnaire_pages_arr = () => JSON.parse(JSON.stringify(StimTemplate.Pages_at_end));
     this.get_bonus_details = () => JSON.parse(JSON.stringify(StimTemplate.BonusStarValue));
@@ -1024,6 +1311,28 @@ let StimulusTransformer = function (StimTemplate) {
                     max_stars += bonus * 2;
                 }
                 max_stars += bonus * this._countPartnerBeliefMemoryProbeTrials(memoryProbeSpecs);
+            }
+
+            if (block.type === "chimera_feature_id") {
+                let n = Array.isArray(block.trials) ? block.trials.length : 9;
+                max_stars += n;
+            }
+
+            if (block.type === "hat_drop_task" || block.type === "hat_drop_gonogo") {
+                let nReps = (typeof block.n_reps === "number" && block.n_reps > 0) ? block.n_reps : 1;
+                let order = Array.isArray(block.instruction_order) && block.instruction_order.length
+                    ? block.instruction_order
+                    : (block.type === "hat_drop_gonogo"
+                        ? ["neighbour", "cousin"]
+                        : ["most_similar", "cousin", "neighbour"]);
+                let byInst = {};
+                (Array.isArray(block.trials) ? block.trials : []).forEach((t) => {
+                    if (!t || !t.instruction) return;
+                    byInst[t.instruction] = (byInst[t.instruction] || 0) + 1;
+                });
+                let trialsPerRep = order.reduce((n, key) => n + (byInst[key] || 0), 0);
+                let maxPoints = (typeof block.max_points === "number") ? block.max_points : 100;
+                max_stars += Math.floor((trialsPerRep * nReps * maxPoints) / 100);
             }
 
             // FIX: Ensure the sorting task's stars are included in the global estimate
