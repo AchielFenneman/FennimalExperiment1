@@ -1367,4 +1367,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("P-READY")
+console.log("SEM_GO")
