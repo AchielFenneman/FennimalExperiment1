@@ -330,7 +330,7 @@ let StimulusSettings = function () {
                 skip_instructions: false,
                 randomization_id: "binding_search_condition",
                 // Weighted by duplicates. One value is drawn per participant and persisted.
-                condition: ["group_based"], //["group_based", "pair_based", "control"],
+                condition: ["group_based", "control"], //["group_based", "pair_based", "control"],
                 searched_triad: ["A", "B", "C"],
                 singletons: ["D1", "D2"],
                 hats: ["A", "B", "C", "D1", "D2"],
@@ -1367,4 +1367,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("SEM_GO")
+console.log("SEM CG -READY")
