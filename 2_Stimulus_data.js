@@ -1,10 +1,11 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["semantic_learning"];
+    this.Experiment_Code = ["semantic_learning_star"];
 
     const All_Instructions_At_Start = {
         test: [],
         semantic_learning: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview"],
+        semantic_learning_star: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview"],
         mentalizing_between_subjects: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
 
     };
@@ -23,11 +24,11 @@ let StimulusSettings = function () {
     // ----------------------------------------------------
     const All_Fennimal_Sets = {
         test: {
-            "A": { head: "A", region: "A", hat: "A" },
-            "B": { head: "A", region: "B", hat: "B" },
-            "C": { head: "C", region: "B", hat: "C" },
-            "D1": { head: "D", region: "D", hat: "D" },
-            "D2": { head: "E", region: "E", hat: "E" },
+            "A": { head: "B", region: "A", toy: "A", hat: "A" },
+            "B": { head: "B", region: "B", toy: "B", hat: "B" },
+            "C": { head: "C", region: "B", toy: "C", hat: "C" },
+            "D": { head: "D", region: "D", toy: "B", hat: "D" },
+         
         },
 
         semantic_learning: {
@@ -38,6 +39,13 @@ let StimulusSettings = function () {
             "D2": { head: "E", region: "E", hat: "E" },
             
            
+        },
+
+        semantic_learning_star: {
+            "A": { head: "B", region: "A", toy: "A", hat: "A" },
+            "B": { head: "B", region: "B", toy: "B", hat: "B" },
+            "C": { head: "C", region: "B", toy: "C", hat: "C" },
+            "D": { head: "D", region: "D", toy: "B", hat: "D" },
         },
 
      
@@ -52,6 +60,77 @@ let StimulusSettings = function () {
 
     let All_Experiment_Structures = {
         test: [
+            {
+                type: "morph_task",
+                skip_instructions: true,
+                skip_practice: true,
+                partner_behavior: "absent",
+                trial_speed: 6000,
+                // resolve_trial: true = on answer the photo completes to the TRUE
+                // Fennimal (implicit feedback). false = freeze the frame as-is.
+                // Default lives on GenParam.MorphTask.resolveTrial.
+                resolve_trial: true,
+                // fenA / fenB / target are Fennimal ids; target must equal fenA or fenB.
+                // morph_centerpoint in [0, 1]: 0 resolves early in the window,
+                // 1 resolves late. noise in [0, 1] is fixed binary static
+                // over the morph photo area: 0 = clear, 1 = fully blocked.
+                // morph: "full" | "shape" | "color" | "mesh"
+                // view: "closeup" (default) | "full"
+                // grayscale: true = print the morph / revealed photo in grayscale.
+                // trials: flat [{...},...] (shuffle all) OR blocks
+                //   [[{...},{...}], [{...},...]] — keep block order, shuffle within.
+                // names_options: Fennimal ids for the prime-name radial ring (required).
+                // prime (required on paid trials): composite chimera in the same polaroid.
+                //   prime: { head?, body?, hat?, toy?, color_scheme?, name }
+                //   Fields are Fennimal ids. name required; at least one visual part.
+                //   toy requires body (held on Fennimal_body_center_point).
+                //   color_scheme: Fennimal id (wins) or gray/grey/grayscale/greyscale.
+                // Flow: ? → develop prime → F/J/Space name quiz → auto jumble morph →
+                //   F/J identity → optional resolve → fly to chosen side.
+                names_options: ["A", "B", "C", "D",],
+                trials: [
+                    // Mesh renderer: same fenA/fenB/target fields as other morph trials.
+                    {
+                        id: "Mesh_M1", fenA: "A", fenB: "C", target: "C", morph_centerpoint: 0.5, noise: 0, morph: "mesh", role: "mesh_ac",
+                        prime: { head: "A", body: "A", hat: "A", toy: "A", name: "A" }
+                    },
+                    {
+                        id: "Mesh_gray",
+                        fenA: "A", fenB: "C", target: "A", morph_centerpoint: 0.5, noise: 0.1, morph: "mesh",
+                        grayscale: true, role: "mesh_gray",
+                        prime: { head: "C", body: "C", hat: "C", name: "C" }
+                    },
+                    {
+                        id: "Prime_full",
+                        fenA: "A", fenB: "C", target: "C", morph_centerpoint: 0.4, noise: 0.15, morph: "mesh", role: "prime_full",
+                        grayscale: true,
+                        prime: { head: "A", body: "B", hat: "C", toy: "A", name: "A" }
+                    },
+                    {
+                        id: "Prime_body_toy",
+                        fenA: "C", fenB: "D", target: "D", morph_centerpoint: 0.5, noise: 0.25, morph: "mesh", role: "prime_body_toy",
+                        prime: { body: "B", toy: "B", name: "B" }
+                    },
+                    {
+                        id: "Prime_head_gray",
+                        fenA: "C", fenB: "D1", target: "D1", morph_centerpoint: 0.5, noise: 0.4, morph: "mesh", role: "prime_head",
+                        prime: { head: "C", color_scheme: "gray", name: "C" }
+                    },
+                    {
+                        id: "Prime_body",
+                        fenA: "D1", fenB: "D2", target: "D2", morph_centerpoint: 0.5, noise: 0.6, morph: "mesh", role: "prime_body",
+                        prime: { body: "D1", name: "D1" }
+                    },
+                    {
+                        id: "Prime_hat",
+                        fenA: "A", fenB: "D2", target: "A", morph_centerpoint: 0.5, noise: 0.8, morph: "mesh", role: "prime_hat",
+                        prime: { hat: "B", name: "B" }
+                    }
+                    // Archived two-polaroid type (unused live): type: "morph_task_two_cards"
+                    // with optional prime as a second polaroid; see 4_MorphTaskTwoCards.js.
+                ]
+                // Day card copy: GenParam.MorphTask.dayTitle / dayBody
+            },
             {
                 type: "chimera_feature_id",
                 skip_instructions: false,
@@ -331,28 +410,10 @@ let StimulusSettings = function () {
                 randomization_id: "binding_search_condition",
                 // Weighted by duplicates. One value is drawn per participant and persisted.
                 condition: ["group_based", "control"], //["group_based", "pair_based", "control"],
-                searched_triad: ["A", "B", "C"],
-                singletons: ["D1", "D2"],
+                hub: "B",
+                arms: ["A", "C"],
+                fillers: ["D1", "D2"],
                 hats: ["A", "B", "C", "D1", "D2"],
-                binding_trials: [
-                    {
-                        id: "searched_to_C",
-                        conditions: ["pair_based", "group_based"],
-                        pair_based: { cue: "B", path: ["neighbour"] },
-                        group_based: { cue: "A", path: ["cousin", "neighbour"] }
-                    },
-                    {
-                        id: "searched_to_A",
-                        conditions: ["pair_based", "group_based"],
-                        pair_based: { cue: "B", path: ["cousin"] },
-                        group_based: { cue: "C", path: ["neighbour", "cousin"] }
-                    },
-                    { id: "self_A", conditions: ["control"], cue: "A", path: [] },
-                    { id: "self_B", conditions: ["control"], cue: "B", path: [] },
-                    { id: "self_C", conditions: ["control"], cue: "C", path: [] },
-                    { id: "self_D1", cue: "D1", path: [] },
-                    { id: "self_D2", cue: "D2", path: [] }
-                ],
                 retraining_fennimals: ["A", "B", "C", "D1", "D2"],
                 day_title: "odd jobs in the Center of Fenneland",
                 day_body: "Today you are tasked with various odd jobs in the Center of Fenneland.",
@@ -492,12 +553,178 @@ let StimulusSettings = function () {
             
 
             
+        ],
+
+        semantic_learning_star: [
+        
+            // TRAINING PHASE
+            // Block 1: free exploration — photograph each Fennimal; polaroid introduces the name
+            { type: "free_exploration",
+                interaction_type: ["photo_Fennimal"],
+                Fennimals_encountered: ["A", "B", "C", "D"],
+                partner_behavior: "absent",
+                include_Fennefinder: true,
+                force_climbing_tower_first: true,
+                introduce_name_on_polaroid: true
+            },
+            
+            // Blocks 2–4 in one phone-room day: hide_and_seek, hat_laundry, hat_blown_away
+            // (cartesian: one trial per Fennimal × each interaction_type, then smart-shuffled)
+            { type: "hint_and_search",
+                hint_type: "name",
+                interaction_type: ["Fennimal_toy"],
+                Fennimals_encountered: ["A", "B", "C", "D"],
+                partner_behavior: "absent",
+                include_Fennefinder: true,
+                ask_Fennimal: true,
+                ask_name: false,
+                ask_hat: false,
+                ask_toy: false
+            },
+            {type: "phone_room",
+                interaction_type: [ "broken_toy_no_box", "hat_blown_away"],
+                Fennimals_encountered: ["A", "B", "C", "D"],
+                partner_behavior: "absent",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: true,
+                ask_Fennimal: true,
+                ask_name: true,
+                ask_hat: true,
+                ask_toy: true
+            },
+
+            // QUIZ
+            {type: "Fennimal_attribute_sorting_task",
+                Fennimals_asked: ["A", "B", "C", "D"],
+                attribute_order: ["region", "head", "hat", "toy"],
+                presentation: "single",
+                maximum_earnable_stars: 5,
+                pass_if_errors_at_most: 3,
+                max_attempts: 3,
+                on_fail: {
+                    type: "phone_room",
+                    interaction_type: "Fennimal_toy",
+                    partner_behavior: "absent",
+                    include_Fennefinder: false,
+                    return_to_phone_room_after_final_trial: true,
+                    skip_instructions: true,
+                    ask_hat: true,
+                    ask_toy: false
+                }
+            },
+
+            //BINDING PHASE
+            {type: "hat_binding_task",
+                skip_instructions: false,
+                randomization_id: "binding_search_condition",
+                arm_randomization_id: "binding_star_arms",
+                // Weighted by duplicates. One value is drawn per participant and persisted.
+                condition: ["group_based", "control"], //["group_based", "pair_based", "control"]
+                hub: "B",
+                arms: ["A", "C", "D"],
+                hats: ["A", "B", "C", "D"],
+                retraining_fennimals: ["A", "B", "C", "D"],
+                day_title: "odd jobs in the Center of Fenneland",
+                day_body: "Today you are tasked with various odd jobs in the Center of Fenneland.",
+                blocks: [
+                    {
+                        kind: "binding",
+                        flavour: "lost_and_found",
+                        hop_catch_after_errors: 2,
+                        cover_story: "Oh no, the Fennimals have lost their hats! Let's help return these hats to their correct owner. Unfortunately, the post office forgot to print the names on the boxes. Instead, we need to rely on your memories. One hat at a time, we will give you a description of a Fennimal. Your task is to first visualize this Fennimal. You then have to place this Fennimal's hat in the shipping box."
+                    },
+                    {
+                        kind: "retraining",
+                        cover_story: "Let's double-check that we can still match each Fennimal to their hat. You will see a photo of a Fennimal — pick the hat that belongs to them."
+                    },
+                    {
+                        kind: "binding",
+                        flavour: "laundry",
+                        hop_catch_after_errors: 3,
+                        cover_story: "It's laundry day! All the Fennimals have had their hats washed and dried. Unfortunately, the name-tags also got washed and are now unusable. Instead, you will have to help match a new tag to the correct hat."
+                    },
+                    {
+                        kind: "retraining",
+                        cover_story: "Another quick check: match each Fennimal to their hat."
+                    },
+                    {
+                        kind: "binding",
+                        flavour: "gift_shop",
+                        hop_catch_after_errors: 3,
+                        cover_story: "Let's buy some new hats for the Fennimals! One hat at a time, we will give you a description of a Fennimal. Your task is to first visualize this Fennimal. You then have to place a new version of this Fennimal's hat in the shopping cart."
+                    }
+                ]
+            },
+
+            //TEST PHASE
+            {type: "name_recall_task",
+                // Prompt-only: "Starting with [NAME]…" — bound conditions: one selected arm; control: any spoke.
+                seed_recall_with_arm_name: true,
+                bonus_stars_per_correct_answer: 1,
+                allowed_Levenshtein_distance_for_match: 2
+            },
+            
+            {
+                type: "morph_task",
+                skip_instructions: false,
+                skip_practice: false,
+                trial_speed: 3000,
+                // resolve_trial: true = on answer the photo completes to the TRUE
+                // Fennimal (implicit feedback). false = freeze the frame as-is.
+                // Default lives on GenParam.MorphTask.resolveTrial.
+                resolve_trial: true,
+                // fenA / fenB / target are Fennimal ids; target must equal fenA or fenB.
+                // morph_centerpoint in [0, 1] controls transition timing.
+                // noise in [0, 1] controls fixed binary static over the photo.
+                // morph: "full" | "shape" | "color" | "mesh"
+                // view: "closeup" (default) | "full"
+                // optional prime was a second polaroid in morph_task_two_cards (archived).
+                // Live morph_task: required composite prime on the same polaroid:
+                //   prime: { head?, body?, hat?, toy?, color_scheme?, name }
+                //   name required; at least one visual part. names_options required.
+                // Flow: ? → develop prime → F/J/Space name → auto morph → F/J identity.
+                // trials: flat list OR blocks [[{...}],[{...}]] (order fixed, shuffle within).
+                names_options: ["A", "B", "C", "D"],
+                trials: [
+                    [
+                        { id: "A_CD_C0", fenA: "C", fenB: "D", target: "C", morph_centerpoint: 1, noise: 0, morph: "mesh", grayscale: true, prime: { head: "A", hat: "A", name: "A"} },
+                        { id: "A_CD_D0", fenA: "C", fenB: "D", target: "D", morph_centerpoint: 1, noise: 0, morph: "mesh", grayscale: true, prime: { head: "A", hat: "A", name: "A" } },
+                        { id: "C_AD_A0", fenA: "A", fenB: "D", target: "A", morph_centerpoint: 1, noise: 0, morph: "mesh", grayscale: true, prime: { head: "C",  hat: "C", name: "C"} },
+                        { id: "C_AD_D0", fenA: "A", fenB: "D", target: "D", morph_centerpoint: 1, noise: 0, morph: "mesh", grayscale: true, prime: { head: "C", hat: "C", name: "C"} },
+                        { id: "D_AC_A0", fenA: "A", fenB: "C", target: "A", morph_centerpoint: 1, noise: 0, morph: "mesh", grayscale: true, prime: { head: "D", hat: "D", name: "D"} },
+                        { id: "D_AC_C0", fenA: "A", fenB: "C", target: "C", morph_centerpoint: 1, noise: 0, morph: "mesh", grayscale: true, prime: { head: "D", hat: "D", name: "D"} }
+                    ],
+                    [
+                        { id: "A_CD_C20", fenA: "C", fenB: "D", target: "C", morph_centerpoint: 1, noise: 0.2, morph: "mesh", grayscale: true, prime: { head: "A", hat: "A", name: "A"} },
+                        { id: "A_CD_D20", fenA: "C", fenB: "D", target: "D", morph_centerpoint: 1, noise: 0.2, morph: "mesh", grayscale: true, prime: { head: "A", hat: "A", name: "A" } },
+                        { id: "C_AD_A20", fenA: "A", fenB: "D", target: "A", morph_centerpoint: 1, noise: 0.2, morph: "mesh", grayscale: true, prime: { head: "C",  hat: "C", name: "C"} },
+                        { id: "C_AD_D20", fenA: "A", fenB: "D", target: "D", morph_centerpoint: 1, noise: 0.2, morph: "mesh", grayscale: true, prime: { head: "C", hat: "C", name: "C"} },
+                        { id: "D_AC_A20", fenA: "A", fenB: "C", target: "A", morph_centerpoint: 1, noise: 0.2, morph: "mesh", grayscale: true, prime: { head: "D", hat: "D", name: "D"} },
+                        { id: "D_AC_C20", fenA: "A", fenB: "C", target: "C", morph_centerpoint: 1, noise: 0.2, morph: "mesh", grayscale: true, prime: { head: "D", hat: "D", name: "D"} }
+                    ],
+                    [
+                        { id: "A_CD_C40", fenA: "C", fenB: "D", target: "C", morph_centerpoint: 1, noise: 0.45, morph: "mesh", grayscale: true, prime: { head: "A", body: "A", hat: "A", name: "A", toy: "A" } },
+                        { id: "A_CD_D40", fenA: "C", fenB: "D", target: "D", morph_centerpoint: 1, noise: 0.45, morph: "mesh", grayscale: true, prime: { head: "A", body: "A", hat: "A", name: "A", toy: "A" } },
+                        { id: "C_AD_A40", fenA: "A", fenB: "D", target: "A", morph_centerpoint: 1, noise: 0.45, morph: "mesh", grayscale: true, prime: { head: "C", body: "C", hat: "C", name: "C", toy: "C" } },
+                        { id: "C_AD_D40", fenA: "A", fenB: "D", target: "D", morph_centerpoint: 1, noise: 0.45, morph: "mesh", grayscale: true, prime: { head: "C", body: "C", hat: "C", name: "C", toy: "C" } },
+                        { id: "D_AC_A40", fenA: "A", fenB: "C", target: "A", morph_centerpoint: 1, noise: 0.45, morph: "mesh", grayscale: true, prime: { head: "D", body: "D", hat: "D", name: "D", toy: "D" } },
+                        { id: "D_AC_C40", fenA: "A", fenB: "C", target: "C", morph_centerpoint: 1, noise: 0.45, morph: "mesh", grayscale: true, prime: { head: "D", body: "D", hat: "D", name: "D", toy: "D" } }
+                    ]
+                ]
+            
+            },
+
+
+            
+
+            
         ]
     };
 
     const All_Questionnaire_Page_sets = {
         test: [],
         semantic_learning: ["demographics_questionnaire"],
+        semantic_learning_star: ["demographics_questionnaire"],
       
         mentalizing: ["demographics_questionnaire"],
         mentalizing_AB: ["demographics_questionnaire"],
@@ -508,8 +735,12 @@ let StimulusSettings = function () {
     const All_Allowed_Head_Lists = { test: false, mentalizing_1: false };
     const All_Banned_Head_Lists = { test: false, mentalizing_1: false };
     const All_Forced_Head_Lists = {
-        test: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
+        // Four unique head codes in the test dictionary (A/B share one). The
+        // forced-head pool below limits assignment to four concrete SVG heads
+        // so mesh trials always morph between distinct shapes.
+        test: ["tube", "tv", "blockhead", "cupcake"],
         semantic_learning: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
+        semantic_learning_star: ["tomato", "jackolantern", "sunflower", "ghost" ],
 
         mentalizing: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
         mentalizing_AB: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
@@ -1318,6 +1549,21 @@ let StimulusTransformer = function (StimTemplate) {
                 max_stars += n;
             }
 
+            if (block.type === "morph_task") {
+                let trials = block.trials;
+                let n = 0;
+                if (Array.isArray(trials)) {
+                    if (trials.length && Array.isArray(trials[0])) {
+                        trials.forEach((b) => { if (Array.isArray(b)) n += b.length; });
+                    } else {
+                        n = trials.length;
+                    }
+                } else {
+                    n = 5;
+                }
+                max_stars += n;
+            }
+
             if (block.type === "hat_drop_task" || block.type === "hat_drop_gonogo") {
                 let nReps = (typeof block.n_reps === "number" && block.n_reps > 0) ? block.n_reps : 1;
                 let order = Array.isArray(block.instruction_order) && block.instruction_order.length
@@ -1367,4 +1613,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("SEM CG -READY")
+console.log("STARGO")

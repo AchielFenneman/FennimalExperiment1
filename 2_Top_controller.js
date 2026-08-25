@@ -98,6 +98,9 @@ class DataController {
             fennimals: [],
             colorAssignment: null,
             phaseRandomizations: {},
+            // Easy-access between-subjects draw for hat_binding_task (also mirrored
+            // under phaseRandomizations for Layer 1 refresh restore).
+            hatBindingAssignment: null,
             avatar: null,
             attentionData: null,
             totalDuration: 0,
@@ -420,6 +423,137 @@ class DataController {
         this.storeAllData(false);
         this.writeSessionClaim(false);
         return condition;
+    }
+
+    /**
+     * Between-subjects star arm pair for hat_binding_task.
+     * Draws 2 arms from armIds (uniform over combinations) and restores on refresh.
+     * Two-arm setups persist the only pair without sampling.
+     */
+    getOrCreateBindingArmPair(randomizationKey, armIds) {
+        if (!this.experimentData.phaseRandomizations
+            || typeof this.experimentData.phaseRandomizations !== "object") {
+            this.experimentData.phaseRandomizations = {};
+        }
+
+        let arms = (Array.isArray(armIds) ? armIds : []).map(String);
+        if (arms.length < 2) {
+            throw new Error("HatBindingTask: arms must be an array of at least 2 Fennimal ids.");
+        }
+
+        let combos = [];
+        for (let i = 0; i < arms.length; i++) {
+            for (let j = i + 1; j < arms.length; j++) {
+                combos.push([arms[i], arms[j]]);
+            }
+        }
+        const comboKey = (pair) => pair.slice().sort().join("|");
+        let comboKeys = new Set(combos.map(comboKey));
+
+        let existing = this.experimentData.phaseRandomizations[randomizationKey];
+        if (existing && Array.isArray(existing.arms) && existing.arms.length === 2) {
+            let restored = existing.arms.map(String);
+            if (comboKeys.has(comboKey(restored))) {
+                return arms.filter((id) => restored.includes(id));
+            }
+            console.warn(
+                `HatBindingTask: restored arm pair "${restored.join(",")}" for "${randomizationKey}" ` +
+                `(not in current arms pool so refresh stays consistent).`
+            );
+            return restored;
+        }
+
+        let picked = (arms.length === 2)
+            ? arms.slice()
+            : combos[Math.floor(Math.random() * combos.length)].slice();
+        this.experimentData.phaseRandomizations[randomizationKey] = { arms: picked.slice() };
+        this.storeAllData(false);
+        this.writeSessionClaim(false);
+        return arms.filter((id) => picked.includes(id));
+    }
+
+    /**
+     * Top-level export of the hat_binding_task between-subjects draw.
+     * Analysts can read experimentData.hatBindingAssignment without digging through
+     * phaseRandomizations or storedData. Layer 1 refresh still uses phaseRandomizations;
+     * this mirror is rewritten whenever the binding phase constructs.
+     */
+    setHatBindingAssignment(record) {
+        if (!record || typeof record !== "object") {
+            this.experimentData.hatBindingAssignment = null;
+            return null;
+        }
+        let prev = this.experimentData.hatBindingAssignment;
+        let assignment = {
+            condition: record.condition || null,
+            selected_arms: Array.isArray(record.selected_arms) ? record.selected_arms.slice() : [],
+            selected_triad: Array.isArray(record.selected_triad) ? record.selected_triad.slice() : [],
+            hub: record.hub != null ? record.hub : null,
+            fillers: Array.isArray(record.fillers) ? record.fillers.slice() : [],
+            all_arms: Array.isArray(record.all_arms) ? record.all_arms.slice() : [],
+            // Name-recall freebie. Binding reconstructs this object without these
+            // fields; keep a prior pick unless the caller is explicitly setting them.
+            starter_name_id: Object.prototype.hasOwnProperty.call(record, "starter_name_id")
+                ? (record.starter_name_id != null ? record.starter_name_id : null)
+                : (prev && prev.starter_name_id != null ? prev.starter_name_id : null),
+            starter_name: Object.prototype.hasOwnProperty.call(record, "starter_name")
+                ? (record.starter_name != null ? record.starter_name : null)
+                : (prev && prev.starter_name != null ? prev.starter_name : null)
+        };
+        this.experimentData.hatBindingAssignment = assignment;
+        this.storeAllData(false);
+        this.writeSessionClaim(false);
+        return assignment;
+    }
+
+    /**
+     * Patch the name-recall freebie onto hatBindingAssignment (same top-level
+     * export as the binding between-subjects draw). No-op if binding never ran.
+     */
+    setNameRecallStarter(id, name) {
+        let prev = this.experimentData.hatBindingAssignment;
+        if (!prev || typeof prev !== "object") return null;
+        return this.setHatBindingAssignment({
+            condition: prev.condition,
+            selected_arms: prev.selected_arms,
+            selected_triad: prev.selected_triad,
+            hub: prev.hub,
+            fillers: prev.fillers,
+            all_arms: prev.all_arms,
+            starter_name_id: id != null ? id : null,
+            starter_name: name != null ? name : null
+        });
+    }
+
+    /**
+     * Persists which spoke is named in the name_recall_task prompt.
+     * Restores the same id on Layer 1 refresh so the starter name does not re-roll.
+     */
+    getOrCreateNameRecallStarterArm(randomizationKey, candidateIds) {
+        if (!this.experimentData.phaseRandomizations
+            || typeof this.experimentData.phaseRandomizations !== "object") {
+            this.experimentData.phaseRandomizations = {};
+        }
+
+        let pool = (Array.isArray(candidateIds) ? candidateIds : []).map(String).filter(Boolean);
+        let existing = this.experimentData.phaseRandomizations[randomizationKey];
+        if (existing && existing.id != null && String(existing.id) !== "") {
+            let restored = String(existing.id);
+            if (!pool.includes(restored)) {
+                console.warn(
+                    `NameRecall: restored starter arm "${restored}" for "${randomizationKey}" ` +
+                    `(not in current candidate pool so refresh stays consistent).`
+                );
+            }
+            return restored;
+        }
+
+        if (!pool.length) return null;
+        let picked = pool[Math.floor(Math.random() * pool.length)];
+        this.experimentData.phaseRandomizations[randomizationKey] = { id: picked };
+        this.storeAllData(false);
+        this.writeSessionClaim(false);
+        return picked;
     }
 
     storeAllData(bool_experiment_completed) {
@@ -1048,14 +1182,25 @@ class TrialGenerator {
             }
 
             if (phase.type === "hat_binding_task") {
-                if (!Array.isArray(phase.searched_triad) || phase.searched_triad.length !== 3) {
-                    errors.push(`${label} requires searched_triad: [F1, F2, F3].`);
+                if (!phase.hub) {
+                    errors.push(`${label} requires hub: a Fennimal id.`);
                 }
-                if (!Array.isArray(phase.singletons) || phase.singletons.length === 0) {
-                    errors.push(`${label} requires a non-empty singletons array.`);
+                if (!Array.isArray(phase.arms) || phase.arms.length < 2) {
+                    errors.push(`${label} requires arms: an array of at least 2 Fennimal ids.`);
+                } else {
+                    let armSet = new Set(phase.arms);
+                    if (armSet.size !== phase.arms.length) {
+                        errors.push(`${label} arms must not contain duplicates.`);
+                    }
+                    if (phase.hub && phase.arms.includes(phase.hub)) {
+                        errors.push(`${label} hub "${phase.hub}" must not also appear in arms.`);
+                    }
                 }
-                if (!Array.isArray(phase.binding_trials) || phase.binding_trials.length === 0) {
-                    errors.push(`${label} requires a non-empty binding_trials array.`);
+                if (phase.fillers !== undefined && !Array.isArray(phase.fillers)) {
+                    errors.push(`${label} fillers must be an array of Fennimal ids when set.`);
+                }
+                if (phase.binding_trials !== undefined && !Array.isArray(phase.binding_trials)) {
+                    errors.push(`${label} binding_trials must be an array when set.`);
                 }
                 if (!Array.isArray(phase.blocks) || phase.blocks.length === 0) {
                     errors.push(`${label} requires a non-empty blocks array.`);
@@ -1073,24 +1218,33 @@ class TrialGenerator {
                             );
                         }
                     });
-                    let uniqueConditions = [...new Set(phase.condition.filter((c) => allowedBinding.includes(c)))];
-                    uniqueConditions.forEach((cond) => {
-                        let n = phase.binding_trials.filter((trial) => {
-                            if (!trial) return false;
-                            if (Array.isArray(trial.conditions) && trial.conditions.length
-                                && !trial.conditions.includes(cond)) {
-                                return false;
+                    if (Array.isArray(phase.binding_trials) && phase.binding_trials.length) {
+                        let uniqueConditions = [...new Set(phase.condition.filter((c) => allowedBinding.includes(c)))];
+                        uniqueConditions.forEach((cond) => {
+                            let n = phase.binding_trials.filter((trial) => {
+                                if (!trial) return false;
+                                if (Array.isArray(trial.conditions) && trial.conditions.length
+                                    && !trial.conditions.includes(cond)) {
+                                    return false;
+                                }
+                                let hasNested = !!(trial.pair_based || trial.group_based || trial.control);
+                                if (hasNested && !trial[cond] && (trial.cue == null || trial.cue === "")) {
+                                    return false;
+                                }
+                                return true;
+                            }).length;
+                            if (n === 0) {
+                                errors.push(`${label} has no binding_trials for condition "${cond}".`);
                             }
-                            let hasNested = !!(trial.pair_based || trial.group_based || trial.control);
-                            if (hasNested && !trial[cond] && (trial.cue == null || trial.cue === "")) {
-                                return false;
-                            }
-                            return true;
-                        }).length;
-                        if (n === 0) {
-                            errors.push(`${label} has no binding_trials for condition "${cond}".`);
-                        }
-                    });
+                        });
+                    }
+                }
+            }
+
+            if (phase.type === "name_recall_task") {
+                if (phase.seed_recall_with_arm_name !== undefined
+                    && typeof phase.seed_recall_with_arm_name !== "boolean") {
+                    errors.push(`${label} seed_recall_with_arm_name must be true or false when set.`);
                 }
             }
 
@@ -1117,6 +1271,169 @@ class TrialGenerator {
                 }
                 if (phase.skip_practice !== undefined && typeof phase.skip_practice !== "boolean") {
                     errors.push(`${label} skip_practice must be true or false when set.`);
+                }
+                if (phase.trial_speed !== undefined && phase.trial_speed !== null && phase.trial_speed !== "") {
+                    let speed = Number(phase.trial_speed);
+                    if (!Number.isFinite(speed) || speed <= 0) {
+                        errors.push(`${label} trial_speed must be a positive number of milliseconds (got "${phase.trial_speed}").`);
+                    }
+                }
+            }
+
+            if (phase.type === "morph_task") {
+                if (!Array.isArray(phase.names_options) || phase.names_options.length === 0) {
+                    errors.push(`${label} names_options is required (non-empty Fennimal ids) for morph_task.`);
+                } else {
+                    phase.names_options.forEach((id, i) => {
+                        if (id === undefined || id === null || String(id).trim() === "") {
+                            errors.push(`${label} names_options[${i}] is empty.`);
+                            return;
+                        }
+                        let sid = String(id).trim();
+                        if (!knownIdSet.has(sid)) {
+                            errors.push(
+                                `${label} names_options[${i}] "${sid}" is not a Fennimal id ` +
+                                `(known: ${[...knownIdSet].join(", ")}).`
+                            );
+                        }
+                    });
+                }
+                let flatTrials = [];
+                if (!Array.isArray(phase.trials) || phase.trials.length === 0) {
+                    errors.push(`${label} requires a non-empty trials array (morph trialset lives in stimulus settings).`);
+                } else {
+                    let blocked = Array.isArray(phase.trials[0]);
+                    for (let i = 0; i < phase.trials.length; i++) {
+                        let entry = phase.trials[i];
+                        if (blocked) {
+                            if (!Array.isArray(entry)) {
+                                errors.push(
+                                    `${label} trials mixes blocks and bare trials (trials[${i}] is not an array).`
+                                );
+                                continue;
+                            }
+                            if (entry.length === 0) {
+                                errors.push(`${label} trials[${i}] block is empty.`);
+                                continue;
+                            }
+                            entry.forEach((trial, j) => {
+                                flatTrials.push({ trial, path: `trials[${i}][${j}]` });
+                            });
+                        } else if (Array.isArray(entry)) {
+                            errors.push(
+                                `${label} trials mixes bare trials and blocks (trials[${i}] is an array).`
+                            );
+                        } else {
+                            flatTrials.push({ trial: entry, path: `trials[${i}]` });
+                        }
+                    }
+                    flatTrials.forEach(({ trial, path }) => {
+                        if (!trial || !trial.id) {
+                            errors.push(`${label} ${path} is missing an id.`);
+                            return;
+                        }
+                        let usesHeadEndpoints = trial.headA != null || trial.headB != null || trial.targetHead != null;
+                        if (usesHeadEndpoints) {
+                            if (!trial.headA || !trial.headB) {
+                                errors.push(`${label} ${path} needs headA and headB SVG head names.`);
+                            }
+                            if (!trial.targetHead) {
+                                errors.push(`${label} ${path} needs targetHead (must equal headA or headB).`);
+                            } else if (trial.headA && trial.headB
+                                && trial.targetHead !== trial.headA && trial.targetHead !== trial.headB) {
+                                errors.push(`${label} ${path} targetHead "${trial.targetHead}" must equal headA or headB.`);
+                            }
+                        } else {
+                            if (!trial.fenA || !trial.fenB) {
+                                errors.push(`${label} ${path} needs fenA and fenB Fennimal ids.`);
+                            }
+                            if (!trial.target) {
+                                errors.push(`${label} ${path} needs a target (must equal fenA or fenB).`);
+                            } else if (trial.fenA && trial.fenB && trial.target !== trial.fenA && trial.target !== trial.fenB) {
+                                errors.push(`${label} ${path} target "${trial.target}" must equal fenA or fenB.`);
+                            }
+                        }
+                        let centerpoint = Number(trial.morph_centerpoint);
+                        if (!Number.isFinite(centerpoint) || centerpoint < 0 || centerpoint > 1) {
+                            errors.push(`${label} ${path} morph_centerpoint must be a number in [0, 1] (got "${trial.morph_centerpoint}").`);
+                        }
+                        if (trial.noise !== undefined && trial.noise !== null && trial.noise !== "") {
+                            let noise = Number(trial.noise);
+                            if (!Number.isFinite(noise) || noise < 0 || noise > 1) {
+                                errors.push(`${label} ${path} noise must be a number in [0, 1] when set (got "${trial.noise}").`);
+                            }
+                        }
+                        if (trial.morph !== undefined && !["full", "shape", "color", "mesh"].includes(trial.morph)) {
+                            errors.push(`${label} ${path} morph must be "full" | "shape" | "color" | "mesh" when set.`);
+                        }
+                        if (trial.view !== undefined && !["closeup", "full"].includes(trial.view)) {
+                            errors.push(`${label} ${path} view must be "closeup" | "full" when set.`);
+                        }
+                        if (trial.grayscale !== undefined && trial.grayscale !== null && trial.grayscale !== "") {
+                            if (typeof trial.grayscale !== "boolean") {
+                                errors.push(`${label} ${path} grayscale must be true or false when set (got "${trial.grayscale}").`);
+                            }
+                        }
+                        let blank = (v) => {
+                            if (v === undefined || v === null) return true;
+                            let s = String(v).trim().toLowerCase();
+                            return s === "" || s === "none" || s === "null" || s === "neutral";
+                        };
+                        let gray = (v) => {
+                            let s = String(v).trim().toLowerCase();
+                            return s === "gray" || s === "grey" || s === "grayscale" || s === "greyscale";
+                        };
+                        if (trial.prime === undefined || trial.prime === null) {
+                            errors.push(
+                                `${label} ${path} requires prime: { head?, body?, hat?, toy?, color_scheme?, name } ` +
+                                `with name and at least one of head/body/hat/toy.`
+                            );
+                        } else if (typeof trial.prime !== "object" || Array.isArray(trial.prime)) {
+                            errors.push(`${label} ${path} prime must be an object.`);
+                        } else {
+                            ["head", "body", "hat", "toy", "name"].forEach((key) => {
+                                if (blank(trial.prime[key])) return;
+                                let id = String(trial.prime[key]).trim();
+                                if (!knownIdSet.has(id)) {
+                                    errors.push(
+                                        `${label} ${path} prime.${key} "${id}" is not a Fennimal id ` +
+                                        `(known: ${[...knownIdSet].join(", ")}).`
+                                    );
+                                }
+                            });
+                            if (blank(trial.prime.name)) {
+                                errors.push(`${label} ${path} prime.name is required.`);
+                            }
+                            if (blank(trial.prime.head) && blank(trial.prime.body)
+                                && blank(trial.prime.hat) && blank(trial.prime.toy)) {
+                                errors.push(
+                                    `${label} ${path} prime must include at least one of head, body, hat, or toy ` +
+                                    `(empty {} not allowed).`
+                                );
+                            }
+                            if (!blank(trial.prime.toy) && blank(trial.prime.body)) {
+                                errors.push(
+                                    `${label} ${path} prime.toy requires prime.body ` +
+                                    `(toy attaches to the body).`
+                                );
+                            }
+                            if (!blank(trial.prime.color_scheme)) {
+                                let cs = String(trial.prime.color_scheme).trim();
+                                if (!gray(cs) && !knownIdSet.has(cs)) {
+                                    errors.push(
+                                        `${label} ${path} prime.color_scheme "${cs}" must be a Fennimal id ` +
+                                        `or gray/grey/grayscale/greyscale.`
+                                    );
+                                }
+                            }
+                        }
+                    });
+                }
+                if (phase.skip_practice !== undefined && typeof phase.skip_practice !== "boolean") {
+                    errors.push(`${label} skip_practice must be true or false when set.`);
+                }
+                if (phase.resolve_trial !== undefined && typeof phase.resolve_trial !== "boolean") {
+                    errors.push(`${label} resolve_trial must be true or false when set.`);
                 }
                 if (phase.trial_speed !== undefined && phase.trial_speed !== null && phase.trial_speed !== "") {
                     let speed = Number(phase.trial_speed);
@@ -1299,6 +1616,8 @@ class TrialGenerator {
             "Fennimal_attribute_sorting_task",
             "hat_binding_task",
             "chimera_feature_id",
+            "morph_task",
+            "morph_task_two_cards",
             "hat_drop_task",
             "hat_drop_gonogo",
             "pseudoday"
@@ -1361,6 +1680,7 @@ class TrialGenerator {
         let refs = [];
         const add = (id, path) => {
             if (id === undefined || id === null || id === "" || id === "all") return;
+            if (typeof id === "string" && id.charAt(0) === "$") return;
             refs.push({ id: String(id), path });
         };
         const addList = (arr, path) => {
@@ -1376,6 +1696,9 @@ class TrialGenerator {
         }
         addList(phase.fennimals_asked, "fennimals_asked");
         addList(phase.displayed_icons, "displayed_icons");
+        add(phase.hub, "hub");
+        addList(phase.arms, "arms");
+        addList(phase.fillers, "fillers");
         addList(phase.searched_triad, "searched_triad");
         addList(phase.unsearched_triad, "unsearched_triad");
         addList(phase.singletons, "singletons");
@@ -1413,9 +1736,19 @@ class TrialGenerator {
             phase.binding_trials.forEach((trial, ti) => {
                 if (!trial) return;
                 add(trial.cue, `binding_trials[${ti}].cue`);
-                if (trial.pair_based) add(trial.pair_based.cue, `binding_trials[${ti}].pair_based.cue`);
-                if (trial.group_based) add(trial.group_based.cue, `binding_trials[${ti}].group_based.cue`);
-                if (trial.control) add(trial.control.cue, `binding_trials[${ti}].control.cue`);
+                add(trial.target, `binding_trials[${ti}].target`);
+                if (trial.pair_based) {
+                    add(trial.pair_based.cue, `binding_trials[${ti}].pair_based.cue`);
+                    add(trial.pair_based.target, `binding_trials[${ti}].pair_based.target`);
+                }
+                if (trial.group_based) {
+                    add(trial.group_based.cue, `binding_trials[${ti}].group_based.cue`);
+                    add(trial.group_based.target, `binding_trials[${ti}].group_based.target`);
+                }
+                if (trial.control) {
+                    add(trial.control.cue, `binding_trials[${ti}].control.cue`);
+                    add(trial.control.target, `binding_trials[${ti}].control.target`);
+                }
             });
         }
 
@@ -1447,6 +1780,58 @@ class TrialGenerator {
                 }
                 if (!skipToken(trial.answer)) add(trial.answer, `trials[${i}].answer`);
             });
+        }
+
+        if (phase.type === "morph_task") {
+            const walkMorphTrials = (arr, prefix) => {
+                if (!Array.isArray(arr)) return;
+                let blocked = arr.length > 0 && Array.isArray(arr[0]);
+                arr.forEach((entry, i) => {
+                    if (blocked) {
+                        if (!Array.isArray(entry)) return;
+                        entry.forEach((trial, j) => {
+                            if (!trial) return;
+                            let path = `${prefix}[${i}][${j}]`;
+                            add(trial.fenA, `${path}.fenA`);
+                            add(trial.fenB, `${path}.fenB`);
+                            add(trial.target, `${path}.target`);
+                            if (trial.prime && typeof trial.prime === "object" && !Array.isArray(trial.prime)) {
+                                ["head", "body", "hat", "toy", "name", "color_scheme"].forEach((key) => {
+                                    let v = trial.prime[key];
+                                    if (v === undefined || v === null) return;
+                                    let s = String(v).trim().toLowerCase();
+                                    if (s === "" || s === "none" || s === "null" || s === "neutral") return;
+                                    if (key === "color_scheme"
+                                        && (s === "gray" || s === "grey" || s === "grayscale" || s === "greyscale")) {
+                                        return;
+                                    }
+                                    add(trial.prime[key], `${path}.prime.${key}`);
+                                });
+                            }
+                        });
+                    } else if (!Array.isArray(entry) && entry) {
+                        let path = `${prefix}[${i}]`;
+                        add(entry.fenA, `${path}.fenA`);
+                        add(entry.fenB, `${path}.fenB`);
+                        add(entry.target, `${path}.target`);
+                        if (entry.prime && typeof entry.prime === "object" && !Array.isArray(entry.prime)) {
+                            ["head", "body", "hat", "toy", "name", "color_scheme"].forEach((key) => {
+                                let v = entry.prime[key];
+                                if (v === undefined || v === null) return;
+                                let s = String(v).trim().toLowerCase();
+                                if (s === "" || s === "none" || s === "null" || s === "neutral") return;
+                                if (key === "color_scheme"
+                                    && (s === "gray" || s === "grey" || s === "grayscale" || s === "greyscale")) {
+                                    return;
+                                }
+                                add(entry.prime[key], `${path}.prime.${key}`);
+                            });
+                        }
+                    }
+                });
+            };
+            walkMorphTrials(phase.trials, "trials");
+            addList(phase.names_options, "names_options");
         }
 
         if (Array.isArray(phase.blocks)) {
@@ -2765,7 +3150,11 @@ class ExperimentController {
                 }
                 break;
             case "name_recall_task":
-                this.instrCont.startNameRecallTask(this.currentDayNum, this.currentPhaseData.bonus_stars_per_correct_answer);
+                this.instrCont.startNameRecallTask(
+                    this.currentDayNum,
+                    this.currentPhaseData.bonus_stars_per_correct_answer,
+                    this.resolveNameRecallStarterName()
+                );
                 break;
             case "card_sorting_task":
                 this.instrCont.startCardSortingTask(this.currentDayNum, this.currentPhaseData.SpecialSettings);
@@ -2793,6 +3182,33 @@ class ExperimentController {
                     this.setupChimeraFeatureIdPhase();
                 } else {
                     this.instrCont.initializeChimeraFeatureIdInstructions(
+                        this.currentDayNum,
+                        this.currentPhaseData.day_title,
+                        this.currentPhaseData.day_body
+                    );
+                }
+                break;
+            case "morph_task":
+                this.flagMorphTaskInstructionsShown = false;
+                if (this.currentPhaseData.skip_instructions === true) {
+                    this.flagMorphTaskInstructionsShown = true;
+                    this.setupMorphTaskPhase();
+                } else {
+                    this.instrCont.initializeMorphTaskInstructions(
+                        this.currentDayNum,
+                        this.currentPhaseData.day_title,
+                        this.currentPhaseData.day_body
+                    );
+                }
+                break;
+            case "morph_task_two_cards":
+                // Archived two-polaroid morph; not used by live structures.
+                this.flagMorphTaskInstructionsShown = false;
+                if (this.currentPhaseData.skip_instructions === true) {
+                    this.flagMorphTaskInstructionsShown = true;
+                    this.setupMorphTaskTwoCardsPhase();
+                } else {
+                    this.instrCont.initializeMorphTaskInstructions(
                         this.currentDayNum,
                         this.currentPhaseData.day_title,
                         this.currentPhaseData.day_body
@@ -2980,6 +3396,80 @@ class ExperimentController {
         );
         this.chimeraCont = currentTask;
         currentTask.start_sequence();
+    }
+
+    setupMorphTaskPhase() {
+        this.mapCont.disable_map_interactions();
+        if (this.mapCont.hide_request_instructions_button) this.mapCont.hide_request_instructions_button();
+        document.getElementById("Map").style.display = "none";
+        let iface = document.getElementById("Interface");
+        if (iface) iface.style.display = "inherit";
+        if (typeof Interface !== "undefined" && Interface.FenneFinder && Interface.FenneFinder.hide) {
+            Interface.FenneFinder.hide();
+        }
+
+        this.currentPhaseData.Data = [];
+        let pLayer = document.getElementById("Fennimals_Layer");
+        if (pLayer) pLayer.style.display = "inherit";
+        if (this.mapCont && this.mapCont.Map_Layer) this.mapCont.Map_Layer.style.display = "none";
+        this.mapCont.hide_all_locations();
+        this.mapCont.currently_in_location = false;
+
+        let currentTask = new MorphTaskController(
+            pLayer,
+            this.currentPhaseData,
+            () => {
+                this.currentPhaseData.Data = this.currentPhaseData.answers || [];
+                currentTask.clean_up();
+                this.morphCont = null;
+                clear_Fennimals_interaction_layer();
+                document.getElementById("Map").style.display = "inherit";
+                this.phaseCompleted();
+            },
+            this
+        );
+        this.morphCont = currentTask;
+        currentTask.start_sequence();
+    }
+
+    // Archived: two-polaroid morph_task_two_cards (MorphTaskTwoCardsController).
+    setupMorphTaskTwoCardsPhase() {
+        this.mapCont.disable_map_interactions();
+        if (this.mapCont.hide_request_instructions_button) this.mapCont.hide_request_instructions_button();
+        document.getElementById("Map").style.display = "none";
+        let iface = document.getElementById("Interface");
+        if (iface) iface.style.display = "inherit";
+        if (typeof Interface !== "undefined" && Interface.FenneFinder && Interface.FenneFinder.hide) {
+            Interface.FenneFinder.hide();
+        }
+
+        this.currentPhaseData.Data = [];
+        let pLayer = document.getElementById("Fennimals_Layer");
+        if (pLayer) pLayer.style.display = "inherit";
+        if (this.mapCont && this.mapCont.Map_Layer) this.mapCont.Map_Layer.style.display = "none";
+        this.mapCont.hide_all_locations();
+        this.mapCont.currently_in_location = false;
+
+        let currentTask = new MorphTaskTwoCardsController(
+            pLayer,
+            this.currentPhaseData,
+            () => {
+                this.currentPhaseData.Data = this.currentPhaseData.answers || [];
+                currentTask.clean_up();
+                this.morphCont = null;
+                clear_Fennimals_interaction_layer();
+                document.getElementById("Map").style.display = "inherit";
+                this.phaseCompleted();
+            },
+            this
+        );
+        this.morphCont = currentTask;
+        currentTask.start_sequence();
+    }
+
+    // Morph trials never travel: same indoor overlay bookkeeping as chimera.
+    prepareMorphTrialTravel(trial, prevTrial) {
+        return this.prepareChimeraTrialTravel(trial, prevTrial);
     }
 
     setupHatDropPhase() {
@@ -3475,6 +3965,18 @@ class ExperimentController {
                     this.setupChimeraFeatureIdPhase();
                 }
                 break;
+            case "morph_task":
+                if (!this.flagMorphTaskInstructionsShown) {
+                    this.flagMorphTaskInstructionsShown = true;
+                    this.setupMorphTaskPhase();
+                }
+                break;
+            case "morph_task_two_cards":
+                if (!this.flagMorphTaskInstructionsShown) {
+                    this.flagMorphTaskInstructionsShown = true;
+                    this.setupMorphTaskTwoCardsPhase();
+                }
+                break;
             case "hat_drop_task":
             case "hat_drop_gonogo":
                 if (!this.flagHatDropInstructionsShown) {
@@ -3776,6 +4278,70 @@ class ExperimentController {
     // ----------------------------------------------------
     // EXTERNAL ORTHOGONAL TASK CALLBACKS
     // ----------------------------------------------------
+
+    /**
+     * Optional name_recall_task seed. Prompt-only. Missing hatBindingAssignment
+     * silently falls back to unseeded copy.
+     *
+     * pair_based / group_based: one of the two selected triad arms (never hub).
+     * control: no bound pair — one of all_arms (the spokes; never hub).
+     */
+    resolveNameRecallStarterName() {
+        let phase = this.currentPhaseData;
+        if (!phase || phase.seed_recall_with_arm_name !== true) return null;
+
+        const stampStarter = (id, name) => {
+            phase.starter_name_id = id != null ? id : null;
+            phase.starter_name = name != null ? name : null;
+            if (this.dataCont && this.dataCont.setNameRecallStarter) {
+                this.dataCont.setNameRecallStarter(phase.starter_name_id, phase.starter_name);
+            }
+        };
+
+        let assignment = (this.dataCont && this.dataCont.experimentData)
+            ? this.dataCont.experimentData.hatBindingAssignment
+            : null;
+        if (!assignment) {
+            stampStarter(null, null);
+            return null;
+        }
+
+        let hubId = assignment.hub != null ? String(assignment.hub) : null;
+        let selectedArms = Array.isArray(assignment.selected_arms)
+            ? assignment.selected_arms.map(String)
+            : [];
+        let allArms = Array.isArray(assignment.all_arms)
+            ? assignment.all_arms.map(String)
+            : [];
+        // Control never binds a pair, so sample from all spokes. Bound
+        // conditions use the two selected triad arms.
+        let pool = (assignment.condition === "control") ? allArms : selectedArms;
+        let candidates = pool.filter((id) => id && id !== hubId);
+
+        if (!candidates.length) {
+            stampStarter(null, null);
+            return null;
+        }
+
+        let pickedId = null;
+        if (this.dataCont && this.dataCont.getOrCreateNameRecallStarterArm) {
+            pickedId = this.dataCont.getOrCreateNameRecallStarterArm("name_recall_starter_arm", candidates);
+        } else {
+            pickedId = candidates[Math.floor(Math.random() * candidates.length)];
+        }
+
+        let fens = (pickedId && this.stimuli && typeof this.stimuli.get_Fennimals_in_array === "function")
+            ? this.stimuli.get_Fennimals_in_array([pickedId])
+            : [];
+        let fen = (fens && fens[0]) || null;
+        if (!fen || !fen.name) {
+            stampStarter(pickedId || null, null);
+            return null;
+        }
+
+        stampStarter(fen.id, fen.name);
+        return fen.name;
+    }
 
     recalledNamesTaskComplete(recalledNames) {
         let evaluationResult = TaskEvaluator.evaluateRecallData(recalledNames, this.stimuli, this.currentPhaseData.allowed_Levenshtein_distance_for_match);

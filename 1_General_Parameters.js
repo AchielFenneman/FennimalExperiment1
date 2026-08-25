@@ -708,10 +708,11 @@ GENERALPARAM = function () {
             case("chefshat"): return("chef's hat")
             case("fisherhat"): return("fisher hat")
             case("tophat"): return("top hat")
-            case("baret"): return("baret")
+            case("beret"): return("beret")
             case("fedora"): return("fedora")
             case("baseballcap"): return("baseball cap")
             case("beanie"): return("beanie")
+            case("strawhat"): return("straw hat")
         }
         return(hat || "hat")
     }
@@ -1198,7 +1199,9 @@ GENERALPARAM = function () {
             polaroidX: 0.26,
             polaroidCenterY: 0.48,
             polaroidScale: 0.78,
-            hatButtonScale: 3.6
+            hatButtonScale: 3.6,
+            toyScale: 2.2,
+            toyDropShadow: "drop-shadow(0px 0px 2px rgba(255,255,255,0.95)) drop-shadow(0px 1px 5px rgba(255,255,255,0.7))"
         }
     }
 
@@ -1292,6 +1295,144 @@ GENERALPARAM = function () {
         targetLagFrac: 0.35,
         targetVeilPad: 22
     }
+
+    this.MorphTask = {
+        // Fallback trial window if a morph block omits trial_speed (ms).
+        trialSpeedMs: 6000,
+        // morph_centerpoint c in [0,1] sets ONLY the resolution midpoint:
+        // t_mid = (midpointMinFrac + (midpointMaxFrac - midpointMinFrac) * c) * trial_speed.
+        // c = 0 resolves early, c = 1 resolves late. Perceptual ambiguity is
+        // controlled independently by each trial's moving binary static noise.
+        midpointMinFrac: 0.15,
+        midpointMaxFrac: 0.85,
+        // Moving static overlay: trial.noise in [0,1] is the *peak* coverage
+        // fraction (this-size cells). Envelope: 0 during prime → linear ramp
+        // to peak over prime→jumble → hold at peak through jumbleHoldMs →
+        // linear ramp to 0 over trial_speed. Speckle positions/fills are fixed
+        // for the trial (seeded by trial id); only coverage density animates.
+        noiseCellSizePx: 8,
+        // Reserved; 0 = no reshuffle (stable static). >0 would re-twinkle.
+        noiseRefreshMs: 0,
+        // Fade duration when resolve_trial removes leftover static after a choice.
+        noiseFadeMs: 350,
+        // Logistic steepness as a fraction of trial_speed. The morph weight is
+        // m(t) = 0.5 + 0.5 * (sig(t) - sig(0)) / (1 - sig(0)),
+        // sig(t) = 1 / (1 + exp(-(t - t_mid) / (tauFrac * trial_speed))).
+        // Larger tauFrac = more gradual morph around t_mid.
+        // m(0) = 0.5 exactly (fully ambiguous); m keeps rising past the window
+        // end, so even the hardest trials fully resolve while a late answer is
+        // still pending.
+        tauFrac: 0.30,
+        // Ambiguity veil: strongest at m = 0.5, gone at m = 1.
+        // ambiguity = clamp01(2 * (1 - m)); blur = blurMaxPx * ambiguity^blurPower.
+        blurMaxPx: 7,
+        blurPower: 1.4,
+        // Paper-coloured film over the photo, opacity = filmMaxOpacity * ambiguity.
+        filmMaxOpacity: 0.18,
+        filmFill: "#f4efe4",
+        // Experimental geometric mesh renderer (morph: "mesh"). Sources are
+        // rasterized in a fixed square, then automatically landmarked using
+        // 24 radial alpha-contour points plus eye/mouth/neck geometry. Both
+        // endpoints are warped to one intermediate Delaunay mesh before the
+        // pixels are blended, yielding one opaque intermediate head.
+        meshRasterSize: 400,
+        meshContourPoints: 24,
+        meshAlphaThreshold: 18,
+        // If true (default): on answer the morph rapidly completes to the TRUE
+        // Fennimal (implicit feedback). If false: the frame freezes as-is
+        // (chimera-style, no feedback). Block override: resolve_trial.
+        resolveTrial: true,
+        resolveAnimMs: 450,
+        // Scoring (identical scheme to the chimera task).
+        maxPoints: 100,
+        incorrectPenalty: 25,
+        pointsPerStar: 100,
+        freezeAfterMs: 1000,
+        tutorialDimOpacity: 0.1,
+        // Layout (polaroid chrome shared with the chimera task).
+        buttonW: 200,
+        buttonH: 72,
+        buttonRadius: 260,
+        // Fixed gray palette for trial.grayscale and prime color_scheme gray*.
+        // Applied as real SVG fills (not a CSS filter) so region lightness is
+        // not inherited from the original hue intensities.
+        grayscaleScheme: {
+            primary_color: "#c4c4c4",
+            secondary_color: "#8e8e8e",
+            tertiary_color: "#5a5a5a",
+            eye_color: "#3a3a3a"
+        },
+        // Toy light/dark slots when a gray prime includes a toy.
+        grayscaleToyScheme: {
+            light_color: "#c4c4c4",
+            dark_color: "#5a5a5a"
+        },
+        // Radial ring for the unpaid prime-name quiz (centered on the polaroid).
+        primeNameRadialRadius: 300,
+        radialRadius: 300,
+        // Hide name keys + shake polaroid on incorrect pick (ms).
+        primeNameIncorrectMs: 1000,
+        // Single-polaroid prime develop animation (ms).
+        primeRevealMs: 900,
+        // Hold named prime before crossfading into the jumble (ms).
+        primeHoldMs: 350,
+        // Crossfade/mesh morph prime → 50/50 jumble (ms). Independent of trial_speed.
+        // Mesh trials use the same geometric mesh warp as jumble→target, with
+        // tau = tauFrac * primeToJumbleMs (not trial_speed).
+        primeToJumbleMs: 1000,
+        // Hold the fully-ambiguous jumble before the target morph / timer arms (ms).
+        jumbleHoldMs: 400,
+        // Keyboard identity keycaps (F left / J right), vertically near the head.
+        identityKeyW: 240,
+        identityKeyH: 88,
+        identityKeyYFrac: 0.44,
+        identityKeyLeftXFrac: 0.30,
+        identityKeyRightXFrac: 0.70,
+        // Start-trial Space keycap sits lower than the F/J identity row.
+        startSpaceKeyYFrac: 0.82,
+        startSpaceKeyW: 280,
+        startSpaceKeyH: 88,
+        // Radial name-quiz keycaps.
+        nameKeyW: 220,
+        nameKeyH: 80,
+        // Fly polaroid to chosen corner after answer (ms) and final scale.
+        flyMs: 650,
+        flyScale: 0.35,
+        // Cross-trial scene fade (ms).
+        trialFadeMs: 450,
+        polaroidScale: 0.90,
+        polaroidX: 0.50,
+        polaroidY: 0.48,
+        // Legacy dual-polaroid layout (MorphTaskTwoCards only).
+        polaroidXWithPrime: 0.62,
+        primePolaroidX: 0.34,
+        primePolaroidYOffset: 0.04,
+        primePolaroidScale: 0.82,
+        primePolaroidRotateDeg: -8,
+        primeEmptyFill: "#9a9590",
+        // Held toy on primed polaroids (same rim as photo_Fennimal / hat-binding retraining).
+        primeToyScale: 2.2,
+        primeToyDropShadow:
+            "drop-shadow(0px 0px 2px rgba(255,255,255,0.95)) drop-shadow(0px 1px 5px rgba(255,255,255,0.7))",
+        polaroidPaperFill: "#f4efe4",
+        polaroidCaptionFill: "#8a8680",
+        occluderFill: "#3e3a44",
+        indoorBackground: "./Locations/Home_photoroom.png",
+        indoorOverlayOpacity: 0.22,
+        barWidth: 136,
+        barLeftX: 0.16,
+        barRightX: 0.84,
+        barTop: 0.12,
+        barBottom: 0.92,
+        // Day N card copy (stimulus blocks may still override day_title / day_body)
+        dayTitle: "a blurry double exposure",
+        dayBody:
+            "The camera glitched this morning. Each trial starts under a ?. Press Space to develop a preview Fennimal, name who you see (F / J to move, Space to confirm), then the photo becomes a blurry mix of two Fennimals and settles into one of them.<br><br>" +
+            "Use F and J to pick which of the two named Fennimals the morph really shows — as quickly as you can. Faster correct answers leave you with more points (100 points = 1 bonus star). An incorrect answer quietly costs points — there is no trial-by-trial feedback."
+    }
+
+    // Archived two-polaroid morph (morph_task_two_cards). Same tunables as MorphTask.
+    this.MorphTaskTwoCards = Object.assign({}, this.MorphTask);
 
     this.HatDrop = {
         nReps: 1,

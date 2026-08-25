@@ -1,7 +1,9 @@
 /**
  * Hat binding phase: one day, multiple internal blocks (binding flavours + retraining).
- * Between-subjects condition is sampled from phaseData.condition (weighted by duplicates)
- * and persisted on experimentData.phaseRandomizations.
+ * Network is a hub plus arms (a 2-arm triad, or a 3-arm star with one pair drawn).
+ * Between-subjects condition and the arm pair are sampled from phaseData,
+ * persisted under experimentData.phaseRandomizations (Layer 1 refresh), and
+ * mirrored to experimentData.hatBindingAssignment for easy top-level export.
  */
 
 class HatBindingTaskController {
@@ -43,8 +45,22 @@ class HatBindingTaskController {
         this.currentBlockIndex = -1;
         this.currentTrialIndex = -1;
 
+        // Phase-level stamps (same idea as retrieve_lost_box's selected_box_location_*),
+        // plus a top-level DataController mirror for analysts.
         this.phaseData.binding_search_condition = this.condition;
+        this.phaseData.binding_selected_arms = this.graph.selectedArmIds.slice();
+        this.phaseData.binding_selected_triad = this.graph.selectedTriad.slice();
         this.phaseData.answers = this.answers;
+        if (this.expCont && this.expCont.dataCont && this.expCont.dataCont.setHatBindingAssignment) {
+            this.expCont.dataCont.setHatBindingAssignment({
+                condition: this.condition,
+                selected_arms: this.graph.selectedArmIds.slice(),
+                selected_triad: this.graph.selectedTriad.slice(),
+                hub: this.graph.hubId,
+                fillers: this.graph.fillerIds.slice(),
+                all_arms: this.graph.armIds.slice()
+            });
+        }
     }
 
     _fail(message) {
@@ -90,17 +106,29 @@ class HatBindingTaskController {
         return pool[Math.floor(Math.random() * pool.length)];
     }
 
+    _allowedRelations() {
+        return ["cousin", "neighbour", "playmate"];
+    }
+
     _relationMatches(fen, other, relation) {
         if (!fen || !other || fen.id === other.id) return false;
         if (relation === "cousin") return fen.head === other.head;
         if (relation === "neighbour") return fen.region === other.region;
-        this._fail(`unknown relation "${relation}". Use "cousin" or "neighbour".`);
+        if (relation === "playmate") return !!(fen.toy && other.toy && fen.toy === other.toy);
+        this._fail(`unknown relation "${relation}". Use "cousin", "neighbour", or "playmate".`);
     }
 
-    _stepRelation(fromFen, relation, pathLabel) {
-        let matches = Object.values(this.fensById).filter((fen) => this._relationMatches(fromFen, fen, relation));
+    _relationsBetween(fen, other) {
+        return this._allowedRelations().filter((rel) => this._relationMatches(fen, other, rel));
+    }
+
+    _stepRelation(fromFen, relation, pathLabel, pool) {
+        let candidates = pool
+            || (this.graph && this.graph.walkPool)
+            || Object.values(this.fensById);
+        let matches = candidates.filter((fen) => this._relationMatches(fromFen, fen, relation));
         if (matches.length === 0) {
-            this._fail(`${pathLabel}: ${fromFen.id} has no ${relation}.`);
+            this._fail(`${pathLabel}: ${fromFen.id} has no ${relation} in the selected triad.`);
         }
         if (matches.length > 1) {
             this._fail(
@@ -119,49 +147,155 @@ class HatBindingTaskController {
         return current;
     }
 
+    _inferPath(cueFen, targetFen, pathLabel) {
+        if (!cueFen || !targetFen) {
+            this._fail(`${pathLabel}: cannot infer path (missing cue or target).`);
+        }
+        if (cueFen.id === targetFen.id) return [];
+        let direct = this._relationsBetween(cueFen, targetFen);
+        if (direct.length === 1) return [direct[0]];
+        if (direct.length > 1) {
+            this._fail(
+                `${pathLabel}: ${cueFen.id} and ${targetFen.id} share multiple relations (${direct.join(", ")}).`
+            );
+        }
+        let hub = this.graph.hub;
+        let poolIds = new Set(this.graph.selectedIds);
+        if (!poolIds.has(cueFen.id) || !poolIds.has(targetFen.id)) {
+            this._fail(
+                `${pathLabel}: cannot infer path from ${cueFen.id} to ${targetFen.id} ` +
+                `(not both in the selected triad).`
+            );
+        }
+        if (cueFen.id !== hub.id && targetFen.id !== hub.id) {
+            let toHub = this._relationsBetween(cueFen, hub);
+            let fromHub = this._relationsBetween(hub, targetFen);
+            if (toHub.length === 1 && fromHub.length === 1) return [toHub[0], fromHub[0]];
+        }
+        this._fail(`${pathLabel}: no unique path from ${cueFen.id} to ${targetFen.id} in the selected triad.`);
+    }
+
+    _uniqueIds(ids, path) {
+        let seen = new Set();
+        ids.forEach((id, i) => {
+            if (seen.has(id)) this._fail(`duplicate Fennimal id "${id}" in ${path}.`);
+            seen.add(id);
+        });
+    }
+
+    _resolveSelectedArms(armIds) {
+        let key = this.phaseData.arm_randomization_id || "binding_star_arms";
+        if (this.expCont && this.expCont.dataCont && this.expCont.dataCont.getOrCreateBindingArmPair) {
+            return this.expCont.dataCont.getOrCreateBindingArmPair(key, armIds);
+        }
+        if (armIds.length === 2) return armIds.slice();
+        let combos = [];
+        for (let i = 0; i < armIds.length; i++) {
+            for (let j = i + 1; j < armIds.length; j++) {
+                combos.push([armIds[i], armIds[j]]);
+            }
+        }
+        return combos[Math.floor(Math.random() * combos.length)].slice();
+    }
+
     _buildAndValidateGraph() {
-        let searchedIds = this.phaseData.searched_triad;
-        let singletonIds = this.phaseData.singletons;
-        if (!Array.isArray(searchedIds) || searchedIds.length !== 3) {
-            this._fail("searched_triad must be [F1, F2, F3].");
+        let hubId = this.phaseData.hub;
+        let armIds = this.phaseData.arms;
+        if (!hubId) this._fail("hub must be a Fennimal id.");
+        if (!Array.isArray(armIds) || armIds.length < 2) {
+            this._fail("arms must be an array of at least 2 Fennimal ids.");
         }
-        if (!Array.isArray(singletonIds) || singletonIds.length < 1) {
-            this._fail("singletons must be a non-empty array of Fennimal ids.");
+        this._uniqueIds(armIds, "arms");
+        if (armIds.includes(hubId)) this._fail(`hub "${hubId}" must not also appear in arms.`);
+
+        let hub = this._getFen(hubId, "hub");
+        let armFens = armIds.map((id, i) => this._getFen(id, `arms[${i}]`));
+
+        let explicitFillers = Array.isArray(this.phaseData.fillers) ? this.phaseData.fillers.slice() : [];
+        this._uniqueIds(explicitFillers, "fillers");
+        explicitFillers.forEach((id, i) => {
+            this._getFen(id, `fillers[${i}]`);
+            if (id === hubId || armIds.includes(id)) {
+                this._fail(`fillers must not repeat hub or arms (got "${id}").`);
+            }
+        });
+
+        let hubRelationByArm = new Map();
+        armFens.forEach((arm) => {
+            let rels = this._relationsBetween(hub, arm);
+            if (rels.length === 0) {
+                this._fail(
+                    `hub "${hubId}" does not overlap arm "${arm.id}" ` +
+                    `(cousin / neighbour / playmate).`
+                );
+            }
+            if (rels.length > 1) {
+                this._fail(
+                    `hub "${hubId}" overlaps arm "${arm.id}" on multiple relations (${rels.join(", ")}).`
+                );
+            }
+            let rel = rels[0];
+            for (let [otherId, otherRel] of hubRelationByArm) {
+                if (otherRel === rel) {
+                    this._fail(
+                        `hub "${hubId}" has two ${rel} arms ("${otherId}" and "${arm.id}"). ` +
+                        `Each relation from the hub must be unique.`
+                    );
+                }
+            }
+            hubRelationByArm.set(arm.id, rel);
+        });
+
+        for (let i = 0; i < armFens.length; i++) {
+            for (let j = i + 1; j < armFens.length; j++) {
+                let rels = this._relationsBetween(armFens[i], armFens[j]);
+                if (rels.length) {
+                    this._fail(
+                        `arms "${armFens[i].id}" and "${armFens[j].id}" overlap (${rels.join(", ")}); ` +
+                        `star arms must not overlap each other.`
+                    );
+                }
+            }
         }
 
-        let f1 = this._getFen(searchedIds[0], "searched_triad[0] (F1)");
-        let f2 = this._getFen(searchedIds[1], "searched_triad[1] (F2)");
-        let f3 = this._getFen(searchedIds[2], "searched_triad[2] (F3)");
-        singletonIds.forEach((id, i) => this._getFen(id, `singletons[${i}]`));
+        let selectedArmIds = this._resolveSelectedArms(armIds);
+        if (!Array.isArray(selectedArmIds) || selectedArmIds.length !== 2) {
+            this._fail("selected arm pair must be two Fennimal ids.");
+        }
+        selectedArmIds.forEach((id) => {
+            if (!armIds.includes(id)) this._fail(`selected arm "${id}" is not in arms.`);
+        });
+        selectedArmIds = armIds.filter((id) => selectedArmIds.includes(id));
 
-        if (f1.head !== f2.head) {
-            this._fail(`F1 "${f1.id}" and F2 "${f2.id}" must share a head (cousins).`);
-        }
-        if (f2.region !== f3.region) {
-            this._fail(`F2 "${f2.id}" and F3 "${f3.id}" must share a region (neighbours).`);
-        }
-        if (f1.region === f2.region) {
-            this._fail(`F1 "${f1.id}" must not share F2's region.`);
-        }
-        if (f2.head === f3.head) {
-            this._fail(`F3 "${f3.id}" must not share F2's head.`);
-        }
+        let unusedArmIds = armIds.filter((id) => !selectedArmIds.includes(id));
+        let fillerIds = explicitFillers.concat(unusedArmIds);
+        let selectedIds = [selectedArmIds[0], hubId, selectedArmIds[1]];
+        let walkPool = selectedIds.map((id) => this._getFen(id));
+        let rosterIds = [hubId].concat(armIds, explicitFillers);
 
-        // Unique steps from the hub.
-        this._stepRelation(f2, "cousin", "searched triad");
-        this._stepRelation(f2, "neighbour", "searched triad");
+        selectedArmIds.forEach((armId) => {
+            let rel = hubRelationByArm.get(armId);
+            this._stepRelation(hub, rel, "selected triad", walkPool);
+        });
 
         return {
-            f1, f2, f3,
-            searchedIds: searchedIds.slice(),
-            singletonIds: singletonIds.slice()
+            hub,
+            hubId,
+            armIds: armIds.slice(),
+            selectedArmIds: selectedArmIds.slice(),
+            fillerIds: fillerIds.slice(),
+            selectedIds: selectedIds.slice(),
+            selectedTriad: selectedIds.slice(),
+            walkPool,
+            rosterIds: rosterIds.slice(),
+            hubRelationByArm
         };
     }
 
     _resolveHatFennimals() {
         let ids = Array.isArray(this.phaseData.hats) && this.phaseData.hats.length
             ? this.phaseData.hats.slice()
-            : this.graph.searchedIds.concat(this.graph.singletonIds);
+            : this.graph.rosterIds.slice();
         let fens = ids.map((id, i) => this._getFen(id, `hats[${i}]`));
         let seenHats = new Map();
         fens.forEach((fen) => {
@@ -178,6 +312,155 @@ class HatBindingTaskController {
         return (path || []).join(">");
     }
 
+    _trialRole(cueId, targetId) {
+        if (this.graph.fillerIds.includes(targetId) || this.graph.fillerIds.includes(cueId)) {
+            return "filler";
+        }
+        if (targetId === this.graph.hubId && cueId === this.graph.hubId) return "hub";
+        if (this.graph.selectedArmIds.includes(targetId)) return "arm";
+        if (targetId === this.graph.hubId) return "hub";
+        return "other";
+    }
+
+    _isRoleToken(value) {
+        return typeof value === "string" && value.charAt(0) === "$";
+    }
+
+    _specTokenValues(spec) {
+        let vals = [];
+        const take = (obj) => {
+            if (!obj || typeof obj !== "object") return;
+            if (typeof obj.cue === "string") vals.push(obj.cue);
+            if (typeof obj.target === "string") vals.push(obj.target);
+        };
+        take(spec);
+        take(spec.pair_based);
+        take(spec.group_based);
+        take(spec.control);
+        return vals;
+    }
+
+    _roleMap(ctx) {
+        ctx = ctx || {};
+        return {
+            $hub: this.graph.hubId,
+            $arm1: this.graph.selectedArmIds[0],
+            $arm2: this.graph.selectedArmIds[1],
+            $arm: ctx.arm,
+            $this_arm: ctx.arm,
+            $other_arm: ctx.other,
+            $member: ctx.member,
+            $filler: ctx.filler,
+            $fillers: ctx.filler
+        };
+    }
+
+    _resolveRoleValue(value, ctx, path) {
+        if (!this._isRoleToken(value)) return value;
+        let mapped = this._roleMap(ctx)[value];
+        if (mapped == null || mapped === "") {
+            this._fail(`${path || "role"}: unknown or unbound role token "${value}".`);
+        }
+        return mapped;
+    }
+
+    _bindSpecRoles(spec, ctx) {
+        const bindBranch = (branch, path) => {
+            if (!branch || typeof branch !== "object") return branch;
+            let out = Object.assign({}, branch);
+            if (out.cue != null) out.cue = this._resolveRoleValue(out.cue, ctx, path + ".cue");
+            if (out.target != null) out.target = this._resolveRoleValue(out.target, ctx, path + ".target");
+            return out;
+        };
+        let out = Object.assign({}, spec);
+        if (out.cue != null) out.cue = this._resolveRoleValue(out.cue, ctx, `${spec.id}.cue`);
+        if (out.target != null) out.target = this._resolveRoleValue(out.target, ctx, `${spec.id}.target`);
+        ["pair_based", "group_based", "control"].forEach((key) => {
+            if (out[key]) out[key] = bindBranch(out[key], `${spec.id}.${key}`);
+        });
+        return out;
+    }
+
+    _cloneSpec(spec) {
+        return JSON.parse(JSON.stringify(spec));
+    }
+
+    _materializeTrialSpecs(specs) {
+        let out = [];
+        specs.forEach((spec, index) => {
+            if (!spec || typeof spec !== "object") this._fail(`binding_trials[${index}] is invalid.`);
+            if (!spec.id) this._fail(`binding_trials[${index}] is missing id.`);
+            let tokens = this._specTokenValues(spec);
+            let expand = spec.expand;
+            let usesArm = expand === "each_arm"
+                || tokens.some((t) => t === "$arm" || t === "$this_arm" || t === "$other_arm");
+            let usesFiller = expand === "each_filler"
+                || tokens.some((t) => t === "$fillers" || t === "$filler");
+            let usesMember = expand === "each_triad_member" || tokens.some((t) => t === "$member");
+
+            if (usesArm) {
+                this.graph.selectedArmIds.forEach((arm) => {
+                    let other = this.graph.selectedArmIds.find((id) => id !== arm);
+                    let clone = this._bindSpecRoles(this._cloneSpec(spec), { arm, other });
+                    clone.id = spec.id + "_" + arm;
+                    delete clone.expand;
+                    out.push(clone);
+                });
+                return;
+            }
+            if (usesFiller) {
+                if (!this.graph.fillerIds.length) return;
+                this.graph.fillerIds.forEach((filler) => {
+                    let clone = this._bindSpecRoles(this._cloneSpec(spec), { filler });
+                    clone.id = spec.id + "_" + filler;
+                    delete clone.expand;
+                    out.push(clone);
+                });
+                return;
+            }
+            if (usesMember) {
+                this.graph.selectedIds.forEach((member) => {
+                    let clone = this._bindSpecRoles(this._cloneSpec(spec), { member });
+                    clone.id = spec.id + "_" + member;
+                    delete clone.expand;
+                    out.push(clone);
+                });
+                return;
+            }
+            let bound = this._bindSpecRoles(this._cloneSpec(spec), {});
+            delete bound.expand;
+            out.push(bound);
+        });
+        return out;
+    }
+
+    _defaultBindingTrialSpecs() {
+        let hubId = this.graph.hubId;
+        let arm1 = this.graph.selectedArmIds[0];
+        let arm2 = this.graph.selectedArmIds[1];
+        let specs = [
+            {
+                id: "to_" + arm1,
+                conditions: ["pair_based", "group_based"],
+                pair_based: { cue: hubId, target: arm1 },
+                group_based: { cue: arm2, target: arm1 }
+            },
+            {
+                id: "to_" + arm2,
+                conditions: ["pair_based", "group_based"],
+                pair_based: { cue: hubId, target: arm2 },
+                group_based: { cue: arm1, target: arm2 }
+            },
+            { id: "self_" + arm1, conditions: ["control"], cue: arm1, path: [] },
+            { id: "self_" + hubId, conditions: ["control"], cue: hubId, path: [] },
+            { id: "self_" + arm2, conditions: ["control"], cue: arm2, path: [] }
+        ];
+        this.graph.fillerIds.forEach((id) => {
+            specs.push({ id: "self_" + id, cue: id, path: [] });
+        });
+        return specs;
+    }
+
     _trialRunsInCondition(spec, condition) {
         if (!spec) return false;
         if (Array.isArray(spec.conditions) && spec.conditions.length) {
@@ -190,11 +473,36 @@ class HatBindingTaskController {
         return true;
     }
 
-    _expandBindingTrials() {
-        let specs = this.phaseData.binding_trials;
-        if (!Array.isArray(specs) || specs.length === 0) {
-            this._fail("binding_trials must be a non-empty array.");
+    _resolveBranchPath(branch, cue, pathLabel) {
+        let hasPath = Array.isArray(branch.path);
+        let hasTarget = branch.target != null && branch.target !== "";
+        if (hasPath && hasTarget) {
+            let walked = this._walkPath(cue, branch.path, pathLabel);
+            let expected = this._getFen(branch.target, pathLabel + ".target");
+            if (walked.id !== expected.id) {
+                this._fail(
+                    `${pathLabel}: path lands on "${walked.id}" but target is "${expected.id}".`
+                );
+            }
+            return { path: branch.path.slice(), target: walked };
         }
+        if (hasPath) {
+            let walked = this._walkPath(cue, branch.path, pathLabel);
+            return { path: branch.path.slice(), target: walked };
+        }
+        if (hasTarget) {
+            let target = this._getFen(branch.target, pathLabel + ".target");
+            let path = this._inferPath(cue, target, pathLabel);
+            return { path, target };
+        }
+        this._fail(`${pathLabel}: needs path (use [] for self) or target.`);
+    }
+
+    _expandBindingTrials() {
+        let rawSpecs = Array.isArray(this.phaseData.binding_trials) && this.phaseData.binding_trials.length
+            ? this.phaseData.binding_trials
+            : this._defaultBindingTrialSpecs();
+        let specs = this._materializeTrialSpecs(rawSpecs);
         let seenIds = new Set();
         let expanded = [];
         specs.forEach((spec, index) => {
@@ -216,30 +524,18 @@ class HatBindingTaskController {
             let hasNested = !!(spec.pair_based || spec.group_based || spec.control);
             let branch = (hasNested && spec[this.condition]) ? spec[this.condition] : spec;
             if (!branch.cue) this._fail(`binding_trials[${index}] ("${spec.id}") is missing cue.`);
-            if (!Array.isArray(branch.path)) {
-                this._fail(`binding_trials[${index}] ("${spec.id}") path must be an array (use [] for self).`);
-            }
 
             let cue = this._getFen(branch.cue, `binding_trials[${index}].cue`);
-            let target = this._walkPath(cue, branch.path, `binding_trials[${index}] "${spec.id}"`);
-            let triad = spec.triad;
-            if (!triad) {
-                if (this.graph.searchedIds.includes(cue.id) || this.graph.searchedIds.includes(target.id)) {
-                    triad = "searched";
-                } else if (this.graph.singletonIds.includes(cue.id) || this.graph.singletonIds.includes(target.id)) {
-                    triad = "singleton";
-                } else {
-                    triad = "other";
-                }
-            }
+            let resolved = this._resolveBranchPath(branch, cue, `binding_trials[${index}] "${spec.id}"`);
             expanded.push({
                 id: spec.id,
-                triad,
+                role: this._trialRole(cue.id, resolved.target.id),
+                selected_triad: this.graph.selectedTriad.slice(),
                 cue_id: cue.id,
-                target_id: target.id,
-                path: branch.path.slice(),
+                target_id: resolved.target.id,
+                path: resolved.path.slice(),
                 cue,
-                target
+                target: resolved.target
             });
         });
         if (expanded.length === 0) {
@@ -356,6 +652,7 @@ class HatBindingTaskController {
             let word;
             if (rel === "neighbour") word = isLast ? "NEIGHBOR" : "neighbor";
             else if (rel === "cousin") word = isLast ? "COUSIN" : "cousin";
+            else if (rel === "playmate") word = isLast ? "PLAYMATE" : "playmate";
             else word = isLast ? String(rel).toUpperCase() : String(rel);
             label += "'s " + word;
         });
@@ -381,18 +678,21 @@ class HatBindingTaskController {
     _relationLabel(relation) {
         if (relation === "neighbour") return "neighbour";
         if (relation === "cousin") return "cousin";
+        if (relation === "playmate") return "playmate";
         return relation;
     }
 
     _relationDescription(relation) {
         if (relation === "neighbour") return "a neighbour — a Fennimal who lives in the same region";
         if (relation === "cousin") return "a cousin — a Fennimal with the same head";
+        if (relation === "playmate") return "a playmate — a Fennimal who plays with the same toy";
         return "a " + this._relationLabel(relation);
     }
 
     _targetRoleCaps(relation) {
         if (relation === "neighbour") return "NEIGHBOR";
         if (relation === "cousin") return "COUSIN";
+        if (relation === "playmate") return "PLAYMATE";
         return "Fennimal";
     }
 
@@ -448,7 +748,11 @@ class HatBindingTaskController {
         this.ParentLayer.appendChild(this.ItemLayers.Plus1);
         this.ParentLayer.appendChild(this.ItemLayers.Plus2);
 
-        console.log("%c HatBindingTask condition: " + this.condition, "color:teal");
+        console.log(
+            "%c HatBindingTask condition: " + this.condition +
+            "  triad: " + this.graph.selectedTriad.join("-"),
+            "color:teal"
+        );
 
         for (let b = 0; b < this.blocks.length; b++) {
             if (this.destroyed) return;
@@ -637,6 +941,7 @@ class HatBindingTaskController {
         let last = (trial.path && trial.path.length) ? trial.path[trial.path.length - 1] : "";
         if (last === "neighbour") return "this NEIGHBOR'S";
         if (last === "cousin") return "this COUSIN'S";
+        if (last === "playmate") return "this PLAYMATE'S";
         return "this Fennimal's";
     }
 
@@ -1777,7 +2082,9 @@ class HatBindingTaskController {
             flavour: block.flavour,
             condition: this.condition,
             trial_id: trial.id,
-            triad: trial.triad,
+            role: trial.role,
+            selected_triad: (trial.selected_triad || this.graph.selectedTriad).slice(),
+            selected_arms: this.graph.selectedArmIds.slice(),
             cue_id: trial.cue_id,
             target_id: trial.target_id,
             path: trial.path.slice(),
@@ -2305,6 +2612,7 @@ class HatBindingTaskController {
         });
         freeze_fennimal_decorative_animations(fenIcon);
         groupScale.appendChild(fenIcon);
+        this._attachRetrainingToy(fen, fenIcon, p);
 
         let fenBox = fenIcon.getBBox();
         let frameBox = bgRect ? bgRect.getBBox() : { width: 500, height: 600 };
@@ -2326,6 +2634,33 @@ class HatBindingTaskController {
         groupRotate.style.transform = "rotate(-3deg)";
 
         return { group: groupTranslate, fenIcon, groupScale, cx, cy };
+    }
+
+    _attachRetrainingToy(fen, fenIcon, retrainingParams) {
+        if (!fen || !fen.toy) return null;
+        let bodyGroup = fenIcon && fenIcon.getElementsByClassName("Fennimal_body")[0];
+        let bodyScaleGroup = bodyGroup && bodyGroup.firstElementChild;
+        let bodySvg = bodyScaleGroup && bodyScaleGroup.firstElementChild;
+        if (!bodySvg) {
+            this._fail(`retraining: Fennimal "${fen.id}" has a toy but no body SVG to attach it to.`);
+        }
+        let bodyPoint = bodySvg.getElementsByClassName("Fennimal_body_center_point")[0];
+        if (!bodyPoint) {
+            this._fail(
+                `retraining: body "${fen.body}" (Fennimal "${fen.id}") is missing Fennimal_body_center_point.`
+            );
+        }
+        let p = retrainingParams || {};
+        let toyScale = (p.toyScale != null) ? p.toyScale : 2.2;
+        // Draw the toy after the head so a chest placement is not hidden under the head.
+        let parent = fenIcon.getElementsByClassName("Fennimal_scale_group")[0] || bodyScaleGroup;
+        let toyGroup = attach_toy_to_fennimal_body(parent, bodySvg, fen, toyScale);
+        if (!toyGroup) {
+            this._fail(`retraining: could not print toy "${fen.toy}" on Fennimal "${fen.id}".`);
+        }
+        toyGroup.style.filter = p.toyDropShadow ||
+            "drop-shadow(0px 0px 2px rgba(255,255,255,0.95)) drop-shadow(0px 1px 5px rgba(255,255,255,0.7))";
+        return toyGroup;
     }
 
     _placePolaroidHatOccluder(fenIcon, parent) {
@@ -2562,6 +2897,9 @@ class HatBindingTaskController {
             flavour: "retraining",
             condition: this.condition,
             trial_id: "retraining_" + fen.id,
+            role: this._trialRole(fen.id, fen.id),
+            selected_triad: this.graph.selectedTriad.slice(),
+            selected_arms: this.graph.selectedArmIds.slice(),
             cue_id: fen.id,
             target_id: fen.id,
             cue_name: fen.name,

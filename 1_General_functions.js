@@ -1054,6 +1054,87 @@ function attach_hat_to_fennimal_head(HeadScaleGroup, HeadSVG, FenObj, head_scale
     return HatGroup;
 }
 
+function _circle_center(el) {
+    if (!el) return null;
+    let cx = parseFloat(el.getAttribute("cx"));
+    let cy = parseFloat(el.getAttribute("cy"));
+    if (!isFinite(cx) || !isFinite(cy)) return null;
+    return { x: cx, y: cy };
+}
+
+function _local_bbox_center(el) {
+    if (!el) return null;
+    try {
+        let box = el.getBBox();
+        if (!box || !(box.width > 0) || !(box.height > 0)) return null;
+        return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    } catch (err) {
+        return null;
+    }
+}
+
+/**
+ * Print a Fennimal's toy onto the body (retraining polaroids).
+ * Snaps to .Fennimal_body_center_point so body SVGs can be overwritten without extra markers.
+ * The toy is centered on that point (not grabbed by toy_pivot_point).
+ */
+function attach_toy_to_fennimal_body(ParentGroup, BodySVG, FenObj, toy_visual_scale) {
+    if (!FenObj || FenObj.toy === undefined || FenObj.toy === null || FenObj.toy === "") return null;
+    if (!ParentGroup || !BodySVG) {
+        console.warn("Attempting to place a toy on a Fennimal with no body.");
+        return null;
+    }
+    let bodyPointEl = BodySVG.getElementsByClassName("Fennimal_body_center_point")[0];
+    if (!bodyPointEl) {
+        console.warn(
+            "Missing Fennimal_body_center_point on body \"" + (FenObj.body || "") +
+            "\" (Fennimal id=\"" + (FenObj.id || "") + "\")."
+        );
+        return null;
+    }
+    let toyId = String(FenObj.toy).replace(/^toy_/, "");
+    let ToyTemplate = document.getElementById("toy_" + toyId);
+    if (!ToyTemplate) {
+        console.warn("Missing SVG toy template #toy_" + toyId + " for Fennimal id=\"" + (FenObj.id || "") + "\".");
+        return null;
+    }
+
+    let ToyGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    let ToyScaleGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    ToyGroup.classList.add("held_toy");
+    ToyGroup.appendChild(ToyScaleGroup);
+    ParentGroup.appendChild(ToyGroup);
+
+    let ToySVG = ToyTemplate.cloneNode(true);
+    ToySVG.removeAttribute("id");
+    if (typeof strip_svg_ids_from_subtree === "function") strip_svg_ids_from_subtree(ToySVG);
+    ToySVG.style.display = "inherit";
+    ToySVG.querySelectorAll(".prep_element_hidden").forEach((el) => el.remove());
+    ToyScaleGroup.appendChild(ToySVG);
+    if (typeof set_toy_color_scheme === "function") set_toy_color_scheme(ToySVG, toyId, false);
+
+    let BodyToyPoint = _circle_center(bodyPointEl);
+    let ToyCenter = _local_bbox_center(ToySVG) || _local_bbox_center(ToyTemplate);
+    if (!ToyCenter) {
+        let toyPivotEl = ToySVG.getElementsByClassName("toy_pivot_point")[0]
+            || ToySVG.getElementsByClassName("toy_attachment_point")[0];
+        ToyCenter = _circle_center(toyPivotEl);
+    }
+    if (!BodyToyPoint || !ToyCenter) {
+        console.warn("Toy attach: missing Fennimal_body_center_point coords or toy bounds.");
+        ToyGroup.remove();
+        return null;
+    }
+
+    ToyGroup.style.transform = `translate(${BodyToyPoint.x - ToyCenter.x}px, ${BodyToyPoint.y - ToyCenter.y}px)`;
+    ToyScaleGroup.style.transformOrigin = `${ToyCenter.x}px ${ToyCenter.y}px`;
+    let visualToyScale = (toy_visual_scale && isFinite(toy_visual_scale) && toy_visual_scale !== 0)
+        ? toy_visual_scale
+        : 2.2;
+    ToyScaleGroup.style.transform = `scale(${visualToyScale})`;
+    return ToyGroup;
+}
+
 function create_Fennimal_SVG_object_head_only(FenObj, outline_only, include_hat) {
     //Create the Fennimal SVG container. There are two layers here, one for transform (top), one for scale (second)
     let TranslationGroup = document.createElementNS("http://www.w3.org/2000/svg", 'g')
@@ -3735,6 +3816,226 @@ class AskHatOverlay {
             await bar.hide();
             await wait(1000);
         }
+    }
+}
+
+/**
+ * Toy-choice overlay for `ask_toy` on Fennimal-on-screen trials that do not
+ * already use the toy as an interactive prop.
+ *
+ * Trial controllers (after ask_hat / hat reveal when present):
+ *   await AskToyOverlay.run(this);                        // quiz + confetti only
+ *   await AskToyOverlay.run(this, { placement: "feet" }); // inert toy at feet
+ *   await AskToyOverlay.run(this, { placement: "held" }); // inert toy on body
+ *   await AskToyOverlay.run(this, { placement: "feet", fallToFloor: true });
+ *
+ * No-ops unless `FenObj.ask_toy` is true AND the Fennimal has a `.toy`.
+ * Records `FenObj.toy_errors_made`. Stores the spawned SVG on `trial.askToyElement`.
+ */
+class AskToyOverlay {
+    static hasToy(fen) {
+        return !!(fen && fen.toy !== undefined && fen.toy !== null && fen.toy !== "");
+    }
+
+    static getBodyBurstCenter(trial) {
+        let basics = trial && trial.basics;
+        if (!basics) return null;
+        let anchor = (basics.TargetPoints && basics.TargetPoints.Fennimal_body_center)
+            || basics.Fennimal;
+        if (!anchor) return null;
+        try {
+            return getSVGInternalCenter(anchor);
+        } catch (err) {
+            return null;
+        }
+    }
+
+    static getFeetWorldPoint(trial) {
+        let fen = trial && trial.basics && trial.basics.Fennimal;
+        if (!fen || !fen.ownerSVGElement) return null;
+        let svg = fen.ownerSVGElement;
+        try {
+            let bbox = fen.getBBox();
+            let localPoint = svg.createSVGPoint();
+            localPoint.x = bbox.x + bbox.width / 2;
+            localPoint.y = bbox.y + bbox.height;
+            let matrixToSVG = svg.getScreenCTM().inverse().multiply(fen.getScreenCTM());
+            return localPoint.matrixTransform(matrixToSVG);
+        } catch (err) {
+            return null;
+        }
+    }
+
+    static getFeetFloorPoint(trial) {
+        let feet = AskToyOverlay.getFeetWorldPoint(trial);
+        if (!feet) return null;
+        let fen = trial.basics.Fennimal;
+        let halfW = 80;
+        try {
+            let bbox = fen.getBBox();
+            let ctm = fen.getCTM && fen.getCTM();
+            let scaleX = ctm ? Math.hypot(ctm.a, ctm.b) : 1;
+            halfW = Math.max(60, (bbox.width * scaleX) / 2);
+        } catch (err) { /* keep default */ }
+        return {
+            x: feet.x + halfW * 0.55 + 28,
+            y: feet.y + 18
+        };
+    }
+
+    static createInertToyElement(fen, parent, centerX, centerY, scale) {
+        let toyId = String(fen.toy).replace(/^toy_/, "");
+        let template = document.getElementById("toy_" + toyId);
+        if (!template || !parent) return null;
+
+        let toy = copy_scale_and_move_object_to_position(
+            template,
+            parent,
+            centerX,
+            centerY,
+            scale,
+            "ask_toy_" + toyId
+        );
+        if (typeof set_toy_color_scheme === "function") {
+            set_toy_color_scheme(toy, toyId, false);
+        }
+        if (typeof ToyChoiceBar !== "undefined" && ToyChoiceBar.make_toy_static) {
+            ToyChoiceBar.make_toy_static(toy, toyId);
+        }
+        toy.style.pointerEvents = "none";
+        toy.style.cursor = "default";
+        toy.onpointerdown = null;
+        toy.onpointermove = null;
+        toy.onpointerup = null;
+        return toy;
+    }
+
+    static attachHeldToy(trial) {
+        let fen = trial && trial.FenObj;
+        let fennimal = trial && trial.basics && trial.basics.Fennimal;
+        if (!AskToyOverlay.hasToy(fen) || !fennimal) return null;
+
+        let bodyGroup = fennimal.getElementsByClassName("Fennimal_body")[0];
+        let bodyScaleGroup = bodyGroup && bodyGroup.firstElementChild;
+        let bodySvg = bodyScaleGroup && bodyScaleGroup.firstElementChild;
+        if (!bodySvg) return null;
+
+        let parent = fennimal.getElementsByClassName("Fennimal_scale_group")[0] || bodyScaleGroup;
+        let toyGroup = attach_toy_to_fennimal_body(parent, bodySvg, fen, 2.2);
+        if (!toyGroup) return null;
+        toyGroup.style.pointerEvents = "none";
+        toyGroup.style.cursor = "default";
+        return toyGroup;
+    }
+
+    static async placeAtFeet(trial, options = {}) {
+        let fen = trial && trial.FenObj;
+        let basics = trial && trial.basics;
+        if (!AskToyOverlay.hasToy(fen) || !basics) return null;
+
+        let layers = basics.ItemLayers || {};
+        // Prefer Plus2 so the toy sits with / in front of the Fennimal (not under Main).
+        let layer = options.parentLayer || layers.Plus2 || layers.Plus1 || layers.Main;
+        if (!layer) return null;
+
+        let floor = AskToyOverlay.getFeetFloorPoint(trial);
+        let body = AskToyOverlay.getBodyBurstCenter(trial);
+        if (!floor) return null;
+
+        let scale = options.scale != null ? options.scale : 3;
+        let start = (options.fallToFloor && body) ? body : floor;
+        let toy = AskToyOverlay.createInertToyElement(fen, layer, start.x, start.y, scale);
+        if (!toy) return null;
+
+        // If the Fennimal is already on this layer, draw the toy after it.
+        if (basics.Fennimal && basics.Fennimal.parentNode === layer) {
+            layer.appendChild(toy);
+        }
+
+        trial.askToyElement = toy;
+
+        if (options.fallToFloor && body) {
+            toy.style.transition = "none";
+            window.getComputedStyle(toy).transform;
+            await wait(40);
+            toy.style.transition = "transform 520ms cubic-bezier(0.33, 0.9, 0.45, 1.15)";
+            toy.style.transform = `translate(${floor.x}px, ${floor.y}px)`;
+            await wait(540);
+        }
+
+        return toy;
+    }
+
+    static async run(trial, options = {}) {
+        let fen = trial && trial.FenObj;
+        if (!fen || !fen.ask_toy) return null;
+        if (!AskToyOverlay.hasToy(fen)) return null;
+
+        let basics = trial.basics;
+        if (!basics) return null;
+
+        let layers = basics.ItemLayers || {};
+        let layer = options.parentLayer || layers.Questions || layers.Plus2 || layers.Main || layers.Partner;
+        if (!layer) return null;
+
+        fen.toy_errors_made = [];
+
+        let toyOptions = Array.isArray(fen.toys_asked) ? [...fen.toys_asked] : [];
+        if (fen.toy && !toyOptions.includes(fen.toy)) {
+            toyOptions.push(fen.toy);
+        }
+        toyOptions = [...new Set(toyOptions.filter(Boolean))];
+        if (toyOptions.length === 0) return null;
+
+        let bar = new ToyChoiceBar(layer, basics.W, basics.H);
+        let prompt = options.prompt
+            || ("Which toy does this " + (fen.name || "Fennimal") + " like to play with?");
+
+        while (true) {
+            Interface.Prompt.show_message(prompt);
+            let selected = await bar.waitForSelection(shuffleArray([...toyOptions]));
+
+            if (selected === fen.toy) {
+                AudioCont.play_sound_effect("positive");
+                await bar.hide();
+                Interface.Prompt.hide();
+
+                let burstCenter = AskToyOverlay.getBodyBurstCenter(trial)
+                    || { x: 0.5 * basics.W, y: 0.45 * basics.H };
+                await spawn_confetti_burst(
+                    layers.Plus2 || layer,
+                    burstCenter.x,
+                    burstCenter.y,
+                    { awaitPopMs: 900 }
+                );
+
+                let placement = options.placement || null;
+                if (placement === "held") {
+                    trial.askToyElement = AskToyOverlay.attachHeldToy(trial);
+                } else if (placement === "feet") {
+                    await AskToyOverlay.placeAtFeet(trial, {
+                        fallToFloor: !!options.fallToFloor,
+                        parentLayer: options.toyParentLayer,
+                        scale: options.toyScale
+                    });
+                }
+
+                return { correct: true, selected, element: trial.askToyElement || null };
+            }
+
+            AudioCont.play_sound_effect("rejected");
+            fen.toy_errors_made.push(selected);
+            Interface.Prompt.show_message("Oops, you picked the wrong toy!");
+            await bar.hide();
+            await wait(1000);
+        }
+    }
+
+    static cleanUp(trial) {
+        if (!trial) return;
+        let el = trial.askToyElement;
+        if (el && el.parentNode) el.remove();
+        trial.askToyElement = null;
     }
 }
 

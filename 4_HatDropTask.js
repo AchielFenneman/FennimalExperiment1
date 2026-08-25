@@ -4,7 +4,7 @@
  * Phase type "hat_drop_gonogo" uses one box (keep under the chute or slide aside).
  *
  * Trials name Fennimals by id. The controller looks those ids up and
- * runs the row as written — no searched_triad / singletons roster.
+ * runs the row as written — no hub / arms roster.
  *
  * Stimulus gates: n_reps, instruction_order, min_points, max_points,
  * total_fall_time, preview_ms, preview_travel_ms, skip_practice,

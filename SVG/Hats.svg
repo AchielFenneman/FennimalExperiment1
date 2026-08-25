@@ -47,7 +47,7 @@
 <circle class="hat_attachment_point invisible_element" cx="53" cy="83" r="2" display="inline" fill="#55f" stroke-linejoin="round" stroke-width=".7938"/>
 <path d="m28.05 64.24c-0.1504 4.123-0.4228 8.215-0.8247 12.28 16.19 4.739 33.39 5.083 51.83 0.0208-0.7142-4.089-0.9858-8.242-1.272-12.39-19.83 2.764-35.4 1.945-49.74 0.0944z" fill="#333" stroke="#000" stroke-width="1.323"/>
 </g>
-<g id="hat_baret" class="hat" display="none" stroke-linecap="round">
+<g id="hat_beret" class="hat" display="none" stroke-linecap="round">
 <g fill="#800000" stroke="#000">
 <path d="m16.68 69c-0.3884 2.078 0.0967 4.037 2.207 5.354 22.16 0.8938 44.15 0.7639 66.21 0.695 0.8326-0.8326 0.9402-3.965 0.3269-3.678-0.1035 0.049-16.59-4.149-33.56-4.747-17.34-0.611-35.18 2.377-35.18 2.377z" stroke-width="1.323"/>
 <path d="m54.06 36.56c-1.001-5.198 0.5753-6.915 2.225-8.38 0.9574-0.8115 4.261-2.316 5.953 1.185-3.517 2.228-4.31 5.977-5.288 9.623z" stroke-width="1.323"/>

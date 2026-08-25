@@ -28,7 +28,7 @@ Experiment_Structure block
   Location entry → TrialFactory.build(FenObj.interaction_type, …)
 ```
 
-Some phases are **not** location trials (`partner_belief_multiple` / `partner_belief_individual_boxes`, sorting, `hat_binding_task`, `chimera_feature_id`, `pseudoday`) and never call `TrialFactory`. `chimera_feature_id` runs as indoor polaroids (no map travel).
+Some phases are **not** location trials (`partner_belief_multiple` / `partner_belief_individual_boxes`, sorting, `hat_binding_task`, `chimera_feature_id`, `morph_task`, `morph_task_two_cards` (archived), `pseudoday`) and never call `TrialFactory`. `chimera_feature_id` and `morph_task` run as indoor polaroids (no map travel).
 
 ### Trial queue: default vs `trial_subblocks`
 
@@ -117,7 +117,7 @@ Sequential trials from a phone UI at Home: ring → hint → auto-travel to loca
 | `partner_behavior` | `"active"` \| `"absent"` (also accepts aliases `"present"`→active, `false`→absent) |
 | `hint_type` | e.g. `["icon"]` (phone hint flavour) |
 | `include_Fennefinder` | `true` \| `false` \| `"low_power_mode"` |
-| `ask_toy` | If `true`, stamp ask-toy quiz onto **all** trials in the block |
+| `ask_toy` | If `true`, stamp ask-toy quiz onto **all** trials in the block (play/repair: quiz only; `hat_blown_away` / `hat_laundry` / `hide_and_seek_Fennimal` / `photo_Fennimal`: inert toy after `ask_hat` — see Shared optional feature) |
 | `toys_asked` | Optional stimulus toy codes for the quiz bar; defaults to all unique toys of Fennimals in the block |
 | `ask_box` | If `true`, stamp ask-box quiz onto **all** trials in the block |
 | `boxes_asked` | Optional stimulus toybox codes for the quiz bar; defaults to all unique toyboxes of Fennimals in the block |
@@ -146,7 +146,7 @@ All phase Fennimals on the map; participant explores until all are visited.
 | `force_climbing_tower_first` | Force watchtower intro first |
 | `ask_toy` / `toys_asked` | Same block-level stamp as phone_room (`toys_asked` optional; defaults to block toys) |
 | `introduce_name_on_polaroid` | With `photo_Fennimal`: nameless camera prompt; polaroid caption introduces the name |
-| `ask_Fennimal` / `ask_name` / `ask_hat` | Same block-level stamps as phone_room; honoured by `photo_Fennimal` |
+| `ask_Fennimal` / `ask_name` / `ask_hat` / `ask_toy` | Same block-level stamps as phone_room; honoured by `photo_Fennimal` (and other types that call the shared overlays) |
 | `bonus_stars_per_correct_answer` | Optional |
 
 #### `retrieve_lost_box`
@@ -202,7 +202,7 @@ One target at a time; hint instruction, then find & interact. Supports orthogona
 |---|---|
 | `interaction_type` | Array, e.g. `["broken_toy_in_box","dirty_toy"]` |
 | `hint_type` | Array or string, e.g. `["icon","toybox","toy","name"]` — **main trials currently get the first element only**. `"name"` shows the Fennimal's name as large text; `"icon"` hides the worn hat if `ask_hat` is set |
-| `ask_Fennimal` / `ask_name` / `ask_hat` | Same block-level stamps as phone_room; honoured by `hide_and_seek_Fennimal`, `hat_laundry`, `hat_blown_away`, `photo_Fennimal` |
+| `ask_Fennimal` / `ask_name` / `ask_hat` / `ask_toy` | Same block-level stamps as phone_room; honoured by `hide_and_seek_Fennimal`, `hat_laundry`, `hat_blown_away`, `photo_Fennimal` (ask_toy placement varies — see Shared optional feature) |
 | `included_orthogonal_tasks` | Extra trial types mixed into the queue (**not** compatible with `trial_subblocks`) |
 | `orthogonal_tasks_possible_after_trial` | Present in stimulus; **not enforced in code yet** |
 | `ask_toy` / `toys_asked` | Stamped onto main **and** orthogonal trials (`toys_asked` optional; defaults to block toys) |
@@ -308,29 +308,65 @@ Attribute sorting / quiz over Fennimals.
 Controllers: `FennimalAttributeSortingMultipleTask` / `FennimalAttributeSortingSingleTask` via `createFennimalAttributeSortingTask`.
 
 #### `hat_binding_task`
-Card-based hat-binding day (no map travel). One phase contains ordered internal `blocks` (binding flavours interleaved with retraining). Between-subjects condition (`pair_based` / `group_based` / `control`) is sampled once from the `condition` array (duplicates raise odds) and stored on `experimentData.phaseRandomizations`.
+Card-based hat-binding day (no map travel). One phase contains ordered internal `blocks` (binding flavours interleaved with retraining). The roster is a **hub plus arms**: two arms is the classic triad; three arms is a star (one pair of arms is drawn per participant). Between-subjects **condition** (`pair_based` / `group_based` / `control`) and the **arm pair** are sampled once.
+
+**Where the draw is stored** (same idea as `retrieve_lost_box`, plus a top-level shortcut):
+
+| Location | Purpose |
+|---|---|
+| `experimentData.hatBindingAssignment` | **Top-level export** — `{ condition, selected_arms, selected_triad, hub, fillers, all_arms, starter_name_id, starter_name }` |
+| `experimentData.phaseRandomizations[randomization_id]` / `[arm_randomization_id]` | Layer 1 refresh restore (same mechanism as lost-box) |
+| phase stamps on the `hat_binding_task` row in `storedData` | `binding_search_condition`, `binding_selected_arms`, `binding_selected_triad` |
+| per-trial logs | `condition`, `selected_arms`, `selected_triad`, `role` |
+
+Walkable relations (unique from the hub; path walking is scoped to the selected triad):
+
+- `cousin` — same head
+- `neighbour` — same region
+- `playmate` — same toy
 
 | Field | Meaning |
 |---|---|
+| `hub` | Fennimal id at the center of the network |
+| `arms` | Spoke ids. Length 2 = no arm draw. Length 3 = sample two arms (`A-B-C`, `A-B-D`, or `C-B-D` when hub is B); the unused arm becomes a filler |
+| `fillers` | Optional extra Fennimal ids that are self-visualization only in every condition. Must not repeat hub/arms |
 | `randomization_id` | Persistence key for the condition draw (default `binding_search_condition`) |
+| `arm_randomization_id` | Persistence key for the arm-pair draw (default `binding_star_arms`) |
 | `condition` | Non-empty array of `"pair_based"` \| `"group_based"` \| `"control"`. One entry is drawn at random per participant; duplicates weight the draw (e.g. `["group_based", "control", "control"]` → ⅓ group, ⅔ control). Refresh restores the stored draw |
-| `searched_triad` | `[F1, F2, F3]` in role order. F2 must be the hub (cousin of F1, neighbour of F3) |
-| `singletons` | Fennimal ids with no triad structure (self-visualization fillers in every condition) |
-| `hats` | Fennimal ids whose hats appear as options (default: searched triad + singletons) |
-| `binding_trials` | Trial templates. Optional `conditions` lists which draws run the trial (omit = all). Searched pair/group trials typically use `{ cue, path }` per condition branch. `path` is walked on the head/region graph (`[]` = visualize self). Control uses self-visualization for the triad *and* the singletons |
+| `hats` | Fennimal ids whose hats appear as options (default: hub + all arms + explicit fillers). Hats must be unique |
+| `binding_trials` | Optional trial templates. **Omit** to generate the default set from the selected triad (see below). Optional `conditions` lists which draws run the trial (omit = all). Branches may use `{ cue, path }` and/or `{ cue, target }` (`path` is inferred on the selected triad when `target` is set). Role tokens: `$hub`, `$arm1`, `$arm2`, `$arm` / `$other_arm` (expands once per selected arm), `$fillers` (expands once per filler). `path` `[]` = visualize self |
 | `retraining_fennimals` | Fennimal ids for retraining blocks |
 | `blocks` | Ordered `{ kind: "binding" \| "retraining", flavour?, cover_story?, hop_catch_after_errors? }` |
 | `day_title` / `day_body` | Copy for the Day N instruction page |
-| `prompt_templates` | Optional overrides keyed by path (`""`, `"neighbour"`, `"cousin>neighbour"`, …) |
+| `prompt_templates` | Optional overrides keyed by path (`""`, `"neighbour"`, `"cousin>neighbour"`, `"playmate"`, …) |
 | `skip_instructions` | Skip the Day N page and start at the first block cover story |
 
-**Conditions**
+**Default trials** (when `binding_trials` is omitted), for selected arms X, Y and hub H:
 
-- `pair_based` — retrieve the triad in pairs: B→A (cousin) and B→C (neighbour), plus singleton self-visualization.
-- `group_based` — retrieve the full triad length: A→C (cousin then neighbour) and C→A (neighbour then cousin); B is only an intermediate hop. Plus singleton self-visualization.
-- `control` — self-visualization only for A, B, C and the singletons (no relational hops).
+- `pair_based` — H→X and H→Y (one hop each), plus filler self-visualization
+- `group_based` — Y→X and X→Y via the hub (two hops), plus filler self-visualization
+- `control` — self-visualization for X, H, Y and the fillers (no relational hops)
 
-Binding trial: occluded hats → name-tag visualization prompt → reveal → flavour response (retry until correct). Hop-catch (block 1): typed name per path hop, then click-hat, then return to the original drag. Retraining: polaroid of the Fennimal without hat; hat appears after the correct pick.
+**Example (classic triad + two fillers)**
+
+```javascript
+hub: "B",
+arms: ["A", "C"],
+fillers: ["D1", "D2"]
+```
+
+**Example (star; leftover arm is the filler)**
+
+```javascript
+hub: "B",
+arms: ["A", "C", "D"]
+```
+
+Hub must overlap each arm on exactly one relation; arms must not overlap each other; each relation from the hub must be unique.
+
+Binding trial: occluded hats → name-tag visualization prompt → reveal → flavour response (retry until correct). Hop-catch (block 1): typed name per path hop, then click-hat, then return to the original drag. Retraining: polaroid of the Fennimal without hat; if the Fennimal has an assigned toy it is printed on the body at `.Fennimal_body_center_point`; hat appears after the correct pick.
+
+Logs `condition`, `selected_triad`, `selected_arms`, and `role` (`hub` \| `arm` \| `filler`) per trial.
 
 Controller: `HatBindingTaskController` (`4_HatBindingTask.js`). Layout tunables: `GenParam.HatBinding`.
 
@@ -414,6 +450,59 @@ Name buttons are **not** reshuffled each trial. One order is drawn per participa
 
 Controller: `ChimeraFeatureIdController` (`4_ChimeraFeatureIdTask.js`). Tunables: `GenParam.ChimeraFeatureId`.
 
+#### `morph_task`
+Speeded 2AFC identity DV on a **single indoor polaroid** (photo-room stage: Home overlay, `?` start, twin time bars, hidden scoring). Each paid trial always shows a **composite chimera prime** first, then a continuous morph between two Fennimals that starts fully ambiguous (50/50) and resolves toward the target. Identity is answered with **F / J** keyboard keycaps (not mouse). Scoring is hidden.
+
+**Trial flow**
+1. Polaroid under `?` (caption `????`).
+2. Click `?` → develop composite `prime` into the well (`primeRevealMs`).
+3. Radial **name quiz**: name keycaps around the polaroid; **F** clockwise / **J** counter-clockwise / **Space** confirm. Wrong → hide ring, shake polaroid, `rejected` SFX, retry (unpaid). Correct → true caption, clear ring.
+4. Brief hold (`primeHoldMs`) → clear prime → place fenA/fenB morph at `m = 0.5` with noise → **score clock + F/J identity keys arm** when that morph starts.
+5. F (left) / J (right) choose parent. Optional `resolve_trial` completes photo to truth; then polaroid **flies** toward the **chosen** bottom corner (~45°, shrink) and the scene fades to the next trial.
+
+| Field | Meaning |
+|---|---|
+| `trials` | Paid trialset. Flat list **or** blocks (nested arrays). Block order fixed; shuffle within. Do not mix bare trials and nested arrays. `fenA` / `fenB` / `target` Fennimal ids (`target` = fenA or fenB). Optional `headA` / `headB` / `targetHead` (SVG head names). |
+| `morph_centerpoint` (per trial) | `[0, 1]` — resolution midpoint only: `t_mid = (midpointMinFrac + range * c) * trial_speed`. |
+| `noise` (per trial) | Optional `[0, 1]` moving binary static over the morph photo. After choice: fades if `resolve_trial`, else freezes. |
+| `grayscale` (per trial) | Optional boolean. Fixed gray fills (`GenParam.MorphTask.grayscaleScheme`), not a CSS filter. |
+| `morph` (per trial) | `"full"` \| `"shape"` \| `"color"` \| `"mesh"`. |
+| `view` (per trial) | `"closeup"` (default) \| `"full"`. |
+| `prime` (per trial, **required**) | Composite chimera in the **same** polaroid: `{ head?, body?, hat?, toy?, color_scheme?, name }`. `name` required; at least one of head/body/hat/toy. `toy` requires `body`. `color_scheme`: Fennimal id or `gray`/`grey`/`grayscale`/`greyscale`. Empty `{}` rejected. |
+| `names_options` | Fennimal ids for the name radial ring. **Required** (non-empty). Unioned with every `prime.name`. Order persisted on `phaseRandomizations.morph_prime_button_order`. |
+| `trial_speed` | Trial window ms (default `GenParam.MorphTask.trialSpeedMs`). |
+| `resolve_trial` | `true` (default): complete morph to truth after answer. `false`: freeze frame. |
+| `skip_practice` | Omit square/triangle practice pipeline. |
+| `day_title` / `day_body` | Optional Day N overrides. |
+| `skip_instructions` | Skip Day N page. |
+| `partner_behavior` | Use `"absent"`. |
+
+**Rendering:** stacked fen parents with opacity morph (or experimental mesh warp). Ambiguity veil strongest at `m = 0.5`. Morph clock: logistic around `t_mid` with `tauFrac`.
+
+**Order:** practice square → practice triangle (same pipeline, unpaid) → paid. First paid trial gets a short tutorial. Trial order (`ids` + `block_sizes`) and F/J button sides persist on `morph_trial_order` / `morph_button_sides`.
+
+**Scoring:** points decay over `trial_speed` from morph start. Correct → remaining; incorrect → silent penalty. Name quiz unpaid.
+
+**Logged rows:** chimera-style basics plus `block_index`, morph fields, `selected_side`, `prime`, `prime_name_quiz`, mesh diagnostics when applicable.
+
+Controller: `MorphTaskController` (`4_MorphTask.js`). Tunables: `GenParam.MorphTask` (incl. `primeRevealMs`, `primeHoldMs`, `identityKeyW/H`, `nameKeyW/H`, `flyMs`, `flyScale`, `trialFadeMs`).
+
+#### `morph_task_two_cards` (archived)
+Former two-polaroid morph: static prime polaroid beside the morph photo, mouse name buttons + L/R click identity. Kept loadable via `MorphTaskTwoCardsController` (`4_MorphTaskTwoCards.js`) / `GenParam.MorphTaskTwoCards` for replay; **not used by live structures**. Prefer `morph_task`.
+
+#### `name_recall_task`
+Typed free recall of all Fennimal names (no map travel). Uses `RecallBoxController`: type + Add, Done (armed twice), optional “I do not remember any names”. Matches entered strings to roster names with Levenshtein distance; stars = unique matched names × `bonus_stars_per_correct_answer`.
+
+| Field | Meaning |
+|---|---|
+| `bonus_stars_per_correct_answer` | Stars per unique matched name |
+| `allowed_Levenshtein_distance_for_match` | Max edit distance for a match (e.g. `2`) |
+| `seed_recall_with_arm_name` | If `true`, the opening sentence becomes “Starting with [NAME], please write down…”. NAME is a Fennimal **display name** (never the hub). `pair_based` / `group_based`: one of the two **selected triad arms**. `control`: no bound pair, so one of `all_arms` (the spokes). Prompt only — the box is not pre-filled (typing it is an attention check; if they do, it still earns a star). The pick is persisted under `phaseRandomizations.name_recall_starter_arm` and written onto `experimentData.hatBindingAssignment` as `starter_name_id` / `starter_name`. If binding has not run, silently falls back to the unseeded prompt. |
+
+Phase logs `RecalledNames` and `Array_of_recalled_IDs`. When the seed flag is on, also `starter_name_id` / `starter_name` (`null` on silent fallback). Same two fields live on `hatBindingAssignment`.
+
+Controller: `InstructionsController.startNameRecallTask` (`3_InstructionsController.js`).
+
 #### `pseudoday`
 Narrative day card only (no trials). Does not advance the “real day” counter the same way trial phases do.
 
@@ -424,7 +513,6 @@ Narrative day card only (no trials). Does not advance the “real day” counter
 | `"partner_returns"` | |
 
 #### Supported in Top controller but rare / unused in current structures
-- `name_recall_task`
 - `card_sorting_task`
 
 ---
@@ -531,7 +619,7 @@ Photograph the toybox with a camera viewfinder; polaroid feedback.
 Photograph the Fennimal; polaroid caption is their name.
 
 **Optional:** `introduce_name_on_polaroid` — camera prompts stay nameless (“Please take a photo of this Fennimal!”); the polaroid caption introduces the name.  
-`ask_Fennimal` / `ask_name` / `ask_hat` — same overlays as the training phone-room trials. If `ask_hat` is set, the worn hat stays hidden until after the hat quiz, then the camera/polaroid show the hat.
+`ask_Fennimal` / `ask_name` / `ask_hat` / `ask_toy` — same overlays as the training phone-room trials. If `ask_hat` is set, the worn hat stays hidden until after the hat quiz, then the camera/polaroid show the hat. If the Fennimal has a toy, an inert held toy is always on the body (after `ask_toy` when that quiz runs, otherwise right after the hat/name steps) and is printed on the polaroid too.
 
 **Needs:** `name` (and a visible Fennimal).  
 **Tunables:** `GenParam.PhotoTrial`.
@@ -600,21 +688,21 @@ Same as `fly_swat`, then sponge-clean dirt on the box.
 #### `hat_blown_away` → `HatBlownAwayTrialController`
 Hat stuck on a region pole; drag a closed box as a step-stool (turn-taking with partner if present). The box is never opened.
 
-**Optional:** `ask_Fennimal` on the empty scene (`await AskFennimalOverlay.run(this)`), then the Fennimal appears (hat hidden if `ask_hat`), then `ask_name`, then `ask_hat`, then the hat is shown and blown onto the pole.
+**Optional:** `ask_Fennimal` on the empty scene (`await AskFennimalOverlay.run(this)`), then the Fennimal appears (hat hidden if `ask_hat`), then `ask_name`, then `ask_hat`, then the hat is shown, then `ask_toy` (inert toy falls to the floor by their feet), then the hat is blown onto the pole.
 
 **Needs:** `hat`, `region`, `name`. `toybox` is optional — if missing, a crate **prop** is used and recolored from that region's hue-algorithm palette (`ColorHuePalettes[color_description]`, including accents).
 
 #### `hat_laundry` → `HatLaundryTrialController`
-Empty screen. Optional `ask_Fennimal` (unique heads from the block) → Fennimal appears **without** a hat → optional `ask_name` → optional `ask_hat` → sad/comfort → unique hats from the current cohort pile in a laundry basket, then rise into a column → drag the correct hat onto the Fennimal (retry until correct). Partner, if present, is passive.
+Empty screen. Optional `ask_Fennimal` (unique heads from the block) → Fennimal appears **without** a hat → optional `ask_name` → optional `ask_hat` → optional `ask_toy` (inert toy at feet) → sad/comfort → unique hats from the current cohort pile in a laundry basket, then rise into a column → drag the correct hat onto the Fennimal (retry until correct). Partner, if present, is passive.
 
 **Needs:** `hat`.  
 **Tunables:** `GenParam.HatLaundry`.  
-**Data:** `fennimal_errors_made`, `name_errors_made`, `name_was_revealed`, `ask_hat_errors_made`, `hat_errors_made`.
+**Data:** `fennimal_errors_made`, `name_errors_made`, `name_was_revealed`, `ask_hat_errors_made`, `hat_errors_made`, `toy_errors_made`.
 
 #### `hide_and_seek_Fennimal` → `HideAndSeekFennimalTrialController`
 Hide-and-seek in a dense foliage field. The Fennimal is scaled down and planted at a random mid-field spot (middle 80% of width; feet in the upper part of the bottom third). Cut plants until you can click them (front plants block clicks; gaps work). Remaining plants fade; the Fennimal steps forward to the usual foreground pose and celebrates. No box, no comfort check-in.
 
-**Optional:** `ask_Fennimal` on the empty scene (before hiding). `ask_name` after they step forward. `ask_hat` after `ask_name` (worn hat hidden until then).
+**Optional:** `ask_Fennimal` on the empty scene (before hiding). `ask_name` after they step forward. `ask_hat` after `ask_name` (worn hat hidden until then). `ask_toy` after hat reveal (inert toy planted at the foreground feet spot).
 
 **Partner:** solo by default. Set `partner_behavior: "active"` on the phase (or `force_partner_present: true` on the trial) to include a helper who cuts plants and avoids the hide spot.
 
@@ -646,10 +734,27 @@ Set on the **phase block** (applies to every trial FenObj in that block, includi
 }
 ```
 
-**Currently implemented in:** `basic_intro`, `Fennimal_toy`, `broken_toy_no_box`.  
-**Data:** `toy_errors_made` — ordered array of wrong toy names.
+**Play / repair types** (quiz only — then their own interactive toy): `basic_intro`, `Fennimal_toy`, `broken_toy_no_box`.  
+Call site: `await this.run_ask_toy_step()` → shared `AskToyOverlay.run(this)`.
 
-**UI:** `ToyChoiceBar`.
+**Inert-toy types** (quiz → confetti → place inert toy). One-liner after `ask_hat` / hat reveal:
+
+```js
+await AskToyOverlay.run(this, { placement: "feet" });
+await AskToyOverlay.run(this, { placement: "feet", fallToFloor: true }); // hat_blown_away
+await AskToyOverlay.run(this, { placement: "held" }); // photo_Fennimal
+```
+
+| Interaction | Placement |
+|---|---|
+| `hat_blown_away` | Feet (right / slightly below); falls from body after confetti |
+| `hat_laundry` | Feet (planted; stays put) |
+| `hide_and_seek_Fennimal` | Feet after they step forward |
+| `photo_Fennimal` | Held on body after quiz when `ask_toy`; otherwise held toy appears whenever the Fennimal has a `.toy`. Polaroid always prints the held toy when present |
+
+No-ops unless `FenObj.ask_toy` is true **and** the Fennimal has a `.toy` (silent skip when there is no toy).  
+**Data:** `toy_errors_made` — ordered array of wrong toy names.  
+**UI:** `AskToyOverlay` / `ToyChoiceBar`.
 
 ---
 

@@ -3362,52 +3362,8 @@ class GeneralTrialController {
     }
 
     async run_ask_toy_step() {
-        if (!this.FenObj.ask_toy) return;
-
-        this.FenObj.toy_errors_made = [];
-        let options = Array.isArray(this.FenObj.toys_asked) ? [...this.FenObj.toys_asked] : [];
-        if (this.FenObj.toy && !options.includes(this.FenObj.toy)) {
-            options.push(this.FenObj.toy);
-            console.warn("ask_toy: FenObj.toy was missing from toys_asked; added it.");
-        }
-        if (options.length === 0) {
-            console.warn("ask_toy: no toys_asked options; skipping question.");
-            return;
-        }
-
-        let bar = new ToyChoiceBar(
-            this.basics.ItemLayers.Plus2,
-            this.basics.W,
-            this.basics.H
-        );
-
-        while (true) {
-            Interface.Prompt.show_message(
-                "Which toy does this " + this.FenObj.name + " like to play with?"
-            );
-            let selected = await bar.waitForSelection(shuffleArray([...options]));
-
-            if (selected === this.FenObj.toy) {
-                AudioCont.play_sound_effect("positive");
-                await bar.hide();
-                let burstCenter = getSVGInternalCenter(
-                    this.basics.TargetPoints.Fennimal_body_center || this.basics.Fennimal
-                );
-                await spawn_confetti_burst(
-                    this.basics.ItemLayers.Plus2,
-                    burstCenter.x,
-                    burstCenter.y,
-                    { awaitPopMs: 900 }
-                );
-                return;
-            }
-
-            AudioCont.play_sound_effect("rejected");
-            this.FenObj.toy_errors_made.push(selected);
-            Interface.Prompt.show_message("Oops, you picked the wrong toy!");
-            await bar.hide();
-            await wait(1000);
-        }
+        // Quiz + confetti only; play/repair types spawn their own interactive toy next.
+        await AskToyOverlay.run(this);
     }
 
     async run_ask_box_step() {
@@ -7838,6 +7794,22 @@ class PhotoTrialController {
             freeze_fennimal_decorative_animations(fenIcon);
             groupScale.appendChild(fenIcon);
 
+            // Always print the Fennimal's toy on the polaroid when they have one.
+            if (AskToyOverlay.hasToy(this.FenObj)) {
+                let bodyGroup = fenIcon.getElementsByClassName("Fennimal_body")[0];
+                let bodyScaleGroup = bodyGroup && bodyGroup.firstElementChild;
+                let bodySvg = bodyScaleGroup && bodyScaleGroup.firstElementChild;
+                if (bodySvg) {
+                    let parent = fenIcon.getElementsByClassName("Fennimal_scale_group")[0] || bodyScaleGroup;
+                    let toyGroup = attach_toy_to_fennimal_body(parent, bodySvg, this.FenObj, 2.2);
+                    if (toyGroup) {
+                        // Same rim as hat-binding retraining polaroids — separates toy from body.
+                        toyGroup.style.filter =
+                            "drop-shadow(0px 0px 2px rgba(255,255,255,0.95)) drop-shadow(0px 1px 5px rgba(255,255,255,0.7))";
+                    }
+                }
+            }
+
             let fenBox = fenIcon.getBBox();
             let bgRect = groupScale.getElementsByTagName("rect")[0];
             let frameBox = bgRect ? bgRect.getBBox() : { width: 500, height: 600 };
@@ -8341,6 +8313,13 @@ class PhotoTrialController {
             await TypedNameAskOverlay.run(this);
             await AskHatOverlay.run(this);
             await AskHatOverlay.revealWornHat(this);
+            // Held toy is always shown when the Fennimal has one: after ask_toy
+            // (quiz → place), or immediately if there is no ask_toy quiz.
+            if (this.FenObj.ask_toy) {
+                await AskToyOverlay.run(this, { placement: "held" });
+            } else {
+                this.askToyElement = AskToyOverlay.attachHeldToy(this);
+            }
         }
 
         Interface.Prompt.show_message(this.get_intro_prompt());
@@ -8353,6 +8332,7 @@ class PhotoTrialController {
         this.hide_camera_button();
         this.remove_viewfinder();
         this.remove_polaroid();
+        AskToyOverlay.cleanUp(this);
         this.basics.clean_up();
         this.box.clean_up();
         if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
@@ -11085,10 +11065,15 @@ class HatBlownAwayTrialController {
         await TypedNameAskOverlay.run(this);
         await AskHatOverlay.run(this);
         await AskHatOverlay.revealWornHat(this);
+        await AskToyOverlay.run(this, { placement: "feet", fallToFloor: true });
 
         this.create_pole();
 
         this.basics.ItemLayers.Plus2.appendChild(this.basics.Fennimal);
+        // Re-append after Fennimal so the planted toy stays in front.
+        if (this.askToyElement) {
+            this.basics.ItemLayers.Plus2.appendChild(this.askToyElement);
+        }
 
         await wait(1000);
         await this.blow_hat_onto_pole();
@@ -11123,6 +11108,7 @@ class HatBlownAwayTrialController {
         if (this.Hat) this.Hat.remove();
         if (this.PolePivot) this.PolePivot.remove();
         else if (this.Pole) this.Pole.remove();
+        AskToyOverlay.cleanUp(this);
         if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
         else if (this.partner.PartnerTranslateGroup) this.partner.PartnerTranslateGroup.remove();
     }
@@ -11252,7 +11238,8 @@ class HideAndSeekFennimalTrialController {
         await TypedNameAskOverlay.run(this);
         await AskHatOverlay.run(this);
         await AskHatOverlay.revealWornHat(this);
-        if (!this.FenObj.ask_name && !this.FenObj.ask_hat) await wait(250);
+        await AskToyOverlay.run(this, { placement: "feet" });
+        if (!this.FenObj.ask_name && !this.FenObj.ask_hat && !this.FenObj.ask_toy) await wait(250);
 
         AudioCont.play_sound_effect("positive");
         Interface.Prompt.show_message(`${this.FenObj.name} is happy you found them!`);
@@ -11361,6 +11348,7 @@ class HideAndSeekFennimalTrialController {
         this.is_task_active = false;
         this.foliageLogic.stop_partner_cutting();
         this.disable_fennimal_click();
+        AskToyOverlay.cleanUp(this);
         this.basics.clean_up();
         this.foliageLogic.clean_up();
         if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
@@ -11935,6 +11923,7 @@ class HatLaundryTrialController {
         await this.appear_fennimal();
         await TypedNameAskOverlay.run(this);
         await AskHatOverlay.run(this);
+        await AskToyOverlay.run(this, { placement: "feet" });
         await this.run_sad_and_comfort();
 
         Interface.Prompt.hide();
@@ -11953,6 +11942,7 @@ class HatLaundryTrialController {
         this.hats.forEach((h) => { if (h.elem && h.elem.parentNode) h.elem.remove(); });
         if (this.BasketBack) this.BasketBack.remove();
         if (this.BasketFront) this.BasketFront.remove();
+        AskToyOverlay.cleanUp(this);
         this.basics.clean_up();
         if (this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
         else if (this.partner.PartnerTranslateGroup) this.partner.PartnerTranslateGroup.remove();

@@ -1903,6 +1903,55 @@ class InstructionsController {
         this.addClosingButtonToParent("bottom-center", false, deleteBonusStarIcons, 1300);
     }
 
+    initializeMorphTaskInstructions(currentBlockNum, dayTitle, dayBody) {
+        this.currentInstructionType = "morph_task";
+        this.clearInstructions();
+        this.currentInstructionsSVG = this.createBasicInstructionElements();
+        this.parentElem.appendChild(this.currentInstructionsSVG);
+        this.parentElem.style.display = "inherit";
+
+        let morphCopy = (typeof GenParam !== "undefined" && GenParam.MorphTask) || {};
+        let title = dayTitle || morphCopy.dayTitle || "a blurry double exposure";
+        document.getElementById("Instructions_Title").innerHTML = `Day ${currentBlockNum}: ${title} (BONUS STAR DAY)`;
+        document.getElementsByClassName("instructions_element_background")[0].style.fill =
+            GenParam.background_fill_for_instructions_where_stars_can_be_earned;
+        document.getElementsByClassName("instructions_element_cover")[0].style.fill =
+            GenParam.background_fill_for_instructions_where_stars_can_be_earned;
+
+        let body = dayBody || morphCopy.dayBody || (
+            "Each polaroid caught two Fennimals in one frame. The photo slowly settles into the one who was really there — pick which one, as quickly as you can."
+        );
+        this.textElemMainInstructions = create_SVG_text_in_foreign_element(
+            body + "<br><br><br><br><br>",
+            0.12 * GenParam.SVG_width, 140,
+            0.76 * GenParam.SVG_width,
+            620,
+            "instruction_element_text"
+        );
+        this.textElemMainInstructions.classList.add("instruction_element_nonbackground");
+        this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0].style.fontSize = "34px";
+        this.currentInstructionsSVG.appendChild(this.textElemMainInstructions);
+
+        setTimeout(() => {
+            showBonusStarOnScreen(
+                this.parentElem,
+                0.5 * GenParam.SVG_width,
+                0.62 * GenParam.SVG_height,
+                true,
+                "deletable_bonus_star",
+                1,
+                undefined
+            );
+        }, 300);
+
+        this.updateProgressNewDay(currentBlockNum);
+        this.updateProgressWithinDay(false);
+        const deleteBonusStarIcons = () => {
+            Array.from(document.getElementsByClassName("deletable_bonus_star")).forEach((s) => s.remove());
+        };
+        this.addClosingButtonToParent("bottom-center", false, deleteBonusStarIcons, 1300);
+    }
+
     initializeHatDropInstructions(currentBlockNum, dayTitle, dayBody, phaseType) {
         this.currentInstructionType = phaseType || "hat_drop_task";
         this.clearInstructions();
@@ -2725,11 +2774,17 @@ class InstructionsController {
         });
     }
 
-    startNameRecallTask(currentBlockNum, bonusStarsPerCorrectAnswer) {
+    startNameRecallTask(currentBlockNum, bonusStarsPerCorrectAnswer, starterName) {
         this.currentInstructionType = "name_recall_task";
         let canEarnStars = bonusStarsPerCorrectAnswer > 0;
         let bonusStart = canEarnStars ? "Today you can earn some bonus stars! " : "";
         let bonusText = canEarnStars ? (bonusStarsPerCorrectAnswer === 1 ? "You will earn one star for each name you correctly enter!" : `You will earn ${bonusStarsPerCorrectAnswer} stars for each name you correctly enter!`) : "";
+        let starterLabel = (starterName != null && String(starterName).trim() !== "")
+            ? String(starterName).trim()
+            : "";
+        let recallLead = starterLabel
+            ? `Starting with ${starterLabel}, please write down all the names of the different Fennimals which you can remember. `
+            : "Please write down all the names of the different Fennimals which you can remember. ";
 
         this.clearInstructions();
         this.currentInstructionsSVG = this.createBasicInstructionElements();
@@ -2749,7 +2804,7 @@ class InstructionsController {
         }
         document.getElementById("Instructions_Title").style.transform = "translate(0px, -50px)";
 
-        let instructionText = bonusStart + "Please write down all the names of the different Fennimals which you can remember. " + bonusText + "<br><br> " +
+        let instructionText = bonusStart + recallLead + bonusText + "<br><br> " +
             "<i>You can enter a name by typing in the box and clicking on the 'Add' button. Your previous answers will be blurred, but if you made a mistake you can click on <span style='color:firebrick'> [x] </span> to remove an answer. If you have listed all the names you remember, then you can click on the 'Done' button to continue (you will not be able to return after pressing the button!) <br>";
 
         this.textElemMainInstructions = create_SVG_text_in_foreign_element(instructionText, 100, 50, (1920 - 2 * 100), 350, "instruction_element_text");
