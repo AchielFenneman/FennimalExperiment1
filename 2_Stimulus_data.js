@@ -1352,24 +1352,36 @@ let StimulusTransformer = function (StimTemplate) {
                 max_stars += bonus * this._countPartnerBeliefMemoryProbeTrials(memoryProbeSpecs);
             }
 
+            if (block.type === "name_recall_task" && typeof block.bonus_stars_per_correct_answer === "number") {
+                let nFens = (typeof this.get_all_Fennimals_objects_in_array === "function")
+                    ? this.get_all_Fennimals_objects_in_array().length
+                    : 0;
+                max_stars += block.bonus_stars_per_correct_answer * nFens;
+            }
+
             if (block.type === "chimera_feature_id") {
                 let n = Array.isArray(block.trials) ? block.trials.length : 9;
                 max_stars += n;
             }
 
             if (block.type === "morph_task" || block.type === "morph_task_two_stage_development") {
-                let trials = block.trials;
-                let n = 0;
-                if (Array.isArray(trials)) {
-                    if (trials.length && Array.isArray(trials[0])) {
-                        trials.forEach((b) => { if (Array.isArray(b)) n += b.length; });
-                    } else {
-                        n = trials.length;
-                    }
+                if (typeof MorphTaskController !== "undefined"
+                    && typeof MorphTaskController.countMaxEarnableStars === "function") {
+                    max_stars += MorphTaskController.countMaxEarnableStars(block);
                 } else {
-                    n = 5;
+                    let mixes = Array.isArray(block.mixes) ? block.mixes : [];
+                    let pairs = Array.isArray(block.pairs) ? block.pairs : [];
+                    if (mixes.length && pairs.length) {
+                        max_stars += mixes.length * pairs.length * 2;
+                    } else if (Array.isArray(block.trials) && block.trials.length) {
+                        if (Array.isArray(block.trials[0])) {
+                            let sizes = block.trials.map((b) => Array.isArray(b) ? b.length : 0);
+                            max_stars += sizes.length ? Math.max.apply(null, sizes) : 0;
+                        } else {
+                            max_stars += block.trials.length;
+                        }
+                    }
                 }
-                max_stars += n;
             }
 
             if (block.type === "hat_drop_task" || block.type === "hat_drop_gonogo") {
@@ -1421,4 +1433,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("STAR2-READY")
+console.log("STAR3-READY")

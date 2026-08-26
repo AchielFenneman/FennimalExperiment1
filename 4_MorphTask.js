@@ -126,6 +126,33 @@ class MorphTaskController {
         return Number.isFinite(n) && n === Math.round(n) && n >= 1 && n <= 99;
     }
 
+    // Max stars a subject can earn. morphs[] is between-subjects, so do not
+    // multiply by the number of morph methods.
+    static countMaxEarnableStars(phase) {
+        phase = phase || {};
+        let mixes = Array.isArray(phase.mixes) ? phase.mixes : [];
+        let pairs = Array.isArray(phase.pairs) ? phase.pairs : [];
+        if (mixes.length && pairs.length) {
+            return mixes.length * pairs.length * 2;
+        }
+        const paidCount = (list) => (list || []).filter((t) => t && t.is_practice !== true).length;
+        let trials = phase.trials;
+        if (!Array.isArray(trials) || !trials.length) return 0;
+        if (Array.isArray(trials[0])) {
+            let sizes = trials.map((block) => paidCount(block));
+            return sizes.length ? Math.max.apply(null, sizes) : 0;
+        }
+        let byMorph = {};
+        trials.forEach((t) => {
+            if (!t || t.is_practice) return;
+            let m = t.morph != null ? String(t.morph) : "_none";
+            byMorph[m] = (byMorph[m] || 0) + 1;
+        });
+        let keys = Object.keys(byMorph);
+        if (!keys.length) return 0;
+        return Math.max.apply(null, keys.map((k) => byMorph[k]));
+    }
+
     _indexFennimals(stimuli) {
         if (!stimuli || typeof stimuli.get_all_Fennimals_objects_in_array !== "function") {
             this._fail("missing stimuli accessor.");
