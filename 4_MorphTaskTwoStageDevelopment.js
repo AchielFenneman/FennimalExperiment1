@@ -1,44 +1,37 @@
 /**
- * Morph task DV (extra-wide two-spot polaroid): one code-drawn polaroid with a
- * shared photo well. Prime (smaller, back-left) starts under a black [?];
- * jumble (larger, front-right) starts under a light-gray [?]. The prime hat
- * is already visible (head still [?]); a radial name quiz (F/J move,
- * Space confirm; keyboard only) identifies prime.name. Correct → head [?]
- * snaps off, pause primeRevealHoldMs, then the jumble [?] fades out over
- * jumbleFadeMs. Identity 2AFC: F/J keycaps show the two
- * jumble parents' hats (prime hat excluded). Polaroid flies to the chosen side.
- * No resolve / no trial-by-trial identity feedback. Caption stays ????.
+ * ARCHIVED: morph_task_two_stage_development (snapshot of the live morph_task
+ * before the extra-wide two-spot polaroid redesign).
+ * Prime develops in the same well, then a timed prime→jumble morph with noise,
+ * then a fenA/fenB morph that resolves over trial_speed. Keep this file
+ * loadable for replay / recovery; do not point new stimuli here.
  *
- * mix: integer percent target in the jumble (1–99). 50 is the unbiased
- * special case (either identity answer is scored correct).
- * morphs: ["crossfade"|"mesh"|"silhouette", ...] is a between-subjects pool;
- * one method is assigned per subject and used for every paid trial.
- * Parents are size-normalized from the opaque silhouette, then rotated
- * and translated from the eyes (not scaled from eye spacing).
- * 50% mix: either identity answer is scored correct.
+ * Flow: polaroid under ? → develop composite prime → F/J/Space name quiz →
+ * prime→jumble morph (noise 0→peak) → jumble hold → fenA/fenB morph over
+ * trial_speed (noise peak→0) → F/J identity. Optional resolve_trial completes
+ * the photo to the true Fennimal; polaroid then flies to the chosen side.
  *
- * Paid prime: { head, hat, name } (Fennimal ids; head/hat default from name).
- * Practice (unless skip_practice): two unpaid shape trials on the same
- * two-spot polaroid (circle prime, square/triangle jumble).
+ * Rendering / morph clock / modes (full, shape, color, mesh), grayscale,
+ * morph_centerpoint, noise, resolve_trial, and trial blocks match the
+ * snapshot of 4_MorphTask.js at archive time.
  *
- * A snapshot of the previous developing-photo flow is
- * morph_task_two_stage_development (4_MorphTaskTwoStageDevelopment.js).
+ * Practice (unless skip_practice): unpaid shape trials (? → circle prime →
+ * Circle/Diamond/Star name quiz → square↔triangle morph → F/J identity).
+ *
+ * Scoring: chimera scheme. Name quiz unpaid. resolve_trial as documented.
  */
-class MorphTaskController {
+class MorphTaskTwoStageDevelopmentController {
     constructor(parentLayer, phaseData, returnfunc, expCont) {
         this.ParentLayer = parentLayer;
         this.phaseData = phaseData;
         this.returnfunc = returnfunc;
         this.expCont = expCont;
-        this.params = (typeof GenParam !== "undefined" && GenParam.MorphTask) || {};
+        this.params = (typeof GenParam !== "undefined" && GenParam.MorphTaskTwoStageDevelopment) || {};
         this.W = GenParam.SVG_width;
         this.H = GenParam.SVG_height;
 
         this.fensById = this._indexFennimals(expCont && expCont.stimuli);
         this.trialSpeedMs = this._resolveTrialSpeed();
-        this.resolveTrial = false;
-        this._ensureTrialList();
-        this._assignSubjectMorph();
+        this.resolveTrial = this._resolveResolveTrial();
         this.trialSpecs = this._readTrialSpecs();
         this.nameRoster = this._buildNameRoster();
         this.queue = this._buildTrialQueue();
@@ -48,8 +41,6 @@ class MorphTaskController {
 
         this.answers = [];
         this.sessionPoints = 0;
-        this.phaseProgressDone = 0;
-        this.phaseProgressTotal = Math.max(1, this.queue.length);
         this.destroyed = false;
         this.inputLocked = true;
         this.morphRaf = null;
@@ -69,20 +60,21 @@ class MorphTaskController {
 
         this.phaseData.answers = this.answers;
         this.phaseData.trial_speed = this.trialSpeedMs;
-        this.phaseData.resolve_trial = false;
-        this.phaseData.assigned_morph = this.assignedMorph || null;
-        this.phaseData.morph_method = this.assignedMorph || null;
-        this.phaseData.morphs_pool = (this.morphsPool || []).slice();
+        this.phaseData.resolve_trial = this.resolveTrial;
         this.phaseData.morph_trial_order = this.queue.map((t) => t.id);
         this.phaseData.morph_button_sides = this.buttonSides;
         this.phaseData.morph_prime_button_order = this.buttonOrderIds;
         this.phaseData.morph_names_options = (this.nameRoster || []).map((fen) => fen.id);
-        this.phaseData.morph_mix_levels = this._mixLevels();
-        this._assertSinglePaidMorph();
+        this.phaseData.morph_curve = {
+            midpoint_min_frac: this._num("midpointMinFrac", 0.15),
+            midpoint_max_frac: this._num("midpointMaxFrac", 0.85),
+            tau_frac: this._num("tauFrac", 0.30),
+            note: "m(t) = 0.5 + 0.5 * normalized logistic around t_mid = f(morph_centerpoint). 0 = resolves early, 1 = resolves late."
+        };
     }
 
     _fail(message) {
-        throw new Error("MorphTask: " + message);
+        throw new Error("MorphTaskTwoStageDevelopment: " + message);
     }
 
     _num(key, fallback) {
@@ -93,7 +85,7 @@ class MorphTaskController {
     _resolveTrialSpeed() {
         let raw = this.phaseData.trial_speed;
         if (raw === undefined || raw === null || raw === "") {
-            raw = this.params.trialSpeedMs != null ? this.params.trialSpeedMs : 5000;
+            raw = this.params.trialSpeedMs != null ? this.params.trialSpeedMs : 6000;
         }
         let ms = Number(raw);
         if (!Number.isFinite(ms) || ms <= 0) {
@@ -102,28 +94,15 @@ class MorphTaskController {
         return ms;
     }
 
-    _mixWeight(trial) {
-        let mix = trial && trial.mix != null ? Number(trial.mix) : 50;
-        return Math.max(0, Math.min(1, mix / 100));
-    }
-
-    _identityPrompt(trial) {
-        if (trial && trial.is_practice) {
-            return this.params.identityPromptPractice || "Which shape does this most look like?";
+    _resolveResolveTrial() {
+        let raw = this.phaseData.resolve_trial;
+        if (raw === undefined || raw === null || raw === "") {
+            return this.params.resolveTrial !== false;
         }
-        return this.params.identityPrompt
-            || this.params.identityPromptMesh
-            || "Who does this most look like? Which is their hat?";
-    }
-
-    static morphKinds() {
-        return ["crossfade", "mesh", "silhouette"];
-    }
-
-    // Percent target in the jumble. Renderer is mix/100; 50 is the unbiased score case.
-    static isAllowedMix(raw) {
-        let n = Number(raw);
-        return Number.isFinite(n) && n === Math.round(n) && n >= 1 && n <= 99;
+        if (typeof raw !== "boolean") {
+            this._fail(`resolve_trial must be true or false (got "${raw}").`);
+        }
+        return raw;
     }
 
     _indexFennimals(stimuli) {
@@ -199,179 +178,6 @@ class MorphTaskController {
         return blocked ? raw : [raw];
     }
 
-    // Expand morphs × mixes × pairs × both targets into blocked trial lists.
-    // Stimulus blocks define those constants; MorphTask then keeps only the
-    // one morph assigned to this subject (between-subjects).
-    static buildFactorialTrialBlocks(phase) {
-        phase = phase || {};
-        let morphs = phase.morphs;
-        let mixes = phase.mixes;
-        let pairs = phase.pairs;
-        if (!Array.isArray(morphs) || morphs.length === 0) {
-            throw new Error('morph_task needs morphs: ["crossfade"|"mesh"|"silhouette", ...] when trials is omitted.');
-        }
-        if (!Array.isArray(mixes) || mixes.length === 0) {
-            throw new Error("morph_task needs mixes: [integer percents 1–99, ...] when trials is omitted.");
-        }
-        if (!Array.isArray(pairs) || pairs.length === 0) {
-            throw new Error("morph_task needs pairs: [{ prime, fenA, fenB }, ...] when trials is omitted.");
-        }
-        let allowed = MorphTaskController.morphKinds();
-        morphs.forEach((morph, i) => {
-            if (allowed.indexOf(morph) < 0) {
-                throw new Error(`morph_task morphs[${i}] must be "crossfade" | "mesh" | "silhouette" (got "${morph}").`);
-            }
-        });
-        mixes.forEach((mix, i) => {
-            if (!MorphTaskController.isAllowedMix(mix)) {
-                throw new Error(`morph_task mixes[${i}] must be an integer percent from 1 to 99 (got "${mix}").`);
-            }
-        });
-        return morphs.map((morph) => {
-            let block = [];
-            mixes.forEach((mix) => {
-                pairs.forEach((pair, pi) => {
-                    if (!pair || !pair.prime || !pair.fenA || !pair.fenB) {
-                        throw new Error(`morph_task pairs[${pi}] needs prime, fenA, and fenB.`);
-                    }
-                    if (pair.fenA === pair.fenB) {
-                        throw new Error(`morph_task pairs[${pi}] fenA and fenB must differ.`);
-                    }
-                    if (pair.prime === pair.fenA || pair.prime === pair.fenB) {
-                        throw new Error(`morph_task pairs[${pi}] prime must not be fenA or fenB.`);
-                    }
-                    [pair.fenA, pair.fenB].forEach((target) => {
-                        let distractor = target === pair.fenA ? pair.fenB : pair.fenA;
-                        block.push({
-                            id: `${morph}_p${pair.prime}_${pair.fenA}-${pair.fenB}_t${target}_m${mix}`,
-                            fenA: pair.fenA,
-                            fenB: pair.fenB,
-                            target,
-                            distractor,
-                            mix: Number(mix),
-                            morph,
-                            prime: { head: pair.prime, hat: pair.prime, name: pair.prime }
-                        });
-                    });
-                });
-            });
-            return block;
-        });
-    }
-
-    _ensureTrialList() {
-        let raw = this.phaseData.trials;
-        if (Array.isArray(raw) && raw.length > 0) return;
-        this.phaseData.trials = MorphTaskController.buildFactorialTrialBlocks(this.phaseData);
-    }
-
-    _morphPool() {
-        let allowed = MorphTaskController.morphKinds();
-        let listed = this.phaseData.morphs;
-        if (Array.isArray(listed) && listed.length) {
-            let pool = listed.map((m) => String(m).trim()).filter((m) => allowed.indexOf(m) >= 0);
-            pool = pool.filter((m, i) => pool.indexOf(m) === i);
-            if (!pool.length) {
-                this._fail('morphs must list "crossfade", "mesh", and/or "silhouette".');
-            }
-            return pool;
-        }
-        let found = [];
-        let walk = (entry) => {
-            if (Array.isArray(entry)) entry.forEach(walk);
-            else if (entry && entry.morph && allowed.indexOf(entry.morph) >= 0 && found.indexOf(entry.morph) < 0) {
-                found.push(entry.morph);
-            }
-        };
-        walk(this.phaseData.trials);
-        return found.length ? found : ["crossfade"];
-    }
-
-    _assignSubjectMorph() {
-        let pool = this._morphPool();
-        let key = "morph_assigned_method";
-        let existing = this._readRandomization(key);
-        let stored = existing && typeof existing === "object" ? existing.morph : existing;
-        let assigned = (stored && pool.indexOf(stored) >= 0) ? stored : shuffleArray(pool.slice())[0];
-        this.morphsPool = pool;
-        this.assignedMorph = assigned;
-        this._persistRandomization(key, { morph: assigned, pool: pool.slice() });
-        let dataCont = this.expCont && this.expCont.dataCont;
-        if (dataCont && dataCont.experimentData) {
-            dataCont.experimentData.morphAssignment = { morph: assigned, pool: pool.slice() };
-        }
-        this.phaseData.assigned_morph = assigned;
-        this.phaseData.morph_method = assigned;
-        this.phaseData.morphs_pool = pool.slice();
-        this._filterTrialsToAssignedMorph(assigned);
-        console.log(
-            `%c MorphTask: assigned "${assigned}" from [${pool.join(", ")}]`,
-            "color:#6b4cff;font-weight:bold"
-        );
-    }
-
-    _mixLevels() {
-        if (Array.isArray(this.phaseData.mixes) && this.phaseData.mixes.length) {
-            return this.phaseData.mixes.map((m) => Number(m));
-        }
-        let seen = [];
-        (this.trialSpecs || []).forEach((t) => {
-            if (!t || t.is_practice) return;
-            let mix = Number(t.mix);
-            if (MorphTaskController.isAllowedMix(mix) && seen.indexOf(mix) < 0) seen.push(mix);
-        });
-        return seen;
-    }
-
-    _assertSinglePaidMorph() {
-        let paid = (this.queue || []).filter((t) => t && !t.is_practice);
-        let morphs = [];
-        paid.forEach((t) => {
-            let m = t.morph != null ? String(t.morph) : null;
-            if (m && morphs.indexOf(m) < 0) morphs.push(m);
-        });
-        if (!paid.length) return;
-        if (morphs.length !== 1) {
-            this._fail(`paid trials must use one morph method; got [${morphs.join(", ")}].`);
-        }
-        if (this.assignedMorph && morphs[0] !== this.assignedMorph) {
-            this._fail(`paid morph "${morphs[0]}" does not match assigned "${this.assignedMorph}".`);
-        }
-        console.log(
-            `%c MorphTask: ${paid.length} paid trials, morph="${morphs[0]}", mixes=[${this.phaseData.morph_mix_levels.join(", ")}]`,
-            "color:#6b4cff;font-weight:bold"
-        );
-    }
-
-    _filterTrialsToAssignedMorph(assigned) {
-        let raw = this.phaseData.trials;
-        if (!Array.isArray(raw) || !raw.length) return;
-        const morphOf = (t) => (t && t.morph != null ? String(t.morph) : null);
-        let blocked = Array.isArray(raw[0]);
-        let stamp = (t) => { if (t) t.morph = assigned; };
-        if (blocked) {
-            let hasMorph = raw.some((block) => (block || []).some((t) => morphOf(t)));
-            if (!hasMorph) {
-                raw.forEach((block) => (block || []).forEach(stamp));
-                return;
-            }
-            let filtered = raw
-                .map((block) => (block || []).filter((t) => morphOf(t) === assigned))
-                .filter((block) => block.length > 0);
-            if (!filtered.length) this._fail(`assigned morph "${assigned}" produced no trials.`);
-            this.phaseData.trials = filtered;
-            return;
-        }
-        let hasMorph = raw.some((t) => morphOf(t));
-        if (!hasMorph) {
-            raw.forEach(stamp);
-            return;
-        }
-        let filtered = raw.filter((t) => morphOf(t) === assigned);
-        if (!filtered.length) this._fail(`assigned morph "${assigned}" produced no trials.`);
-        this.phaseData.trials = filtered;
-    }
-
     _readTrialSpecs() {
         let blocks = this._normalizeTrialBlocks(this.phaseData.trials);
         // Firestore rejects nested arrays — keep a flat trials list on the phase
@@ -414,30 +220,44 @@ class MorphTaskController {
         if (target.id !== fenA.id && target.id !== fenB.id) {
             this._fail(`trial "${spec.id}" target "${target.id}" must be fenA or fenB.`);
         }
-        let mix = Number(spec.mix);
-        if (!MorphTaskController.isAllowedMix(mix)) {
-            this._fail(`trial "${spec.id}" mix must be an integer percent from 1 to 99 (got "${spec.mix}").`);
+        let centerpoint = Number(spec.morph_centerpoint);
+        if (!Number.isFinite(centerpoint) || centerpoint < 0 || centerpoint > 1) {
+            this._fail(`trial "${spec.id}" morph_centerpoint must be a number in [0, 1] (got "${spec.morph_centerpoint}").`);
         }
-        let morph = spec.morph || "crossfade";
-        if (MorphTaskController.morphKinds().indexOf(morph) < 0) {
-            this._fail(`trial "${spec.id}" morph must be "crossfade" | "mesh" | "silhouette" (got "${morph}").`);
+        let noise = spec.noise == null || spec.noise === "" ? 0 : Number(spec.noise);
+        if (!Number.isFinite(noise) || noise < 0 || noise > 1) {
+            this._fail(`trial "${spec.id}" noise must be a number in [0, 1] when set (got "${spec.noise}").`);
         }
-        if (fenA.head === fenB.head) {
-            this._fail(`trial "${spec.id}" morph "${morph}" requires fenA and fenB to have different heads (both are "${fenA.head}").`);
+        let morph = spec.morph || "full";
+        if (["full", "shape", "color", "mesh"].indexOf(morph) < 0) {
+            this._fail(`trial "${spec.id}" morph must be "full" | "shape" | "color" | "mesh" (got "${morph}").`);
+        }
+        let sameHead = fenA.head === fenB.head;
+        if (morph === "color" && !sameHead) {
+            this._fail(`trial "${spec.id}" morph "color" requires fenA and fenB to share a head (got "${fenA.head}" vs "${fenB.head}").`);
+        }
+        if (morph !== "color" && sameHead) {
+            this._fail(`trial "${spec.id}" morph "${morph}" requires fenA and fenB to have different heads (both are "${fenA.head}"; use morph: "color").`);
+        }
+        let view = spec.view || "closeup";
+        if (["closeup", "full"].indexOf(view) < 0) {
+            this._fail(`trial "${spec.id}" view must be "closeup" | "full" (got "${view}").`);
+        }
+        let grayscale = false;
+        if (spec.grayscale !== undefined && spec.grayscale !== null && spec.grayscale !== "") {
+            if (typeof spec.grayscale !== "boolean") {
+                this._fail(`trial "${spec.id}" grayscale must be true or false when set (got "${spec.grayscale}").`);
+            }
+            grayscale = spec.grayscale;
         }
         (["A", "B"]).forEach((side) => {
             let fen = side === "A" ? fenA : fenB;
             if (!fen.name) this._fail(`trial "${spec.id}" fen${side} "${fen.id}" is missing a name.`);
-            if (!fen.hat) this._fail(`trial "${spec.id}" fen${side} "${fen.id}" is missing a hat.`);
         });
         if (spec.prime === undefined || spec.prime === null) {
             this._fail(`trial "${spec.id}" requires a prime object with name (paid trials).`);
         }
-        let prime = this._expandPrimeSpec(spec.prime, spec.id);
-        if (prime.nameFen && (prime.nameFen.id === fenA.id || prime.nameFen.id === fenB.id)) {
-            this._fail(`trial "${spec.id}" prime.name "${prime.nameFen.id}" must not be fenA or fenB (prime hat is excluded from the 2AFC).`);
-        }
-        let otherFen = target.id === fenA.id ? fenB : fenA;
+        let prime = this._expandPrimeSpec(spec.prime, spec.id, true);
         return {
             id: spec.id,
             role: spec.role || spec.id,
@@ -447,19 +267,18 @@ class MorphTaskController {
             requestedHeadA: fenA.head || null,
             requestedHeadB: fenB.head || null,
             targetFen: target,
-            otherFen,
+            otherFen: target.id === fenA.id ? fenB : fenA,
             correctId: target.id,
-            mix,
+            morphCenterpoint: centerpoint,
+            noise,
             morph,
-            view: "closeup",
-            grayscale: true,
+            view,
+            grayscale,
             prime,
-            question: this.params.identityPrompt
-                || this.params.identityPromptMesh
-                || "Who does this most look like? Which is their hat?",
+            question: "Who is this?",
             options: [
-                { id: fenA.id, label: fenA.name, hat: fenA.hat, fen: fenA },
-                { id: fenB.id, label: fenB.name, hat: fenB.hat, fen: fenB }
+                { id: fenA.id, label: fenA.name },
+                { id: fenB.id, label: fenB.name }
             ]
         };
     }
@@ -476,40 +295,93 @@ class MorphTaskController {
         return s === "gray" || s === "grey" || s === "grayscale" || s === "greyscale";
     }
 
-    _expandPrimeSpec(raw, trialId) {
+    _expandPrimeSpec(raw, trialId, paid) {
         if (typeof raw !== "object" || Array.isArray(raw)) {
             this._fail(`trial "${trialId}" prime must be an object.`);
         }
+        let headId = this._isBlankPrimeToken(raw.head) ? null : String(raw.head).trim();
+        let bodyId = this._isBlankPrimeToken(raw.body) ? null : String(raw.body).trim();
+        let hatId = this._isBlankPrimeToken(raw.hat) ? null : String(raw.hat).trim();
+        let toyId = this._isBlankPrimeToken(raw.toy) ? null : String(raw.toy).trim();
         let nameId = this._isBlankPrimeToken(raw.name) ? null : String(raw.name).trim();
-        if (!nameId) this._fail(`trial "${trialId}" prime.name is required.`);
-        let nameFen = this._getFen(nameId, `trial "${trialId}" prime.name`);
-        let headId = this._isBlankPrimeToken(raw.head) ? nameId : String(raw.head).trim();
-        let hatId = this._isBlankPrimeToken(raw.hat) ? nameId : String(raw.hat).trim();
-        let headFen = this._getFen(headId, `trial "${trialId}" prime.head`);
-        let hatFen = this._getFen(hatId, `trial "${trialId}" prime.hat`);
-        if (!headFen.head) this._fail(`trial "${trialId}" prime.head "${headId}" has no head SVG assigned.`);
-        if (!hatFen.hat) this._fail(`trial "${trialId}" prime.hat "${hatId}" has no hat assigned.`);
-        if (!nameFen.name) this._fail(`trial "${trialId}" prime.name "${nameId}" is missing a name.`);
+        let colorRaw = this._isBlankPrimeToken(raw.color_scheme) ? null : String(raw.color_scheme).trim();
+
+        if (paid) {
+            if (!nameId) this._fail(`trial "${trialId}" prime.name is required on paid trials.`);
+            if (!headId && !bodyId && !hatId && !toyId) {
+                this._fail(`trial "${trialId}" prime must include at least one of head, body, hat, or toy (empty {} not allowed).`);
+            }
+        }
+
+        let headFen = headId ? this._getFen(headId, `trial "${trialId}" prime.head`) : null;
+        let bodyFen = bodyId ? this._getFen(bodyId, `trial "${trialId}" prime.body`) : null;
+        let hatFen = hatId ? this._getFen(hatId, `trial "${trialId}" prime.hat`) : null;
+        let toyFen = toyId ? this._getFen(toyId, `trial "${trialId}" prime.toy`) : null;
+        let nameFen = nameId ? this._getFen(nameId, `trial "${trialId}" prime.name`) : null;
+
+        if (bodyFen && !bodyFen.body) {
+            this._fail(`trial "${trialId}" prime.body "${bodyId}" has no body SVG assigned.`);
+        }
+        if (headFen && !headFen.head) {
+            this._fail(`trial "${trialId}" prime.head "${headId}" has no head SVG assigned.`);
+        }
+        if (hatId && hatFen && !hatFen.hat) {
+            this._fail(`trial "${trialId}" prime.hat "${hatId}" has no hat assigned.`);
+        }
+        if (toyId && toyFen && !toyFen.toy) {
+            this._fail(`trial "${trialId}" prime.toy "${toyId}" has no toy assigned.`);
+        }
+        if (toyFen && !bodyFen) {
+            this._fail(`trial "${trialId}" prime.toy requires prime.body (toy attaches to the body).`);
+        }
+
+        let schemeMode = "grayscale";
+        let schemeFen = null;
+        if (colorRaw) {
+            if (this._isGrayscaleSchemeToken(colorRaw)) {
+                schemeMode = "grayscale";
+            } else {
+                schemeFen = this._getFen(colorRaw, `trial "${trialId}" prime.color_scheme`);
+                schemeMode = "fen";
+            }
+        } else if (nameFen) {
+            // Default: palette of the named Fennimal (its region colors).
+            schemeFen = nameFen;
+            schemeMode = "fen";
+        } else if (bodyFen) {
+            schemeFen = bodyFen;
+            schemeMode = "fen";
+        }
+
+        let trueCaption = nameFen && nameFen.name ? String(nameFen.name) : null;
+        let needsNameQuiz = !!trueCaption;
+        let caption = "????";
+        let hasToy = !!(toyFen && toyFen.toy);
         return {
             headFen,
+            bodyFen,
             hatFen,
+            toyFen,
             nameFen,
-            hasHead: true,
-            hasHat: true,
-            hasBody: false,
-            hasToy: false,
-            empty: false,
-            schemeMode: "grayscale",
-            schemeFen: null,
-            needsNameQuiz: true,
-            trueCaption: String(nameFen.name),
-            caption: "????",
+            hasHead: !!headFen,
+            hasBody: !!bodyFen,
+            hasHat: !!(hatFen && hatFen.hat),
+            hasToy,
+            empty: !headFen && !bodyFen && !(hatFen && hatFen.hat) && !hasToy,
+            schemeMode,
+            schemeFen,
+            needsNameQuiz,
+            trueCaption,
+            caption,
             log: {
                 head: headId,
+                body: bodyId,
                 hat: hatId,
+                toy: toyId,
+                color_scheme: colorRaw,
                 name: nameId,
-                caption: "????",
-                needs_name_quiz: true
+                caption,
+                needs_name_quiz: needsNameQuiz
             }
         };
     }
@@ -605,11 +477,6 @@ class MorphTaskController {
             { id: "diamond", label: "Diamond" },
             { id: "star", label: "Star" }
         ];
-        let mix = Math.round(this._num("practiceMix", 80));
-        const shapeOpts = () => ([
-            { id: "square", label: "Square", shape: "square" },
-            { id: "triangle", label: "Triangle", shape: "triangle" }
-        ]);
         return [
             {
                 id: "practice_square",
@@ -623,12 +490,15 @@ class MorphTaskController {
                 nameCorrectId: "circle",
                 nameOptions,
                 correctId: "square",
-                mix,
+                morphCenterpoint: 0.5,
+                noise: 0.15,
                 morph: "shape",
                 view: "closeup",
-                grayscale: true,
-                question: this.params.identityPromptPractice || "Which shape does this most look like?",
-                options: shapeOpts()
+                question: "What shape?",
+                options: [
+                    { id: "square", label: "Square" },
+                    { id: "triangle", label: "Triangle" }
+                ]
             },
             {
                 id: "practice_triangle",
@@ -642,12 +512,15 @@ class MorphTaskController {
                 nameCorrectId: "circle",
                 nameOptions,
                 correctId: "triangle",
-                mix,
+                morphCenterpoint: 0.5,
+                noise: 0.15,
                 morph: "shape",
                 view: "closeup",
-                grayscale: true,
-                question: this.params.identityPromptPractice || "Which shape does this most look like?",
-                options: shapeOpts()
+                question: "What shape?",
+                options: [
+                    { id: "square", label: "Square" },
+                    { id: "triangle", label: "Triangle" }
+                ]
             }
         ];
     }
@@ -837,7 +710,7 @@ class MorphTaskController {
         return this._schemeFromRegion(fen.region);
     }
 
-    // Fixed primary/secondary/tertiary/eye grays (GenParam.MorphTask.grayscaleScheme).
+    // Fixed primary/secondary/tertiary/eye grays (GenParam.MorphTaskTwoStageDevelopment.grayscaleScheme).
     _grayscaleScheme() {
         let s = this.params.grayscaleScheme || {};
         return {
@@ -857,9 +730,24 @@ class MorphTaskController {
         };
     }
 
+    // Morph parent palette: fixed grays when trial.grayscale, else Fennimal / blend.
     _schemesForMorphTrial(trial) {
-        let gray = this._grayscaleScheme();
-        return { target: gray, other: gray };
+        if (trial.grayscale) {
+            let gray = this._grayscaleScheme();
+            return { target: gray, other: gray };
+        }
+        if (trial.morph === "shape") {
+            let blended = this._blendSchemes(
+                this._schemeFromFen(trial.fenA),
+                this._schemeFromFen(trial.fenB),
+                0.5
+            );
+            return { target: blended, other: blended };
+        }
+        return {
+            target: this._schemeFromFen(trial.targetFen),
+            other: this._schemeFromFen(trial.otherFen)
+        };
     }
 
     _parseCssColor(raw) {
@@ -906,13 +794,13 @@ class MorphTaskController {
             invisible_element: 1,
             prep_element_hidden: 1
         };
-        root.querySelectorAll("g, path, circle, rect, polygon, ellipse, line, polyline").forEach((el) => {
+        root.querySelectorAll("path, circle, rect, polygon, ellipse, line, polyline").forEach((el) => {
             if (!el || !el.classList) return;
             for (let i = 0; i < el.classList.length; i++) {
                 if (skipClass[el.classList[i]]) return;
             }
             let fill = el.getAttribute("fill");
-            if (fill == null || fill === "" || fill === "inherit") fill = el.style && el.style.fill;
+            if (fill == null || fill === "") fill = el.style && el.style.fill;
             let rgb = this._parseCssColor(fill);
             if (!rgb) return;
             let lum = 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2];
@@ -1065,16 +953,11 @@ class MorphTaskController {
 
             this.phaseData.number_interactions_in_phase = this.queue.length;
             this.phaseData.Data = this.answers;
-            this.phaseData.assigned_morph = this.assignedMorph || null;
-            this.phaseData.morph_method = this.assignedMorph || null;
-            this.phaseData.morphs_pool = (this.morphsPool || []).slice();
-            this.phaseProgressTotal = Math.max(1, this.queue.length);
 
             for (let i = 0; i < this.queue.length; i++) {
                 if (this.destroyed) return;
                 this.currentTrialIndex = i;
                 this.currentTrial = this.queue[i];
-                this.phaseProgressDone = i;
                 if (this.expCont && this.expCont.instrCont && this.expCont.instrCont.updateProgressWithinDay) {
                     this.expCont.instrCont.updateProgressWithinDay((i / this.queue.length) * 100);
                 }
@@ -1097,13 +980,10 @@ class MorphTaskController {
         let maxStars = this.queue.filter((t) => t && !t.is_practice).length;
         this.phaseData.bonus_stars_earned = starsEarned;
         this.phaseData.session_points = this.sessionPoints;
-        this.phaseData.assigned_morph = this.assignedMorph || this.phaseData.assigned_morph || null;
-        this.phaseData.morph_method = this.assignedMorph || this.phaseData.morph_method || null;
-        this.phaseData.morphs_pool = (this.morphsPool || this.phaseData.morphs_pool || []).slice();
         if (this.expCont && this.expCont.dataCont && this.expCont.dataCont.recordStarsEarned) {
             this.expCont.dataCont.recordStarsEarned(
                 this.expCont.currentDayNum,
-                "morph_task",
+                "morph_task_two_stage_development",
                 starsEarned,
                 maxStars
             );
@@ -1117,7 +997,7 @@ class MorphTaskController {
 
     _ensureLayers() {
         if (this.layers) return;
-        this.sceneRoot = create_SVG_group(0, 0, "morph_task_root", "morph_task_root");
+        this.sceneRoot = create_SVG_group(0, 0, "morph_two_stage_root", "morph_two_stage_root");
         this.layers = {
             Neg1: create_SVG_group(0, 0, "morph_layer_neg1", "morph_layer_neg1"),
             Main: create_SVG_group(0, 0, "morph_layer_main", "morph_layer_main"),
@@ -1159,14 +1039,9 @@ class MorphTaskController {
         this.primeFilmRect = null;
         this.occluder = null;
         this.occluderHit = null;
-        this.primeSlotOccluder = null;
-        this.jumbleOccluder = null;
-        this.primeHeadOccluder = null;
         this.questionEl = null;
-        this.questionLabel = null;
         this.pointsEl = null;
         this.pointsDiv = null;
-        this.progressEl = null;
         this.barLeft = null;
         this.barRight = null;
         this.optionSides = null;
@@ -1184,11 +1059,9 @@ class MorphTaskController {
         this._noiseAmount = 0;
         this._noiseRedraw = null;
         this._noiseRampRaf = null;
-        this.morphCanvas = null;
         this.meshCanvas = null;
         this.meshData = null;
         this.meshForeignObject = null;
-        this.morphPair = null;
         this.activeRenderer = null;
         this.meshFallbackReason = null;
     }
@@ -1216,30 +1089,12 @@ class MorphTaskController {
     }
 
     _placePolaroidChrome(trial) {
-        let cx = (this.params.polaroidX != null ? this.params.polaroidX : 0.5) * this.W;
-        let cy = (this.params.polaroidY != null ? this.params.polaroidY : 0.5) * this.H;
-        let polaroidScale = this.params.polaroidScale != null ? this.params.polaroidScale : 0.86;
-        let frameW = this._num("polaroidFrameW", 800);
-        let frameH = this._num("polaroidFrameH", 740);
-        let padX = this._num("polaroidWellPadX", 32);
-        let padTop = this._num("polaroidWellPadTop", 36);
-        let padBottom = this._num("polaroidWellPadBottom", 118);
-        let paperRx = this._num("polaroidPaperRx", 36);
-        let wellRx = this._num("polaroidWellRx", 28);
-        let paperFill = this.params.polaroidPaperFill || "#f4efe4";
-        let wellFill = this.params.polaroidWellFill || "#e2dfd8";
-        let rotateDeg = this.params.polaroidRotateDeg != null ? this.params.polaroidRotateDeg : -2.5;
+        let template = document.getElementById("polaroid_frame");
+        if (!template) this._fail("missing SVG polaroid_frame template.");
 
-        let x0 = cx - frameW / 2;
-        let y0 = cy - frameH / 2;
-        let wellBox = {
-            x: x0 + padX,
-            y: y0 + padTop,
-            width: frameW - padX * 2,
-            height: frameH - padTop - padBottom,
-            rx: String(wellRx),
-            ry: String(wellRx)
-        };
+        let cx = (this.params.polaroidX != null ? this.params.polaroidX : 0.5) * this.W;
+        let cy = (this.params.polaroidY != null ? this.params.polaroidY : 0.48) * this.H;
+        let polaroidScale = this.params.polaroidScale != null ? this.params.polaroidScale : 0.9;
 
         let groupTranslate = create_SVG_group(0, 0, "morph_polaroid");
         let groupRotate = create_SVG_group(0, 0);
@@ -1248,82 +1103,34 @@ class MorphTaskController {
         groupTranslate.appendChild(groupRotate);
         this.layers.Main.appendChild(groupTranslate);
 
-        let paper = create_SVG_rect(x0, y0, frameW, frameH);
-        paper.setAttribute("rx", String(paperRx));
-        paper.setAttribute("ry", String(paperRx));
-        paper.setAttribute("fill", paperFill);
-        paper.setAttribute("stroke", "#d9d2c4");
-        paper.setAttribute("stroke-width", "5");
-        paper.style.pointerEvents = "none";
-        groupScale.appendChild(paper);
+        let frame = copy_scale_and_move_object_to_position(template, groupScale, cx, cy, 1);
+        let bgRect = frame.getElementsByTagName("rect")[0];
+        if (bgRect) {
+            bgRect.style.fill = this.params.polaroidPaperFill || "#f4efe4";
+            bgRect.style.display = "inherit";
+            this.photoWellRect = bgRect;
+        }
+        this._setPolaroidCaption(frame, "????");
 
-        let ns = "http://www.w3.org/2000/svg";
-        let defs = document.createElementNS(ns, "defs");
-        let clipId = "morph_well_clip_" + String(Date.now());
-        let clip = document.createElementNS(ns, "clipPath");
-        clip.setAttribute("id", clipId);
-        let clipRect = create_SVG_rect(wellBox.x, wellBox.y, wellBox.width, wellBox.height);
-        clipRect.setAttribute("rx", wellBox.rx);
-        clipRect.setAttribute("ry", wellBox.ry);
-        clip.appendChild(clipRect);
-        defs.appendChild(clip);
-        groupScale.appendChild(defs);
+        let photoHost = bgRect && bgRect.parentNode;
+        if (photoHost) photoHost.style.pointerEvents = "none";
+        let framePath = this._photoWellPath();
+        if (framePath) framePath.style.pointerEvents = "none";
 
-        let wellHost = create_SVG_group(0, 0, "morph_photo_host");
-        wellHost.setAttribute("clip-path", `url(#${clipId})`);
-        wellHost.style.pointerEvents = "none";
-        groupScale.appendChild(wellHost);
-
-        let bgRect = create_SVG_rect(wellBox.x, wellBox.y, wellBox.width, wellBox.height);
-        bgRect.setAttribute("rx", wellBox.rx);
-        bgRect.setAttribute("ry", wellBox.ry);
-        bgRect.setAttribute("fill", wellFill);
-        bgRect.style.pointerEvents = "none";
-        wellHost.appendChild(bgRect);
-
-        let wellStroke = create_SVG_rect(wellBox.x, wellBox.y, wellBox.width, wellBox.height);
-        wellStroke.setAttribute("rx", wellBox.rx);
-        wellStroke.setAttribute("ry", wellBox.ry);
-        wellStroke.setAttribute("fill", "none");
-        wellStroke.setAttribute("stroke", "#cfc6b6");
-        wellStroke.setAttribute("stroke-width", "4");
-        wellStroke.style.pointerEvents = "none";
-        wellStroke.classList.add("polaroid_frame_frame");
-        groupScale.appendChild(wellStroke);
-
-        let caption = create_SVG_text_elem(cx, y0 + frameH - padBottom * 0.42, "????", undefined, undefined);
-        caption.style.fontFamily = "'Myriad Pro', 'Source Sans 3', sans-serif";
-        caption.style.fontSize = "64px";
-        caption.style.fontWeight = "700";
-        caption.style.fill = this.params.polaroidCaptionFill || "#8a8680";
-        caption.style.textAnchor = "middle";
-        caption.style.dominantBaseline = "central";
-        caption.style.pointerEvents = "none";
-        caption.classList.add("polaroid_frame_name");
-        groupScale.appendChild(caption);
-
-        groupScale.style.transformOrigin = `${cx}px ${cy}px`;
+        groupScale.style.transformOrigin = "center";
         groupRotate.style.transformOrigin = `${cx}px ${cy}px`;
         groupScale.style.transform = `scale(${polaroidScale})`;
-        groupRotate.style.transform = `rotate(${rotateDeg}deg)`;
+        groupRotate.style.transform = `rotate(-3deg)`;
 
-        this.photoWellRect = bgRect;
         this.stimulusGroup = groupTranslate;
-        this.polaroidMount = {
-            groupTranslate, groupRotate, groupScale, cx, cy, scale: polaroidScale,
-            bgRect, photoHost: wellHost, framePath: wellStroke, frame: groupScale,
-            captionNode: caption, wellBox, clipId
-        };
+        this.polaroidMount = { groupTranslate, groupRotate, groupScale, cx, cy, bgRect, photoHost, framePath, frame };
         return this.polaroidMount;
     }
 
     _mountPolaroidBaseTransform() {
         let m = this.polaroidMount || {};
-        if (m.groupScale) m.groupScale.style.transform = `scale(${m.scale != null ? m.scale : 0.78})`;
-        if (m.groupRotate) {
-            let deg = this.params.polaroidRotateDeg != null ? this.params.polaroidRotateDeg : -2.5;
-            m.groupRotate.style.transform = `rotate(${deg}deg)`;
-        }
+        if (m.groupScale) m.groupScale.style.transform = `scale(${this.params.polaroidScale != null ? this.params.polaroidScale : 0.9})`;
+        if (m.groupRotate) m.groupRotate.style.transform = "rotate(-3deg)";
         if (m.groupTranslate) {
             m.groupTranslate.style.transition = "";
             m.groupTranslate.style.transform = "";
@@ -1331,43 +1138,12 @@ class MorphTaskController {
         }
     }
 
-    _slotFrac(kind) {
-        let key = kind === "prime" ? "primeSlot" : "jumbleSlot";
-        let d = this.params[key] || (kind === "prime"
-            ? { x: 0.02, y: 0.06, w: 0.42, h: 0.70 }
-            : { x: 0.34, y: 0.06, w: 0.64, h: 0.90 });
-        return d;
-    }
-
-    _slotBox(kind) {
-        let well = this._photoWellBox();
-        if (!well) return null;
-        let f = this._slotFrac(kind);
-        return {
-            x: well.x + well.width * f.x,
-            y: well.y + well.height * f.y,
-            width: well.width * f.w,
-            height: well.height * f.h,
-            rx: "18",
-            ry: "18"
-        };
-    }
-
-    _slotCenterSvg(kind) {
-        let slot = this._slotBox(kind);
-        let m = this.polaroidMount || {};
-        if (!slot || m.cx == null) return { x: this.W * 0.5, y: this.H * 0.48 };
-        let lx = slot.x + slot.width / 2;
-        let ly = slot.y + slot.height / 2;
-        let s = m.scale != null ? m.scale : 1;
-        return {
-            x: m.cx + (lx - m.cx) * s,
-            y: m.cy + (ly - m.cy) * s
-        };
-    }
-
     _preparePrimeNode(trial) {
-        if (trial && trial.is_practice) return this._buildPracticePrimeIcon(trial);
+        if (trial.is_practice) {
+            let shape = trial.primeShape || trial.shapeTarget;
+            let node = this._buildShapeNode(shape);
+            return { node, widthFrac: 0.55, heightFrac: 0.5 };
+        }
         if (!trial.prime || trial.prime.empty) return null;
         return this._buildPrimeIcon(trial.prime);
     }
@@ -1375,113 +1151,75 @@ class MorphTaskController {
     _placeHiddenPrime(trial) {
         let built = this._preparePrimeNode(trial);
         if (!built || !built.node) return;
-        let slot = this._slotBox("prime");
-        if (!this._insertInPhotoWell(built.node, this.primeSlotOccluder) && this.polaroidMount && this.polaroidMount.photoHost) {
-            this.polaroidMount.photoHost.appendChild(built.node);
+        // Insert first, then fit — getBBox on a detached SVG node often returns
+        // empty/zeros and leaves the prime with a broken transform (invisible).
+        if (!this._insertInPhotoWell(built.node) && this.polaroidMount && this.polaroidMount.groupScale) {
+            this.polaroidMount.groupScale.appendChild(built.node);
         }
-        this._fitNodeInBox(built.node, slot, built.widthFrac || 0.92, built.heightFrac || 0.92);
-        this._installPrimeHeadOccluder(built.node, trial);
+        this._fitNodeInPhotoWell(built.node, built.widthFrac, built.heightFrac);
+        built.node.style.opacity = "0";
+        built.node.setAttribute("opacity", "0");
         this.primeGroup = built.node;
-    }
-
-    _installPrimeHeadOccluder(icon, trial) {
-        if (!icon) return;
-        this._clearPrimeHeadOccluder();
-        let hat = icon.getElementsByClassName("hat")[0];
-        let practiceHead = icon.querySelector(".practice_head");
-        if (practiceHead) {
-            let box = null;
-            try {
-                box = practiceHead.getBBox();
-            } catch (e) {
-                box = null;
-            }
-            if (!box || !(box.width > 0 && box.height > 0)) {
-                box = { x: -90, y: -90, width: 180, height: 180 };
-            }
-            let pad = Math.max(8, box.width * 0.08);
-            let well = {
-                x: box.x - pad,
-                y: box.y - pad,
-                width: box.width + pad * 2,
-                height: box.height + pad * 2,
-                rx: "18",
-                ry: "18"
-            };
-            let built = this._buildOccluderGroup(well, "morph_prime_head_occluder", { highlight: false });
-            if (built.hit) {
-                built.hit.style.pointerEvents = "none";
-                built.hit.style.cursor = "default";
-                built.hit.classList.remove("focus_on_SVG_outline");
-            }
-            let host = (hat && hat.parentNode) || icon;
-            if (hat && hat.parentNode === host) host.insertBefore(built.g, hat);
-            else host.appendChild(built.g);
-            this.primeHeadOccluder = built.g;
-            return;
+        let well = this._photoWellBox();
+        if (well) {
+            let film = create_SVG_rect(well.x, well.y, well.width, well.height);
+            film.setAttribute("rx", well.rx);
+            film.setAttribute("ry", well.ry);
+            film.setAttribute("fill", this.params.filmFill || this.params.polaroidPaperFill || "#f4efe4");
+            film.style.pointerEvents = "none";
+            film.style.opacity = String(this._num("filmMaxOpacity", 0.18));
+            this._insertInPhotoWell(film);
+            this.primeFilmRect = film;
         }
-        let scale = icon.getElementsByClassName("Fennimal_scale_group")[0];
-        let headGroup = scale ? scale.firstElementChild : null;
-        let headScale = headGroup ? headGroup.firstElementChild : null;
-        let headSvg = headScale ? headScale.firstElementChild : null;
-        let host = (hat && hat.parentNode) || headScale || icon;
-        let box = null;
-        try {
-            box = (headSvg && headSvg.getBBox) ? headSvg.getBBox() : null;
-        } catch (e) {
-            box = null;
-        }
-        if (!box || !(box.width > 0 && box.height > 0)) {
-            box = { x: -80, y: -90, width: 160, height: 170 };
-        }
-        let pad = Math.max(8, box.width * 0.06);
-        let well = {
-            x: box.x - pad,
-            y: box.y - pad,
-            width: box.width + pad * 2,
-            height: box.height + pad * 2,
-            rx: "18",
-            ry: "18"
-        };
-        let built = this._buildOccluderGroup(well, "morph_prime_head_occluder", { highlight: false });
-        if (built.hit) {
-            built.hit.style.pointerEvents = "none";
-            built.hit.style.cursor = "default";
-            built.hit.classList.remove("focus_on_SVG_outline");
-        }
-        if (hat && hat.parentNode === host) host.insertBefore(built.g, hat);
-        else host.appendChild(built.g);
-        this.primeHeadOccluder = built.g;
-    }
-
-    _clearPrimeHeadOccluder() {
-        if (this.primeHeadOccluder && this.primeHeadOccluder.parentNode) {
-            this.primeHeadOccluder.remove();
-        }
-        this.primeHeadOccluder = null;
     }
 
     async _animatePrimeReveal() {
-        this._liftPrimeSlotOccluder();
-        this._stackForPrimePhase();
-        // Practice has no hat to name from, so lift the head [?] before the
-        // Circle / Diamond / Star chips appear. Paid trials keep the [?]
-        // through the name quiz (the hat is already visible).
-        if (this.currentTrial && this.currentTrial.is_practice) {
-            this._clearPrimeHeadOccluder();
-            await this._waitForPaint();
-            await wait(280);
-            return;
+        if (!this.primeGroup) return;
+        // Re-fit after the occluder is gone so layout/bbox is final.
+        let trial = this.currentTrial;
+        let wFrac = 0.78;
+        let hFrac = 0.78;
+        if (trial && trial.is_practice) {
+            wFrac = 0.55;
+            hFrac = 0.5;
+        } else if (trial && trial.prime) {
+            let p = trial.prime;
+            if (!p.hasHead && !p.hasBody && p.hasHat) {
+                wFrac = 0.62;
+                hFrac = 0.55;
+            } else if (p.hasHead && !p.hasBody) {
+                wFrac = 0.72;
+                hFrac = 0.62;
+            }
         }
-        this._setPrimeHeadOccluderHighlight(true);
-    }
+        try {
+            this._fitNodeInPhotoWell(this.primeGroup, wFrac, hFrac);
+        } catch (e) { /* keep prior transform */ }
 
-    _setPrimeHeadOccluderHighlight(on) {
-        if (!this.primeHeadOccluder) return;
-        this.primeHeadOccluder.style.filter = on
-            ? (this.params.primeOccluderDropShadow
-                || "drop-shadow(0px 0px 4px #ffffff) drop-shadow(0px 2px 12px rgba(255,255,255,0.95))")
-            : "none";
+        let ms = Math.max(1, Math.round(this._num("primeRevealMs", 900)));
+        let node = this.primeGroup;
+        let film = this.primeFilmRect;
+        let filmMax = this._num("filmMaxOpacity", 0.18);
+        let start = performance.now();
+        await new Promise((resolve) => {
+            const tick = (now) => {
+                if (this.destroyed) return resolve();
+                let t = Math.min(1, (now - start) / ms);
+                let eased = 1 - Math.pow(1 - t, 2);
+                node.style.opacity = String(eased);
+                node.setAttribute("opacity", String(eased));
+                if (film) film.style.opacity = String(filmMax * (1 - eased));
+                if (t >= 1) return resolve();
+                requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+        });
+        node.style.opacity = "1";
+        node.setAttribute("opacity", "1");
+        if (film) {
+            film.remove();
+            this.primeFilmRect = null;
+        }
     }
 
     async _holdThenClearPrime() {
@@ -1545,7 +1283,7 @@ class MorphTaskController {
         bg.setAttribute("height", String(well.height));
         bg.setAttribute("rx", String(well.rx || 0));
         bg.setAttribute("ry", String(well.ry || 0));
-        bg.setAttribute("fill", this.params.polaroidWellFill || this.params.polaroidPaperFill || "#e2dfd8");
+        bg.setAttribute("fill", this.params.polaroidPaperFill || "#f4efe4");
         svg.appendChild(bg);
         (nodes || []).forEach((node) => {
             if (!node) return;
@@ -1608,36 +1346,21 @@ class MorphTaskController {
             y: eyeMid.y * 0.58 + mouthCenter.y * 0.42
         };
         let center = this._meshNearestOpaque(pixels, size, proposedCenter, threshold);
-        let contourCount = Math.max(12, Math.round(this._num("meshContourPoints", 48)));
+        let contourCount = Math.max(12, Math.round(this._num("meshContourPoints", 24)));
         let contour = this._meshRadialContour(pixels, size, center, contourCount, threshold);
-        let neck = { x: size * 0.5, y: size * 0.88 };
-        let brow = this._meshNearestOpaque(pixels, size, {
-            x: eyeMid.x,
-            y: eyeMid.y - size * 0.10
-        }, threshold);
-        let chin = this._meshNearestOpaque(pixels, size, {
-            x: mouthCenter.x,
-            y: mouthCenter.y * 0.45 + neck.y * 0.55
-        }, threshold);
-        let points = [];
+        let points = [
+            { x: 0, y: 0 }, { x: size - 1, y: 0 },
+            { x: size - 1, y: size - 1 }, { x: 0, y: size - 1 }
+        ];
         points = points.concat(contour);
         points = points.concat(this._meshBoxPoints(null, leftCenter));
         points = points.concat(this._meshBoxPoints(null, rightCenter));
         points = points.concat(this._meshBoxPoints(null, mouthCenter));
         points.push(center);
-        points.push(neck);
-        points.push(brow);
-        points.push(chin);
+        points.push({ x: size * 0.5, y: size * 0.88 });
         return {
             canvas,
             points,
-            anchors: {
-                leftEye: leftCenter,
-                rightEye: rightCenter,
-                mouth: mouthCenter,
-                neck,
-                center
-            },
             diagnostics: diagnostics || { raster_size: size, contour_points: contourCount, center }
         };
     }
@@ -1725,11 +1448,11 @@ class MorphTaskController {
         try {
             await this._placeMorphStimulus(trial, placeOpts);
         } catch (err) {
-            console.error("MorphTask: failed to place morph stimulus after prime name:", err);
+            console.error("MorphTaskTwoStageDevelopment: failed to place morph stimulus after prime name:", err);
             this.meshFallbackReason = err && err.message ? err.message : String(err);
-            if (trial.morph === "mesh") {
+            if (!trial.is_practice && trial.morph === "mesh") {
                 let saved = trial.morph;
-                trial.morph = "crossfade";
+                trial.morph = "full";
                 try {
                     await this._placeMorphStimulus(trial, placeOpts);
                 } finally {
@@ -1754,7 +1477,7 @@ class MorphTaskController {
                 await wait(Math.max(0, Math.round(this._num("jumbleHoldMs", 1000))));
                 return;
             } catch (err) {
-                console.warn("MorphTask: prime→jumble mesh morph failed, falling back to still blend:", err);
+                console.warn("MorphTaskTwoStageDevelopment: prime→jumble mesh morph failed, falling back to still blend:", err);
                 this._setNoiseAmount(0);
             }
         }
@@ -1837,7 +1560,7 @@ class MorphTaskController {
         try {
             fromCanvas = await this._rasterizeWellNodes([prime], well, size);
         } catch (err) {
-            console.warn("MorphTask: prime snapshot failed:", err);
+            console.warn("MorphTaskTwoStageDevelopment: prime snapshot failed:", err);
         }
         let jumbleNodes = [this.morphGroup, this.filmRect].filter(Boolean);
         if (this.activeRenderer === "mesh" && this.meshCanvas) {
@@ -1845,14 +1568,14 @@ class MorphTaskController {
             toCanvas.width = size;
             toCanvas.height = size;
             let tctx = toCanvas.getContext("2d");
-            tctx.fillStyle = this.params.polaroidWellFill || this.params.polaroidPaperFill || "#e2dfd8";
+            tctx.fillStyle = this.params.polaroidPaperFill || "#f4efe4";
             tctx.fillRect(0, 0, size, size);
             tctx.drawImage(this.meshCanvas, 0, 0, size, size);
         } else {
             try {
                 toCanvas = await this._rasterizeWellNodes(jumbleNodes, well, size);
             } catch (err) {
-                console.warn("MorphTask: jumble snapshot failed:", err);
+                console.warn("MorphTaskTwoStageDevelopment: jumble snapshot failed:", err);
             }
         }
         if (!fromCanvas || !toCanvas) {
@@ -1896,16 +1619,23 @@ class MorphTaskController {
     }
 
     _setPolaroidCaption(frame, question) {
-        let nameNode = (this.polaroidMount && this.polaroidMount.captionNode)
-            || (frame && frame.getElementsByTagName("text")[0]);
+        let nameNode = frame && frame.getElementsByTagName("text")[0];
         if (!nameNode) return;
-        let caption = question || "????";
+        let caption = question || "";
         let fill = this.params.polaroidCaptionFill || "#8a8680";
         nameNode.style.display = "inherit";
         nameNode.style.fill = fill;
-        nameNode.style.fontWeight = "700";
+        nameNode.style.fontWeight = "600";
         nameNode.style.pointerEvents = "none";
-        nameNode.textContent = caption;
+        let tspans = nameNode.getElementsByTagName("tspan");
+        if (tspans.length) {
+            tspans[0].textContent = caption;
+            tspans[0].style.fill = fill;
+            tspans[0].style.fontWeight = "600";
+            for (let i = 1; i < tspans.length; i++) tspans[i].textContent = "";
+        } else {
+            nameNode.textContent = caption;
+        }
     }
 
     _photoWellPath() {
@@ -1945,75 +1675,69 @@ class MorphTaskController {
     }
 
     _insertInPhotoWell(node, beforeOverride) {
-        let host = (this.polaroidMount && this.polaroidMount.photoHost)
-            || (this.photoWellRect && this.photoWellRect.parentNode);
+        let host = this.photoWellRect && this.photoWellRect.parentNode;
         if (!host) return false;
         let before = beforeOverride || null;
         if (!before || before.parentNode !== host) {
-            before = (this.jumbleOccluder && this.jumbleOccluder.parentNode === host)
-                ? this.jumbleOccluder
-                : ((this.primeSlotOccluder && this.primeSlotOccluder.parentNode === host)
-                    ? this.primeSlotOccluder
-                    : null);
+            before = (this.occluder && this.occluder.parentNode === host)
+                ? this.occluder
+                : (this._photoWellPath() || null);
         }
         if (before) host.insertBefore(node, before);
         else host.appendChild(node);
         return true;
     }
 
-    _photoWellHost() {
-        return (this.polaroidMount && this.polaroidMount.photoHost)
-            || (this.photoWellRect && this.photoWellRect.parentNode)
-            || null;
+    // Keep the prime on top of jumble layers so a dissolve can reveal them.
+    _stackPrimeAboveJumble() {
+        let prime = this.primeGroup;
+        if (!prime || !prime.parentNode) return;
+        let host = prime.parentNode;
+        let frame = this._photoWellPath();
+        if (frame && frame.parentNode === host) host.insertBefore(prime, frame);
+        else host.appendChild(prime);
     }
 
-    _stackWellNodes(nodes) {
-        let host = this._photoWellHost();
-        if (!host) return;
-        (nodes || []).forEach((n) => {
-            if (n && n.parentNode === host) host.appendChild(n);
-        });
-    }
-
-    _stackForPrimePhase() {
-        this._stackWellNodes([this.morphGroup, this.jumbleOccluder, this.primeGroup]);
-    }
-
-    _stackForJumblePhase() {
-        this._stackWellNodes([this.primeGroup, this.morphGroup, this.jumbleOccluder]);
-    }
-
-    _fitNodeInBox(node, box, wFrac, hFrac, align) {
-        if (!node || !box) return;
-        let frameBox = box;
-        let bbox;
+    _fitNodeInPhotoWell(node, wFrac, hFrac) {
+        if (!node) return;
+        let mount = this.polaroidMount || {};
+        let bgRect = mount.bgRect || this.photoWellRect;
+        if (!bgRect) return;
+        let frameBox;
         try {
-            bbox = node.getBBox();
+            frameBox = {
+                x: parseFloat(bgRect.getAttribute("x")),
+                y: parseFloat(bgRect.getAttribute("y")),
+                width: parseFloat(bgRect.getAttribute("width")),
+                height: parseFloat(bgRect.getAttribute("height"))
+            };
+            if (![frameBox.x, frameBox.y, frameBox.width, frameBox.height].every(Number.isFinite)) {
+                let b = bgRect.getBBox();
+                frameBox = { x: b.x, y: b.y, width: b.width, height: b.height };
+            }
         } catch (e) {
             return;
         }
-        if (!(bbox.width > 0 && bbox.height > 0)) return;
+        let box;
+        try {
+            box = node.getBBox();
+        } catch (e) {
+            return;
+        }
+        if (!(box.width > 0 && box.height > 0)) return;
         let scale = Math.min(
-            (frameBox.width * (wFrac != null ? wFrac : 0.92)) / bbox.width,
-            (frameBox.height * (hFrac != null ? hFrac : 0.92)) / bbox.height
+            (frameBox.width * (wFrac != null ? wFrac : 0.72)) / box.width,
+            (frameBox.height * (hFrac != null ? hFrac : 0.62)) / box.height
         );
         if (!Number.isFinite(scale) || scale <= 0) return;
-        let cx = bbox.x + bbox.width / 2;
-        let cy = bbox.y + bbox.height / 2;
-        let drawnW = bbox.width * scale;
-        let inset = Math.max(4, frameBox.width * 0.02);
-        let wellCx = (align === "right")
-            ? (frameBox.x + frameBox.width - inset - drawnW / 2)
-            : (frameBox.x + frameBox.width / 2);
+        let cx = box.x + box.width / 2;
+        let cy = box.y + box.height / 2;
+        let wellCx = frameBox.x + frameBox.width / 2;
         let wellCy = frameBox.y + frameBox.height / 2;
         node.setAttribute(
             "transform",
             `translate(${wellCx}, ${wellCy}) scale(${scale}) translate(${-cx}, ${-cy})`
         );
-    }
-
-    _fitNodeInPhotoWell(node, wFrac, hFrac) {
-        this._fitNodeInBox(node, this._photoWellBox(), wFrac, hFrac);
     }
 
     // ------------------------------------------------------------------
@@ -2025,23 +1749,19 @@ class MorphTaskController {
             id: "morph_" + trial.id + "_" + fen.id,
             name: "",
             head: fen.head,
-            ColorScheme: { Head: scheme }
+            body: fen.body || this._fallbackBody(),
+            region: fen.region,
+            ColorScheme: { Head: scheme, Body: scheme }
         };
-        let icon = create_Fennimal_SVG_object_head_only(display, false, false);
+        let icon = create_Fennimal_SVG_object(display, GenParam.Fennimal_head_size, false);
         this._prepareFennimalIcon(icon);
         this._applyPartColors(icon, scheme);
-        this._applyJumbleComponentGrayscale(icon);
+        if (trial.view !== "full") {
+            let body = icon.getElementsByClassName("Fennimal_body")[0];
+            if (body) body.style.display = "none";
+        }
         icon.style.pointerEvents = "none";
         return icon;
-    }
-
-    _buildPracticePrimeIcon(trial) {
-        let wrap = create_SVG_group(0, 0, "morph_practice_prime");
-        let head = this._buildShapeNode(trial.primeShape || "circle");
-        head.classList.add("practice_head");
-        wrap.appendChild(head);
-        wrap.style.pointerEvents = "none";
-        return { node: wrap, widthFrac: 0.72, heightFrac: 0.72 };
     }
 
     _buildShapeNode(shape) {
@@ -2077,8 +1797,8 @@ class MorphTaskController {
             node.setAttribute("height", "180");
             node.setAttribute("rx", "12");
         }
-        node.setAttribute("fill", "#6a6a6a");
-        node.setAttribute("stroke", "#3a3a3a");
+        node.setAttribute("fill", "#5b7c99");
+        node.setAttribute("stroke", "#2c3e50");
         node.setAttribute("stroke-width", "6");
         let wrap = create_SVG_group(0, 0);
         wrap.appendChild(node);
@@ -2424,20 +2144,62 @@ class MorphTaskController {
     }
 
     _buildPrimeIcon(prime) {
-        let scheme = this._grayscaleScheme();
+        let scheme = this._primeScheme(prime);
+        let paintGray = this._primeUsesFixedGrayscale(prime);
+
+        // Hat alone — no host head.
+        if (!prime.hasHead && !prime.hasBody && prime.hasHat) {
+            let hat = this._buildHatOnlyIcon(prime.hatFen);
+            this._preparePrimeIcon(hat);
+            if (paintGray) this._applyFixedGrayscaleAccessories(hat);
+            return { node: hat, widthFrac: 0.62, heightFrac: 0.55 };
+        }
+
+        // Head (+ optional hat), no body → close-up (toys require a body).
+        if (prime.hasHead && !prime.hasBody) {
+            let display = {
+                id: "morph_prime_head",
+                name: "",
+                head: prime.headFen.head,
+                ColorScheme: { Head: scheme }
+            };
+            if (prime.hasHat) display.hat = prime.hatFen.hat;
+            let icon = create_Fennimal_SVG_object_head_only(display, false, !!prime.hasHat);
+            this._preparePrimeIcon(icon);
+            this._applyPartColors(icon, scheme);
+            if (paintGray) this._applyFixedGrayscaleAccessories(icon);
+            icon.style.pointerEvents = "none";
+            return { node: icon, widthFrac: 0.72, heightFrac: 0.62 };
+        }
+
+        // Body present, no head → headless body + ? square (+ optional toy).
+        if (prime.hasBody && !prime.hasHead) {
+            let icon = this._buildHeadlessBodyIcon(prime.bodyFen, scheme);
+            // Toy needs Fennimal_body_center_point before _preparePrimeIcon strips it.
+            this._attachPrimeToy(icon, prime);
+            this._preparePrimeIcon(icon);
+            if (paintGray) this._applyFixedGrayscaleAccessories(icon);
+            return { node: icon, widthFrac: 0.78, heightFrac: 0.78 };
+        }
+
+        // Body + head (+ optional hat / toy).
         let display = {
-            id: "morph_prime_head",
+            id: "morph_prime_full",
             name: "",
             head: prime.headFen.head,
-            hat: prime.hatFen.hat,
-            ColorScheme: { Head: scheme }
+            body: prime.bodyFen.body || this._fallbackBody(),
+            region: prime.bodyFen.region || prime.headFen.region,
+            ColorScheme: { Head: scheme, Body: scheme }
         };
-        let icon = create_Fennimal_SVG_object_head_only(display, false, true);
-        this._preparePrimeIcon(icon);
+        if (prime.hasHat) display.hat = prime.hatFen.hat;
+        let icon = create_Fennimal_SVG_object(display, GenParam.Fennimal_head_size, false);
         this._applyPartColors(icon, scheme);
-        this._applyFixedGrayscaleAccessories(icon);
+        // Toy needs Fennimal_body_center_point before _preparePrimeIcon strips it.
+        this._attachPrimeToy(icon, prime);
+        this._preparePrimeIcon(icon);
+        if (paintGray) this._applyFixedGrayscaleAccessories(icon);
         icon.style.pointerEvents = "none";
-        return { node: icon, widthFrac: 0.92, heightFrac: 0.92 };
+        return { node: icon, widthFrac: 0.78, heightFrac: 0.78 };
     }
 
     _buildOccluderGroup(well, className, opts) {
@@ -2448,7 +2210,7 @@ class MorphTaskController {
         let rect = create_SVG_rect(well.x, well.y, well.width, well.height);
         rect.setAttribute("rx", well.rx);
         rect.setAttribute("ry", well.ry);
-        rect.setAttribute("fill", opts.fill || this.params.occluderFill || "#3e3a44");
+        rect.setAttribute("fill", this.params.occluderFill || "#3e3a44");
         rect.style.pointerEvents = "none";
         g.appendChild(rect);
 
@@ -2457,7 +2219,7 @@ class MorphTaskController {
         let qSize = Math.round(Math.min(well.width, well.height) * 0.42);
         let q = create_SVG_text_elem(cx, cy, "?", undefined, undefined);
         q.style.fontSize = qSize + "px";
-        q.style.fill = opts.questionFill || this.params.occluderQuestionFill || "#f5f0e6";
+        q.style.fill = "#f5f0e6";
         q.style.textAnchor = "middle";
         q.style.dominantBaseline = "central";
         q.style.pointerEvents = "none";
@@ -2490,35 +2252,6 @@ class MorphTaskController {
         this._applyPartColors(head, scheme);
         this._freezeHappyExpression(head);
         return head;
-    }
-
-    _jumbleGrayscaleFilter() {
-        return "grayscale(100%)";
-    }
-
-    _applyJumbleComponentGrayscale(node) {
-        if (!node) return;
-        node.style.filter = this._jumbleGrayscaleFilter();
-    }
-
-    _grayscaleCanvas(canvas) {
-        if (!canvas) return;
-        let ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        try {
-            let img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            let d = img.data;
-            for (let i = 0; i < d.length; i += 4) {
-                if (d[i + 3] === 0) continue;
-                let g = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
-                d[i] = g;
-                d[i + 1] = g;
-                d[i + 2] = g;
-            }
-            ctx.putImageData(img, 0, 0);
-        } catch (e) {
-            /* tainted canvas — skip */
-        }
     }
 
     _meshBBox(el) {
@@ -2658,7 +2391,6 @@ class MorphTaskController {
                 clearTimeout(timer);
                 ctx.clearRect(0, 0, size, size);
                 ctx.drawImage(img, 0, 0, size, size);
-                this._grayscaleCanvas(canvas);
                 resolve();
             };
             img.onerror = () => {
@@ -2704,38 +2436,23 @@ class MorphTaskController {
             y: eyeMid.y * 0.58 + mouthCenter.y * 0.42
         };
         let center = this._meshNearestOpaque(pixels, size, proposedCenter, threshold);
-        let contourCount = Math.max(12, Math.round(this._num("meshContourPoints", 48)));
+        let contourCount = Math.max(12, Math.round(this._num("meshContourPoints", 24)));
         let contour = this._meshRadialContour(pixels, size, center, contourCount, threshold);
 
-        let points = [];
+        let points = [
+            { x: 0, y: 0 }, { x: size - 1, y: 0 },
+            { x: size - 1, y: size - 1 }, { x: 0, y: size - 1 }
+        ];
         points = points.concat(contour);
         points = points.concat(this._meshBoxPoints(leftBox, leftCenter));
         points = points.concat(this._meshBoxPoints(rightBox, rightCenter));
         points = points.concat(this._meshBoxPoints(mouthBox, mouthCenter));
         points.push(center);
-        let neck = neckMarker || { x: size * 0.5, y: size * 0.88 };
-        points.push(neck);
-        let brow = this._meshNearestOpaque(pixels, size, {
-            x: eyeMid.x,
-            y: eyeMid.y - size * 0.10
-        }, threshold);
-        let chin = this._meshNearestOpaque(pixels, size, {
-            x: mouthCenter.x,
-            y: mouthCenter.y * 0.45 + neck.y * 0.55
-        }, threshold);
-        points.push(brow);
-        points.push(chin);
+        points.push(neckMarker || { x: size * 0.5, y: size * 0.88 });
 
         return {
             canvas,
             points,
-            anchors: {
-                leftEye: leftCenter,
-                rightEye: rightCenter,
-                mouth: mouthCenter,
-                neck,
-                center
-            },
             diagnostics: {
                 head: fen.head,
                 raster_size: size,
@@ -2801,454 +2518,13 @@ class MorphTaskController {
                 if (record.count === 1) triangles.push([record.edge[0], record.edge[1], i]);
             });
         }
-        return triangles.filter((tri) => {
-            if (!(tri[0] < n && tri[1] < n && tri[2] < n)) return false;
-            let a = points[tri[0]], b = points[tri[1]], c = points[tri[2]];
-            let area = Math.abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) * 0.5;
-            return area >= 2;
-        });
-    }
-
-    _ensureScratchCanvas(key, w, h) {
-        let c = this[key];
-        if (!c || c.width !== w || c.height !== h) {
-            c = document.createElement("canvas");
-            c.width = w;
-            c.height = h;
-            this[key] = c;
-        }
-        return c;
-    }
-
-    _opaqueBBox(canvas, threshold) {
-        let size = canvas.width;
-        let ctx = canvas.getContext("2d", { willReadFrequently: true });
-        let d = ctx.getImageData(0, 0, size, size).data;
-        let minX = size, minY = size, maxX = -1, maxY = -1;
-        for (let y = 0; y < size; y++) {
-            for (let x = 0; x < size; x++) {
-                if (d[(y * size + x) * 4 + 3] < threshold) continue;
-                if (x < minX) minX = x;
-                if (y < minY) minY = y;
-                if (x > maxX) maxX = x;
-                if (y > maxY) maxY = y;
-            }
-        }
-        if (maxX < minX) {
-            return { x: 0, y: 0, width: size, height: size, maxSide: size };
-        }
-        let width = maxX - minX + 1;
-        let height = maxY - minY + 1;
-        return { x: minX, y: minY, width, height, maxSide: Math.max(width, height) };
-    }
-
-    _sourceEyeMid(src) {
-        if (src.anchors && src.anchors.leftEye && src.anchors.rightEye) {
-            return {
-                x: (src.anchors.leftEye.x + src.anchors.rightEye.x) / 2,
-                y: (src.anchors.leftEye.y + src.anchors.rightEye.y) / 2
-            };
-        }
-        let b = this._opaqueBBox(src.canvas, 18);
-        return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
-    }
-
-    _sourceEyeAngle(src) {
-        if (!src.anchors || !src.anchors.leftEye || !src.anchors.rightEye) return 0;
-        return Math.atan2(
-            src.anchors.rightEye.y - src.anchors.leftEye.y,
-            src.anchors.rightEye.x - src.anchors.leftEye.x
-        );
-    }
-
-    _sourceExtents(src, threshold) {
-        let b = this._opaqueBBox(src.canvas, threshold);
-        let e = this._sourceEyeMid(src);
-        return {
-            size: Math.max(8, b.maxSide),
-            up: Math.max(1, e.y - b.y),
-            down: Math.max(1, b.y + b.height - e.y),
-            left: Math.max(1, e.x - b.x),
-            right: Math.max(1, b.x + b.width - e.x),
-            eyeMid: e,
-            angle: this._sourceEyeAngle(src)
-        };
-    }
-
-    _meanAngle(a, b) {
-        return Math.atan2(Math.sin(a) + Math.sin(b), Math.cos(a) + Math.cos(b));
-    }
-
-    // Equal printed size from the opaque silhouette; rotate/translate from the eyes.
-    // Face-only similarity was scaling the stocking up to match rocket eye-spacing.
-    _chooseMorphFrame(target, other, canvasSize, threshold) {
-        let fitFrac = this._num("morphFitFrac", 0.76);
-        let pad = Math.max(8, canvasSize * 0.04);
-        let extA = this._sourceExtents(target, threshold);
-        let extB = this._sourceExtents(other, threshold);
-        let destSize = Math.min(
-            canvasSize * fitFrac,
-            Math.sqrt(extA.size * extB.size) || ((extA.size + extB.size) / 2)
-        );
-        destSize = Math.max(canvasSize * 0.42, destSize);
-        let sA = destSize / extA.size;
-        let sB = destSize / extB.size;
-        let needUp = Math.max(sA * extA.up, sB * extB.up);
-        let needDown = Math.max(sA * extA.down, sB * extB.down);
-        let needLeft = Math.max(sA * extA.left, sB * extB.left);
-        let needRight = Math.max(sA * extA.right, sB * extB.right);
-        let avail = canvasSize - 2 * pad;
-        let k = 1;
-        if (needUp + needDown > avail) k = Math.min(k, avail / (needUp + needDown));
-        if (needLeft + needRight > avail) k = Math.min(k, avail / (needLeft + needRight));
-        if (k < 1) {
-            sA *= k;
-            sB *= k;
-            destSize *= k;
-            needUp *= k;
-            needDown *= k;
-            needLeft *= k;
-            needRight *= k;
-        }
-        let needH = needUp + needDown;
-        let needW = needLeft + needRight;
-        return {
-            size: destSize,
-            angle: this._meanAngle(extA.angle, extB.angle),
-            eyeMid: {
-                x: pad + needLeft + (avail - needW) / 2,
-                y: pad + needUp + (avail - needH) / 2
-            },
-            scaleA: sA,
-            scaleB: sB
-        };
-    }
-
-    _alignSourceToFrame(src, frame, scale, threshold) {
-        let eyeMid = this._sourceEyeMid(src);
-        let srcAngle = this._sourceEyeAngle(src);
-        let dAngle = frame.angle - srcAngle;
-        let xf = {
-            s: scale,
-            c: Math.cos(dAngle),
-            sn: Math.sin(dAngle),
-            tx: 0,
-            ty: 0
-        };
-        xf.tx = frame.eyeMid.x - scale * (xf.c * eyeMid.x - xf.sn * eyeMid.y);
-        xf.ty = frame.eyeMid.y - scale * (xf.sn * eyeMid.x + xf.c * eyeMid.y);
-        let anchors = {};
-        Object.keys(src.anchors || {}).forEach((key) => {
-            anchors[key] = this._applySimilarity(src.anchors[key], xf);
-        });
-        let ext = this._sourceExtents(src, threshold);
-        return {
-            canvas: this._warpCanvasBySimilarity(src.canvas, xf),
-            points: (src.points || []).map((p) => this._applySimilarity(p, xf)),
-            anchors,
-            diagnostics: Object.assign({}, src.diagnostics || {}, {
-                silhouette_max_side: Math.round(ext.size * 10) / 10,
-                align_scale: Math.round(scale * 1000) / 1000,
-                dest_size: Math.round(frame.size * 10) / 10
-            })
-        };
-    }
-
-    _alignMorphSources(target, other, canvasSize, threshold) {
-        let frame = this._chooseMorphFrame(target, other, canvasSize, threshold);
-        return {
-            target: this._alignSourceToFrame(target, frame, frame.scaleA, threshold),
-            other: this._alignSourceToFrame(other, frame, frame.scaleB, threshold),
-            frame
-        };
-    }
-
-    _homologousMeshPoints(src, center, contourCount, innerFrac, threshold) {
-        let canvas = src.canvas;
-        let size = canvas.width;
-        let ctx = canvas.getContext("2d", { willReadFrequently: true });
-        let pixels = ctx.getImageData(0, 0, size, size).data;
-        let contour = this._meshRadialContour(pixels, size, center, contourCount, threshold);
-        let ring = innerFrac > 0
-            ? contour.map((p) => ({
-                x: center.x + (p.x - center.x) * innerFrac,
-                y: center.y + (p.y - center.y) * innerFrac
-            }))
-            : [];
-        let a = src.anchors || {};
-        let points = contour.concat(ring);
-        points.push(a.leftEye || { x: center.x - 24, y: center.y });
-        points.push(a.rightEye || { x: center.x + 24, y: center.y });
-        points.push(a.mouth || { x: center.x, y: center.y + 28 });
-        points.push(a.neck || { x: center.x, y: center.y + 70 });
-        points.push(center);
-        return points;
-    }
-
-    _blurSignedDistance(sdf, size, passes) {
-        passes = Math.max(0, Math.round(passes || 0));
-        if (!passes) return sdf;
-        let src = sdf;
-        let dst = new Float32Array(sdf.length);
-        for (let p = 0; p < passes; p++) {
-            for (let y = 0; y < size; y++) {
-                for (let x = 0; x < size; x++) {
-                    let acc = 0;
-                    let n = 0;
-                    for (let dy = -1; dy <= 1; dy++) {
-                        let yy = y + dy;
-                        if (yy < 0 || yy >= size) continue;
-                        for (let dx = -1; dx <= 1; dx++) {
-                            let xx = x + dx;
-                            if (xx < 0 || xx >= size) continue;
-                            acc += src[yy * size + xx];
-                            n++;
-                        }
-                    }
-                    dst[y * size + x] = acc / n;
-                }
-            }
-            src = dst;
-            if (p + 1 < passes) dst = new Float32Array(sdf.length);
-        }
-        return src;
-    }
-
-    _sealAlphaCracks(canvas, passes) {
-        passes = Math.max(0, Math.round(passes || 0));
-        if (!passes) return;
-        let size = canvas.width;
-        let ctx = canvas.getContext("2d", { willReadFrequently: true });
-        let img = ctx.getImageData(0, 0, size, size);
-        let p = img.data;
-        for (let pass = 0; pass < passes; pass++) {
-            let copy = new Uint8ClampedArray(p);
-            for (let y = 1; y < size - 1; y++) {
-                for (let x = 1; x < size - 1; x++) {
-                    let i = (y * size + x) * 4;
-                    if (copy[i + 3] >= 12) continue;
-                    let n = 0, r = 0, g = 0, b = 0, a = 0;
-                    for (let dy = -1; dy <= 1; dy++) {
-                        for (let dx = -1; dx <= 1; dx++) {
-                            if (!dx && !dy) continue;
-                            let j = ((y + dy) * size + (x + dx)) * 4;
-                            if (copy[j + 3] < 16) continue;
-                            n++;
-                            r += copy[j];
-                            g += copy[j + 1];
-                            b += copy[j + 2];
-                            a += copy[j + 3];
-                        }
-                    }
-                    if (n < 4) continue;
-                    p[i] = r / n;
-                    p[i + 1] = g / n;
-                    p[i + 2] = b / n;
-                    p[i + 3] = a / n;
-                }
-            }
-        }
-        ctx.putImageData(img, 0, 0);
-    }
-
-    // 2D similarity (translate + rotate + uniform scale) via least squares.
-    _fitSimilarity(fromPts, toPts) {
-        let n = Math.min(fromPts.length, toPts.length);
-        if (n < 1) return { s: 1, c: 1, sn: 0, tx: 0, ty: 0 };
-        let mx = 0, my = 0, nx = 0, ny = 0;
-        for (let i = 0; i < n; i++) {
-            mx += fromPts[i].x;
-            my += fromPts[i].y;
-            nx += toPts[i].x;
-            ny += toPts[i].y;
-        }
-        mx /= n;
-        my /= n;
-        nx /= n;
-        ny /= n;
-        let a = 0, b = 0, varP = 0;
-        for (let i = 0; i < n; i++) {
-            let px = fromPts[i].x - mx;
-            let py = fromPts[i].y - my;
-            let qx = toPts[i].x - nx;
-            let qy = toPts[i].y - ny;
-            a += px * qx + py * qy;
-            b += px * qy - py * qx;
-            varP += px * px + py * py;
-        }
-        if (varP < 1e-8) {
-            return { s: 1, c: 1, sn: 0, tx: nx - mx, ty: ny - my };
-        }
-        let mag = Math.hypot(a, b);
-        if (mag < 1e-12) {
-            return { s: 1, c: 1, sn: 0, tx: nx - mx, ty: ny - my };
-        }
-        let s = mag / varP;
-        let c = a / mag;
-        let sn = b / mag;
-        return {
-            s,
-            c,
-            sn,
-            tx: nx - s * (c * mx - sn * my),
-            ty: ny - s * (sn * mx + c * my)
-        };
-    }
-
-    _applySimilarity(pt, xf) {
-        return {
-            x: xf.s * (xf.c * pt.x - xf.sn * pt.y) + xf.tx,
-            y: xf.s * (xf.sn * pt.x + xf.c * pt.y) + xf.ty
-        };
-    }
-
-    _warpCanvasBySimilarity(src, xf) {
-        let dst = document.createElement("canvas");
-        dst.width = src.width;
-        dst.height = src.height;
-        let ctx = dst.getContext("2d", { willReadFrequently: true });
-        ctx.setTransform(
-            xf.s * xf.c,
-            xf.s * xf.sn,
-            -xf.s * xf.sn,
-            xf.s * xf.c,
-            xf.tx,
-            xf.ty
-        );
-        ctx.imageSmoothingEnabled = true;
-        if (ctx.imageSmoothingQuality) ctx.imageSmoothingQuality = "high";
-        ctx.drawImage(src, 0, 0);
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        return dst;
-    }
-
-    // Premultiplied RGB lerp. At m=.5 the result is unchanged if parents swap.
-    _lerpCanvases(a, b, m, dest) {
-        let size = dest.width;
-        let ctxA = a.getContext("2d", { willReadFrequently: true });
-        let ctxB = b.getContext("2d", { willReadFrequently: true });
-        let ctxD = dest.getContext("2d", { willReadFrequently: true });
-        let da = ctxA.getImageData(0, 0, size, size);
-        let db = ctxB.getImageData(0, 0, size, size);
-        let out = ctxD.createImageData(size, size);
-        let pa = da.data;
-        let pb = db.data;
-        let po = out.data;
-        let wB = m;
-        let wA = 1 - m;
-        for (let i = 0; i < pa.length; i += 4) {
-            let aA = pa[i + 3];
-            let aB = pb[i + 3];
-            let r = wA * pa[i] * aA + wB * pb[i] * aB;
-            let g = wA * pa[i + 1] * aA + wB * pb[i + 1] * aB;
-            let bl = wA * pa[i + 2] * aA + wB * pb[i + 2] * aB;
-            let alpha = wA * aA + wB * aB;
-            if (alpha > 0) {
-                po[i] = r / alpha;
-                po[i + 1] = g / alpha;
-                po[i + 2] = bl / alpha;
-            }
-            po[i + 3] = alpha;
-        }
-        ctxD.putImageData(out, 0, 0);
-    }
-
-    _edt1d(f) {
-        let n = f.length;
-        let v = new Int32Array(n);
-        let z = new Float64Array(n + 1);
-        let d = new Float64Array(n);
-        let k = 0;
-        v[0] = 0;
-        z[0] = -1e20;
-        z[1] = 1e20;
-        for (let q = 1; q < n; q++) {
-            let s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
-            while (s <= z[k]) {
-                k--;
-                s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
-            }
-            k++;
-            v[k] = q;
-            z[k] = s;
-            z[k + 1] = 1e20;
-        }
-        k = 0;
-        for (let q = 0; q < n; q++) {
-            while (z[k + 1] < q) k++;
-            let p = v[k];
-            d[q] = (q - p) * (q - p) + f[p];
-        }
-        return d;
-    }
-
-    _edt2d(seed, size) {
-        let d = new Float64Array(seed);
-        let row = new Float64Array(size);
-        for (let y = 0; y < size; y++) {
-            let off = y * size;
-            for (let x = 0; x < size; x++) row[x] = d[off + x];
-            let dr = this._edt1d(row);
-            for (let x = 0; x < size; x++) d[off + x] = dr[x];
-        }
-        let col = new Float64Array(size);
-        for (let x = 0; x < size; x++) {
-            for (let y = 0; y < size; y++) col[y] = d[y * size + x];
-            let dc = this._edt1d(col);
-            for (let y = 0; y < size; y++) d[y * size + x] = dc[y];
-        }
-        return d;
-    }
-
-    _signedDistanceFromAlpha(canvas, threshold) {
-        let size = canvas.width;
-        let ctx = canvas.getContext("2d", { willReadFrequently: true });
-        let pixels = ctx.getImageData(0, 0, size, size).data;
-        let n = size * size;
-        let inf = 1e12;
-        let fOut = new Float64Array(n);
-        let fIn = new Float64Array(n);
-        for (let i = 0; i < n; i++) {
-            let inside = pixels[i * 4 + 3] >= threshold;
-            fOut[i] = inside ? inf : 0;
-            fIn[i] = inside ? 0 : inf;
-        }
-        let dOut = this._edt2d(fOut, size);
-        let dIn = this._edt2d(fIn, size);
-        let sdf = new Float32Array(n);
-        for (let i = 0; i < n; i++) {
-            sdf[i] = pixels[i * 4 + 3] >= threshold
-                ? Math.sqrt(dOut[i])
-                : -Math.sqrt(dIn[i]);
-        }
-        return sdf;
-    }
-
-    _meanOpaqueGray(canvases, threshold) {
-        let sum = 0;
-        let n = 0;
-        canvases.forEach((canvas) => {
-            let ctx = canvas.getContext("2d", { willReadFrequently: true });
-            let d = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-            for (let i = 0; i < d.length; i += 4) {
-                if (d[i + 3] < threshold) continue;
-                sum += d[i];
-                n++;
-            }
-        });
-        let g = n ? Math.round(sum / n) : 160;
-        return { r: g, g: g, b: g };
+        return triangles.filter((tri) => tri[0] < n && tri[1] < n && tri[2] < n);
     }
 
     _meshDrawWarped(ctx, source, sourcePoints, destPoints, triangles, alpha) {
         triangles.forEach((tri) => {
             let s0 = sourcePoints[tri[0]], s1 = sourcePoints[tri[1]], s2 = sourcePoints[tri[2]];
             let d0 = destPoints[tri[0]], d1 = destPoints[tri[1]], d2 = destPoints[tri[2]];
-            if (!s0 || !s1 || !s2 || !d0 || !d1 || !d2) return;
-            let srcOri = (s1.x - s0.x) * (s2.y - s0.y) - (s1.y - s0.y) * (s2.x - s0.x);
-            let dstOri = (d1.x - d0.x) * (d2.y - d0.y) - (d1.y - d0.y) * (d2.x - d0.x);
-            if (srcOri * dstOri <= 0) return;
-            if (Math.abs(dstOri) < 4) return;
             let den = s0.x * (s1.y - s2.y) + s1.x * (s2.y - s0.y) + s2.x * (s0.y - s1.y);
             if (Math.abs(den) < 1e-8) return;
             let a = (d0.x * (s1.y - s2.y) + d1.x * (s2.y - s0.y) + d2.x * (s0.y - s1.y)) / den;
@@ -3261,21 +2537,13 @@ class MorphTaskController {
             let f = (d0.y * (s1.x * s2.y - s2.x * s1.y)
                 + d1.y * (s2.x * s0.y - s0.x * s2.y)
                 + d2.y * (s0.x * s1.y - s1.x * s0.y)) / den;
-            let cx = (d0.x + d1.x + d2.x) / 3;
-            let cy = (d0.y + d1.y + d2.y) / 3;
-            const bump = (p) => {
-                let dx = p.x - cx, dy = p.y - cy;
-                let len = Math.hypot(dx, dy) || 1;
-                return { x: p.x + dx / len * 0.85, y: p.y + dy / len * 0.85 };
-            };
-            let c0 = bump(d0), c1 = bump(d1), c2 = bump(d2);
 
             ctx.save();
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.beginPath();
-            ctx.moveTo(c0.x, c0.y);
-            ctx.lineTo(c1.x, c1.y);
-            ctx.lineTo(c2.x, c2.y);
+            ctx.moveTo(d0.x, d0.y);
+            ctx.lineTo(d1.x, d1.y);
+            ctx.lineTo(d2.x, d2.y);
             ctx.closePath();
             ctx.clip();
             ctx.globalAlpha = alpha;
@@ -3286,186 +2554,98 @@ class MorphTaskController {
     }
 
     _renderMeshMorph(m) {
-        this._renderRefinedMesh(m);
-    }
-
-    _renderAlignedCrossfade(m) {
-        let dest = this.morphCanvas || this.meshCanvas;
-        let data = this.morphPair || this.meshData;
-        if (!dest || !data) return;
-        this._lerpCanvases(data.other.canvas, data.target.canvas, m, dest);
-    }
-
-    _renderRefinedMesh(m) {
-        let dest = this.morphCanvas || this.meshCanvas;
-        let data = this.meshData || this.morphPair;
-        if (!dest || !data) return;
-        let size = dest.width;
-        if (!data.triangles || !data.triangles.length
-            || data.other.points.length !== data.target.points.length) {
-            this._lerpCanvases(data.other.canvas, data.target.canvas, m, dest);
-            return;
-        }
-        let destPts = data.other.points.map((p, i) => ({
+        if (!this.meshCanvas || !this.meshData) return;
+        let ctx = this.meshCanvas.getContext("2d");
+        let data = this.meshData;
+        let size = this.meshCanvas.width;
+        let dest = data.other.points.map((p, i) => ({
             x: p.x + (data.target.points[i].x - p.x) * m,
             y: p.y + (data.target.points[i].y - p.y) * m
         }));
-        let warpA = this._ensureScratchCanvas("_morphWarpA", size, size);
-        let warpB = this._ensureScratchCanvas("_morphWarpB", size, size);
-        let ctxA = warpA.getContext("2d");
-        let ctxB = warpB.getContext("2d");
-        [ctxA, ctxB].forEach((ctx) => {
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
-            ctx.globalAlpha = 1;
-            ctx.globalCompositeOperation = "source-over";
-            ctx.clearRect(0, 0, size, size);
-        });
-        this._meshDrawWarped(ctxA, data.other.canvas, data.other.points, destPts, data.triangles, 1);
-        this._meshDrawWarped(ctxB, data.target.canvas, data.target.points, destPts, data.triangles, 1);
-        this._lerpCanvases(warpA, warpB, m, dest);
-        this._sealAlphaCracks(dest, 2);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.clearRect(0, 0, size, size);
+        // Add the two premultiplied warped sources at complementary weights.
+        // This yields an exact 50/50 blend at m=.5 and a pure target at m=1;
+        // destination-over paper then makes the final canvas fully opaque.
+        ctx.globalCompositeOperation = "source-over";
+        this._meshDrawWarped(ctx, data.other.canvas, data.other.points, dest, data.triangles, 1 - m);
+        ctx.globalCompositeOperation = "lighter";
+        this._meshDrawWarped(ctx, data.target.canvas, data.target.points, dest, data.triangles, m);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "destination-over";
+        ctx.fillStyle = this.params.polaroidPaperFill || "#f4efe4";
+        ctx.fillRect(0, 0, size, size);
+        ctx.globalCompositeOperation = "source-over";
     }
 
-    _renderSilhouetteMorph(m) {
-        let dest = this.morphCanvas || this.meshCanvas;
-        let data = this.morphPair || this.meshData;
-        if (!dest || !data || !data.other.sdf || !data.target.sdf) {
-            this._renderAlignedCrossfade(m);
-            return;
-        }
-        let size = dest.width;
-        this._lerpCanvases(data.other.canvas, data.target.canvas, m, dest);
-        let ctx = dest.getContext("2d", { willReadFrequently: true });
-        let img = ctx.getImageData(0, 0, size, size);
-        let p = img.data;
-        let sdfA = data.other.sdf;
-        let sdfB = data.target.sdf;
-        let fill = data.fillGray || { r: 160, g: 160, b: 160 };
-        let minLerpA = Math.max(8, Math.round(this._num("silhouetteMinLerpAlpha", 56)));
-        let wB = m;
-        let wA = 1 - m;
-        for (let i = 0, px = 0; i < p.length; i += 4, px++) {
-            let sdf = wA * sdfA[px] + wB * sdfB[px];
-            let mask = sdf * 0.8 + 0.5;
-            if (mask < 0) mask = 0;
-            else if (mask > 1) mask = 1;
-            if (mask <= 0) {
-                p[i + 3] = 0;
-                continue;
-            }
-            if (p[i + 3] < minLerpA) {
-                p[i] = fill.r;
-                p[i + 1] = fill.g;
-                p[i + 2] = fill.b;
-            }
-            p[i + 3] = Math.round(mask * 255);
-        }
-        ctx.putImageData(img, 0, 0);
-    }
-
-    async _placeRasterMorph(trial, opts) {
-        let slot = this._slotBox("jumble") || this._photoWellBox();
-        if (!slot || !trial.targetFen || !trial.otherFen) return false;
+    async _placeMeshStimulus(trial, opts) {
+        let well = this._photoWellBox();
+        if (!well || !trial.targetFen || !trial.otherFen) return false;
         let size = Math.max(200, Math.round(this._num("meshRasterSize", 400)));
         let schemes = this._schemesForMorphTrial(trial);
-        let kind = trial.morph || "crossfade";
-        if (kind !== "crossfade" && kind !== "mesh" && kind !== "silhouette") {
-            kind = "crossfade";
-        }
+        let targetScheme = schemes.target;
+        let otherScheme = schemes.other;
         let ns = "http://www.w3.org/2000/svg";
         let foreign = document.createElementNS(ns, "foreignObject");
-        let side = Math.min(slot.width * 0.98, slot.height * 0.98);
-        let inset = Math.max(4, slot.width * 0.02);
-        foreign.setAttribute("x", String(slot.x + slot.width - inset - side));
-        foreign.setAttribute("y", String(slot.y + (slot.height - side) / 2));
+        let side = Math.min(well.width * 0.76, well.height * 0.82);
+        foreign.setAttribute("x", String(well.x + (well.width - side) / 2));
+        foreign.setAttribute("y", String(well.y + (well.height - side) / 2));
         foreign.setAttribute("width", String(side));
         foreign.setAttribute("height", String(side));
         foreign.style.pointerEvents = "none";
-        foreign.style.overflow = "visible";
+        foreign.style.overflow = "hidden";
         let canvas = document.createElement("canvas");
         canvas.width = size;
         canvas.height = size;
         canvas.style.width = "100%";
         canvas.style.height = "100%";
         canvas.style.display = "block";
-        canvas.style.background = "transparent";
-        canvas.getContext("2d", { willReadFrequently: true });
         foreign.appendChild(canvas);
+        // Do NOT insert until the first jumble frame is painted — inserting early
+        // flashes an empty/partial canvas on top of the prime.
 
         try {
-            let raw = await Promise.all([
-                this._meshRasterSource(trial.targetFen, schemes.target),
-                this._meshRasterSource(trial.otherFen, schemes.other)
+            let sources = await Promise.all([
+                this._meshRasterSource(trial.targetFen, targetScheme),
+                this._meshRasterSource(trial.otherFen, otherScheme)
             ]);
-            let threshold = Math.max(1, Math.min(255, Math.round(this._num("meshAlphaThreshold", 18))));
-            let aligned = this._alignMorphSources(raw[0], raw[1], size, threshold);
-            let target = aligned.target;
-            let other = aligned.other;
-            let fillGray = this._meanOpaqueGray([target.canvas, other.canvas], threshold);
-            let contourCount = Math.max(12, Math.round(this._num("meshContourPoints", 48)));
-            let innerFrac = Math.max(0, Math.min(0.9, this._num("meshInnerRingFrac", 0.55)));
-            let center = aligned.frame.eyeMid;
-            target.points = this._homologousMeshPoints(target, center, contourCount, innerFrac, threshold);
-            other.points = this._homologousMeshPoints(other, center, contourCount, innerFrac, threshold);
-            let triangles = null;
-            if (kind === "mesh") {
-                let average = other.points.map((p, i) => ({
-                    x: (p.x + target.points[i].x) / 2,
-                    y: (p.y + target.points[i].y) / 2
-                }));
-                triangles = this._meshDelaunay(average);
-                if (!triangles.length) {
-                    this.meshFallbackReason = "Delaunay triangulation produced no triangles.";
-                    console.warn("MorphTask mesh renderer fell back to crossfade:", this.meshFallbackReason);
-                    kind = "crossfade";
-                    triangles = null;
-                }
+            if (sources[0].points.length !== sources[1].points.length) {
+                throw new Error("mesh sources produced different landmark counts.");
             }
-            if (kind === "silhouette") {
-                let blur = Math.max(0, Math.round(this._num("silhouetteSdfBlur", 1)));
-                target.sdf = this._blurSignedDistance(
-                    this._signedDistanceFromAlpha(target.canvas, threshold), size, blur
-                );
-                other.sdf = this._blurSignedDistance(
-                    this._signedDistanceFromAlpha(other.canvas, threshold), size, blur
-                );
-            }
-            let pair = {
-                size,
-                target,
-                other,
-                triangles,
-                fillGray,
-                renderer: kind
-            };
-            this.morphCanvas = canvas;
+            let average = sources[0].points.map((p, i) => ({
+                x: (p.x + sources[1].points[i].x) / 2,
+                y: (p.y + sources[1].points[i].y) / 2
+            }));
+            let triangles = this._meshDelaunay(average);
+            if (!triangles.length) throw new Error("Delaunay triangulation produced no triangles.");
             this.meshCanvas = canvas;
             this.meshForeignObject = foreign;
-            this.morphPair = pair;
-            this.meshData = pair;
+            this.meshData = {
+                target: sources[0],
+                other: sources[1],
+                triangles
+            };
             this.morphGroup = foreign;
-            this.activeRenderer = kind;
-            this._applyMorph(this._mixWeight(trial));
-            this._insertInPhotoWell(foreign, opts && opts.before ? opts.before : this.jumbleOccluder);
-            foreign.style.opacity = "1";
+            this.activeRenderer = "mesh";
+            this._renderMeshMorph(0.5);
+            let before = opts && opts.before ? opts.before : null;
+            this._insertInPhotoWell(foreign, before);
             return true;
         } catch (err) {
-            console.warn("MorphTask raster morph failed:", err);
+            console.warn("MorphTaskTwoStageDevelopment mesh renderer fell back to cross-fade:", err);
             this.meshFallbackReason = err && err.message ? err.message : String(err);
             if (foreign.parentNode) foreign.remove();
-            this.morphCanvas = null;
             this.meshCanvas = null;
             this.meshForeignObject = null;
             this.meshData = null;
-            this.morphPair = null;
             this.morphGroup = null;
-            this.activeRenderer = null;
             return false;
         }
     }
 
-    // Overlay blend is unfiltered so each parent can be grayed before stacking.
-    // Mesh sources are grayed on the raster, then warped/blended.
+    // Veil blur only (grayscale is painted into fills / mesh sources, not filtered).
     _setMorphGroupFilter(extra) {
         if (!this.morphGroup) return;
         this.morphGroup.style.filter = (extra && extra !== "none") ? extra : "none";
@@ -3473,76 +2653,109 @@ class MorphTaskController {
 
     async _placeMorphStimulus(trial, opts) {
         opts = opts || null;
-        if (trial && trial.is_practice) {
-            this._placePracticeJumble(trial, opts);
-            return;
+        let before = opts && opts.before ? opts.before : null;
+        if (!trial.is_practice && trial.morph === "mesh") {
+            let ready = await this._placeMeshStimulus(trial, opts);
+            if (ready) {
+                this._setMorphGroupFilter("none");
+                this._applyMorph(0.5);
+                return;
+            }
         }
-        let mix = this._mixWeight(trial);
-        let ready = await this._placeRasterMorph(trial, opts);
-        if (!ready) {
-            console.warn("MorphTask: could not place jumble morph", trial && trial.id, trial && trial.morph);
-            return;
-        }
-        this._currentMorphLevel = mix;
-        if (this.morphGroup) this.morphGroup.style.opacity = "1";
-    }
-
-    _placePracticeJumble(trial, opts) {
-        let slot = this._slotBox("jumble");
-        if (!slot) return false;
         let group = create_SVG_group(0, 0, "morph_stimulus");
         group.style.pointerEvents = "none";
-        this.otherIcon = this._buildShapeNode(trial.shapeOther);
-        this.targetIcon = this._buildShapeNode(trial.shapeTarget);
-        group.appendChild(this.otherIcon);
-        group.appendChild(this.targetIcon);
         this.morphGroup = group;
-        this.activeRenderer = "shape-crossfade";
-        this._insertInPhotoWell(group, opts && opts.before ? opts.before : this.jumbleOccluder);
-        this._fitNodeInBox(this.otherIcon, slot, 0.78, 0.72, "right");
-        this._fitNodeInBox(this.targetIcon, slot, 0.78, 0.72, "right");
-        this._applyMorph(this._mixWeight(trial));
-        group.style.opacity = "1";
-        this._currentMorphLevel = this._mixWeight(trial);
-        return true;
+        this.activeRenderer = trial.is_practice ? "shape-crossfade" : "crossfade";
+
+        if (trial.is_practice) {
+            this.otherIcon = this._buildShapeNode(trial.shapeOther);
+            this.targetIcon = this._buildShapeNode(trial.shapeTarget);
+            group.appendChild(this.otherIcon);
+            group.appendChild(this.targetIcon);
+        } else {
+            let schemes = this._schemesForMorphTrial(trial);
+            this.otherIcon = this._buildParentIcon(trial, trial.otherFen, schemes.other);
+            this.targetIcon = this._buildParentIcon(trial, trial.targetFen, schemes.target);
+            group.appendChild(this.otherIcon);
+            group.appendChild(this.targetIcon);
+        }
+
+        // Insert under the prime (when transitioning) only after children exist.
+        this._insertInPhotoWell(group, before);
+        if (trial.is_practice) {
+            this._fitNodeInPhotoWell(this.otherIcon, 0.62, 0.55);
+            this._fitNodeInPhotoWell(this.targetIcon, 0.62, 0.55);
+        } else {
+            let showBody = trial.view === "full";
+            let wFrac = showBody ? 0.78 : 0.72;
+            let hFrac = showBody ? 0.78 : 0.62;
+            this._fitNodeInPhotoWell(this.otherIcon, wFrac, hFrac);
+            this._fitNodeInPhotoWell(this.targetIcon, wFrac, hFrac);
+        }
+
+        // Ambiguity film above the stacked renders (still under the prime when dissolving).
+        let well = this._photoWellBox();
+        if (well) {
+            let film = create_SVG_rect(well.x, well.y, well.width, well.height);
+            film.setAttribute("rx", well.rx);
+            film.setAttribute("ry", well.ry);
+            film.setAttribute("fill", this.params.filmFill || this.params.polaroidPaperFill || "#f4efe4");
+            film.style.pointerEvents = "none";
+            this._insertInPhotoWell(film, before);
+            this.filmRect = film;
+        }
+
+        this._applyMorph(0.5);
     }
 
+    // m in [0.5, 1]: 0.5 = fully ambiguous 50/50 blend, 1 = pure target.
+    // Target on top at opacity m; other below fading out over m in [0.5, 1].
     _applyMorph(m) {
-        m = Math.max(0, Math.min(1, m));
+        m = Math.max(0.5, Math.min(1, m));
         this._currentMorphLevel = m;
-        let kind = this.activeRenderer || "crossfade";
-        if (kind === "shape-crossfade") {
-            if (this.targetIcon) this.targetIcon.style.opacity = String(m);
-            if (this.otherIcon) this.otherIcon.style.opacity = String(1 - m);
-        } else if (kind === "silhouette") this._renderSilhouetteMorph(m);
-        else if (kind === "mesh") this._renderRefinedMesh(m);
-        else this._renderAlignedCrossfade(m);
-        if (this.morphGroup) this.morphGroup.style.filter = "none";
-        if (this.filmRect) this.filmRect.style.opacity = "0";
+        if (this.activeRenderer === "mesh") {
+            this._renderMeshMorph(m);
+            this._setMorphGroupFilter("none");
+            if (this.filmRect) this.filmRect.style.opacity = "0";
+            return;
+        }
+        if (!this.targetIcon || !this.otherIcon) return;
+        let resolved = m >= 0.999;
+        this.targetIcon.style.opacity = String(m);
+        this.otherIcon.style.opacity = resolved ? "0" : String(Math.min(1, 2 * (1 - m)));
+
+        let ambiguity = Math.max(0, Math.min(1, 2 * (1 - m)));
+        if (this.morphGroup) {
+            if (resolved || ambiguity <= 0.001) {
+                this._setMorphGroupFilter("none");
+            } else {
+                let blurMax = this._num("blurMaxPx", 7);
+                let power = this._num("blurPower", 1.4);
+                let blur = blurMax * Math.pow(ambiguity, power);
+                this._setMorphGroupFilter(blur > 0.05 ? `blur(${blur.toFixed(2)}px)` : "none");
+            }
+        }
+        if (this.filmRect) {
+            let filmMax = this._num("filmMaxOpacity", 0.18);
+            this.filmRect.style.opacity = String(resolved ? 0 : filmMax * ambiguity);
+        }
     }
 
     // Keyboard-only identity keycaps + radial name-choice chips
     // ------------------------------------------------------------------
 
-    _drawKeyCap(parent, x, y, w, h, style) {
-        style = style || {};
+    _drawKeyCap(parent, x, y, w, h) {
         let g = parent;
-        let faceFill = style.faceFill || "#f4efe4";
-        let lipFill = style.lipFill || "#cfc8b8";
-        let faceOpacity = style.faceOpacity != null ? style.faceOpacity : 1;
-        let lipOpacity = style.lipOpacity != null ? style.lipOpacity : 1;
         let lip = create_SVG_rect(x - w / 2, y - h / 2 + 5, w, h);
         lip.setAttribute("rx", "16");
-        lip.setAttribute("fill", lipFill);
-        lip.setAttribute("fill-opacity", String(lipOpacity));
+        lip.setAttribute("fill", "#cfc8b8");
         lip.setAttribute("stroke", "#4b5563");
         lip.setAttribute("stroke-width", "4");
         lip.classList.add("hat_drop_key_lip");
         g.appendChild(lip);
         let face = create_SVG_rect(x - w / 2, y - h / 2 - 2, w, h);
         face.setAttribute("rx", "16");
-        face.setAttribute("fill", faceFill);
-        face.setAttribute("fill-opacity", String(faceOpacity));
+        face.setAttribute("fill", "#f4efe4");
         face.setAttribute("stroke", "#4b5563");
         face.setAttribute("stroke-width", "4");
         face.classList.add("hat_drop_key_face");
@@ -3551,10 +2764,8 @@ class MorphTaskController {
         g._keyFace = face;
         g._keyFaceRestY = y - h / 2 - 2;
         g._keyLipRestY = y - h / 2 + 5;
-        g._keyFaceRestFill = faceFill;
-        g._keyLipRestFill = lipFill;
-        g._keyFaceRestOpacity = faceOpacity;
-        g._keyLipRestOpacity = lipOpacity;
+        g._keyFaceRestFill = "#f4efe4";
+        g._keyLipRestFill = "#cfc8b8";
         g._keyPressDy = 7;
         return face;
     }
@@ -3603,10 +2814,6 @@ class MorphTaskController {
         let g = create_SVG_group(0, 0, handlers.chip ? "morph_name_chip" : "hat_drop_key");
         if (handlers.chip) this._drawNameChip(g, x, y, w, h);
         else this._drawKeyCap(g, x, y, w, h);
-        if (handlers.chip) {
-            g.style.filter = this.params.nameChipDropShadow
-                || "drop-shadow(0px 0px 3px #ffffff) drop-shadow(0px 1px 8px rgba(255,255,255,0.95)) drop-shadow(0px 2px 14px rgba(255,255,255,0.8))";
-        }
         let text = create_SVG_text_elem(x, y - 2, label, undefined, undefined);
         text.classList.add(handlers.chip ? "morph_name_chip_glyph" : "hat_drop_key_glyph");
         text.style.fontFamily = "'Source Sans 3', 'PT Sans', sans-serif";
@@ -3637,17 +2844,12 @@ class MorphTaskController {
         g._keyFace.setAttribute("stroke", on ? "#c9a227" : (isChip ? "#5a6f86" : "#4b5563"));
         g._keyFace.setAttribute("stroke-width", on ? "5" : (isChip ? "3" : "4"));
         g._keyFace.setAttribute("fill", on ? "#ffe9a8" : (g._keyFaceRestFill || (isChip ? "#d7e4f0" : "#f4efe4")));
-        g._keyFace.setAttribute("fill-opacity", on ? "0.92" : String(g._keyFaceRestOpacity != null ? g._keyFaceRestOpacity : 1));
         if (g._keyLip) {
             g._keyLip.setAttribute("fill", on ? "#e0c46a" : (g._keyLipRestFill || "#cfc8b8"));
-            g._keyLip.setAttribute("fill-opacity", on ? "0.92" : String(g._keyLipRestOpacity != null ? g._keyLipRestOpacity : 1));
             g._keyLip.setAttribute("stroke", on ? "#c9a227" : "#4b5563");
         }
         if (g._keyGlyph) {
-            let glyphText = g._keyGlyph.tagName === "text"
-                ? g._keyGlyph
-                : g._keyGlyph.querySelector("text");
-            if (glyphText) glyphText.setAttribute("fill", on ? "#5a3e00" : "#1e3a5f");
+            g._keyGlyph.setAttribute("fill", on ? "#5a3e00" : "#1e3a5f");
         }
     }
 
@@ -3765,10 +2967,10 @@ class MorphTaskController {
         let n = options.length;
         let btnW = this._num("nameKeyW", 200);
         let btnH = this._num("nameKeyH", 72);
-        let radius = n <= 2 ? 200 : this._num("radialRadius", this._num("primeNameRadialRadius", 250));
-        let primeCenter = this._slotCenterSvg("prime");
-        let cx = primeCenter.x;
-        let cy = primeCenter.y;
+        let radius = n <= 2 ? 240 : this._num("radialRadius", this._num("primeNameRadialRadius", 300));
+        let mount = this.polaroidMount || {};
+        let cx = mount.cx != null ? mount.cx : 0.5 * this.W;
+        let cy = mount.cy != null ? mount.cy : 0.48 * this.H;
         let minX = 16 + btnW / 2;
         let maxX = this.W - 16 - btnW / 2;
         let minY = 110 + btnH / 2;
@@ -3853,9 +3055,7 @@ class MorphTaskController {
 
         let moveBubbleDone = this._showBubble(
             wrongEl,
-            (this.currentTrial && this.currentTrial.is_practice)
-                ? "Each polaroid has two pictures. Name the shape on the left — use F and J to move the highlighted name."
-                : "Use F and J to move the highlighted name.",
+            "Use F and J to move the highlighted name.",
             { hideButton: true, preferredSide: "up" }
         );
         await new Promise((resolve) => {
@@ -3956,9 +3156,13 @@ class MorphTaskController {
         this._clearNameQuizUi();
         this.inputLocked = true;
         this._inputStage = null;
+        // Show F/J early (dimmed); arm them when the score timer starts.
+        this._placeIdentityKeys(trial, { armed: false });
         let resolveQuiz = this._nameQuizResolve;
         this._nameQuizResolve = null;
-        if (resolveQuiz) resolveQuiz(result);
+        this._shakePolaroid().then(() => {
+            if (resolveQuiz) resolveQuiz(result);
+        });
     }
 
     async _runNameQuiz(trial) {
@@ -4011,10 +3215,10 @@ class MorphTaskController {
         return {
             y: headY,
             startY: this.H * this._num("startSpaceKeyYFrac", 0.82),
-            leftX: this.W * this._num("identityKeyLeftXFrac", 0.265),
-            rightX: this.W * this._num("identityKeyRightXFrac", 0.735),
+            leftX: this.W * this._num("identityKeyLeftXFrac", 0.30),
+            rightX: this.W * this._num("identityKeyRightXFrac", 0.70),
             centerX: this.W * 0.5,
-            w: this._num("identityKeyW", 112),
+            w: this._num("identityKeyW", 240),
             h: this._num("identityKeyH", 88)
         };
     }
@@ -4025,148 +3229,23 @@ class MorphTaskController {
         this._clearIdentityKeys();
         let keyOpts = this._identityOptions(trial);
         let layout = this._identityKeyLayout();
+        // Above the time bars (bars live on Plus1).
         let group = create_SVG_group(0, 0, "morph_identity_keys");
         this.layers.Plus2.appendChild(group);
         this.identityKeysGroup = group;
-
-        let leftFen = keyOpts.left && (keyOpts.left.fen || this.fensById[keyOpts.left.id]);
-        let rightFen = keyOpts.right && (keyOpts.right.fen || this.fensById[keyOpts.right.id]);
-        let leftSize = (keyOpts.left && keyOpts.left.shape)
-            ? { width: 180, height: 180 }
-            : this._identityHatNativeSize(leftFen);
-        let rightSize = (keyOpts.right && keyOpts.right.shape)
-            ? { width: 180, height: 180 }
-            : this._identityHatNativeSize(rightFen);
-        let maxW = Math.max(leftSize.width, rightSize.width, 1);
-        let maxH = Math.max(leftSize.height, rightSize.height, 1);
-        let slotW = this._num("identityHatSlotW", 150);
-        let slotH = this._num("identityHatSlotH", 118);
-        let hatScale = Math.min(slotW / maxW, slotH / maxH);
-        if (!Number.isFinite(hatScale) || hatScale <= 0) hatScale = 1;
-
-        let pad = this._num("identityFieldPad", 16);
-        let gap = this._num("identityHatKeyGap", 10);
-        let fieldW = Math.max(slotW, layout.w) + pad * 2;
-        let fieldH = pad + slotH + gap + layout.h + pad;
-        let field = { w: fieldW, h: fieldH, pad, gap, slotW, slotH, hatScale };
-
-        this.identityKeyF = this._placeIdentityChoice(group, layout.leftX, layout.y, layout, "F", keyOpts.left, field);
-        this.identityKeyJ = this._placeIdentityChoice(group, layout.rightX, layout.y, layout, "J", keyOpts.right, field);
-        this._setIdentityKeysArmed(armed);
-    }
-
-    _identityHatNativeSize(fen) {
-        let fallback = { width: 80, height: 80 };
-        if (!fen || !fen.hat) return fallback;
-        let hatId = "hat_" + String(fen.hat).replace(/^hat_/, "");
-        let template = document.getElementById(hatId);
-        if (!template) return fallback;
-        let clone = template.cloneNode(true);
-        if (typeof strip_svg_ids_from_subtree === "function") strip_svg_ids_from_subtree(clone);
-        clone.style.display = "inherit";
-        clone.setAttribute("display", "inline");
-        clone.querySelectorAll(".invisible_element, .hat_attachment_point").forEach((el) => {
-            el.setAttribute("display", "none");
-            el.style.display = "none";
-        });
-        let host = (this.layers && this.layers.Plus2) || (this.layers && this.layers.Main);
-        if (!host) return fallback;
-        host.appendChild(clone);
-        let b = fallback;
-        try { b = clone.getBBox(); } catch (e) { b = fallback; }
-        clone.remove();
-        if (!(b.width > 0 && b.height > 0)) return fallback;
-        return { width: b.width, height: b.height };
-    }
-
-    _placeIdentityChoice(parent, cx, cy, layout, letter, option, field) {
-        let col = create_SVG_group(0, 0, "morph_identity_choice");
-        col.style.pointerEvents = "none";
-        parent.appendChild(col);
-        let x0 = cx - field.w / 2;
-        let y0 = cy - field.h / 2;
-        let opacity = this._num("identityFieldOpacity", 0.72);
-        let rx = this._num("identityFieldRx", 24);
-        let backdrop = create_SVG_rect(x0, y0, field.w, field.h);
-        backdrop.setAttribute("rx", String(rx));
-        backdrop.setAttribute("ry", String(rx));
-        backdrop.setAttribute("fill", "#ffffff");
-        backdrop.setAttribute("fill-opacity", String(opacity));
-        backdrop.setAttribute("stroke", "#d7d2c8");
-        backdrop.setAttribute("stroke-width", "2");
-        backdrop.style.pointerEvents = "none";
-        col.appendChild(backdrop);
-
-        let hatBox = {
-            x: cx - field.slotW / 2,
-            y: y0 + field.pad,
-            width: field.slotW,
-            height: field.slotH
-        };
-        let fen = option && (option.fen || this.fensById[option.id]);
-        if (option && option.shape) this._placeShapeOnKey(col, option.shape, hatBox);
-        else if (fen && fen.hat) this._placeHatOnKey(col, fen, hatBox, field.hatScale);
-
-        let keyY = y0 + field.h - field.pad - layout.h / 2;
-        let key = this._placeTextKey(cx, keyY, layout.w, layout.h, letter, {
-            keyboardOnly: true,
-            fontSize: this._num("identityKeyLetterSize", 40)
-        });
-        col.appendChild(key);
-        return key;
-    }
-
-    _placeHatOnKey(parent, fen, box, uniformScale) {
-        let hatId = "hat_" + String(fen.hat).replace(/^hat_/, "");
-        let template = document.getElementById(hatId);
-        if (!template || !box) return null;
-        let clone = template.cloneNode(true);
-        if (typeof strip_svg_ids_from_subtree === "function") strip_svg_ids_from_subtree(clone);
-        clone.style.display = "inherit";
-        clone.setAttribute("display", "inline");
-        clone.style.pointerEvents = "none";
-        clone.querySelectorAll(".invisible_element, .hat_attachment_point").forEach((el) => {
-            el.setAttribute("display", "none");
-            el.style.display = "none";
-        });
-        let zero = create_SVG_group(0, 0);
-        let scaleG = create_SVG_group(0, 0);
-        let pos = create_SVG_group(0, 0, "morph_identity_hat");
-        pos.style.pointerEvents = "none";
-        zero.appendChild(clone);
-        scaleG.appendChild(zero);
-        pos.appendChild(scaleG);
-        parent.appendChild(pos);
-        let b = { x: 0, y: 0, width: 80, height: 80 };
-        try { b = clone.getBBox(); } catch (e) { /* keep fallback */ }
-        if (!(b.width > 0 && b.height > 0)) b = { x: 0, y: 0, width: 80, height: 80 };
-        let scale = uniformScale != null
-            ? uniformScale
-            : Math.min(box.width / b.width, box.height / b.height);
-        if (!Number.isFinite(scale) || scale <= 0) scale = 1;
-        zero.setAttribute("transform", `translate(${-(b.x + b.width / 2)}, ${-(b.y + b.height / 2)})`);
-        scaleG.setAttribute("transform", `scale(${scale})`);
-        pos.setAttribute("transform", `translate(${box.x + box.width / 2}, ${box.y + box.height / 2})`);
-        return pos;
-    }
-
-    _placeShapeOnKey(parent, shape, box) {
-        if (!box) return null;
-        let node = this._buildShapeNode(shape);
-        node.style.pointerEvents = "none";
-        parent.appendChild(node);
-        let b = { x: -90, y: -90, width: 180, height: 180 };
-        try { b = node.getBBox(); } catch (e) { /* keep fallback */ }
-        if (!(b.width > 0 && b.height > 0)) b = { x: -90, y: -90, width: 180, height: 180 };
-        let scale = Math.min(box.width / b.width, box.height / b.height);
-        if (!Number.isFinite(scale) || scale <= 0) scale = 1;
-        let cx = b.x + b.width / 2;
-        let cy = b.y + b.height / 2;
-        node.setAttribute(
-            "transform",
-            `translate(${box.x + box.width / 2}, ${box.y + box.height / 2}) scale(${scale}) translate(${-cx}, ${-cy})`
+        this.identityKeyF = this._placeTextKey(
+            layout.leftX, layout.y, layout.w, layout.h,
+            "F: " + keyOpts.left.label,
+            { keyboardOnly: true, fontSize: 28 }
         );
-        return node;
+        this.identityKeyJ = this._placeTextKey(
+            layout.rightX, layout.y, layout.w, layout.h,
+            "J: " + keyOpts.right.label,
+            { keyboardOnly: true, fontSize: 28 }
+        );
+        group.appendChild(this.identityKeyF);
+        group.appendChild(this.identityKeyJ);
+        this._setIdentityKeysArmed(armed);
     }
 
     _setIdentityKeysArmed(armed) {
@@ -4297,87 +3376,18 @@ class MorphTaskController {
     }
 
     _placeOccluder() {
-        this._placeSlotOccluders();
-    }
-
-    _placeSlotOccluders() {
-        this._liftPrimeSlotOccluder();
-        this._liftJumbleOccluder();
-        let jumbleSlot = this._slotBox("jumble");
-        if (!jumbleSlot) this._fail("missing photo slots for occluders.");
-        let jumbleBuilt = this._buildOccluderGroup(jumbleSlot, "morph_jumble_occluder", {
-            highlight: false,
-            fill: this.params.jumbleOccluderFill || "#cfcbc3",
-            questionFill: this.params.jumbleOccluderQuestionFill || "#4a4640"
-        });
-        if (jumbleBuilt.hit) {
-            jumbleBuilt.hit.style.pointerEvents = "none";
-            jumbleBuilt.hit.style.cursor = "default";
-            jumbleBuilt.hit.classList.remove("focus_on_SVG_outline");
+        let well = this._photoWellBox();
+        if (!well) this._fail("missing photo well for occluder.");
+        // Visual ? only — start is keyboard Space (see _placeStartSpaceKey).
+        let built = this._buildOccluderGroup(well, "morph_occluder", { highlight: false });
+        if (built.hit) {
+            built.hit.style.pointerEvents = "none";
+            built.hit.style.cursor = "default";
+            built.hit.classList.remove("focus_on_SVG_outline");
         }
-        let host = this.polaroidMount && this.polaroidMount.photoHost;
-        if (!host) this._fail("missing photo host for occluders.");
-        host.appendChild(jumbleBuilt.g);
-        this.primeSlotOccluder = null;
-        this.jumbleOccluder = jumbleBuilt.g;
-        this.occluder = this.jumbleOccluder;
-        this.occluderHit = jumbleBuilt.hit;
-    }
-
-    _liftPrimeSlotOccluder() {
-        if (this.primeSlotOccluder && this.primeSlotOccluder.parentNode) {
-            this.primeSlotOccluder.remove();
-        }
-        this.primeSlotOccluder = null;
-        this.occluder = this.jumbleOccluder || null;
-        this.occluderHit = null;
-    }
-
-    _liftJumbleOccluder() {
-        if (this.jumbleOccluder && this.jumbleOccluder.parentNode) {
-            this.jumbleOccluder.remove();
-        }
-        this.jumbleOccluder = null;
-    }
-
-    async _beginTrialReveal() {
-        await this._animatePrimeReveal();
-    }
-
-    async _revealJumble(trial) {
-        this._setPrimeHeadOccluderHighlight(false);
-        this._clearPrimeHeadOccluder();
-        this._keepMysteryCaption(trial);
-        if (!this.morphGroup) {
-            await this._placeMorphStimulus(trial, { before: this.jumbleOccluder });
-        }
-        if (this.morphGroup) this.morphGroup.style.opacity = "1";
-        await wait(Math.max(0, Math.round(this._num("primeRevealHoldMs", 1000))));
-        if (this.destroyed) return;
-        this._stackForJumblePhase();
-        await this._fadeOutJumbleOccluder();
-    }
-
-    async _fadeOutJumbleOccluder() {
-        let node = this.jumbleOccluder;
-        if (!node) return;
-        let ms = Math.max(1, Math.round(this._num("jumbleFadeMs", 1400)));
-        node.style.opacity = "1";
-        let start = performance.now();
-        await new Promise((resolve) => {
-            const tick = (now) => {
-                if (this.destroyed) return resolve();
-                let t = Math.min(1, (now - start) / ms);
-                let eased = t < 0.5
-                    ? 4 * t * t * t
-                    : 1 - Math.pow(-2 * t + 2, 3) / 2;
-                node.style.opacity = String(1 - eased);
-                if (t >= 1) return resolve();
-                requestAnimationFrame(tick);
-            };
-            requestAnimationFrame(tick);
-        });
-        this._liftJumbleOccluder();
+        this._insertInPhotoWell(built.g);
+        this.occluder = built.g;
+        this.occluderHit = built.hit;
     }
 
     _confirmSpaceStart() {
@@ -4408,6 +3418,22 @@ class MorphTaskController {
             this._waitingForStart = true;
             this._startResolve = resolve;
         });
+    }
+
+    async _beginTrialReveal() {
+        await this._waitForSpaceStart();
+        await this._fadeOutStartSpaceKey();
+        this._liftOccluder();
+        await this._shakePolaroid();
+        await this._animatePrimeReveal();
+    }
+
+    _liftOccluder() {
+        if (this.occluder) {
+            this.occluder.remove();
+            this.occluder = null;
+        }
+        this.occluderHit = null;
     }
 
     async _waitForPaint() {
@@ -4455,21 +3481,13 @@ class MorphTaskController {
     }
 
     _placeQuestion(trial) {
-        let w = 980;
+        let w = 720;
         let h = 78;
         let x = 0.5 * this.W - w / 2;
-        let y = 14;
-        let text = (trial && trial.is_practice)
-            ? (this.params.primePromptPractice || "What shape is this?")
-            : (this.params.primePrompt || "Whose hat is this?");
-        let hud = this._placeHudBubble(x, y, w, h, text, "morph_question", 32);
+        let y = 18;
+        let hud = this._placeHudBubble(x, y, w, h, trial.question, "morph_question", 36);
         this.questionEl = hud.group;
-        this.questionLabel = hud.label;
         this._questionHud = { x, y, w, h };
-    }
-
-    _setQuestionText(text) {
-        if (this.questionLabel) this.questionLabel.textContent = text || "";
     }
 
     _starPoints(cx, cy, outer, inner) {
@@ -4525,64 +3543,6 @@ class MorphTaskController {
         this.pointsEl = g;
         this.pointsDiv = label;
         this._setPointsDisplay(value);
-    }
-
-    _placeProgressHud() {
-        let h = 78;
-        let w = 176;
-        let gap = 16;
-        let q = this._questionHud || { x: 0.5 * this.W - 490, y: 14, w: 980, h: 78 };
-        let x = q.x + q.w + gap;
-        let y = q.y;
-        let pal = this._bubblePalette();
-        let g = create_SVG_group(0, 0, "morph_progress");
-        g.style.pointerEvents = "none";
-
-        let rect = create_SVG_rect(x, y, w, h);
-        rect.setAttribute("rx", String(pal.radius != null ? pal.radius : 28));
-        rect.setAttribute("ry", String(pal.radius != null ? pal.radius : 28));
-        rect.setAttribute("fill", pal.fill);
-        rect.setAttribute("fill-opacity", String(pal.fillOpacity));
-        rect.setAttribute("stroke", pal.stroke);
-        rect.setAttribute("stroke-width", String(pal.strokeWidth != null ? pal.strokeWidth : 4));
-        g.appendChild(rect);
-
-        let cx = x + w / 2;
-        let cy = y + h / 2;
-        let r = 26;
-        let track = create_SVG_circle(cx, cy, r);
-        track.setAttribute("fill", "#d4d4d4");
-        g.appendChild(track);
-
-        let t = this.phaseProgressTotal > 0
-            ? Math.min(1, Math.max(0, this.phaseProgressDone / this.phaseProgressTotal))
-            : 0;
-        if (t >= 1) {
-            let full = create_SVG_circle(cx, cy, r);
-            full.setAttribute("fill", "navy");
-            full.style.opacity = "0.7";
-            g.appendChild(full);
-        } else if (t > 0) {
-            let slice = document.createElementNS("http://www.w3.org/2000/svg", "path");
-            slice.setAttribute("d", this._pieSlicePath(cx, cy, r, t));
-            slice.setAttribute("fill", "navy");
-            slice.style.opacity = "0.7";
-            g.appendChild(slice);
-        }
-
-        this.layers.Plus2.appendChild(g);
-        this.progressEl = g;
-    }
-
-    _pieSlicePath(cx, cy, r, t) {
-        let a = -Math.PI / 2 + t * 2 * Math.PI;
-        let px = cx + r * Math.cos(a);
-        let py = cy + r * Math.sin(a);
-        let large = t > 0.5 ? 1 : 0;
-        return "M " + cx + " " + cy +
-            " L " + cx + " " + (cy - r) +
-            " A " + r + " " + r + " 0 " + large + " 1 " + px + " " + py +
-            " Z";
     }
 
     _setPointsDisplay(value) {
@@ -4653,7 +3613,7 @@ class MorphTaskController {
     }
 
     _startMorphPhase(trial) {
-        this._setQuestionText(this._identityPrompt(trial));
+        this._liftOccluder();
         this._showTimeBars();
         this._setBarsProgress(0);
         this._setPointsDisplay(this.params.maxPoints || 100);
@@ -4681,15 +3641,21 @@ class MorphTaskController {
             const tick = (now) => {
                 if (this.destroyed) return;
                 let elapsed = now - start;
+                this._applyMorph(this._morphWeightAt(elapsed, trial));
                 let scoreT = Math.min(1, elapsed / T);
                 this._setBarsProgress(scoreT);
                 if (!this._pointsFrozen) {
                     this._setPointsDisplay(maxPoints * (1 - scoreT));
                 }
+                // Linear peak → 0 over trial_speed (noise:X is peak only).
+                if (this._noisePeak > 0) {
+                    this._setNoiseAmount(this._noisePeak * (1 - scoreT));
+                }
                 if (scoreT >= 1 && !this._late) {
                     this._late = true;
                     this._setBarsProgress(1);
                     this._setPointsDisplay(0);
+                    this._setNoiseAmount(0);
                 }
                 this.morphRaf = requestAnimationFrame(tick);
             };
@@ -4791,20 +3757,24 @@ class MorphTaskController {
     }
 
     async _runPracticeTutorial() {
-        this.inputLocked = true;
+        this._placeStartSpaceKey();
+        let startTarget = this.startSpaceKey || this.occluder || this.questionEl;
+        let bubbleDone = this._showBubble(
+            startTarget,
+            "Something is hidden here. Press Space when you are ready to start.",
+            { hideButton: true, preferredSide: "up" }
+        );
         await this._beginTrialReveal();
+        await bubbleDone;
+        await this._showBubble(
+            this.stimulusGroup || this.questionEl,
+            "First, name the shape you see."
+        );
         await this._runNameQuiz(this.currentTrial);
-        await this._revealJumble(this.currentTrial);
+        await this._transitionPrimeToMorph(this.currentTrial);
         await this._showBubble(
             this.morphGroup || this.stimulusGroup,
-            "Now the bigger picture is a mix of two shapes."
-        );
-    }
-
-    async _showPracticeIdentityBubbles() {
-        await this._showBubble(
-            this.identityKeyF || this.identityKeysGroup,
-            "Use F and J to pick which shape it looks like."
+            "The picture is now a blurry mix. It will settle into one shape — your job is to identify which shape it becomes. Use F and J to answer."
         );
         await this._showBubble(
             this.barLeft || this.barRight,
@@ -4812,11 +3782,7 @@ class MorphTaskController {
         );
         await this._showBubble(
             this.pointsEl,
-            "When the real photos start, faster correct answers leave more bonus stars. These practice rounds do not count."
-        );
-        await this._showBubble(
-            this.barRight || this.barLeft,
-            "If the bars run out, you still have to answer — you just will not earn points."
+            "Points count down from the start. Faster correct answers leave you with more bonus stars."
         );
     }
 
@@ -4824,24 +3790,25 @@ class MorphTaskController {
         this.inputLocked = true;
         await this._showBubble(
             this.questionEl,
-            "Same two steps, now with Fennimals you know. Name who is wearing the hat, then decide which of the two the mix looks like."
+            "Each trial starts with a preview photo. Name who you see, then decide which of two Fennimals the morph really shows."
+        );
+        this._placeStartSpaceKey();
+        let startTarget = this.startSpaceKey || this.occluder || this.questionEl;
+        let bubbleDone = this._showBubble(
+            startTarget,
+            "Press Space when you are ready.",
+            { hideButton: true, preferredSide: "up" }
         );
         await this._beginTrialReveal();
+        await bubbleDone;
         await this._runNameQuiz(this.currentTrial);
-        await this._revealJumble(this.currentTrial);
-    }
-
-    async _showPaidIdentityBubbles() {
-        await this._showBubble(
-            this.identityKeyF || this.identityKeysGroup,
-            "F and J represent two hats. Your task is to select the hat which belongs to which Fennimal is most visible in the blurred part of the photo."
-        );
+        await this._transitionPrimeToMorph(this.currentTrial);
     }
 
     async _runStandardTrialFlow() {
         await this._beginTrialReveal();
         await this._runNameQuiz(this.currentTrial);
-        await this._revealJumble(this.currentTrial);
+        await this._transitionPrimeToMorph(this.currentTrial);
     }
 
     async _runTrial(trial) {
@@ -4856,17 +3823,10 @@ class MorphTaskController {
         this._placePolaroidChrome(trial);
         this._placeQuestion(trial);
         this._placePointsHud(this.params.maxPoints || 100);
-        this._placeProgressHud();
         this._placeTimeBars();
         this._placeOccluder();
         this._placeHiddenPrime(trial);
         await this._waitForPaint();
-        try {
-            await this._placeMorphStimulus(trial, { before: this.jumbleOccluder });
-        } catch (err) {
-            console.warn("MorphTask: jumble pre-place failed:", err);
-        }
-        this._stackForPrimePhase();
 
         if (trial.tutorial === "practice") {
             await this._runPracticeTutorial();
@@ -4877,15 +3837,9 @@ class MorphTaskController {
         }
 
         this._startMorphPhase(trial);
-        if (trial.tutorial === "practice") {
-            this.inputLocked = true;
-            await this._showPracticeIdentityBubbles();
-        } else if (trial.tutorial === "paid") {
-            this.inputLocked = true;
-            await this._showPaidIdentityBubbles();
-        }
         let choice = await this._runMorphUntilResponse(trial);
         this._stopMorph();
+        this._handleNoiseAfterChoice();
         this._pointsFrozen = true;
         this._inputStage = null;
 
@@ -4896,15 +3850,14 @@ class MorphTaskController {
         let scoreT = Math.min(1, Math.max(0, elapsed) / T);
         let remaining = Math.max(0, Math.round(maxPoints * (1 - scoreT)));
         let late = scoreT >= 1;
-        let mixWeight = this._mixWeight(trial);
+        let morphAtClick = this._currentMorphLevel != null ? this._currentMorphLevel : this._morphWeightAt(elapsed, trial);
         this._setPointsDisplay(remaining);
         this._setBarsProgress(scoreT);
 
-        let correctVsTarget = choice.selected_id === trial.correctId;
-        let scoredCorrect = trial.mix === 50 ? true : correctVsTarget;
+        let correct = choice.selected_id === trial.correctId;
         let awarded = 0;
         if (!trial.is_practice) {
-            if (scoredCorrect) {
+            if (correct) {
                 awarded = remaining;
                 this.sessionPoints += awarded;
             } else {
@@ -4913,6 +3866,7 @@ class MorphTaskController {
             }
         }
 
+        let spec = this._morphSpec(trial);
         this.answers.push({
             trial_index: this.currentTrialIndex,
             trial_id: trial.id,
@@ -4920,36 +3874,32 @@ class MorphTaskController {
             kind: trial.kind || (trial.is_practice ? "practice" : null),
             role: trial.role,
             is_practice: !!trial.is_practice,
-            question: this._identityPrompt(trial),
+            question: trial.question,
             fenA_id: trial.fenA ? trial.fenA.id : null,
             fenB_id: trial.fenB ? trial.fenB.id : null,
             fenA_head: trial.fenA ? trial.fenA.head : null,
             fenB_head: trial.fenB ? trial.fenB.head : null,
             target_id: trial.correctId,
-            target_head: trial.targetFen ? trial.targetFen.head : (trial.shapeTarget || null),
-            other_id: trial.otherFen ? trial.otherFen.id : (trial.shapeOther || null),
-            distractor_id: trial.otherFen ? trial.otherFen.id : (trial.shapeOther || null),
-            distractor_head: trial.otherFen ? trial.otherFen.head : (trial.shapeOther || null),
+            other_id: trial.otherFen ? trial.otherFen.id : null,
             correct_id: trial.correctId,
             selected_id: choice.selected_id,
             selected_side: choice.selected_side || null,
-            correct_vs_target: correctVsTarget,
-            scored_correct: scoredCorrect,
-            correct: scoredCorrect,
-            mix: trial.mix,
-            mix_weight: mixWeight,
+            correct: correct,
             late: late,
             timeout: late,
             reaction_time_ms: rt,
-            grayscale: true,
-            morph_level_at_click: Math.round(mixWeight * 1000) / 1000,
-            assigned_morph: this.assignedMorph || null,
+            morph_centerpoint: trial.morphCenterpoint != null ? trial.morphCenterpoint : null,
+            noise: trial.noise != null ? trial.noise : 0,
+            grayscale: !!trial.grayscale,
+            t_mid_ms: Math.round(spec.tMid),
+            tau_ms: Math.round(spec.tau),
+            morph_level_at_click: Math.round(morphAtClick * 1000) / 1000,
             morph_mode: trial.morph || null,
             morph_renderer: this.activeRenderer,
             mesh_fallback_reason: this.meshFallbackReason,
             mesh_target_diagnostics: this.meshData ? this.meshData.target.diagnostics : null,
             mesh_other_diagnostics: this.meshData ? this.meshData.other.diagnostics : null,
-            mesh_triangle_count: (this.meshData && this.meshData.triangles) ? this.meshData.triangles.length : null,
+            mesh_triangle_count: this.meshData ? this.meshData.triangles.length : null,
             prime: (trial.prime && trial.prime.log) ? Object.assign({}, trial.prime.log) : null,
             prime_name_quiz: this._primeNameQuizResult ? {
                 correct_id: this._primeNameQuizResult.correct_id,
@@ -4962,8 +3912,8 @@ class MorphTaskController {
                 presented_options: (this._primeNameQuizResult.presented_options || []).slice(),
                 button_order_ids: (this._primeNameQuizResult.button_order_ids || []).slice()
             } : null,
-            view: "closeup",
-            resolve_trial: false,
+            view: trial.view || null,
+            resolve_trial: this.resolveTrial,
             button_sides: this.optionSides ? Object.assign({}, this.optionSides) : null,
             presented_ids: trial.options.map((o) => o.id),
             presented_options: trial.options.map((o) => ({ id: o.id, label: o.label })),
@@ -4981,6 +3931,9 @@ class MorphTaskController {
             AudioCont.play_sound_effect("button_click");
         }
 
+        if (this.resolveTrial) {
+            await this._resolveToTruth();
+        }
         this._clearIdentityKeys();
         await this._flyPolaroidToSide(choice.selected_side === "right" ? "J" : "F");
         await this._fadeSceneOut();

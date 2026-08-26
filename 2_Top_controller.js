@@ -101,6 +101,7 @@ class DataController {
             // Easy-access between-subjects draw for hat_binding_task (also mirrored
             // under phaseRandomizations for Layer 1 refresh restore).
             hatBindingAssignment: null,
+            morphAssignment: null,
             avatar: null,
             attentionData: null,
             totalDuration: 0,
@@ -178,6 +179,12 @@ class DataController {
                         this.experimentData.phaseRandomizations = JSON.parse(
                             JSON.stringify(earlySession.assignment.phaseRandomizations)
                         );
+                        let morphRec = this.experimentData.phaseRandomizations.morph_assigned_method;
+                        if (morphRec) {
+                            this.experimentData.morphAssignment = typeof morphRec === "object"
+                                ? JSON.parse(JSON.stringify(morphRec))
+                                : { morph: morphRec };
+                        }
                     }
                     this.experimentData.assignmentRestored = true;
                     this.didRestoreAssignment = true;
@@ -1280,9 +1287,9 @@ class TrialGenerator {
                 }
             }
 
-            if (phase.type === "morph_task") {
+            if (phase.type === "morph_task_two_stage_development") {
                 if (!Array.isArray(phase.names_options) || phase.names_options.length === 0) {
-                    errors.push(`${label} names_options is required (non-empty Fennimal ids) for morph_task.`);
+                    errors.push(`${label} names_options is required (non-empty Fennimal ids) for ${phase.type}.`);
                 } else {
                     phase.names_options.forEach((id, i) => {
                         if (id === undefined || id === null || String(id).trim() === "") {
@@ -1434,6 +1441,129 @@ class TrialGenerator {
                 }
                 if (phase.resolve_trial !== undefined && typeof phase.resolve_trial !== "boolean") {
                     errors.push(`${label} resolve_trial must be true or false when set.`);
+                }
+                if (phase.trial_speed !== undefined && phase.trial_speed !== null && phase.trial_speed !== "") {
+                    let speed = Number(phase.trial_speed);
+                    if (!Number.isFinite(speed) || speed <= 0) {
+                        errors.push(`${label} trial_speed must be a positive number of milliseconds (got "${phase.trial_speed}").`);
+                    }
+                }
+            }
+
+            if (phase.type === "morph_task") {
+                if (!Array.isArray(phase.names_options) || phase.names_options.length === 0) {
+                    errors.push(`${label} names_options is required (non-empty Fennimal ids) for morph_task.`);
+                } else {
+                    phase.names_options.forEach((id, i) => {
+                        if (id === undefined || id === null || String(id).trim() === "") {
+                            errors.push(`${label} names_options[${i}] is empty.`);
+                            return;
+                        }
+                        let sid = String(id).trim();
+                        if (!knownIdSet.has(sid)) {
+                            errors.push(
+                                `${label} names_options[${i}] "${sid}" is not a Fennimal id ` +
+                                `(known: ${[...knownIdSet].join(", ")}).`
+                            );
+                        }
+                    });
+                }
+                let hasTrials = Array.isArray(phase.trials) && phase.trials.length > 0;
+                let builderFailed = false;
+                if (!hasTrials) {
+                    try {
+                        if (typeof MorphTaskController === "undefined"
+                            || typeof MorphTaskController.buildFactorialTrialBlocks !== "function") {
+                            throw new Error("trials is empty and MorphTask trial builder is not loaded.");
+                        }
+                        phase.trials = MorphTaskController.buildFactorialTrialBlocks(phase);
+                    } catch (err) {
+                        builderFailed = true;
+                        errors.push(`${label} ${err && err.message ? err.message : err}`);
+                    }
+                }
+                let flatTrials = [];
+                if (!Array.isArray(phase.trials) || phase.trials.length === 0) {
+                    if (!builderFailed) {
+                        errors.push(`${label} requires trials, or morphs / mixes / pairs for the MorphTask builder.`);
+                    }
+                } else {
+                    let blocked = Array.isArray(phase.trials[0]);
+                    for (let i = 0; i < phase.trials.length; i++) {
+                        let entry = phase.trials[i];
+                        if (blocked) {
+                            if (!Array.isArray(entry)) {
+                                errors.push(
+                                    `${label} trials mixes blocks and bare trials (trials[${i}] is not an array).`
+                                );
+                                continue;
+                            }
+                            if (entry.length === 0) {
+                                errors.push(`${label} trials[${i}] block is empty.`);
+                                continue;
+                            }
+                            entry.forEach((trial, j) => {
+                                flatTrials.push({ trial, path: `trials[${i}][${j}]` });
+                            });
+                        } else if (Array.isArray(entry)) {
+                            errors.push(
+                                `${label} trials mixes bare trials and blocks (trials[${i}] is an array).`
+                            );
+                        } else {
+                            flatTrials.push({ trial: entry, path: `trials[${i}]` });
+                        }
+                    }
+                    let blank = (v) => {
+                        if (v === undefined || v === null) return true;
+                        let s = String(v).trim().toLowerCase();
+                        return s === "" || s === "none" || s === "null" || s === "neutral";
+                    };
+                    flatTrials.forEach(({ trial, path }) => {
+                        if (!trial || !trial.id) {
+                            errors.push(`${label} ${path} is missing an id.`);
+                            return;
+                        }
+                        if (!trial.fenA || !trial.fenB) {
+                            errors.push(`${label} ${path} needs fenA and fenB Fennimal ids.`);
+                        }
+                        if (!trial.target) {
+                            errors.push(`${label} ${path} needs a target (must equal fenA or fenB).`);
+                        } else if (trial.fenA && trial.fenB && trial.target !== trial.fenA && trial.target !== trial.fenB) {
+                            errors.push(`${label} ${path} target "${trial.target}" must equal fenA or fenB.`);
+                        }
+                        if (!MorphTaskController.isAllowedMix(trial.mix)) {
+                            errors.push(
+                                `${label} ${path} mix must be an integer percent from 1 to 99 (got "${trial.mix}").`
+                            );
+                        }
+                        if (trial.morph !== undefined && !["crossfade", "mesh", "silhouette"].includes(trial.morph)) {
+                            errors.push(`${label} ${path} morph must be "crossfade" | "mesh" | "silhouette" when set.`);
+                        }
+                        if (trial.prime === undefined || trial.prime === null) {
+                            errors.push(`${label} ${path} requires prime: { head, hat, name }.`);
+                        } else if (typeof trial.prime !== "object" || Array.isArray(trial.prime)) {
+                            errors.push(`${label} ${path} prime must be an object.`);
+                        } else {
+                            ["head", "hat", "name"].forEach((key) => {
+                                if (blank(trial.prime[key]) && key !== "name") return;
+                                if (blank(trial.prime[key]) && key === "name") {
+                                    errors.push(`${label} ${path} prime.name is required.`);
+                                    return;
+                                }
+                                if (blank(trial.prime[key])) return;
+                                let id = String(trial.prime[key]).trim();
+                                if (!knownIdSet.has(id)) {
+                                    errors.push(
+                                        `${label} ${path} prime.${key} "${id}" is not a Fennimal id ` +
+                                        `(known: ${[...knownIdSet].join(", ")}).`
+                                    );
+                                }
+                            });
+                        }
+                    });
+                }
+                if (phase.skip_practice !== undefined && typeof phase.skip_practice !== "boolean") {
+                    errors.push(`${label} skip_practice must be true or false when set.`);
                 }
                 if (phase.trial_speed !== undefined && phase.trial_speed !== null && phase.trial_speed !== "") {
                     let speed = Number(phase.trial_speed);
@@ -1618,6 +1748,7 @@ class TrialGenerator {
             "chimera_feature_id",
             "morph_task",
             "morph_task_two_cards",
+            "morph_task_two_stage_development",
             "hat_drop_task",
             "hat_drop_gonogo",
             "pseudoday"
@@ -1782,7 +1913,7 @@ class TrialGenerator {
             });
         }
 
-        if (phase.type === "morph_task") {
+        if (phase.type === "morph_task" || phase.type === "morph_task_two_stage_development") {
             const walkMorphTrials = (arr, prefix) => {
                 if (!Array.isArray(arr)) return;
                 let blocked = arr.length > 0 && Array.isArray(arr[0]);
@@ -1832,6 +1963,14 @@ class TrialGenerator {
             };
             walkMorphTrials(phase.trials, "trials");
             addList(phase.names_options, "names_options");
+            if (Array.isArray(phase.pairs)) {
+                phase.pairs.forEach((pair, i) => {
+                    if (!pair) return;
+                    add(pair.prime, `pairs[${i}].prime`);
+                    add(pair.fenA, `pairs[${i}].fenA`);
+                    add(pair.fenB, `pairs[${i}].fenB`);
+                });
+            }
         }
 
         if (Array.isArray(phase.blocks)) {
@@ -3215,6 +3354,20 @@ class ExperimentController {
                     );
                 }
                 break;
+            case "morph_task_two_stage_development":
+                // Archived developing-photo morph; not used by live structures.
+                this.flagMorphTaskInstructionsShown = false;
+                if (this.currentPhaseData.skip_instructions === true) {
+                    this.flagMorphTaskInstructionsShown = true;
+                    this.setupMorphTaskTwoStageDevelopmentPhase();
+                } else {
+                    this.instrCont.initializeMorphTaskInstructions(
+                        this.currentDayNum,
+                        this.currentPhaseData.day_title,
+                        this.currentPhaseData.day_body
+                    );
+                }
+                break;
             case "hat_drop_task":
             case "hat_drop_gonogo":
                 this.flagHatDropInstructionsShown = false;
@@ -3451,6 +3604,42 @@ class ExperimentController {
         this.mapCont.currently_in_location = false;
 
         let currentTask = new MorphTaskTwoCardsController(
+            pLayer,
+            this.currentPhaseData,
+            () => {
+                this.currentPhaseData.Data = this.currentPhaseData.answers || [];
+                currentTask.clean_up();
+                this.morphCont = null;
+                clear_Fennimals_interaction_layer();
+                document.getElementById("Map").style.display = "inherit";
+                this.phaseCompleted();
+            },
+            this
+        );
+        this.morphCont = currentTask;
+        currentTask.start_sequence();
+    }
+
+    // Archived: developing-photo morph_task_two_stage_development
+    // (MorphTaskTwoStageDevelopmentController).
+    setupMorphTaskTwoStageDevelopmentPhase() {
+        this.mapCont.disable_map_interactions();
+        if (this.mapCont.hide_request_instructions_button) this.mapCont.hide_request_instructions_button();
+        document.getElementById("Map").style.display = "none";
+        let iface = document.getElementById("Interface");
+        if (iface) iface.style.display = "inherit";
+        if (typeof Interface !== "undefined" && Interface.FenneFinder && Interface.FenneFinder.hide) {
+            Interface.FenneFinder.hide();
+        }
+
+        this.currentPhaseData.Data = [];
+        let pLayer = document.getElementById("Fennimals_Layer");
+        if (pLayer) pLayer.style.display = "inherit";
+        if (this.mapCont && this.mapCont.Map_Layer) this.mapCont.Map_Layer.style.display = "none";
+        this.mapCont.hide_all_locations();
+        this.mapCont.currently_in_location = false;
+
+        let currentTask = new MorphTaskTwoStageDevelopmentController(
             pLayer,
             this.currentPhaseData,
             () => {
@@ -3975,6 +4164,12 @@ class ExperimentController {
                 if (!this.flagMorphTaskInstructionsShown) {
                     this.flagMorphTaskInstructionsShown = true;
                     this.setupMorphTaskTwoCardsPhase();
+                }
+                break;
+            case "morph_task_two_stage_development":
+                if (!this.flagMorphTaskInstructionsShown) {
+                    this.flagMorphTaskInstructionsShown = true;
+                    this.setupMorphTaskTwoStageDevelopmentPhase();
                 }
                 break;
             case "hat_drop_task":

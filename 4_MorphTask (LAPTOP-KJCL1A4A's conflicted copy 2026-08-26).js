@@ -9,8 +9,7 @@
  * jumble parents' hats (prime hat excluded). Polaroid flies to the chosen side.
  * No resolve / no trial-by-trial identity feedback. Caption stays ????.
  *
- * mix: integer percent target in the jumble (1–99). 50 is the unbiased
- * special case (either identity answer is scored correct).
+ * mix: 50 | 55 | 60 | 65 = percent target in the jumble.
  * morphs: ["crossfade"|"mesh"|"silhouette", ...] is a between-subjects pool;
  * one method is assigned per subject and used for every paid trial.
  * Parents are size-normalized from the opaque silhouette, then rotated
@@ -77,8 +76,7 @@ class MorphTaskController {
         this.phaseData.morph_button_sides = this.buttonSides;
         this.phaseData.morph_prime_button_order = this.buttonOrderIds;
         this.phaseData.morph_names_options = (this.nameRoster || []).map((fen) => fen.id);
-        this.phaseData.morph_mix_levels = this._mixLevels();
-        this._assertSinglePaidMorph();
+        this.phaseData.morph_mix_levels = [50, 55, 60, 65];
     }
 
     _fail(message) {
@@ -118,12 +116,6 @@ class MorphTaskController {
 
     static morphKinds() {
         return ["crossfade", "mesh", "silhouette"];
-    }
-
-    // Percent target in the jumble. Renderer is mix/100; 50 is the unbiased score case.
-    static isAllowedMix(raw) {
-        let n = Number(raw);
-        return Number.isFinite(n) && n === Math.round(n) && n >= 1 && n <= 99;
     }
 
     _indexFennimals(stimuli) {
@@ -211,7 +203,7 @@ class MorphTaskController {
             throw new Error('morph_task needs morphs: ["crossfade"|"mesh"|"silhouette", ...] when trials is omitted.');
         }
         if (!Array.isArray(mixes) || mixes.length === 0) {
-            throw new Error("morph_task needs mixes: [integer percents 1–99, ...] when trials is omitted.");
+            throw new Error("morph_task needs mixes: [50|55|60|65, ...] when trials is omitted.");
         }
         if (!Array.isArray(pairs) || pairs.length === 0) {
             throw new Error("morph_task needs pairs: [{ prime, fenA, fenB }, ...] when trials is omitted.");
@@ -223,8 +215,8 @@ class MorphTaskController {
             }
         });
         mixes.forEach((mix, i) => {
-            if (!MorphTaskController.isAllowedMix(mix)) {
-                throw new Error(`morph_task mixes[${i}] must be an integer percent from 1 to 99 (got "${mix}").`);
+            if ([50, 55, 60, 65].indexOf(Number(mix)) < 0) {
+                throw new Error(`morph_task mixes[${i}] must be 50, 55, 60, or 65 (got "${mix}").`);
             }
         });
         return morphs.map((morph) => {
@@ -296,51 +288,10 @@ class MorphTaskController {
         this.morphsPool = pool;
         this.assignedMorph = assigned;
         this._persistRandomization(key, { morph: assigned, pool: pool.slice() });
-        let dataCont = this.expCont && this.expCont.dataCont;
-        if (dataCont && dataCont.experimentData) {
-            dataCont.experimentData.morphAssignment = { morph: assigned, pool: pool.slice() };
-        }
         this.phaseData.assigned_morph = assigned;
         this.phaseData.morph_method = assigned;
         this.phaseData.morphs_pool = pool.slice();
         this._filterTrialsToAssignedMorph(assigned);
-        console.log(
-            `%c MorphTask: assigned "${assigned}" from [${pool.join(", ")}]`,
-            "color:#6b4cff;font-weight:bold"
-        );
-    }
-
-    _mixLevels() {
-        if (Array.isArray(this.phaseData.mixes) && this.phaseData.mixes.length) {
-            return this.phaseData.mixes.map((m) => Number(m));
-        }
-        let seen = [];
-        (this.trialSpecs || []).forEach((t) => {
-            if (!t || t.is_practice) return;
-            let mix = Number(t.mix);
-            if (MorphTaskController.isAllowedMix(mix) && seen.indexOf(mix) < 0) seen.push(mix);
-        });
-        return seen;
-    }
-
-    _assertSinglePaidMorph() {
-        let paid = (this.queue || []).filter((t) => t && !t.is_practice);
-        let morphs = [];
-        paid.forEach((t) => {
-            let m = t.morph != null ? String(t.morph) : null;
-            if (m && morphs.indexOf(m) < 0) morphs.push(m);
-        });
-        if (!paid.length) return;
-        if (morphs.length !== 1) {
-            this._fail(`paid trials must use one morph method; got [${morphs.join(", ")}].`);
-        }
-        if (this.assignedMorph && morphs[0] !== this.assignedMorph) {
-            this._fail(`paid morph "${morphs[0]}" does not match assigned "${this.assignedMorph}".`);
-        }
-        console.log(
-            `%c MorphTask: ${paid.length} paid trials, morph="${morphs[0]}", mixes=[${this.phaseData.morph_mix_levels.join(", ")}]`,
-            "color:#6b4cff;font-weight:bold"
-        );
     }
 
     _filterTrialsToAssignedMorph(assigned) {
@@ -415,8 +366,8 @@ class MorphTaskController {
             this._fail(`trial "${spec.id}" target "${target.id}" must be fenA or fenB.`);
         }
         let mix = Number(spec.mix);
-        if (!MorphTaskController.isAllowedMix(mix)) {
-            this._fail(`trial "${spec.id}" mix must be an integer percent from 1 to 99 (got "${spec.mix}").`);
+        if ([50, 55, 60, 65].indexOf(mix) < 0) {
+            this._fail(`trial "${spec.id}" mix must be 50, 55, 60, or 65 (got "${spec.mix}").`);
         }
         let morph = spec.morph || "crossfade";
         if (MorphTaskController.morphKinds().indexOf(morph) < 0) {
@@ -1335,7 +1286,7 @@ class MorphTaskController {
         let key = kind === "prime" ? "primeSlot" : "jumbleSlot";
         let d = this.params[key] || (kind === "prime"
             ? { x: 0.02, y: 0.06, w: 0.42, h: 0.70 }
-            : { x: 0.34, y: 0.06, w: 0.64, h: 0.90 });
+            : { x: 0.20, y: 0.10, w: 0.78, h: 0.88 });
         return d;
     }
 
@@ -1350,6 +1301,16 @@ class MorphTaskController {
             height: well.height * f.h,
             rx: "18",
             ry: "18"
+        };
+    }
+
+    _jumbleCanvasBox(slot) {
+        let side = Math.min(slot.width * 0.99, slot.height * 0.99);
+        let pad = Math.max(4, slot.width * 0.012);
+        return {
+            side,
+            x: slot.x + slot.width - side - pad,
+            y: slot.y + (slot.height - side) / 2
         };
     }
 
@@ -2000,11 +1961,10 @@ class MorphTaskController {
         if (!Number.isFinite(scale) || scale <= 0) return;
         let cx = bbox.x + bbox.width / 2;
         let cy = bbox.y + bbox.height / 2;
-        let drawnW = bbox.width * scale;
-        let inset = Math.max(4, frameBox.width * 0.02);
+        let pad = Math.max(4, frameBox.width * 0.015);
         let wellCx = (align === "right")
-            ? (frameBox.x + frameBox.width - inset - drawnW / 2)
-            : (frameBox.x + frameBox.width / 2);
+            ? frameBox.x + frameBox.width - pad - (bbox.width * scale) / 2
+            : frameBox.x + frameBox.width / 2;
         let wellCy = frameBox.y + frameBox.height / 2;
         node.setAttribute(
             "transform",
@@ -2882,7 +2842,7 @@ class MorphTaskController {
     // Equal printed size from the opaque silhouette; rotate/translate from the eyes.
     // Face-only similarity was scaling the stocking up to match rocket eye-spacing.
     _chooseMorphFrame(target, other, canvasSize, threshold) {
-        let fitFrac = this._num("morphFitFrac", 0.76);
+        let fitFrac = this._num("morphFitFrac", 0.86);
         let pad = Math.max(8, canvasSize * 0.04);
         let extA = this._sourceExtents(target, threshold);
         let extB = this._sourceExtents(other, threshold);
@@ -3374,12 +3334,11 @@ class MorphTaskController {
         }
         let ns = "http://www.w3.org/2000/svg";
         let foreign = document.createElementNS(ns, "foreignObject");
-        let side = Math.min(slot.width * 0.98, slot.height * 0.98);
-        let inset = Math.max(4, slot.width * 0.02);
-        foreign.setAttribute("x", String(slot.x + slot.width - inset - side));
-        foreign.setAttribute("y", String(slot.y + (slot.height - side) / 2));
-        foreign.setAttribute("width", String(side));
-        foreign.setAttribute("height", String(side));
+        let box = this._jumbleCanvasBox(slot);
+        foreign.setAttribute("x", String(box.x));
+        foreign.setAttribute("y", String(box.y));
+        foreign.setAttribute("width", String(box.side));
+        foreign.setAttribute("height", String(box.side));
         foreign.style.pointerEvents = "none";
         foreign.style.overflow = "visible";
         let canvas = document.createElement("canvas");
@@ -3499,8 +3458,8 @@ class MorphTaskController {
         this.morphGroup = group;
         this.activeRenderer = "shape-crossfade";
         this._insertInPhotoWell(group, opts && opts.before ? opts.before : this.jumbleOccluder);
-        this._fitNodeInBox(this.otherIcon, slot, 0.78, 0.72, "right");
-        this._fitNodeInBox(this.targetIcon, slot, 0.78, 0.72, "right");
+        this._fitNodeInBox(this.otherIcon, slot, 0.88, 0.86, "right");
+        this._fitNodeInBox(this.targetIcon, slot, 0.88, 0.86, "right");
         this._applyMorph(this._mixWeight(trial));
         group.style.opacity = "1";
         this._currentMorphLevel = this._mixWeight(trial);

@@ -463,11 +463,11 @@ Speeded 2AFC identity DV on an **extra-wide indoor polaroid** (photo-room stage:
 
 | Field | Meaning |
 |---|---|
-| `morphs` | Between-subjects renderer pool (`["crossfade","mesh","silhouette"]`). One value is assigned per subject (persisted on `phaseRandomizations.morph_assigned_method` and `experimentData.morphAssignment`) and used for every paid trial. Also stored on the phase root as `assigned_morph` / `morph_method`, with `morphs_pool` recording the declared list. |
-| `mixes` | Mix percents (integer 1–99). Example `[50, 60, 70]`. |
+| `morphs` | Between-subjects renderer pool (`["crossfade","mesh","silhouette"]`). One value is assigned per subject (persisted on `phaseRandomizations.morph_assigned_method`) and used for every paid trial. Stored on the phase root as `assigned_morph` / `morph_method`, with `morphs_pool` recording the declared list. |
+| `mixes` | Mix percents (`[50,55,60,65]`). |
 | `pairs` | `{ prime, fenA, fenB }` leftover-of-trio rows. Each pair × each mix × both targets. Prime must not be fenA or fenB. |
 | `trials` | Optional explicit trialset (flat or blocks). If omitted, MorphTask builds blocks from `morphs` × `mixes` × `pairs`. |
-| `mix` (per trial) | Integer percent target in the jumble (1–99). At 50, either identity answer is scored correct (`scored_correct`); `correct_vs_target` still logs bias. |
+| `mix` (per trial) | `50` \| `55` \| `60` \| `65` — percent target in the jumble. At 50, either identity answer is scored correct (`scored_correct`); `correct_vs_target` still logs bias. |
 | `morph` (per trial) | `"crossfade"` (eye–mouth aligned RGB lerp) \| `"mesh"` (landmark warp to a shared geometry, then the same lerp) \| `"silhouette"` (signed-distance outline morph + lerp fill). |
 | `prime` (per trial, **required**) | `{ head, hat, name }` Fennimal ids. `head`/`hat` default from `name`. Prime must not be fenA or fenB. |
 | `names_options` | Fennimal ids for the name radial ring. **Required**. Order persisted on `phaseRandomizations.morph_prime_button_order`. |

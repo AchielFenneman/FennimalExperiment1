@@ -1929,7 +1929,7 @@ class InstructionsController {
             "instruction_element_text"
         );
         this.textElemMainInstructions.classList.add("instruction_element_nonbackground");
-        this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0].style.fontSize = "34px";
+        this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0].style.fontSize = "32px";
         this.currentInstructionsSVG.appendChild(this.textElemMainInstructions);
 
         setTimeout(() => {

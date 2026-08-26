@@ -1,6 +1,6 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["semantic_learning_star"];
+    this.Experiment_Code = ["test"];
 
     const All_Instructions_At_Start = {
         test: [],
@@ -62,20 +62,20 @@ let StimulusSettings = function () {
         test: [
             {
                 type: "morph_task",
-                skip_instructions: true,
-                skip_practice: true,
+                skip_instructions: false,
+                skip_practice: false,
                 partner_behavior: "absent",
                 trial_speed: 5000,
                 // leftover-of-trio primes (A/C/D; B is name-quiz lure).
                 // MorphTask expands morphs × mixes × pairs × both targets, then
                 // assigns one morph from morphs[] per subject (between-subjects).
                 names_options: ["A", "B", "C", "D"],
-                morphs: ["crossfade", "silhouette"], //"mesh", 
+                morphs: ["crossfade", "mesh", "silhouette"],
                 mixes: [50, 65],
                 pairs: [
                     { prime: "A", fenA: "C", fenB: "D" },
-                    { prime: "C", fenA: "A", fenB: "D" },
-                    { prime: "D", fenA: "A", fenB: "C" }
+                    //{ prime: "C", fenA: "A", fenB: "D" },
+                    //{ prime: "D", fenA: "A", fenB: "C" }
                 ]
             }
         ],
@@ -459,7 +459,7 @@ let StimulusSettings = function () {
                 randomization_id: "binding_search_condition",
                 arm_randomization_id: "binding_star_arms",
                 // Weighted by duplicates. One value is drawn per participant and persisted.
-                condition: ["group_based"], //["group_based", "pair_based", "control"]
+                condition: ["group_based", "control"], //["group_based", "pair_based", "control"]
                 hub: "B",
                 arms: ["A", "C", "D"],
                 hats: ["A", "B", "C", "D"],
@@ -508,20 +508,20 @@ let StimulusSettings = function () {
                 type: "morph_task",
                 skip_instructions: false,
                 skip_practice: false,
-                partner_behavior: "absent",
                 trial_speed: 5000,
                 // leftover-of-trio primes (A/C/D; B is name-quiz lure).
                 // MorphTask expands morphs × mixes × pairs × both targets, then
                 // assigns one morph from morphs[] per subject (between-subjects).
                 names_options: ["A", "B", "C", "D"],
-                morphs: ["crossfade", "silhouette"], //"mesh", 
-                mixes: [50, 60,70],
+                morphs: ["crossfade", "mesh", "silhouette"],
+                mixes: [50, 55, 60, 65],
                 pairs: [
                     { prime: "A", fenA: "C", fenB: "D" },
                     { prime: "C", fenA: "A", fenB: "D" },
                     { prime: "D", fenA: "A", fenB: "C" }
                 ]
-            }
+            },
+
 
             
 
@@ -546,9 +546,9 @@ let StimulusSettings = function () {
         // Four unique head codes in the test dictionary (A/B share one). The
         // forced-head pool below limits assignment to four concrete SVG heads
         // so mesh trials always morph between distinct shapes.
-        test: ["tomato", "pig", "aliengrey", "cupcake"],
+        test: ["rocket", "shark", "fly", "stocking", "giraffe" ],
         semantic_learning: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
-        semantic_learning_star: ["tomato", "pig", "aliengrey"],
+        semantic_learning_star: ["rocket", "shark", "fly", "stocking", "giraffe" ],
 
         mentalizing: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
         mentalizing_AB: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
