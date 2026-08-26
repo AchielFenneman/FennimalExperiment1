@@ -1421,4 +1421,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("P-READY")
+console.log("STAR2-READY")
