@@ -1,0 +1,60 @@
+<svg width="400" height="400" version="1.1" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+<!-- Sketch: Fennimal head shaped like a bell. Same 400x400, palette, and stroke language as Heads.svg. -->
+<defs>
+<clipPath id="bell_body_clip">
+<path d="M 200,76 C 150,76 120,102 114,152 C 108,202 106,240 88,276 C 64,318 52,338 78,348 C 118,362 158,356 200,356 C 242,356 282,362 322,348 C 348,338 336,318 312,276 C 294,240 292,202 286,152 C 280,102 250,76 200,76 Z"/>
+</clipPath>
+</defs>
+<g id="Fennimal_head_bell" class="Fennimal_head" name="Ding Dong Bell">
+
+<!-- hanging loop -->
+<path fill-rule="evenodd" d="m200 10c-22 0-40 16-40 36 0 20 18 36 40 36s40-16 40-36c0-20-18-36-40-36zm0 16c12 0 22 9 22 20s-10 20-22 20-22-9-22-20 10-20 22-20z" fill="#812c2c" stroke="#000" stroke-linecap="round" stroke-linejoin="bevel" stroke-miterlimit="0" stroke-width="3.5"/>
+
+<!-- bell body: rounded crown, flare so the rim is the widest point -->
+<path d="M 200,76 C 150,76 120,102 114,152 C 108,202 106,240 88,276 C 64,318 52,338 78,348 C 118,362 158,356 200,356 C 242,356 282,362 322,348 C 348,338 336,318 312,276 C 294,240 292,202 286,152 C 280,102 250,76 200,76 Z" fill="#ea6208" stroke="#000" stroke-linecap="round" stroke-linejoin="bevel" stroke-miterlimit="0" stroke-width="3.5"/>
+
+<!-- highlight clipped to the dome -->
+<ellipse clip-path="url(#bell_body_clip)" transform="rotate(-32 142 128)" cx="142" cy="128" rx="20" ry="11" fill="#eed671" stroke="#000" stroke-linecap="round" stroke-linejoin="bevel" stroke-width="3.5"/>
+
+<!-- gold front lip of the rim -->
+<path d="M 90,338 C 90,324 140,318 200,318 C 260,318 310,324 310,338 C 310,354 258,366 200,366 C 142,366 90,354 90,338 Z" fill="#eed671" stroke="#000" stroke-linecap="round" stroke-linejoin="bevel" stroke-miterlimit="0" stroke-width="3.5"/>
+
+<!-- hollow opening sitting on the lip -->
+<ellipse cx="200" cy="340" rx="80" ry="14" fill="#812c2c" stroke="#000" stroke-width="3.5"/>
+
+<!-- clapper -->
+<path d="M 200,340 V 366" fill="none" stroke="#000" stroke-linecap="round" stroke-width="3.5"/>
+<ellipse cx="200" cy="382" rx="18" ry="16" fill="#eed671" stroke="#000" stroke-linecap="round" stroke-linejoin="bevel" stroke-width="3.5"/>
+
+<!-- eyebrows -->
+<path class="eyebrow_happy" d="m114 134c12-18 40-22 56-6-18-2-38 2-56 6z" fill="#812c2c" stroke="#000" stroke-linecap="round" stroke-linejoin="bevel" stroke-width="3.5"/>
+<path class="eyebrow_happy" d="m286 134c-12-18-40-22-56-6 18-2 38 2 56 6z" fill="#812c2c" stroke="#000" stroke-linecap="round" stroke-linejoin="bevel" stroke-width="3.5"/>
+
+<!-- left eye -->
+<g class="eye eye_left">
+<circle class="eye_sclera" cx="146" cy="176" r="33" fill="#fff" stroke="#000" stroke-width="3.5"/>
+<g class="eye_gaze">
+<circle class="eye_iris" cx="146" cy="180" r="19" fill="#a7cdfe" stroke="#000" stroke-width="3.5"/>
+<circle class="eye_pupil" cx="146" cy="182" r="11"/>
+<circle class="eye_shine" cx="138" cy="172" r="5" fill="#fff"/>
+</g>
+</g>
+
+<!-- right eye -->
+<g class="eye eye_right">
+<circle class="eye_sclera" cx="254" cy="176" r="33" fill="#fff" stroke="#000" stroke-width="3.5"/>
+<g class="eye_gaze">
+<circle class="eye_iris" cx="254" cy="180" r="19" fill="#a7cdfe" stroke="#000" stroke-width="3.5"/>
+<circle class="eye_pupil" cx="254" cy="182" r="11"/>
+<circle class="eye_shine" cx="246" cy="172" r="5" fill="#fff"/>
+</g>
+</g>
+
+<!-- smile -->
+<g class="mouth_happy" stroke="#000" stroke-linecap="round" stroke-linejoin="bevel" stroke-width="3.5">
+<path d="M 155,228 Q 200,262 245,228 Q 200,286 155,228 Z" fill="#812c2c"/>
+<path d="M 184,252 Q 200,268 216,252 Q 200,260 184,252 Z" fill="#eed671"/>
+</g>
+
+</g>
+</svg>

@@ -558,7 +558,7 @@ class PartnerSpeechBubbleController {
     /**
      * Show a blocking partner speech bubble.
      * @param {Object} opts
-     * @param {SVGElement} opts.target - Element to point at (partner icon group, etc.)
+     * @param {SVGElement} [opts.target] Element to point at. Omit (or null) for a centered bubble with no triangle.
      * @param {string} opts.text
      * @param {string} [opts.buttonLabel="Continue"]
      * @param {boolean} [opts.hideButton=false] Skip the Continue button (caller dismisses).
@@ -580,24 +580,28 @@ class PartnerSpeechBubbleController {
 
             let p = this.params();
             let parent = document.getElementById("Interface");
-            if (!parent || !target) {
-                console.warn("PartnerSpeechBubble: missing Interface layer or target");
+            if (!parent) {
+                console.warn("PartnerSpeechBubble: missing Interface layer");
                 this.resolveConfirm();
                 this.resolveConfirm = null;
                 return;
             }
 
-            this.targetElement = target;
-            this.targetPrevFilter = target.style.filter || "";
-            target.style.filter = p.highlightFilter ||
-                "brightness(1.18) drop-shadow(0px 0px 6px #fff6b0) drop-shadow(0px 0px 18px #ffe566) drop-shadow(0px 0px 42px rgba(255, 196, 0, 1))";
-
-            let tipPoint = this.resolveTipTargetPoint(target, context);
-            let layout = this.computeLayout(tipPoint, text, hideButton ? "" : buttonLabel, p, {
-                preferredSide,
-                tipGap,
-                hideButton
-            });
+            let layout;
+            if (target) {
+                this.targetElement = target;
+                this.targetPrevFilter = target.style.filter || "";
+                target.style.filter = p.highlightFilter ||
+                    "brightness(1.18) drop-shadow(0px 0px 6px #fff6b0) drop-shadow(0px 0px 18px #ffe566) drop-shadow(0px 0px 42px rgba(255, 196, 0, 1))";
+                let tipPoint = this.resolveTipTargetPoint(target, context);
+                layout = this.computeLayout(tipPoint, text, hideButton ? "" : buttonLabel, p, {
+                    preferredSide,
+                    tipGap,
+                    hideButton
+                });
+            } else {
+                layout = this.computeCenteredLayout(text, hideButton ? "" : buttonLabel, p, { hideButton });
+            }
 
             this.root = create_SVG_group(0, 0, "partner_speech_bubble_root", "PartnerSpeechBubbleRoot");
             this.root.style.opacity = 0;
@@ -629,18 +633,19 @@ class PartnerSpeechBubbleController {
             body.style.strokeWidth = `${p.strokeWidth || 3}px`;
             bubbleGroup.appendChild(body);
 
-            let triangle = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-            triangle.setAttribute("points", layout.trianglePoints);
-            triangle.classList.add("partner_speech_bubble_triangle");
-            triangle.style.fill = p.fill || "#faf8eb";
-            triangle.style.fillOpacity = p.fillOpacity != null ? p.fillOpacity : 0.92;
-            triangle.style.stroke = p.stroke || "#4b5563";
-            triangle.style.strokeWidth = `${p.strokeWidth || 3}px`;
-            triangle.style.strokeLinejoin = "round";
-            bubbleGroup.appendChild(triangle);
-
-            // Redraw body on top of triangle base so the stroke joins cleanly.
-            bubbleGroup.appendChild(body);
+            if (layout.trianglePoints) {
+                let triangle = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                triangle.setAttribute("points", layout.trianglePoints);
+                triangle.classList.add("partner_speech_bubble_triangle");
+                triangle.style.fill = p.fill || "#faf8eb";
+                triangle.style.fillOpacity = p.fillOpacity != null ? p.fillOpacity : 0.92;
+                triangle.style.stroke = p.stroke || "#4b5563";
+                triangle.style.strokeWidth = `${p.strokeWidth || 3}px`;
+                triangle.style.strokeLinejoin = "round";
+                bubbleGroup.appendChild(triangle);
+                // Redraw body on top of triangle base so the stroke joins cleanly.
+                bubbleGroup.appendChild(body);
+            }
 
             let fo = create_SVG_foreignElement(
                 layout.bubbleX + (p.paddingX || 28),
@@ -764,6 +769,39 @@ class PartnerSpeechBubbleController {
         return {
             width: Math.min(maxWidth, Math.max(width, 120)),
             height: Math.max(height, fontSize * 1.4)
+        };
+    }
+
+    computeCenteredLayout(text, buttonLabel, p, opts) {
+        opts = opts || {};
+        let W = GenParam.SVG_width;
+        let H = GenParam.SVG_height;
+        let margin = p.edgeMargin != null ? p.edgeMargin : 24;
+        let padX = p.paddingX || 28;
+        let padY = p.paddingY || 22;
+        let hideButton = !!opts.hideButton;
+        let buttonW = hideButton ? 0 : (p.buttonWidth || 320);
+        let buttonH = hideButton ? 0 : (p.buttonHeight || 70);
+        let buttonGap = hideButton ? 0 : (p.buttonGap || 22);
+        let fontSize = p.fontSize || 32;
+        let maxWidth = p.maxWidth || 520;
+        let minWidth = p.minWidth || 280;
+        let textSize = this.measureTextSize(text, fontSize, maxWidth - 2 * padX);
+        let bubbleW = Math.max(minWidth, Math.min(maxWidth, textSize.width + 2 * padX));
+        let bubbleH = textSize.height + 2 * padY;
+        let totalH = bubbleH + buttonGap + buttonH;
+        let bubbleX = Math.max(margin, (W - bubbleW) / 2);
+        let bubbleY = Math.max(margin, (H - totalH) / 2);
+        return {
+            bubbleX,
+            bubbleY,
+            bubbleW,
+            bubbleH,
+            trianglePoints: null,
+            buttonCenterX: bubbleX + 0.5 * bubbleW,
+            buttonCenterY: bubbleY + bubbleH + buttonGap + 0.5 * buttonH,
+            fontSize,
+            fits: true
         };
     }
 

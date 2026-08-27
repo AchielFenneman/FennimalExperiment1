@@ -498,6 +498,9 @@ class DataController {
             hub: record.hub != null ? record.hub : null,
             fillers: Array.isArray(record.fillers) ? record.fillers.slice() : [],
             all_arms: Array.isArray(record.all_arms) ? record.all_arms.slice() : [],
+            joining_features: Array.isArray(record.joining_features)
+                ? record.joining_features.slice()
+                : (prev && Array.isArray(prev.joining_features) ? prev.joining_features.slice() : []),
             // Name-recall freebie. Binding reconstructs this object without these
             // fields; keep a prior pick unless the caller is explicitly setting them.
             starter_name_id: Object.prototype.hasOwnProperty.call(record, "starter_name_id")
@@ -1189,19 +1192,26 @@ class TrialGenerator {
             }
 
             if (phase.type === "hat_binding_task") {
-                if (!phase.hub) {
-                    errors.push(`${label} requires hub: a Fennimal id.`);
+                let hasHub = !!phase.hub;
+                let hasArms = Array.isArray(phase.arms);
+                if (hasHub !== hasArms) {
+                    errors.push(`${label} must set both hub and arms, or omit both (they are inferred from the Fennimal set).`);
                 }
-                if (!Array.isArray(phase.arms) || phase.arms.length < 2) {
-                    errors.push(`${label} requires arms: an array of at least 2 Fennimal ids.`);
-                } else {
-                    let armSet = new Set(phase.arms);
-                    if (armSet.size !== phase.arms.length) {
-                        errors.push(`${label} arms must not contain duplicates.`);
+                if (hasArms) {
+                    if (phase.arms.length < 2) {
+                        errors.push(`${label} requires arms: an array of at least 2 Fennimal ids.`);
+                    } else {
+                        let armSet = new Set(phase.arms);
+                        if (armSet.size !== phase.arms.length) {
+                            errors.push(`${label} arms must not contain duplicates.`);
+                        }
+                        if (phase.hub && phase.arms.includes(phase.hub)) {
+                            errors.push(`${label} hub "${phase.hub}" must not also appear in arms.`);
+                        }
                     }
-                    if (phase.hub && phase.arms.includes(phase.hub)) {
-                        errors.push(`${label} hub "${phase.hub}" must not also appear in arms.`);
-                    }
+                }
+                if (phase.hats !== undefined && !Array.isArray(phase.hats)) {
+                    errors.push(`${label} hats must be an array of Fennimal ids when set.`);
                 }
                 if (phase.fillers !== undefined && !Array.isArray(phase.fillers)) {
                     errors.push(`${label} fillers must be an array of Fennimal ids when set.`);

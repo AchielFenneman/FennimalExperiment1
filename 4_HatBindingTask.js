@@ -4,6 +4,22 @@
  * Between-subjects condition and the arm pair are sampled from phaseData,
  * persisted under experimentData.phaseRandomizations (Layer 1 refresh), and
  * mirrored to experimentData.hatBindingAssignment for easy top-level export.
+ *
+ * Visualization:
+ *   group_based — gist checks on each hop of the two-hop bound trials (the two
+ *     joining features of the selected triad). The leftover unused arm is an
+ *     unbound hat-gist. Hub B never gets its own hat-selection trial (B is only
+ *     the middle hop).
+ *   control — hat-gist for every self trial, including hub B.
+ *   pair_based — honor-system "I can picture this Fennimal" (no gist). If this
+ *     condition is re-implemented with gist, focus the questions on hub B.
+ *
+ * Join tasks (exam / shipping / party) bind the selected triad vs the leftover
+ * arm with two inclusive-OR hat-selection questions. They currently run only
+ * in group_based (TODO: control / pair_based).
+ *
+ * Hats stay hidden until gist / visualize screens are finished. Hop-catch
+ * (typed names after hat errors) is retired.
  */
 
 class HatBindingTaskController {
@@ -20,6 +36,7 @@ class HatBindingTaskController {
         this.condition = this._resolveCondition();
         this.graph = this._buildAndValidateGraph();
         this.hatFens = this._resolveHatFennimals();
+        this._validateGistCoverage();
         this.expandedTrials = this._expandBindingTrials();
         this.blocks = this._normalizeBlocks();
 
@@ -33,6 +50,7 @@ class HatBindingTaskController {
         this.tagView = null;
         this.tagDragOutline = null;
         this.laundryWire = null;
+        this.laundryClips = [];
         this.occluders = [];
         this.shelfHats = [];
         this.dummyHats = [];
@@ -50,6 +68,7 @@ class HatBindingTaskController {
         this.phaseData.binding_search_condition = this.condition;
         this.phaseData.binding_selected_arms = this.graph.selectedArmIds.slice();
         this.phaseData.binding_selected_triad = this.graph.selectedTriad.slice();
+        this.phaseData.binding_joining_features = this.graph.joiningFeatureKinds.slice();
         this.phaseData.answers = this.answers;
         if (this.expCont && this.expCont.dataCont && this.expCont.dataCont.setHatBindingAssignment) {
             this.expCont.dataCont.setHatBindingAssignment({
@@ -58,7 +77,8 @@ class HatBindingTaskController {
                 selected_triad: this.graph.selectedTriad.slice(),
                 hub: this.graph.hubId,
                 fillers: this.graph.fillerIds.slice(),
-                all_arms: this.graph.armIds.slice()
+                all_arms: this.graph.armIds.slice(),
+                joining_features: this.graph.joiningFeatureKinds.slice()
             });
         }
     }
@@ -198,12 +218,70 @@ class HatBindingTaskController {
         return combos[Math.floor(Math.random() * combos.length)].slice();
     }
 
+    _inferHubAndArms() {
+        let all = Object.values(this.fensById);
+        if (all.length < 3) {
+            this._fail("need at least 3 Fennimals to infer hub and arms.");
+        }
+        let candidates = [];
+        all.forEach((hub) => {
+            let others = all.filter((fen) => fen.id !== hub.id);
+            let armFens = [];
+            let fillerFens = [];
+            let relsSeen = new Set();
+            let ok = true;
+            others.forEach((fen) => {
+                let rels = this._relationsBetween(hub, fen);
+                if (rels.length === 0) {
+                    fillerFens.push(fen);
+                    return;
+                }
+                if (rels.length !== 1 || relsSeen.has(rels[0])) {
+                    ok = false;
+                    return;
+                }
+                relsSeen.add(rels[0]);
+                armFens.push(fen);
+            });
+            if (!ok || armFens.length < 2) return;
+            for (let i = 0; i < armFens.length; i++) {
+                for (let j = i + 1; j < armFens.length; j++) {
+                    if (this._relationsBetween(armFens[i], armFens[j]).length) ok = false;
+                }
+            }
+            if (!ok) return;
+            candidates.push({
+                hubId: hub.id,
+                armIds: armFens.map((fen) => fen.id),
+                fillerIds: fillerFens.map((fen) => fen.id)
+            });
+        });
+        if (!candidates.length) {
+            this._fail("could not infer hub/arms from the Fennimal set. Set hub and arms on the phase.");
+        }
+        if (candidates.length > 1) {
+            this._fail(
+                `Fennimal set matches ${candidates.length} hub/arm layouts ` +
+                `(hubs ${candidates.map((c) => c.hubId).join(", ")}). Set hub and arms on the phase.`
+            );
+        }
+        return candidates[0];
+    }
+
     _buildAndValidateGraph() {
         let hubId = this.phaseData.hub;
         let armIds = this.phaseData.arms;
-        if (!hubId) this._fail("hub must be a Fennimal id.");
-        if (!Array.isArray(armIds) || armIds.length < 2) {
-            this._fail("arms must be an array of at least 2 Fennimal ids.");
+        let explicitFillers = Array.isArray(this.phaseData.fillers) ? this.phaseData.fillers.slice() : [];
+        if (!hubId && !armIds) {
+            let inferred = this._inferHubAndArms();
+            hubId = inferred.hubId;
+            armIds = inferred.armIds.slice();
+            if (!explicitFillers.length) explicitFillers = inferred.fillerIds.slice();
+        } else {
+            if (!hubId) this._fail("hub must be a Fennimal id.");
+            if (!Array.isArray(armIds) || armIds.length < 2) {
+                this._fail("arms must be an array of at least 2 Fennimal ids.");
+            }
         }
         this._uniqueIds(armIds, "arms");
         if (armIds.includes(hubId)) this._fail(`hub "${hubId}" must not also appear in arms.`);
@@ -211,7 +289,6 @@ class HatBindingTaskController {
         let hub = this._getFen(hubId, "hub");
         let armFens = armIds.map((id, i) => this._getFen(id, `arms[${i}]`));
 
-        let explicitFillers = Array.isArray(this.phaseData.fillers) ? this.phaseData.fillers.slice() : [];
         this._uniqueIds(explicitFillers, "fillers");
         explicitFillers.forEach((id, i) => {
             this._getFen(id, `fillers[${i}]`);
@@ -278,6 +355,17 @@ class HatBindingTaskController {
             this._stepRelation(hub, rel, "selected triad", walkPool);
         });
 
+        // Two joining feature types of the selected triad (e.g. ABC → head+region).
+        // Unused arm D is not a joining feature of ABC; it is the unbound hat-gist.
+        let joiningFeatureKinds = selectedArmIds.map((armId) => {
+            return this._relationToFeatureKind(hubRelationByArm.get(armId));
+        });
+        if (joiningFeatureKinds.length !== 2 || new Set(joiningFeatureKinds).size !== 2) {
+            this._fail(
+                `selected triad must join on two distinct features (got ${joiningFeatureKinds.join(", ")}).`
+            );
+        }
+
         return {
             hub,
             hubId,
@@ -288,7 +376,9 @@ class HatBindingTaskController {
             selectedTriad: selectedIds.slice(),
             walkPool,
             rosterIds: rosterIds.slice(),
-            hubRelationByArm
+            hubRelationByArm,
+            joiningFeatureKinds: joiningFeatureKinds.slice(),
+            unusedArmIds: unusedArmIds.slice()
         };
     }
 
@@ -435,6 +525,12 @@ class HatBindingTaskController {
     }
 
     _defaultBindingTrialSpecs() {
+        // group_based: two-hop bound trials Y→X and X→Y via the hub (hat of the
+        // endpoint). Hub B is never itself the hat target. Leftover unused arm
+        // is a filler self-trial (hat-gist).
+        // pair_based: honor-system one-hop from the hub. If gist is added later,
+        // start on B and focus questions on B.
+        // control: self-trial hat-gist for X, H, Y, and fillers (including hub B).
         let hubId = this.graph.hubId;
         let arm1 = this.graph.selectedArmIds[0];
         let arm2 = this.graph.selectedArmIds[1];
@@ -549,15 +645,21 @@ class HatBindingTaskController {
         if (!Array.isArray(blocks) || blocks.length === 0) {
             this._fail("blocks must be a non-empty array.");
         }
-        let knownFlavours = new Set(["lost_and_found", "laundry", "gift_shop"]);
+        let knownHopFlavours = new Set(["lost_and_found", "laundry", "gift_shop"]);
+        let knownJoinFlavours = new Set(["exam", "shipping", "party"]);
         return blocks.map((block, index) => {
             if (!block || typeof block !== "object") this._fail(`blocks[${index}] is invalid.`);
             let kind = block.kind;
-            if (kind !== "binding" && kind !== "retraining") {
-                this._fail(`blocks[${index}].kind must be "binding" or "retraining".`);
+            if (kind !== "binding" && kind !== "retraining" && kind !== "join") {
+                this._fail(`blocks[${index}].kind must be "binding", "retraining", or "join".`);
             }
             if (kind === "binding") {
-                if (!knownFlavours.has(block.flavour)) {
+                if (!knownHopFlavours.has(block.flavour)) {
+                    this._fail(`blocks[${index}].flavour "${block.flavour}" is unknown.`);
+                }
+            }
+            if (kind === "join") {
+                if (!knownJoinFlavours.has(block.flavour)) {
                     this._fail(`blocks[${index}].flavour "${block.flavour}" is unknown.`);
                 }
             }
@@ -572,9 +674,6 @@ class HatBindingTaskController {
                 kind,
                 flavour: block.flavour || (kind === "retraining" ? "retraining" : null),
                 cover_story: block.cover_story || this._defaultCoverStory(kind, block.flavour),
-                hop_catch_after_errors: (typeof block.hop_catch_after_errors === "number")
-                    ? block.hop_catch_after_errors
-                    : null,
                 retraining_fennimals: retrainingIds ? retrainingIds.slice() : null
             };
         });
@@ -585,13 +684,22 @@ class HatBindingTaskController {
             return "Let's double-check that we can still match each Fennimal to their hat.";
         }
         if (flavour === "lost_and_found") {
-            return "Oh no, the Fennimals have lost their hats! Let's help return these hats to their correct owner. Unfortunately, the post office forgot to print the names on the boxes. Instead, we need to rely on your memories. One hat at a time, we will give you a description of a Fennimal. Your task is to first visualize this Fennimal. You then have to place this Fennimal's hat in the shipping box.";
+            return "Oh no, the Fennimals have lost their hats! Let's help return these hats to their correct owner. Unfortunately, the post office forgot to print the names on the boxes. Instead, we need to rely on your memories. One hat at a time, we will give you a description of a Fennimal. First, answer a few questions to help you picture that Fennimal. Then place this Fennimal's hat in the shipping box.";
         }
         if (flavour === "laundry") {
-            return "It's laundry day! All the Fennimals have had their hats washed and dried. Unfortunately, the name-tags also got washed and are now unusable. Instead, you will have to help match a new tag to the correct hat.";
+            return "It's laundry day! All the Fennimals have had their hats washed and dried. Unfortunately, the name-tags also got washed and are now unusable. Instead, you will have to help match a new tag to the correct hat. First, answer a few questions to help you picture the Fennimal. Then place the tag on that Fennimal's hat.";
         }
         if (flavour === "gift_shop") {
-            return "Let's buy some new hats for the Fennimals! One hat at a time, we will give you a description of a Fennimal. Your task is to first visualize this Fennimal. You then have to place a new version of this Fennimal's hat in the shopping cart.";
+            return "Let's buy some new hats for the Fennimals! One hat at a time, we will give you a description of a Fennimal. First, answer a few questions to help you picture that Fennimal. Then place a new version of this Fennimal's hat in the shopping cart.";
+        }
+        if (kind === "join" && flavour === "exam") {
+            return "The Fennimals have a short quiz for you. On the exam sheet, mark every hat that belongs to a Fennimal matching the description. You can change your marks before you submit.";
+        }
+        if (kind === "join" && flavour === "shipping") {
+            return "A new shipment of hats is in. You'll sort them onto two delivery routes.";
+        }
+        if (kind === "join" && flavour === "party") {
+            return "A big party is happening soon, and you need to help out with the seating arrangements. You have to assign all the Fennimals to the correct table. However, there has been a leak and the polaroids got a little smudged.";
         }
         return "Let's get to work.";
     }
@@ -689,6 +797,13 @@ class HatBindingTaskController {
         return "a " + this._relationLabel(relation);
     }
 
+    _relationToFeatureKind(relation) {
+        if (relation === "cousin") return "head";
+        if (relation === "neighbour") return "region";
+        if (relation === "playmate") return "toy";
+        this._fail(`cannot map relation "${relation}" to a gist feature.`);
+    }
+
     _targetRoleCaps(relation) {
         if (relation === "neighbour") return "NEIGHBOR";
         if (relation === "cousin") return "COUSIN";
@@ -721,13 +836,475 @@ class HatBindingTaskController {
         return steps;
     }
 
-    _hopCatchQuestionHtml(trial, revealedNames, askIndex) {
-        let truncated = {
-            cue: trial.cue,
-            path: (trial.path || []).slice(0, askIndex + 1)
-        };
-        return this._pathPromptHtml(truncated, revealedNames) + "<br>Please type the name below.";
+    _gistCfg() {
+        return (this.params && this.params.gist) ? this.params.gist : {};
     }
+
+    _usesGistQuestions() {
+        // pair_based keeps the honor-system visualize button (no gist). If gist
+        // is added later, focus questions on hub B — group_based never gives B
+        // its own hat-selection trial (B is only the middle hop).
+        return this.condition === "group_based" || this.condition === "control";
+    }
+
+    _hasGist(kind, featureId) {
+        let bucket = this._gistBucket(kind);
+        let dict = (typeof GenParam !== "undefined" && GenParam.gistDescriptions)
+            ? GenParam.gistDescriptions[bucket]
+            : null;
+        let lines = dict && dict[featureId];
+        return Array.isArray(lines) && lines.length > 0;
+    }
+
+    _validateGistCoverage() {
+        if (!this._usesGistQuestions()) return;
+        let missing = [];
+        const collect = (kind, fens) => {
+            this._uniqueFeatureIds(kind, fens).forEach((id) => {
+                if (!this._hasGist(kind, id)) {
+                    missing.push(this._gistBucket(kind) + '["' + id + '"]');
+                }
+            });
+        };
+        collect("hat", this.hatFens);
+        if (this.condition === "group_based") {
+            (this.graph.joiningFeatureKinds || []).forEach((kind) => {
+                collect(kind, this._rosterFens());
+            });
+        }
+        if (missing.length) {
+            this._fail("missing gistDescriptions." + missing.join(", gistDescriptions.") + ".");
+        }
+    }
+
+    _rosterFens() {
+        return this.graph.rosterIds.map((id) => this._getFen(id));
+    }
+
+    _fenFeatureId(fen, kind) {
+        if (kind === "head") return fen.head;
+        if (kind === "region") return fen.region;
+        if (kind === "toy") return fen.toy;
+        if (kind === "hat") return fen.hat;
+        this._fail(`unknown gist feature "${kind}".`);
+    }
+
+    _normalizeFeatureId(kind, raw) {
+        let s = raw == null ? "" : String(raw);
+        if (kind === "head") s = s.replace(/^Fennimal_head_/, "");
+        if (kind === "hat") s = s.replace(/^hat_/, "");
+        if (kind === "toy") s = s.replace(/^toy_/, "");
+        return s;
+    }
+
+    _gistBucket(kind) {
+        if (kind === "head") return "heads";
+        if (kind === "region") return "regions";
+        if (kind === "toy") return "toys";
+        if (kind === "hat") return "hats";
+        this._fail(`unknown gist feature "${kind}".`);
+    }
+
+    _sampleGistText(kind, featureId) {
+        let bucket = this._gistBucket(kind);
+        let dict = (typeof GenParam !== "undefined" && GenParam.gistDescriptions)
+            ? GenParam.gistDescriptions[bucket]
+            : null;
+        let lines = dict && dict[featureId];
+        if (!Array.isArray(lines) || lines.length === 0) {
+            this._fail(`missing gistDescriptions.${bucket}["${featureId}"].`);
+        }
+        return String(lines[Math.floor(Math.random() * lines.length)]);
+    }
+
+    _uniqueFeatureIds(kind, fens) {
+        let seen = new Set();
+        let ids = [];
+        (fens || []).forEach((fen) => {
+            let raw = this._fenFeatureId(fen, kind);
+            if (raw == null || raw === "") return;
+            let id = this._normalizeFeatureId(kind, raw);
+            if (!id || seen.has(id)) return;
+            seen.add(id);
+            ids.push(id);
+        });
+        if (!ids.length) this._fail(`no unique ${kind} values for gist options.`);
+        return ids;
+    }
+
+    _fenAtHop(trial, hopIndex) {
+        let current = trial.cue;
+        let path = trial.path || [];
+        for (let i = 0; i < hopIndex; i++) {
+            current = this._stepRelation(current, path[i], "gist hop");
+        }
+        return current;
+    }
+
+    _gistSubjectPhrase(trial, hopIndex) {
+        if (hopIndex <= 0) return "this Fennimal";
+        return "that " + this._relationLabel(trial.path[hopIndex - 1]);
+    }
+
+    _gistStem(kind, subject) {
+        let stems = this._gistCfg().stems || {};
+        let tmpl = stems[kind];
+        if (tmpl) return String(tmpl).split("{subject}").join(subject);
+        if (kind === "head") return "What does " + subject + "'s head look like?";
+        if (kind === "region") return "Where does " + subject + " live?";
+        if (kind === "toy") return "What does " + subject + " play with?";
+        if (kind === "hat") return "What does " + subject + "'s hat look like?";
+        this._fail(`no gist stem for "${kind}".`);
+    }
+
+    _gistLeadHtml(trial, hopIndex) {
+        let name = (trial.cue && trial.cue.name) ? trial.cue.name : "this Fennimal";
+        if (hopIndex <= 0) return "Visualize <b>" + name + "</b>.";
+        let rel = trial.path[hopIndex - 1];
+        let desc = this._relationDescription(rel);
+        let role = this._relationLabel(rel);
+        if (hopIndex === 1) {
+            return "<b>" + name + "</b> has " + desc + ". Visualize that " + role + ".";
+        }
+        let prior = trial.path.slice(0, hopIndex - 1).map((r) => this._relationLabel(r)).join("'s ");
+        return "<b>" + name + "</b>'s " + prior + " has " + desc + ". Visualize that " + role + ".";
+    }
+
+    _makeGistQuestion(fen, kind, subject) {
+        let poolFens = (kind === "hat") ? this.hatFens.slice() : this._rosterFens();
+        let correctId = this._normalizeFeatureId(kind, this._fenFeatureId(fen, kind));
+        if (!correctId) this._fail(`Fennimal "${fen.id}" has no ${kind} for gist.`);
+        let optionIds = this._uniqueFeatureIds(kind, poolFens);
+        if (optionIds.indexOf(correctId) < 0) {
+            this._fail(`gist ${kind} pool is missing "${correctId}" for "${fen.id}".`);
+        }
+        shuffleArray(optionIds);
+        let options = optionIds.map((id) => ({
+            value: id,
+            text: this._sampleGistText(kind, id)
+        }));
+        let correctOpt = options.filter((o) => o.value === correctId)[0];
+        return {
+            feature: kind,
+            stem: this._gistStem(kind, subject),
+            correct_value: correctId,
+            correct_text: correctOpt.text,
+            options: options
+        };
+    }
+
+    _makeGistPage(trial, hopIndex, kinds, isLast) {
+        let fen = this._fenAtHop(trial, hopIndex);
+        let subject = this._gistSubjectPhrase(trial, hopIndex);
+        let qKinds = shuffleArray(kinds.slice());
+        return {
+            leadHtml: this._gistLeadHtml(trial, hopIndex),
+            isLast: !!isLast,
+            hop_index: hopIndex,
+            visualized_id: fen.id,
+            questions: qKinds.map((kind) => this._makeGistQuestion(fen, kind, subject))
+        };
+    }
+
+    async _runVisualization(trial) {
+        if (this._usesGistQuestions()) {
+            return this._runGistVisualization(trial);
+        }
+        await this._showVisualizePrompt(trial);
+        return { kind: "honor_system", joining_features: [], n_errors: 0, pages: [] };
+    }
+
+    async _runGistVisualization(trial) {
+        let pages;
+        if (this._isSelfTrial(trial)) {
+            pages = [this._makeGistPage(trial, 0, ["hat"], true)];
+        } else {
+            let kinds = (this.graph.joiningFeatureKinds || []).slice();
+            let nHops = (trial.path || []).length;
+            pages = [];
+            for (let hop = 0; hop <= nHops; hop++) {
+                pages.push(this._makeGistPage(trial, hop, kinds, hop === nHops));
+            }
+        }
+        let out = {
+            kind: this._isSelfTrial(trial) ? "hat_gist" : "bound_hops",
+            joining_features: this._isSelfTrial(trial)
+                ? ["hat"]
+                : (this.graph.joiningFeatureKinds || []).slice(),
+            n_errors: 0,
+            pages: []
+        };
+        for (let i = 0; i < pages.length; i++) {
+            if (this.destroyed) return out;
+            let pageLog = await this._showGistPage(pages[i]);
+            out.pages.push(pageLog);
+            out.n_errors += (pageLog && pageLog.n_errors) ? pageLog.n_errors : 0;
+        }
+        return out;
+    }
+
+    _setSvgButtonLabel(btn, label) {
+        if (!btn) return;
+        let text = btn.querySelector("text");
+        if (text) text.textContent = label;
+    }
+
+    _showGistPage(page) {
+        let cfg = this._gistCfg();
+        let instruction = cfg.instruction
+            || "Select the option which most accurately describes the answer";
+        let checkLabel = cfg.checkLabel || "Check";
+        let continueLabel = cfg.continueLabel || "Continue";
+        let selectHatLine = cfg.selectHatLine || "Now select this Fennimal's hat.";
+        let placeholder = cfg.placeholder || "Choose one…";
+
+        let group = create_SVG_group(0, 0, undefined, "hat_binding_gist_panel");
+        this.ItemLayers.Plus2.appendChild(group);
+
+        let catcher = create_SVG_rect(0, 0, this.W, this.H);
+        catcher.setAttribute("fill", "#111");
+        catcher.style.opacity = 0.22;
+        catcher.style.pointerEvents = "all";
+        group.appendChild(catcher);
+
+        let panelW = 0.78 * this.W;
+        let panelX = (this.W - panelW) / 2;
+        let panel = create_SVG_rect(panelX, 0, panelW, 200);
+        panel.setAttribute("rx", 28);
+        panel.setAttribute("fill", "rgba(250, 246, 236, 0.96)");
+        panel.setAttribute("stroke", "rgba(184, 159, 93, 0.9)");
+        panel.setAttribute("stroke-width", "6");
+        group.appendChild(panel);
+
+        let wrap = create_SVG_foreignElement(panelX + 36, 0, panelW - 72, 900);
+        wrap.style.pointerEvents = "auto";
+        wrap.style.overflow = "visible";
+        let div = document.createElement("div");
+        div.style.width = "100%";
+        div.style.height = "auto";
+        div.style.display = "flex";
+        div.style.flexDirection = "column";
+        div.style.alignItems = "stretch";
+        div.style.gap = "14px";
+        div.style.color = "#3b2f14";
+        div.style.fontFamily = "Arial, sans-serif";
+        div.style.textAlign = "center";
+        wrap.appendChild(div);
+        group.appendChild(wrap);
+
+        let lead = document.createElement("div");
+        lead.style.fontSize = "28px";
+        lead.style.fontWeight = "800";
+        lead.style.lineHeight = "135%";
+        lead.innerHTML = page.leadHtml;
+        div.appendChild(lead);
+
+        let instr = document.createElement("div");
+        instr.style.fontSize = "20px";
+        instr.style.fontWeight = "600";
+        instr.style.lineHeight = "130%";
+        instr.style.color = "#5c4a2a";
+        instr.textContent = instruction;
+        div.appendChild(instr);
+
+        let pageStart = performance.now();
+        let rows = (page.questions || []).map((q) => {
+            let block = document.createElement("div");
+            block.style.width = "100%";
+            block.style.textAlign = "left";
+
+            let stem = document.createElement("div");
+            stem.textContent = q.stem;
+            stem.style.fontSize = "22px";
+            stem.style.fontWeight = "700";
+            stem.style.lineHeight = "130%";
+            stem.style.marginBottom = "8px";
+            stem.style.color = "#3b2f14";
+            block.appendChild(stem);
+
+            let answerHost = document.createElement("div");
+            let select = document.createElement("select");
+            select.style.width = "100%";
+            select.style.boxSizing = "border-box";
+            select.style.fontSize = "18px";
+            select.style.padding = "10px 12px";
+            select.style.borderRadius = "10px";
+            select.style.border = "2px solid #7a5a1e";
+            select.style.background = "#fffdf6";
+            select.style.fontFamily = "Arial, sans-serif";
+            select.style.color = "#3b2f14";
+            select.style.cursor = "pointer";
+
+            let ph = document.createElement("option");
+            ph.value = "";
+            ph.disabled = true;
+            ph.selected = true;
+            ph.textContent = placeholder;
+            select.appendChild(ph);
+            (q.options || []).forEach((opt) => {
+                let o = document.createElement("option");
+                o.value = opt.value;
+                o.textContent = opt.text;
+                select.appendChild(o);
+            });
+
+            const clearRed = () => { stem.style.color = "#3b2f14"; };
+            select.addEventListener("mousedown", clearRed);
+            select.addEventListener("focus", clearRed);
+            select.addEventListener("change", clearRed);
+
+            answerHost.appendChild(select);
+            block.appendChild(answerHost);
+            div.appendChild(block);
+
+            return {
+                question: q,
+                stem: stem,
+                select: select,
+                answerHost: answerHost,
+                locked: false,
+                n_errors: 0,
+                attempts: []
+            };
+        });
+
+        let nextHint = document.createElement("div");
+        nextHint.style.display = "none";
+        nextHint.style.fontSize = "26px";
+        nextHint.style.fontWeight = "800";
+        nextHint.style.lineHeight = "135%";
+        nextHint.textContent = selectHatLine;
+        div.appendChild(nextHint);
+
+        let btnHolder = create_SVG_group(0, 0);
+        let btn = create_SVG_buttonElement(
+            this.W / 2,
+            0,
+            Math.max(420, 18 * Math.max(checkLabel.length, continueLabel.length)),
+            72,
+            checkLabel,
+            26
+        );
+        btn.style.cursor = "pointer";
+        btnHolder.appendChild(btn);
+        group.appendChild(btnHolder);
+
+        const layout = () => {
+            let padTop = 28;
+            let padBot = 24;
+            let gap = 18;
+            let btnH = 72;
+            wrap.setAttribute("width", panelW - 72);
+            wrap.setAttribute("height", 1100);
+            div.style.height = "auto";
+            void div.offsetHeight;
+            let textH = Math.max(div.scrollHeight, 40);
+            let panelH = padTop + textH + gap + btnH + padBot;
+            panelH = Math.min(panelH, 0.92 * this.H);
+            let panelY = Math.max(0.03 * this.H, (this.H - panelH) / 2);
+            panel.setAttribute("x", panelX);
+            panel.setAttribute("y", panelY);
+            panel.setAttribute("width", panelW);
+            panel.setAttribute("height", panelH);
+            wrap.setAttribute("x", panelX + 36);
+            wrap.setAttribute("y", panelY + padTop);
+            wrap.setAttribute("height", Math.max(40, panelH - padTop - gap - btnH - padBot));
+            btnHolder.style.transform = "translate(0px, " + (panelY + panelH - padBot - btnH / 2) + "px)";
+        };
+        layout();
+        requestAnimationFrame(layout);
+
+        const lockRow = (row) => {
+            row.locked = true;
+            if (row.select && row.select.parentNode) row.select.remove();
+            let text = document.createElement("div");
+            text.textContent = row.question.correct_text;
+            text.style.fontSize = "20px";
+            text.style.fontWeight = "600";
+            text.style.lineHeight = "135%";
+            text.style.color = "#1f7a3a";
+            text.style.paddingLeft = "22px";
+            row.answerHost.appendChild(text);
+            row.stem.style.color = "#3b2f14";
+        };
+
+        const buildPageLog = () => {
+            let nErrors = 0;
+            let questions = rows.map((row) => {
+                nErrors += row.n_errors;
+                return {
+                    feature: row.question.feature,
+                    stem: row.question.stem,
+                    correct_value: row.question.correct_value,
+                    correct_text: row.question.correct_text,
+                    option_values: (row.question.options || []).map((o) => o.value),
+                    option_texts: (row.question.options || []).map((o) => o.text),
+                    n_errors: row.n_errors,
+                    attempts: row.attempts.slice()
+                };
+            });
+            return {
+                hop_index: page.hop_index,
+                visualized_id: page.visualized_id,
+                is_last: !!page.isLast,
+                n_errors: nErrors,
+                rt_ms: Math.round(performance.now() - pageStart),
+                questions: questions
+            };
+        };
+
+        return new Promise((resolve) => {
+            let busy = false;
+            let mode = "check";
+            btn.onpointerdown = async () => {
+                if (busy || this.destroyed) return;
+                if (mode === "continue") {
+                    busy = true;
+                    if (typeof AudioCont !== "undefined") AudioCont.play_sound_effect("button_click");
+                    await this._animateGroupUpAndOut(group);
+                    resolve(buildPageLog());
+                    return;
+                }
+                if (rows.some((row) => !row.locked && row.select && !row.select.value)) return;
+                busy = true;
+                let anyWrong = false;
+                let anyNewCorrect = false;
+                rows.forEach((row) => {
+                    if (row.locked) return;
+                    let val = row.select.value;
+                    let correct = val === row.question.correct_value;
+                    row.attempts.push({
+                        selected_value: val,
+                        correct: correct,
+                        rt_from_page_ms: Math.round(performance.now() - pageStart)
+                    });
+                    if (correct) {
+                        anyNewCorrect = true;
+                        lockRow(row);
+                    } else {
+                        anyWrong = true;
+                        row.n_errors += 1;
+                        row.stem.style.color = "#c0392b";
+                    }
+                });
+                if (anyNewCorrect && typeof AudioCont !== "undefined") {
+                    AudioCont.play_sound_effect("positive");
+                }
+                if (anyWrong && typeof AudioCont !== "undefined") {
+                    AudioCont.play_sound_effect("rejected");
+                }
+                if (rows.every((row) => row.locked)) {
+                    if (page.isLast) nextHint.style.display = "block";
+                    this._setSvgButtonLabel(btn, continueLabel);
+                    mode = "continue";
+                }
+                layout();
+                requestAnimationFrame(layout);
+                busy = false;
+            };
+        });
+    }
+
 
     async start_sequence() {
         try {
@@ -758,15 +1335,31 @@ class HatBindingTaskController {
             if (this.destroyed) return;
             this.currentBlockIndex = b;
             this.currentBlock = this.blocks[b];
+            // TODO: join tasks (exam / shipping / party) are group_based-only for now.
+            // Skip them for control and pair_based until those conditions get a join design.
+            if (this.currentBlock.kind === "join" && this.condition !== "group_based") {
+                continue;
+            }
             this._setLocator(this.currentBlock.flavour);
             this._clearScene();
             this._setSceneOpacity(1);
             this._paintBackground(this.currentBlock.flavour);
-            await this._showCoverStory(this.currentBlock.cover_story);
+            if (this.currentBlock.kind === "join" && this.currentBlock.flavour === "party") {
+                await this._showJoinBubble(this.currentBlock.cover_story);
+            } else if (this.currentBlock.kind === "join" && this.currentBlock.flavour === "shipping") {
+                let bubble = (this.params.join && this.params.join.shippingBubble)
+                    || this.currentBlock.cover_story
+                    || "A new batch of hats has arrived. They will be delivered across the island along two routes, A and B.";
+                await this._showJoinBubble(bubble);
+            } else {
+                await this._showCoverStory(this.currentBlock.cover_story);
+            }
             if (this.currentBlock.kind === "binding") {
                 await this._runBindingBlock(this.currentBlock, b);
-            } else {
+            } else if (this.currentBlock.kind === "retraining") {
                 await this._runRetrainingBlock(this.currentBlock, b);
+            } else {
+                await this._runJoinBlock(this.currentBlock, b);
             }
         }
 
@@ -800,10 +1393,27 @@ class HatBindingTaskController {
             this._paintGiftShopRoom();
             return;
         }
+        if (flavour === "exam" || flavour === "shipping" || flavour === "party") {
+            this._paintJoinRoom(flavour);
+            return;
+        }
         let bg = create_SVG_rect(0, 0, this.W, this.H);
         bg.setAttribute("fill", "#ffffff");
         bg.style.opacity = "0.92";
         this.ItemLayers.Neg1.appendChild(bg);
+    }
+
+    _paintJoinRoom(flavour) {
+        let join = this.params.join || {};
+        let bg = join.background;
+        if (flavour === "exam") {
+            bg = join.examBackground || "./Locations/Home_classroom.png";
+        } else if (flavour === "party") {
+            bg = join.partyBackground || "./Locations/Home_ballroom.png";
+        } else {
+            bg = join.shippingBackground || join.background || "./Locations/Home_warehouse.png";
+        }
+        this._paintRoomPhoto(Object.assign({}, join, { background: bg }));
     }
 
     _paintRoomPhoto(p) {
@@ -1078,6 +1688,7 @@ class HatBindingTaskController {
         this.tagView = null;
         this.tagDragOutline = null;
         this.laundryWire = null;
+        this.laundryClips = [];
         this.occluders = [];
         this.shelfHats = [];
         this.dummyHats = [];
@@ -1128,6 +1739,7 @@ class HatBindingTaskController {
     }
 
     async _showVisualizePrompt(trial) {
+        // pair_based only: honor-system step-through. Gist conditions use _showGistPage.
         let steps = this._visualizePromptSteps(trial);
         let selfTrial = this._isSelfTrial(trial);
         let group = create_SVG_group(0, 0, undefined, "hat_binding_panel");
@@ -1612,7 +2224,7 @@ class HatBindingTaskController {
         }
 
         await wait(40);
-        this._placeOccluders();
+        // Hats stay at opacity 0 until gist / visualize finishes (_revealBindingHats).
         await this._fadeTrialIn();
     }
 
@@ -1662,7 +2274,9 @@ class HatBindingTaskController {
         clip.setAttribute("stroke", "#5c4a2a");
         clip.setAttribute("stroke-width", "3");
         clip.style.pointerEvents = "none";
+        clip.style.opacity = "0";
         this.ItemLayers.Plus1.appendChild(clip);
+        this.laundryClips.push(clip);
     }
 
     _hangHatFromWire(hat, x, wireY) {
@@ -1756,7 +2370,7 @@ class HatBindingTaskController {
             let t = fens.length === 1 ? 0.5 : (i + 0.5) / fens.length;
             let x = x0 + t * (x1 - x0);
             let wireY = this._laundryWireY(x);
-            let hat = this._placeHat(fen, x, wireY + 90, { opacity: 1, pointerEvents: false });
+            let hat = this._placeHat(fen, x, wireY + 90, { opacity: 0, pointerEvents: false });
             this._hangHatFromWire(hat, x, wireY);
             this._drawLaundryClip(x, wireY);
             return hat;
@@ -1817,7 +2431,7 @@ class HatBindingTaskController {
                 let dummy = this._placeHat(fen, startX + d * dx, row.y, {
                     parent: row.parent,
                     pointerEvents: false,
-                    opacity: 1,
+                    opacity: 0,
                     scale: hatScale,
                     id: "binding_hat_" + fen.id + "_d" + d + "_" + i
                 });
@@ -1827,7 +2441,7 @@ class HatBindingTaskController {
             let active = this._placeHat(fen, startX + dummyN * dx, row.y, {
                 parent: row.parent,
                 pointerEvents: false,
-                opacity: 1,
+                opacity: 0,
                 scale: hatScale,
                 id: "binding_hat_" + fen.id
             });
@@ -2068,12 +2682,32 @@ class HatBindingTaskController {
         return mouse.x >= b.left - p && mouse.x <= b.right + p && mouse.y >= b.top - p && mouse.y <= b.bottom + p;
     }
 
+    async _revealBindingHats() {
+        let elems = [];
+        const takeHat = (arr) => {
+            (arr || []).forEach((hat) => {
+                if (hat && hat.elem) elems.push(hat.elem);
+            });
+        };
+        takeHat(this.hats);
+        takeHat(this.dummyHats);
+        takeHat(this.shelfHats);
+        (this.laundryClips || []).forEach((clip) => {
+            if (clip) elems.push(clip);
+        });
+        elems.forEach((el) => {
+            el.style.transition = "opacity 380ms ease-out";
+            el.style.opacity = "1";
+        });
+        if (elems.length) await wait(380);
+    }
+
     async _runBindingTrial(block, blockIndex, trial, trialIndex) {
         await this._buildBindingRoom(block.flavour, trial);
         let visStart = performance.now();
-        await this._showVisualizePrompt(trial);
+        let gistLog = await this._runVisualization(trial);
         let visualizationRt = Math.round(performance.now() - visStart);
-        if (this._usesHatOccluders(block.flavour)) this._removeOccluders();
+        await this._revealBindingHats();
         await this._showSummaryBanner(trial, block.flavour);
 
         let log = {
@@ -2085,6 +2719,7 @@ class HatBindingTaskController {
             role: trial.role,
             selected_triad: (trial.selected_triad || this.graph.selectedTriad).slice(),
             selected_arms: this.graph.selectedArmIds.slice(),
+            joining_features: (this.graph.joiningFeatureKinds || []).slice(),
             cue_id: trial.cue_id,
             target_id: trial.target_id,
             path: trial.path.slice(),
@@ -2097,7 +2732,8 @@ class HatBindingTaskController {
             first_hat: null,
             first_correct: null,
             hat_errors: [],
-            hop_catch: null
+            gist: gistLog || null,
+            gist_n_errors: (gistLog && gistLog.n_errors) ? gistLog.n_errors : 0
         };
         let revealAt = performance.now();
         let finished = false;
@@ -2150,12 +2786,6 @@ class HatBindingTaskController {
                 recordAttempt(hatId, false);
                 if (typeof AudioCont !== "undefined") AudioCont.play_sound_effect("rejected");
                 if (block.flavour === "laundry") await this._dropTagToFloor();
-                let threshold = block.hop_catch_after_errors;
-                if (!this._isSelfTrial(trial) && typeof threshold === "number" && log.hat_errors.length >= threshold) {
-                    let revealedNames = await this._runHopCatch(trial, log);
-                    if (finished || this.destroyed) return;
-                    await this._showSummaryBanner(trial, block.flavour, revealedNames, { instant: true });
-                }
                 if (block.flavour !== "laundry") await this._snapMoversHome();
                 if (finished || this.destroyed) return;
                 this._armBindingResponse(block.flavour, trial, finishCorrect, handleMiss, handleDropAway);
@@ -2458,72 +3088,6 @@ class HatBindingTaskController {
             if (typeof previousCleanup === "function") previousCleanup();
         };
         move(startEvent);
-    }
-
-    async _runHopCatch(trial, log) {
-        if (!trial.path || !trial.path.length) return [];
-        if (!Array.isArray(log.hop_catch)) log.hop_catch = [];
-        if (!this.currentBlock || this.currentBlock.flavour !== "laundry") {
-            await this._snapMoversHome();
-        }
-
-        let dim = create_SVG_rect(0, 0, this.W, this.H);
-        dim.setAttribute("fill", "#111");
-        dim.style.opacity = 0.52;
-        dim.style.pointerEvents = "none";
-        this.ItemLayers.Plus2.appendChild(dim);
-        this._raiseSummaryBanner();
-
-        let current = trial.cue;
-        let revealedNames = [];
-        for (let i = 0; i < trial.path.length; i++) {
-            let relation = trial.path[i];
-            let next = this._stepRelation(current, relation, "hop-catch");
-            let stepStart = performance.now();
-            let result = await this._askHopCatchName(this._hopCatchQuestionHtml(trial, revealedNames, i), next);
-            log.hop_catch.push({
-                kind: "name",
-                relation,
-                from_id: current.id,
-                correct_name: next.name,
-                failed_attempts: result ? result.failedAttempts : 0,
-                name_revealed: !!(result && result.nameRevealed),
-                rt_ms: Math.round(performance.now() - stepStart)
-            });
-            revealedNames.push(next.name);
-            current = next;
-        }
-
-        if (dim.parentNode) dim.remove();
-        return revealedNames;
-    }
-
-    _askHopCatchName(questionHtml, correctFen) {
-        let panelTop = 0.08 * this.H;
-        if (this.taskBanner) {
-            let bar = this.taskBanner.querySelector("rect");
-            if (bar) {
-                panelTop = Number(bar.getAttribute("y")) + Number(bar.getAttribute("height")) + 16;
-            }
-        }
-        let overlay = new TypedNameAskOverlay(this.ItemLayers.Plus2, this.W, this.H, {
-            maxFailedAttempts: 5,
-            closeDistance: 2,
-            largePanel: true,
-            panelTop: panelTop,
-            panelFill: "rgba(250, 246, 236, 0.96)",
-            getQuestionHtml: ({ feedbackKind, nameRevealed, correctName }) => {
-                let html = questionHtml;
-                if (feedbackKind === "close") html += "<br><br>Close, but not quite yet";
-                if (feedbackKind === "far") html += "<br><br>Oops, that's not it!";
-                if (nameRevealed && correctName) {
-                    html += "<br><br><span style='display:inline-block;padding:8px 14px;background:#ffe566;border-radius:10px;'>This Fennimal is called <b>"
-                        + correctName + "</b>. Please type it below.</span>";
-                }
-                return html;
-            }
-        });
-        return overlay.waitForCorrectName(correctFen.name);
     }
 
     _getBoundsInParent(element, parent) {

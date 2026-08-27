@@ -1122,6 +1122,170 @@ GENERALPARAM = function () {
         indicatorInactiveFill: "#d0d0d0"
     }
 
+    // Gist lines for forced visualization (hat-binding hops + leftover hat-gist).
+    // Keys match runtime ids: fen.hat (no "hat_" prefix), RegionData keys, head SVG
+    // suffix (Fennimal_head_<id>), fen.toy (no "toy_" prefix).
+    // Each entry is three interchangeable correct descriptions. Sample one independently
+    // every time a question is built (including when the same feature repeats on a later hop).
+    // Heads are a starter set — add the rest of the SVG pool later.
+    // Do not use sorting labels, official region names, or head-derived character names.
+    // Missing keys fail loud in HatBindingTask — every roster head/region/toy/hat needs a line.
+    this.gistDescriptions = {
+        hats: {
+            partyhat: [
+                "A tall cone-shaped hat, the kind worn at a birthday festivity",
+                "A pointed cone that sits high on the head, with a frilly ball on top",
+                "A paper-looking cone hat, narrow at the top and wider where it meets the head"
+            ],
+            chefshat: [
+                "A tall puffy hat with a wide band, something you would wear in the kitchen",
+                "A mushroom-shaped hat that stands very high above the head, to keep hair out of any dishes",
+                "A hat with a stiff collar around the forehead and a tall cloud of white fabric piled on top"
+            ],
+            fisherhat: [
+                "A soft hat with a brim all the way around, like someone might wear on a boat",
+                "A floppy wide-brim hat that shades the face on all sides",
+                "A squashable outdoor hat whose brim droops in a full circle"
+            ],
+            strawhat: [
+                "A wide-brimmed hat with a flat, woven-looking crown",
+                "A sun hat with a broad brim and a shallow top, made from rough material",
+                "A hat that looks braided or woven, with a low top and a brim that sticks out far"
+            ],
+            tophat: [
+                "A tall stiff hat with a flat crown and a narrow brim",
+                "A formal cylinder hat that stands straight up from a small brim",
+                "A rigid tube of a hat, flat on top, with only a thin rim at the bottom"
+            ],
+            beret: [
+                "A soft, flat, round cap that sits at a slight tilt",
+                "A classy French cloth cap with almost no brim",
+                "A floppy, assymetric cap with a top-stem on the middle"
+            ],
+            fedora: [
+                "A felt hat with a pinched crown, often worn in old movies",
+                "An old-fashioned rimmed hat whose top is dented in along the middle",
+                "A brimmed hat with a crease down the crown, as if pinched between two fingers"
+            ],
+            baseballcap: [
+                "A snug cap with a stiff visor only at the front",
+                "A rounded cap with a bill sticking out over the eyes",
+                "A sporty cap that is brimless at the back and has a hard shade only in front"
+            ],
+            beanie: [
+                "A close-fitting knit cap that hugs the top of the head",
+                "A soft winter cap with no brim, pulled down over the crown",
+                "A stretchy skull-hugging cap, with no visor and no floppy brim"
+            ]
+        },
+        regions: {
+            North: [
+                "A region that had an igloo and a snowman",
+                "A snowy area with pine trees and an iceberg",
+                "A cold place where you could visit a snowman, then walk to an ice cave of a house"
+            ],
+            Jungle: [
+                "A region of dense rainforest around a hidden lake",
+                "A leafy area with thick lush bushes and limestone rocks",
+                "A green tangle of tall plants, with a still lake tucked somewhere inside it"
+            ],
+            Desert: [
+                "A hot region that had a cactus and an oasis",
+                "A dry sandy area with a wagon and a small camp",
+                "A barren sandy stretch, except for a watering hole and some spiky plants"
+            ],
+            Mountains: [
+                "A region with a mine, a steep cliff, and a waterfall",
+                "A rocky high place that has a dam",
+                "A steep, stony landscape where water pours off a cliff near an old mine"
+            ],
+            Beach: [
+                "A region with a lighthouse and a little port",
+                "A sandy shore that had a hammock and a beach bar",
+                "A coastline with boats at a dock and a tall tower for warning ships"
+            ],
+            Flowerfields: [
+                "A region that had a windmill and an orchard",
+                "A flowery area with a fountain and a statue",
+                "Open ground full of purple blossoms, with fruit trees and a mill with turning sails"
+            ],
+            Village: [
+                "A region which contained a farm and a settlement",
+                "A clustered town area with a church, a manor, and a gatehouse",
+                "A small settled patch with barns and fields beside a few large buildings"
+            ],
+            Swamp: [
+                "A region of marsh and bayou with a small cottage",
+                "A wet, tree-filled lowland with lots of standing water",
+                "A soggy, flooded woodland, with a lonely cottage among the pools"
+            ]
+        },
+        heads: {
+            tomato: [
+                "A round head with leaves on top",
+                "A plump, ball-shaped head with a little leafy cap at the crown",
+                "A nearly spherical head, smooth all over except for foliage sitting on the very top"
+            ],
+            pig: [
+                "A head with a wide snout and floppy ears",
+                "A snouted head with two small ears sticking out to the sides",
+                "A roundish head whose nose is a broad disk, with ears that hang rather than point up"
+            ],
+            bell: [
+                "A head with a small loop on top, and wider at the base than at the top",
+                "A plump head with a little ring-shaped handle at the crown, and a ball at the chin",
+                "A flared-base head small loop sitting on the very top, and a dark lip along the bottom"
+            ],
+            aliengrey: [
+                "A tall oval head with huge slanted eyes",
+                "A bald, oblong head whose eyes take up most of the face",
+                "A stretched, egg-shaped head with almost no nose, and eyes like large almonds"
+            ],
+            cupcake: [
+                "A head with swirled frosting on top and a ridged cup below",
+                "A pastry-shaped head with a crinkled wrapper-like base and a peaked swirl",
+                "A head that looks baked in a fluted cup, with a piled swirl instead of hair"
+            ]
+        },
+        toys: {
+            globe: [
+                "A shocking glass ball on a stand that sits on a small control box",
+                "A round sphere on a pedestal, with a panel of lights at the base",
+                "A clear sphere on a footed stand, with buttons or lights in the box underneath"
+            ],
+            robot: [
+                "A small figure with a boxy body and a mechanical head",
+                "electronic, with arms and a square torso",
+                "A stiff little person made of rectangles, with jointed arms sticking out"
+            ],
+            bubblewand: [
+                "A looped wand with a bottle of soap",
+                "A wand with a ring at the top and a bottle beside it",
+                "A stick ending in an open circle, kept next to a bottle you dip it in"
+            ],
+            car: [
+                "An object with wheels and a windshield",
+                "A four-wheeled vehicle with a little cabin",
+                "A miniature road vehicle, with a window in front and wheels at the corners"
+            ],
+            trumpet: [
+                "A horn with a flared bell and valves along the tubing",
+                "A brass-like wind instrument with a wide opening at one end",
+                "A coiled horn you blow into, widening into a bell, with buttons on top of the tubes"
+            ],
+            plane: [
+                "A vehicle with wings and a propeller at the nose",
+                "A small flying vehicle with a tail and spinning blades in front",
+                "A miniature aircraft: wings on the sides, a tail at the back, and a spinner up front"
+            ],
+            jack: [
+                "A cranked box with a figure on a spring inside",
+                "A box with a handle on the side and a spring-headed figure that pops up",
+                "A cube you wind with a crank, until a spring-mounted face jumps out of it"
+            ]
+        }
+    };
+
     // Hat binding / retraining phase (placeholder layouts; swap art later)
     this.HatBinding = {
         hatScale: 3.1,
@@ -1130,17 +1294,28 @@ GENERALPARAM = function () {
         snapBackMs: 280,
         trialGapMs: 450,
         occluderSize: 150,
+        // Day N card copy (stimulus blocks may still override day_title / day_body)
+        dayTitle: "odd jobs in the Center of Fenneland",
+        dayBody:
+            "Today you are tasked with various odd jobs in the Center of Fenneland.<br><br>" +
+            "You will work through a few different jobs today. In each one, you will first picture a Fennimal, then use what you remember to pick the right hat.",
         flavourColors: {
             lost_and_found: "#efe6d4",
             laundry: "#dce8ef",
             gift_shop: "#f3ddd6",
-            retraining: "#ece4d4"
+            retraining: "#ece4d4",
+            exam: "#ece6da",
+            shipping: "#e4e8ee",
+            party: "#eadfd3"
         },
         flavourNames: {
             lost_and_found: "Lost & found",
             laundry: "Laundry room",
             gift_shop: "Gift shop",
-            retraining: "Photo studio"
+            retraining: "Photo studio",
+            exam: "Quiz room",
+            shipping: "Shipping desk",
+            party: "Banquet hall"
         },
         hatSpread: { left: 0.12, right: 0.88 },
         flavourPrompts: {
@@ -1202,6 +1377,51 @@ GENERALPARAM = function () {
             hatButtonScale: 3.6,
             toyScale: 2.2,
             toyDropShadow: "drop-shadow(0px 0px 2px rgba(255,255,255,0.95)) drop-shadow(0px 1px 5px rgba(255,255,255,0.7))"
+        },
+        gist: {
+            instruction: "Select the option which most accurately describes the answer",
+            checkLabel: "Check",
+            continueLabel: "Continue",
+            selectHatLine: "Now select this Fennimal's hat.",
+            placeholder: "Choose one…",
+            stems: {
+                head: "What does {subject}'s head look like?",
+                region: "Where does {subject} live?",
+                toy: "What does {subject} play with?",
+                hat: "What does {subject}'s hat look like?"
+            }
+        },
+        join: {
+            background: "./Locations/Home_warehouse.png",
+            examBackground: "./Locations/Home_classroom.png",
+            shippingBackground: "./Locations/Home_shippingdock.png",
+            partyBackground: "./Locations/Home_ballroom.png",
+            overlayOpacity: 0.32,
+            promptTemplate: "Please select the hat(s) of every Fennimal {clause1}, <b>and/or</b> every Fennimal who {who2}.",
+            partyCaptionTemplate: "Table {n}: {clause1}, <b>and/or</b> every Fennimal who {who2}",
+            partyTopPrompt: "Circle the correct photos on each table",
+            checkLabel: "Check Answers",
+            submitLabel: "Submit",
+            reviseLine: "Please revise your answers and submit again!",
+            shippingError: "There are some mistakes on your answers — please check again.",
+            shippingErrorY: 0.82,
+            shippingErrorMs: 1000,
+            shippingErrorFadeMs: 400,
+            shippingBubble:
+                "A new batch of hats has arrived. They will be delivered across the island along two routes, A and B.",
+            examTitle: "Fenneland Natural History",
+            examSubtitle: "Hat Identification Quiz",
+            successBeatMs: 1000,
+            examSuccessBeatMs: 2000,
+            examTiltDeg: -3.5,
+            examHatScale: 2.15,
+            shippingHatScale: 2.35,
+            shippingStampR: 93,
+            polaroidScale: 0.28,
+            partyPolaroidW: 186,
+            partyPolaroidH: 232,
+            hatBoxW: 200,
+            hatBoxH: 185
         }
     }
 

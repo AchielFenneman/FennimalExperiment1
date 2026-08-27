@@ -1,6 +1,6 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["semantic_learning_star"];
+    this.Experiment_Code = ["test"];
 
     const All_Instructions_At_Start = {
         test: [],
@@ -60,66 +60,22 @@ let StimulusSettings = function () {
 
     let All_Experiment_Structures = {
         test: [
-            {type: "hat_binding_task",
-                skip_instructions: false,
-                randomization_id: "binding_search_condition",
-                arm_randomization_id: "binding_star_arms",
-                // Weighted by duplicates. One value is drawn per participant and persisted.
-                condition: ["group_based"], //["group_based", "pair_based", "control"]
-                retraining_fennimals: ["A", "B", "C", "D"],
-                blocks: [
-                    {
-                        kind: "join",
-                        flavour: "exam"
-                    },
-                    {
-                        kind: "join",
-                        flavour: "shipping"
-                    },
-                    {
-                        kind: "join",
-                        flavour: "party"
-                    },
-                    {
-                        kind: "binding",
-                        flavour: "lost_and_found",
-                        cover_story: "Oh no, the Fennimals have lost their hats! Let's help return these hats to their correct owner. Unfortunately, the post office forgot to print the names on the boxes. Instead, we need to rely on your memories. One hat at a time, we will give you a description of a Fennimal. First, answer a few questions to help you picture that Fennimal. Then place this Fennimal's hat in the shipping box."
-                    },
-                    
-                    {
-                        kind: "retraining",
-                        cover_story: "Let's double-check that we can still match each Fennimal to their hat. You will see a photo of a Fennimal — pick the hat that belongs to them."
-                    },
-                    {
-                        kind: "binding",
-                        flavour: "laundry",
-                        cover_story: "It's laundry day! All the Fennimals have had their hats washed and dried. Unfortunately, the name-tags also got washed and are now unusable. Instead, you will have to help match a new tag to the correct hat. First, answer a few questions to help you picture the Fennimal. Then place the tag on that Fennimal's hat."
-                    },
-                    
-                    {
-                        kind: "binding",
-                        flavour: "gift_shop",
-                        cover_story: "Let's buy some new hats for the Fennimals! One hat at a time, we will give you a description of a Fennimal. First, answer a few questions to help you picture that Fennimal. Then place a new version of this Fennimal's hat in the shopping cart."
-                    },
-                    
-                ]
-            },
             {
                 type: "morph_task",
-                skip_instructions: true,
-                skip_practice: true,
+                skip_instructions: false,
+                skip_practice: false,
                 partner_behavior: "absent",
                 trial_speed: 5000,
                 // leftover-of-trio primes (A/C/D; B is name-quiz lure).
                 // MorphTask expands morphs × mixes × pairs × both targets, then
                 // assigns one morph from morphs[] per subject (between-subjects).
                 names_options: ["A", "B", "C", "D"],
-                morphs: ["crossfade", "silhouette"], //"mesh", 
+                morphs: ["crossfade", "mesh", "silhouette"],
                 mixes: [50, 65],
                 pairs: [
                     { prime: "A", fenA: "C", fenB: "D" },
-                    { prime: "C", fenA: "A", fenB: "D" },
-                    { prime: "D", fenA: "A", fenB: "C" }
+                    //{ prime: "C", fenA: "A", fenB: "D" },
+                    //{ prime: "D", fenA: "A", fenB: "C" }
                 ]
             }
         ],
@@ -294,12 +250,19 @@ let StimulusSettings = function () {
                 randomization_id: "binding_search_condition",
                 // Weighted by duplicates. One value is drawn per participant and persisted.
                 condition: ["group_based", "control"], //["group_based", "pair_based", "control"],
+                hub: "B",
+                arms: ["A", "C"],
+                fillers: ["D1", "D2"],
+                hats: ["A", "B", "C", "D1", "D2"],
                 retraining_fennimals: ["A", "B", "C", "D1", "D2"],
+                day_title: "odd jobs in the Center of Fenneland",
+                day_body: "Today you are tasked with various odd jobs in the Center of Fenneland.",
                 blocks: [
                     {
                         kind: "binding",
                         flavour: "lost_and_found",
-                        cover_story: "Oh no, the Fennimals have lost their hats! Let's help return these hats to their correct owner. Unfortunately, the post office forgot to print the names on the boxes. Instead, we need to rely on your memories. One hat at a time, we will give you a description of a Fennimal. First, answer a few questions to help you picture that Fennimal. Then place this Fennimal's hat in the shipping box."
+                        hop_catch_after_errors: 2,
+                        cover_story: "Oh no, the Fennimals have lost their hats! Let's help return these hats to their correct owner. Unfortunately, the post office forgot to print the names on the boxes. Instead, we need to rely on your memories. One hat at a time, we will give you a description of a Fennimal. Your task is to first visualize this Fennimal. You then have to place this Fennimal's hat in the shipping box."
                     },
                     {
                         kind: "retraining",
@@ -308,7 +271,8 @@ let StimulusSettings = function () {
                     {
                         kind: "binding",
                         flavour: "laundry",
-                        cover_story: "It's laundry day! All the Fennimals have had their hats washed and dried. Unfortunately, the name-tags also got washed and are now unusable. Instead, you will have to help match a new tag to the correct hat. First, answer a few questions to help you picture the Fennimal. Then place the tag on that Fennimal's hat."
+                        hop_catch_after_errors: 3,
+                        cover_story: "It's laundry day! All the Fennimals have had their hats washed and dried. Unfortunately, the name-tags also got washed and are now unusable. Instead, you will have to help match a new tag to the correct hat."
                     },
                     {
                         kind: "retraining",
@@ -317,7 +281,8 @@ let StimulusSettings = function () {
                     {
                         kind: "binding",
                         flavour: "gift_shop",
-                        cover_story: "Let's buy some new hats for the Fennimals! One hat at a time, we will give you a description of a Fennimal. First, answer a few questions to help you picture that Fennimal. Then place a new version of this Fennimal's hat in the shopping cart."
+                        hop_catch_after_errors: 3,
+                        cover_story: "Let's buy some new hats for the Fennimals! One hat at a time, we will give you a description of a Fennimal. Your task is to first visualize this Fennimal. You then have to place a new version of this Fennimal's hat in the shopping cart."
                     }
                 ]
             },
@@ -431,7 +396,7 @@ let StimulusSettings = function () {
         ],
 
         semantic_learning_star: [
-
+        
             // TRAINING PHASE
             // Block 1: free exploration — photograph each Fennimal; polaroid introduces the name
             { type: "free_exploration",
@@ -494,47 +459,40 @@ let StimulusSettings = function () {
                 randomization_id: "binding_search_condition",
                 arm_randomization_id: "binding_star_arms",
                 // Weighted by duplicates. One value is drawn per participant and persisted.
-                condition: ["group_based"], //["group_based", "pair_based", "control"]
+                condition: ["group_based", "control"], //["group_based", "pair_based", "control"]
+                hub: "B",
+                arms: ["A", "C", "D"],
+                hats: ["A", "B", "C", "D"],
                 retraining_fennimals: ["A", "B", "C", "D"],
+                day_title: "odd jobs in the Center of Fenneland",
+                day_body: "Today you are tasked with various odd jobs in the Center of Fenneland.",
                 blocks: [
-                    
-                   
-                    
-                    //{
-                    //    kind: "binding",
-                    //    flavour: "lost_and_found",
-                    //    cover_story: "Oh no, the Fennimals have lost their hats! Let's help return these hats to their correct owner. Unfortunately, the post office forgot to print the names on the boxes. Instead, we need to rely on your memories. One hat at a time, we will give you a description of a Fennimal. First, answer a few questions to help you picture that Fennimal. Then place this Fennimal's hat in the shipping box."
-                    //},
                     {
                         kind: "binding",
-                        flavour: "laundry",
-                        cover_story: "It's laundry day! All the Fennimals have had their hats washed and dried. Unfortunately, the name-tags also got washed and are now unusable. Instead, you will have to help match a new tag to the correct hat. First, answer a few questions to help you picture the Fennimal. Then place the tag on that Fennimal's hat."
-                    },
-                   
-                    {
-                        kind: "join",
-                        flavour: "exam"
+                        flavour: "lost_and_found",
+                        hop_catch_after_errors: 2,
+                        cover_story: "Oh no, the Fennimals have lost their hats! Let's help return these hats to their correct owner. Unfortunately, the post office forgot to print the names on the boxes. Instead, we need to rely on your memories. One hat at a time, we will give you a description of a Fennimal. Your task is to first visualize this Fennimal. You then have to place this Fennimal's hat in the shipping box."
                     },
                     {
                         kind: "retraining",
                         cover_story: "Let's double-check that we can still match each Fennimal to their hat. You will see a photo of a Fennimal — pick the hat that belongs to them."
                     },
-                    
                     {
-                        kind: "join",
-                        flavour: "shipping"
+                        kind: "binding",
+                        flavour: "laundry",
+                        hop_catch_after_errors: 3,
+                        cover_story: "It's laundry day! All the Fennimals have had their hats washed and dried. Unfortunately, the name-tags also got washed and are now unusable. Instead, you will have to help match a new tag to the correct hat."
                     },
-                    
-                    //{
-                    //    kind: "binding",
-                    //    flavour: "gift_shop",
-                    //    cover_story: "Let's buy some new hats for the Fennimals! One hat at a time, we will give you a description of a Fennimal. First, answer a few questions to help you picture that Fennimal. Then place a new version of this Fennimal's hat in the shopping cart."
-                    //},
                     {
-                        kind: "join",
-                        flavour: "party"
+                        kind: "retraining",
+                        cover_story: "Another quick check: match each Fennimal to their hat."
                     },
-                    
+                    {
+                        kind: "binding",
+                        flavour: "gift_shop",
+                        hop_catch_after_errors: 3,
+                        cover_story: "Let's buy some new hats for the Fennimals! One hat at a time, we will give you a description of a Fennimal. Your task is to first visualize this Fennimal. You then have to place a new version of this Fennimal's hat in the shopping cart."
+                    }
                 ]
             },
 
@@ -550,20 +508,20 @@ let StimulusSettings = function () {
                 type: "morph_task",
                 skip_instructions: false,
                 skip_practice: false,
-                partner_behavior: "absent",
                 trial_speed: 5000,
                 // leftover-of-trio primes (A/C/D; B is name-quiz lure).
                 // MorphTask expands morphs × mixes × pairs × both targets, then
                 // assigns one morph from morphs[] per subject (between-subjects).
                 names_options: ["A", "B", "C", "D"],
-                morphs: ["crossfade", "silhouette"], //"mesh", 
-                mixes: [50, 60,70],
+                morphs: ["crossfade", "mesh", "silhouette"],
+                mixes: [50, 55, 60, 65],
                 pairs: [
                     { prime: "A", fenA: "C", fenB: "D" },
                     { prime: "C", fenA: "A", fenB: "D" },
                     { prime: "D", fenA: "A", fenB: "C" }
                 ]
-            }
+            },
+
 
             
 
@@ -588,9 +546,9 @@ let StimulusSettings = function () {
         // Four unique head codes in the test dictionary (A/B share one). The
         // forced-head pool below limits assignment to four concrete SVG heads
         // so mesh trials always morph between distinct shapes.
-        test: ["tomato", "pig", "aliengrey", "cupcake"],
+        test: ["rocket", "shark", "fly", "stocking", "giraffe" ],
         semantic_learning: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
-        semantic_learning_star: ["tomato", "pig", "bell"],
+        semantic_learning_star: ["rocket", "shark", "fly", "stocking", "giraffe" ],
 
         mentalizing: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
         mentalizing_AB: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
@@ -1394,36 +1352,24 @@ let StimulusTransformer = function (StimTemplate) {
                 max_stars += bonus * this._countPartnerBeliefMemoryProbeTrials(memoryProbeSpecs);
             }
 
-            if (block.type === "name_recall_task" && typeof block.bonus_stars_per_correct_answer === "number") {
-                let nFens = (typeof this.get_all_Fennimals_objects_in_array === "function")
-                    ? this.get_all_Fennimals_objects_in_array().length
-                    : 0;
-                max_stars += block.bonus_stars_per_correct_answer * nFens;
-            }
-
             if (block.type === "chimera_feature_id") {
                 let n = Array.isArray(block.trials) ? block.trials.length : 9;
                 max_stars += n;
             }
 
             if (block.type === "morph_task" || block.type === "morph_task_two_stage_development") {
-                if (typeof MorphTaskController !== "undefined"
-                    && typeof MorphTaskController.countMaxEarnableStars === "function") {
-                    max_stars += MorphTaskController.countMaxEarnableStars(block);
-                } else {
-                    let mixes = Array.isArray(block.mixes) ? block.mixes : [];
-                    let pairs = Array.isArray(block.pairs) ? block.pairs : [];
-                    if (mixes.length && pairs.length) {
-                        max_stars += mixes.length * pairs.length * 2;
-                    } else if (Array.isArray(block.trials) && block.trials.length) {
-                        if (Array.isArray(block.trials[0])) {
-                            let sizes = block.trials.map((b) => Array.isArray(b) ? b.length : 0);
-                            max_stars += sizes.length ? Math.max.apply(null, sizes) : 0;
-                        } else {
-                            max_stars += block.trials.length;
-                        }
+                let trials = block.trials;
+                let n = 0;
+                if (Array.isArray(trials)) {
+                    if (trials.length && Array.isArray(trials[0])) {
+                        trials.forEach((b) => { if (Array.isArray(b)) n += b.length; });
+                    } else {
+                        n = trials.length;
                     }
+                } else {
+                    n = 5;
                 }
+                max_stars += n;
             }
 
             if (block.type === "hat_drop_task" || block.type === "hat_drop_gonogo") {
@@ -1475,4 +1421,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("STAR4GO-READY")
+console.log("P-READY")

@@ -314,10 +314,10 @@ Card-based hat-binding day (no map travel). One phase contains ordered internal 
 
 | Location | Purpose |
 |---|---|
-| `experimentData.hatBindingAssignment` | **Top-level export** — `{ condition, selected_arms, selected_triad, hub, fillers, all_arms, starter_name_id, starter_name }` |
+| `experimentData.hatBindingAssignment` | **Top-level export** — `{ condition, selected_arms, selected_triad, hub, fillers, all_arms, joining_features, starter_name_id, starter_name }` |
 | `experimentData.phaseRandomizations[randomization_id]` / `[arm_randomization_id]` | Layer 1 refresh restore (same mechanism as lost-box) |
-| phase stamps on the `hat_binding_task` row in `storedData` | `binding_search_condition`, `binding_selected_arms`, `binding_selected_triad` |
-| per-trial logs | `condition`, `selected_arms`, `selected_triad`, `role` |
+| phase stamps on the `hat_binding_task` row in `storedData` | `binding_search_condition`, `binding_selected_arms`, `binding_selected_triad`, `binding_joining_features` |
+| per-trial logs | `condition`, `selected_arms`, `selected_triad`, `joining_features`, `role`, `gist`, `gist_n_errors` |
 
 Walkable relations (unique from the hub; path walking is scoped to the selected triad):
 
@@ -327,27 +327,31 @@ Walkable relations (unique from the hub; path walking is scoped to the selected 
 
 | Field | Meaning |
 |---|---|
-| `hub` | Fennimal id at the center of the network |
-| `arms` | Spoke ids. Length 2 = no arm draw. Length 3 = sample two arms (`A-B-C`, `A-B-D`, or `C-B-D` when hub is B); the unused arm becomes a filler |
-| `fillers` | Optional extra Fennimal ids that are self-visualization only in every condition. Must not repeat hub/arms |
+| `hub` | Optional Fennimal id at the center. Omit with `arms` to infer the unique star/triad from the Fennimal set |
+| `arms` | Optional spoke ids. Length 2 = no arm draw. Length 3 = sample two arms (`A-B-C`, `A-B-D`, or `C-B-D` when hub is B); the unused arm becomes a filler |
+| `fillers` | Optional extra Fennimal ids that are self-visualization only in every condition. Inferred as roster members that do not connect to the hub when `hub`/`arms` are omitted |
 | `randomization_id` | Persistence key for the condition draw (default `binding_search_condition`) |
 | `arm_randomization_id` | Persistence key for the arm-pair draw (default `binding_star_arms`) |
 | `condition` | Non-empty array of `"pair_based"` \| `"group_based"` \| `"control"`. One entry is drawn at random per participant; duplicates weight the draw (e.g. `["group_based", "control", "control"]` → ⅓ group, ⅔ control). Refresh restores the stored draw |
-| `hats` | Fennimal ids whose hats appear as options (default: hub + all arms + explicit fillers). Hats must be unique |
+| `hats` | Optional Fennimal ids whose hats appear as options (default: hub + all arms + fillers). Hats must be unique |
 | `binding_trials` | Optional trial templates. **Omit** to generate the default set from the selected triad (see below). Optional `conditions` lists which draws run the trial (omit = all). Branches may use `{ cue, path }` and/or `{ cue, target }` (`path` is inferred on the selected triad when `target` is set). Role tokens: `$hub`, `$arm1`, `$arm2`, `$arm` / `$other_arm` (expands once per selected arm), `$fillers` (expands once per filler). `path` `[]` = visualize self |
 | `retraining_fennimals` | Fennimal ids for retraining blocks |
-| `blocks` | Ordered `{ kind: "binding" \| "retraining", flavour?, cover_story?, hop_catch_after_errors? }` |
-| `day_title` / `day_body` | Copy for the Day N instruction page |
+| `blocks` | Ordered `{ kind: "binding" \| "retraining" \| "join", flavour?, cover_story? }`. Join flavours: `exam`, `shipping`, `party`. Join currently runs only for `group_based` (skipped for `control` / `pair_based`) |
+| `day_title` / `day_body` | Optional override of `GenParam.HatBinding.dayTitle` / `dayBody` |
 | `prompt_templates` | Optional overrides keyed by path (`""`, `"neighbour"`, `"cousin>neighbour"`, `"playmate"`, …) |
 | `skip_instructions` | Skip the Day N page and start at the first block cover story |
 
 **Default trials** (when `binding_trials` is omitted), for selected arms X, Y and hub H:
 
-- `pair_based` — H→X and H→Y (one hop each), plus filler self-visualization
-- `group_based` — Y→X and X→Y via the hub (two hops), plus filler self-visualization
-- `control` — self-visualization for X, H, Y and the fillers (no relational hops)
+- `pair_based` — H→X and H→Y (one hop each), plus filler self-visualization. **Honor-system** visualize (no gist). If gist is added later, start from hub B and focus questions on B. Hub B never gets its own `group_based` hat-selection trial (B is only the middle hop).
+- `group_based` — Y→X and X→Y via the hub (two hops), plus filler self-visualization (the unused star arm). Gist screens on each hop; leftover arm is a hat-gist.
+- `control` — hat-gist self-trials for X, H, Y and the fillers (including hub B; no relational hops)
 
-**Example (classic triad + two fillers)**
+**Joining features.** The selected triad’s two hub–arm relations become the gist question types (cousin→head, neighbour→region, playmate→toy). Example with hub B: ABC → `{head, region}`, ABD → `{head, toy}`, CBD → `{region, toy}` (D shares a toy with B, not with C). Options are the unique values of that feature among the full star roster. Hats use every hat on the `hats` list (4AFC in the star).
+
+Gist copy lives in `GenParam.gistDescriptions` (two interchangeable lines per element; one is sampled per option). Stems / Check / Continue copy: `GenParam.HatBinding.gist`. Missing gist lines fail at phase start.
+
+**Example (classic triad + two fillers)** — or omit `hub` / `arms` / `fillers` and let the controller infer them from the Fennimal set:
 
 ```javascript
 hub: "B",
@@ -364,11 +368,23 @@ arms: ["A", "C", "D"]
 
 Hub must overlap each arm on exactly one relation; arms must not overlap each other; each relation from the hub must be unique.
 
-Binding trial: occluded hats → name-tag visualization prompt → reveal → flavour response (retry until correct). Hop-catch (block 1): typed name per path hop, then click-hat, then return to the original drag. Retraining: polaroid of the Fennimal without hat; if the Fennimal has an assigned toy it is printed on the body at `.Fennimal_body_center_point`; hat appears after the correct pick.
+Binding trial: room furniture is visible, **hats stay hidden**. Then gist (or pair-based honor-system visualize) → hats appear → flavour response (retry until correct). Hop-catch (typed names after hat errors) is retired.
 
-Logs `condition`, `selected_triad`, `selected_arms`, and `role` (`hub` \| `arm` \| `filler`) per trial.
+**Gist screens (`group_based` hops).** One page per hop. Top: accumulating relation line (“A has a cousin — … Visualize that cousin.”). Instruction: “Select the option which most accurately describes the answer.” Two dropdowns for the joining features (order shuffled). **Check** scores both; a correct dropdown becomes the correct gist text; a miss turns the **question stem** red (clears when the menu is opened) and increments `gist_n_errors`. After both are locked, **Continue**. On the last hop (and on unbound / control hat-gist), the locked page adds “Now select this Fennimal’s hat.” before Continue.
 
-Controller: `HatBindingTaskController` (`4_HatBindingTask.js`). Layout tunables: `GenParam.HatBinding`.
+**Join tasks (`kind: "join"`, `group_based` only).** After hops, bind the selected triad vs the leftover unused arm with two inclusive-**OR** questions (never AND — only the hub has both joining features). Answers are always **hats**, never names or heads. Stem: “Please select the hat(s) of every Fennimal who had {gist1} and/or {gist2}.” Gist order is shuffled per question; gist variants are resampled; hat order is shuffled independently. Bound question: triad overlap values (3 hats). Unbound: leftover arm’s values on the same two types (1 hat). Empty Submit/Check is scored as Hamming (blank bound = 3 misses, blank unbound = 1). Controller extras: `4_HatBindingJoinTasks.js`. Tunables: `GenParam.HatBinding.join`.
+
+Default star day order: hops (lost & found) → join (exam) → retraining → hops (laundry) → join (shipping) → hops (gift shop) → join (party). Warehouse photo `Home_warehouse.png` behind all three join flavours.
+
+- **Exam** — one tilted worksheet, both questions stacked. Printed hat boxes are grayscale; hats stay in colour. Click toggles a checkmark at the top-left of the hat. One Submit for the sheet. One letter grade at the **top-right of the screen** (Hamming across both questions): A+ (0) “Perfect!” + confetti + 1000ms then the block ends; B (1) “Almost there!”; C (2–3) “Keep trying!”; F (>3) “Please read carefully!”. Non-A+ keeps marks and shows “Please revise your answers and submit again!” at the bottom.
+- **Shipping** — cover story, then a bubble (“A new batch of hats… two routes, A and B.”). Two colour manifests (Route A / Route B). Click a hat to toggle a stamp. Check Answers scores both routes together. Wrong: error bubble. Right: confetti on both manifests, 1000ms, end block.
+- **Party** — cover as a message bubble only (no cream panel). Two tables; caption `Table N: {gist1} and/or {gist2}`. Same four polaroids on each table (2×2), wearing hats, **heads replaced by a smear placeholder** (not CSS blur), grayscale bodies, no toys, no region-coloured polaroid fill, names hidden. Click polaroid to draw on a marker circle; click again to fade it off. Check Answers like shipping.
+
+Retraining: polaroid of the Fennimal without hat; if the Fennimal has an assigned toy it is printed on the body at `.Fennimal_body_center_point`; hat appears after the correct pick.
+
+Logs `condition`, `selected_triad`, `selected_arms`, `joining_features`, `role` (`hub` \| `arm` \| `filler`), `gist`, and `gist_n_errors` per binding trial. Join logs `block_kind: "join"`, flavour, per-question gists / correct ids / selected ids, `n_submits`, and exam grade.
+
+Controller: `HatBindingTaskController` (`4_HatBindingTask.js`, join UIs in `4_HatBindingJoinTasks.js`). Layout tunables: `GenParam.HatBinding`. Gist lines: `GenParam.gistDescriptions`.
 
 #### `chimera_feature_id`
 Speeded feature-identification DV. All trials are **indoor polaroids** (Home overlay, no map travel, no region wallpaper). Head-query trials wear no hat. Head and body share the **prime’s** colour scheme (body-prime → body palette; head-prime → head palette) so region colour cannot give away the other part. Name buttons come from `names_options`, always unioned with every trial `answer` so a forgotten name cannot leave a trial without a valid button. Buttons are visible before `?` but inert until the reveal clock starts. HUD points freeze on click and never reflect accuracy; stars are recorded for the end-of-experiment payment overview only.

@@ -1834,12 +1834,14 @@ class InstructionsController {
         this.parentElem.appendChild(this.currentInstructionsSVG);
         this.parentElem.style.display = "inherit";
 
-        let title = dayTitle || "odd jobs in the Center of Fenneland";
+        let copy = (typeof GenParam !== "undefined" && GenParam.HatBinding) || {};
+        let title = dayTitle || copy.dayTitle || "odd jobs in the Center of Fenneland";
         document.getElementById("Instructions_Title").innerHTML = `Day ${currentBlockNum}: ${title}`;
 
-        let body = dayBody || "Today you are tasked with various odd jobs in the Center of Fenneland.";
+        let body = dayBody || copy.dayBody ||
+            "Today you are tasked with various odd jobs in the Center of Fenneland.<br><br>You will work through a few different jobs today. In each one, you will first picture a Fennimal, then use what you remember to pick the right hat.";
         this.textElemMainInstructions = create_SVG_text_in_foreign_element(
-            body + "<br><br>You will work through a few different jobs today. In each one, you will first picture a Fennimal, then use what you remember to pick the right hat.",
+            body,
             0.12 * GenParam.SVG_width, 180,
             0.76 * GenParam.SVG_width,
             520,
