@@ -4,9 +4,12 @@
  * jumble (larger, front-right) starts under a light-gray [?]. The prime hat
  * is already visible (head still [?]); a radial name quiz (F/J move,
  * Space confirm; keyboard only) identifies prime.name. Correct → head [?]
- * snaps off, pause primeRevealHoldMs, then the jumble [?] fades out over
- * jumbleFadeMs. Identity 2AFC: F/J keycaps show the two
- * jumble parents' hats (prime hat excluded). Polaroid flies to the chosen side.
+ * snaps off: the head if show_head_on_prime, else empty space (hat only).
+ * Pause primeRevealHoldMs, then the jumble [?] fades out over
+ * jumbleFadeMs. Identity 2AFC: F/J keycaps show the two jumble
+ * parents (prime excluded). phase.response_key_icons selects the
+ * property on those keys: "hats" (default), "heads" (grayscale,
+ * as in morph_head_pilot), or "names". Polaroid flies to the chosen side.
  * No resolve / no trial-by-trial identity feedback. Caption stays ????.
  *
  * mix: integer percent target in the jumble (1–99). 50 is the unbiased
@@ -31,6 +34,8 @@ class MorphTaskController {
         this.returnfunc = returnfunc;
         this.expCont = expCont;
         this.params = (typeof GenParam !== "undefined" && GenParam.MorphTask) || {};
+        this.responseKeyIcons = this._resolveResponseKeyIcons();
+        this.showHeadOnPrime = this._resolveShowHeadOnPrime();
         this.W = GenParam.SVG_width;
         this.H = GenParam.SVG_height;
 
@@ -78,6 +83,8 @@ class MorphTaskController {
         this.phaseData.morph_prime_button_order = this.buttonOrderIds;
         this.phaseData.morph_names_options = (this.nameRoster || []).map((fen) => fen.id);
         this.phaseData.morph_mix_levels = this._mixLevels();
+        this.phaseData.response_key_icons = this.responseKeyIcons;
+        this.phaseData.show_head_on_prime = this.showHeadOnPrime;
         this._assertSinglePaidMorph();
     }
 
@@ -107,9 +114,54 @@ class MorphTaskController {
         return Math.max(0, Math.min(1, mix / 100));
     }
 
+    static responseKeyIconKinds() {
+        return ["hats", "heads", "names"];
+    }
+
+    _resolveResponseKeyIcons() {
+        let allowed = MorphTaskController.responseKeyIconKinds();
+        let raw = this.phaseData && this.phaseData.response_key_icons;
+        if (raw === undefined || raw === null || String(raw).trim() === "") {
+            raw = this.params.responseKeyIcons;
+        }
+        if (raw === undefined || raw === null || String(raw).trim() === "") return "hats";
+        let mode = String(raw).trim().toLowerCase();
+        if (allowed.indexOf(mode) < 0) {
+            this._fail(
+                `response_key_icons must be "hats" | "heads" | "names" (got "${this.phaseData.response_key_icons}").`
+            );
+        }
+        return mode;
+    }
+
+    _resolveShowHeadOnPrime() {
+        let raw = this.phaseData && this.phaseData.show_head_on_prime;
+        if (raw === undefined || raw === null || raw === "") {
+            raw = this.params.showHeadOnPrime;
+        }
+        if (raw === undefined || raw === null || raw === "") return true;
+        if (typeof raw === "boolean") return raw;
+        let s = String(raw).trim().toLowerCase();
+        if (s === "true" || s === "1" || s === "yes") return true;
+        if (s === "false" || s === "0" || s === "no") return false;
+        this._fail(`show_head_on_prime must be true or false (got "${this.phaseData.show_head_on_prime}").`);
+    }
+
+    _shouldHidePrimeHead(trial) {
+        if (!trial || trial.is_practice) return false;
+        return this.showHeadOnPrime === false;
+    }
+
     _identityPrompt(trial) {
         if (trial && trial.is_practice) {
             return this.params.identityPromptPractice || "Which shape does this most look like?";
+        }
+        let mode = this.responseKeyIcons || "hats";
+        if (mode === "heads") {
+            return this.params.identityPromptHeads || "Who does this most look like? Which is their head?";
+        }
+        if (mode === "names") {
+            return this.params.identityPromptNames || "Who does this most look like?";
         }
         return this.params.identityPrompt
             || this.params.identityPromptMesh
@@ -365,7 +417,7 @@ class MorphTaskController {
             this._fail(`paid morph "${morphs[0]}" does not match assigned "${this.assignedMorph}".`);
         }
         console.log(
-            `%c MorphTask: ${paid.length} paid trials, morph="${morphs[0]}", mixes=[${this.phaseData.morph_mix_levels.join(", ")}]`,
+            `%c MorphTask: ${paid.length} paid trials, morph="${morphs[0]}", mixes=[${this.phaseData.morph_mix_levels.join(", ")}], response_key_icons="${this.responseKeyIcons}", show_head_on_prime=${this.showHeadOnPrime}`,
             "color:#6b4cff;font-weight:bold"
         );
     }
@@ -481,12 +533,10 @@ class MorphTaskController {
             view: "closeup",
             grayscale: true,
             prime,
-            question: this.params.identityPrompt
-                || this.params.identityPromptMesh
-                || "Who does this most look like? Which is their hat?",
+            question: this._identityPrompt({ is_practice: false }),
             options: [
-                { id: fenA.id, label: fenA.name, hat: fenA.hat, fen: fenA },
-                { id: fenB.id, label: fenB.name, hat: fenB.hat, fen: fenB }
+                { id: fenA.id, label: fenA.name, hat: fenA.hat, head: fenA.head, fen: fenA },
+                { id: fenB.id, label: fenB.name, hat: fenB.hat, head: fenB.head, fen: fenB }
             ]
         };
     }
@@ -536,7 +586,8 @@ class MorphTaskController {
                 hat: hatId,
                 name: nameId,
                 caption: "????",
-                needs_name_quiz: true
+                needs_name_quiz: true,
+                show_head_on_prime: this.showHeadOnPrime !== false
             }
         };
     }
@@ -1408,6 +1459,7 @@ class MorphTaskController {
         }
         this._fitNodeInBox(built.node, slot, built.widthFrac || 0.92, built.heightFrac || 0.92);
         this._installPrimeHeadOccluder(built.node, trial);
+        if (this._shouldHidePrimeHead(trial)) this._hidePrimeHead(built.node);
         this.primeGroup = built.node;
     }
 
@@ -1479,6 +1531,25 @@ class MorphTaskController {
         if (hat && hat.parentNode === host) host.insertBefore(built.g, hat);
         else host.appendChild(built.g);
         this.primeHeadOccluder = built.g;
+    }
+
+    // Drop the head SVG so only the hat remains (empty space where the face was).
+    _hidePrimeHead(fenIcon) {
+        if (!fenIcon) this._fail("missing prime icon to hide the head.");
+        let hat = fenIcon.getElementsByClassName("hat")[0];
+        let host = (hat && hat.parentNode) || null;
+        if (!host) {
+            let scaleGroup = fenIcon.getElementsByClassName("Fennimal_scale_group")[0];
+            let headGroup = scaleGroup && scaleGroup.firstElementChild;
+            host = headGroup && headGroup.firstElementChild;
+        }
+        if (!host) this._fail("could not find prime head host to hide.");
+        Array.from(host.children).forEach((node) => {
+            if (!node || !node.classList) return;
+            if (node.classList.contains("hat")) return;
+            if (node.classList.contains("morph_prime_head_occluder")) return;
+            node.remove();
+        });
     }
 
     _clearPrimeHeadOccluder() {
@@ -4058,12 +4129,8 @@ class MorphTaskController {
 
         let leftFen = keyOpts.left && (keyOpts.left.fen || this.fensById[keyOpts.left.id]);
         let rightFen = keyOpts.right && (keyOpts.right.fen || this.fensById[keyOpts.right.id]);
-        let leftSize = (keyOpts.left && keyOpts.left.shape)
-            ? { width: 180, height: 180 }
-            : this._identityHatNativeSize(leftFen);
-        let rightSize = (keyOpts.right && keyOpts.right.shape)
-            ? { width: 180, height: 180 }
-            : this._identityHatNativeSize(rightFen);
+        let leftSize = this._identityIconNativeSize(keyOpts.left, leftFen);
+        let rightSize = this._identityIconNativeSize(keyOpts.right, rightFen);
         let maxW = Math.max(leftSize.width, rightSize.width, 1);
         let maxH = Math.max(leftSize.height, rightSize.height, 1);
         let slotW = this._num("identityHatSlotW", 150);
@@ -4082,20 +4149,32 @@ class MorphTaskController {
         this._setIdentityKeysArmed(armed);
     }
 
-    _identityHatNativeSize(fen) {
+    _identityIconNativeSize(option, fen) {
+        if (option && option.shape) return { width: 180, height: 180 };
+        let mode = this.responseKeyIcons || "hats";
+        if (mode === "names") {
+            return {
+                width: this._num("identityHatSlotW", 150),
+                height: this._num("identityHatSlotH", 118)
+            };
+        }
+        if (mode === "heads") return this._identityHeadNativeSize(fen);
+        return this._identityHatNativeSize(fen);
+    }
+
+    _measureSvgTemplateSize(template, hideSelectors) {
         let fallback = { width: 80, height: 80 };
-        if (!fen || !fen.hat) return fallback;
-        let hatId = "hat_" + String(fen.hat).replace(/^hat_/, "");
-        let template = document.getElementById(hatId);
         if (!template) return fallback;
         let clone = template.cloneNode(true);
         if (typeof strip_svg_ids_from_subtree === "function") strip_svg_ids_from_subtree(clone);
         clone.style.display = "inherit";
         clone.setAttribute("display", "inline");
-        clone.querySelectorAll(".invisible_element, .hat_attachment_point").forEach((el) => {
-            el.setAttribute("display", "none");
-            el.style.display = "none";
-        });
+        if (hideSelectors) {
+            clone.querySelectorAll(hideSelectors).forEach((el) => {
+                el.setAttribute("display", "none");
+                el.style.display = "none";
+            });
+        }
         let host = (this.layers && this.layers.Plus2) || (this.layers && this.layers.Main);
         if (!host) return fallback;
         host.appendChild(clone);
@@ -4104,6 +4183,20 @@ class MorphTaskController {
         clone.remove();
         if (!(b.width > 0 && b.height > 0)) return fallback;
         return { width: b.width, height: b.height };
+    }
+
+    _identityHatNativeSize(fen) {
+        if (!fen || !fen.hat) return { width: 80, height: 80 };
+        let hatId = "hat_" + String(fen.hat).replace(/^hat_/, "");
+        return this._measureSvgTemplateSize(
+            document.getElementById(hatId),
+            ".invisible_element, .hat_attachment_point"
+        );
+    }
+
+    _identityHeadNativeSize(fen) {
+        if (!fen || !fen.head) return { width: 80, height: 80 };
+        return this._measureSvgTemplateSize(document.getElementById("Fennimal_head_" + fen.head));
     }
 
     _placeIdentityChoice(parent, cx, cy, layout, letter, option, field) {
@@ -4131,8 +4224,15 @@ class MorphTaskController {
             height: field.slotH
         };
         let fen = option && (option.fen || this.fensById[option.id]);
+        let mode = this.responseKeyIcons || "hats";
         if (option && option.shape) this._placeShapeOnKey(col, option.shape, hatBox);
-        else if (fen && fen.hat) this._placeHatOnKey(col, fen, hatBox, field.hatScale);
+        else if (mode === "names") {
+            this._placeNameOnKey(col, (option && option.label) || (fen && fen.name), hatBox);
+        } else if (mode === "heads") {
+            this._placeHeadOnKey(col, fen, hatBox, field.hatScale);
+        } else if (fen && fen.hat) {
+            this._placeHatOnKey(col, fen, hatBox, field.hatScale);
+        }
 
         let keyY = y0 + field.h - field.pad - layout.h / 2;
         let key = this._placeTextKey(cx, keyY, layout.w, layout.h, letter, {
@@ -4175,6 +4275,67 @@ class MorphTaskController {
         scaleG.setAttribute("transform", `scale(${scale})`);
         pos.setAttribute("transform", `translate(${box.x + box.width / 2}, ${box.y + box.height / 2})`);
         return pos;
+    }
+
+    _placeHeadOnKey(parent, fen, box, uniformScale) {
+        if (!fen || !fen.head || !box) return null;
+        let display = {
+            id: "morph_key_" + fen.id,
+            name: "",
+            head: fen.head,
+            ColorScheme: { Head: this._grayscaleScheme() }
+        };
+        let icon = create_Fennimal_SVG_object_head_only(display, false, false);
+        this._prepareFennimalIcon(icon);
+        this._applyPartColors(icon, this._grayscaleScheme());
+        this._applyJumbleComponentGrayscale(icon);
+        icon.style.pointerEvents = "none";
+        parent.appendChild(icon);
+        let b = { x: -90, y: -90, width: 180, height: 180 };
+        try { b = icon.getBBox(); } catch (e) { /* keep fallback */ }
+        if (!(b.width > 0 && b.height > 0)) b = { x: -90, y: -90, width: 180, height: 180 };
+        let scale = uniformScale != null
+            ? uniformScale
+            : Math.min(box.width / b.width, box.height / b.height);
+        if (!Number.isFinite(scale) || scale <= 0) scale = 1;
+        let cx = b.x + b.width / 2;
+        let cy = b.y + b.height / 2;
+        icon.setAttribute(
+            "transform",
+            `translate(${box.x + box.width / 2}, ${box.y + box.height / 2}) scale(${scale}) translate(${-cx}, ${-cy})`
+        );
+        return icon;
+    }
+
+    _placeNameOnKey(parent, name, box) {
+        let label = String(name == null ? "" : name).trim();
+        if (!label || !box) return null;
+        let g = create_SVG_group(0, 0, "morph_identity_name");
+        g.style.pointerEvents = "none";
+        let cx = box.x + box.width / 2;
+        let cy = box.y + box.height / 2;
+        let text = create_SVG_text_elem(cx, cy, label, undefined, undefined);
+        text.classList.add("morph_identity_name_glyph");
+        text.style.fontFamily = "'Source Sans 3', 'PT Sans', sans-serif";
+        text.style.fontWeight = "700";
+        text.style.textAnchor = "middle";
+        text.style.dominantBaseline = "central";
+        text.setAttribute("fill", "#1e3a5f");
+        text.style.pointerEvents = "none";
+        g.appendChild(text);
+        parent.appendChild(g);
+        let maxSize = this._num("identityNameFontSize", 36);
+        let minSize = this._num("identityNameFontSizeMin", 18);
+        let size = maxSize;
+        text.style.fontSize = size + "px";
+        let maxW = Math.max(12, box.width - 12);
+        try {
+            while (size > minSize && text.getComputedTextLength() > maxW) {
+                size -= 1;
+                text.style.fontSize = size + "px";
+            }
+        } catch (e) { /* keep maxSize */ }
+        return g;
     }
 
     _placeShapeOnKey(parent, shape, box) {
@@ -4858,10 +5019,24 @@ class MorphTaskController {
         await this._revealJumble(this.currentTrial);
     }
 
+    _paidIdentityCoachText() {
+        let mode = this.responseKeyIcons || "hats";
+        if (mode === "heads") {
+            return this.params.paidIdentityCoachHeads
+                || "F and J represent two heads. Your task is to select the head of the Fennimal that is most visible in the blurred part of the photo.";
+        }
+        if (mode === "names") {
+            return this.params.paidIdentityCoachNames
+                || "F and J show two names. Your task is to select the name of the Fennimal that is most visible in the blurred part of the photo.";
+        }
+        return this.params.paidIdentityCoachHats
+            || "F and J represent two hats. Your task is to select the hat which belongs to which Fennimal is most visible in the blurred part of the photo.";
+    }
+
     async _showPaidIdentityBubbles() {
         await this._showBubble(
             this.identityKeyF || this.identityKeysGroup,
-            "F and J represent two hats. Your task is to select the hat which belongs to which Fennimal is most visible in the blurred part of the photo."
+            this._paidIdentityCoachText()
         );
     }
 
@@ -4947,6 +5122,8 @@ class MorphTaskController {
             kind: trial.kind || (trial.is_practice ? "practice" : null),
             role: trial.role,
             is_practice: !!trial.is_practice,
+            response_key_icons: this.responseKeyIcons || "hats",
+            show_head_on_prime: this.showHeadOnPrime !== false,
             question: this._identityPrompt(trial),
             fenA_id: trial.fenA ? trial.fenA.id : null,
             fenB_id: trial.fenB ? trial.fenB.id : null,

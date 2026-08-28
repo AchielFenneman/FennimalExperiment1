@@ -1,12 +1,12 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["morph_head_pilot"];
+    this.Experiment_Code = ["semantic_learning_star"];
     // Stimulus pilot (jumble 2AFC, no map): ["morph_head_pilot"]
 
     const All_Instructions_At_Start = {
         test: [],
         semantic_learning: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview"],
-       // semantic_learning_star: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview"],
+        semantic_learning_star: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview"],
         mentalizing_between_subjects: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
         morph_head_pilot: ["browser_check_and_full_screen_prompt", "consent", "single_sitting"],
 
@@ -69,6 +69,10 @@ let StimulusSettings = function () {
                 // Weighted by duplicates. One value is drawn per participant and persisted.
                 condition: ["group_based"], //["group_based", "pair_based", "control"]
                 retraining_fennimals: ["A", "B", "C", "D"],
+                // true = gistDescriptions for that linking feature; anything else = generic names.
+                use_head_gist_descriptions: true,
+                use_region_gist_descriptions: true,
+                use_toy_gist_descriptions: true,
                 blocks: [
                     {
                         kind: "join",
@@ -112,6 +116,11 @@ let StimulusSettings = function () {
                 skip_practice: true,
                 partner_behavior: "absent",
                 trial_speed: 5000,
+                // F/J identity keys: "hats" (default) | "heads" (grayscale) | "names".
+                response_key_icons: "hats",
+                // After the name quiz, lift the head [?]: true = show the prime
+                // head; false = hat only (empty space, no head or smear).
+                show_head_on_prime: false,
                 // leftover-of-trio primes (A/C/D; B is name-quiz lure).
                 // MorphTask expands morphs × mixes × pairs × both targets, then
                 // assigns one morph from morphs[] per subject (between-subjects).
@@ -297,6 +306,10 @@ let StimulusSettings = function () {
                 // Weighted by duplicates. One value is drawn per participant and persisted.
                 condition: ["group_based", "control"], //["group_based", "pair_based", "control"],
                 retraining_fennimals: ["A", "B", "C", "D1", "D2"],
+                // true = gistDescriptions for that linking feature; anything else = generic names.
+                use_head_gist_descriptions: true,
+                use_region_gist_descriptions: false,
+                use_toy_gist_descriptions: false,
                 blocks: [
                     {
                         kind: "binding",
@@ -434,51 +447,6 @@ let StimulusSettings = function () {
 
         semantic_learning_star: [
 
-            {type: "hat_binding_task",
-                skip_instructions: false,
-                randomization_id: "binding_search_condition",
-                arm_randomization_id: "binding_star_arms",
-                // Weighted by duplicates. One value is drawn per participant and persisted.
-                condition: ["group_based"], //["group_based", "pair_based", "control"]
-                retraining_fennimals: ["A", "B", "C", "D"],
-                blocks: [
-                    
-                   
-                    
-                    //{
-                    //    kind: "binding",
-                    //    flavour: "lost_and_found",
-                    //    cover_story: "Oh no, the Fennimals have lost their hats! Let's help return these hats to their correct owner. Unfortunately, the post office forgot to print the names on the boxes. Instead, we need to rely on your memories. One hat at a time, we will give you a description of a Fennimal. First, answer a few questions to help you picture that Fennimal. Then place this Fennimal's hat in the shipping box."
-                    //},
-                    
-                   
-                    {
-                        kind: "join",
-                        flavour: "exam"
-                    },
-                    {
-                        kind: "retraining",
-                        cover_story: "Let's double-check that we can still match each Fennimal to their hat. You will see a photo of a Fennimal — pick the hat that belongs to them."
-                    },
-                    
-                    {
-                        kind: "join",
-                        flavour: "shipping"
-                    },
-                    
-                    //{
-                    //    kind: "binding",
-                    //    flavour: "gift_shop",
-                    //    cover_story: "Let's buy some new hats for the Fennimals! One hat at a time, we will give you a description of a Fennimal. First, answer a few questions to help you picture that Fennimal. Then place a new version of this Fennimal's hat in the shopping cart."
-                    //},
-                    {
-                        kind: "join",
-                        flavour: "party"
-                    },
-                    
-                ]
-            },
-
 
             // TRAINING PHASE
             // Block 1: free exploration — photograph each Fennimal; polaroid introduces the name
@@ -544,28 +512,35 @@ let StimulusSettings = function () {
                 // Weighted by duplicates. One value is drawn per participant and persisted.
                 condition: ["group_based"], //["group_based", "pair_based", "control"]
                 retraining_fennimals: ["A", "B", "C", "D"],
+                // true = gistDescriptions for that linking feature; anything else = generic names.
+                use_head_gist_descriptions: true,
+                use_region_gist_descriptions: false,
+                use_toy_gist_descriptions: false,
                 blocks: [
                     
                    
                     
-                    //{
-                    //    kind: "binding",
-                    //    flavour: "lost_and_found",
-                    //    cover_story: "Oh no, the Fennimals have lost their hats! Let's help return these hats to their correct owner. Unfortunately, the post office forgot to print the names on the boxes. Instead, we need to rely on your memories. One hat at a time, we will give you a description of a Fennimal. First, answer a few questions to help you picture that Fennimal. Then place this Fennimal's hat in the shipping box."
-                    //},
                     {
                         kind: "binding",
-                        flavour: "laundry",
-                        cover_story: "It's laundry day! All the Fennimals have had their hats washed and dried. Unfortunately, the name-tags also got washed and are now unusable. Instead, you will have to help match a new tag to the correct hat. First, answer a few questions to help you picture the Fennimal. Then place the tag on that Fennimal's hat."
+                        flavour: "lost_and_found",
+                        cover_story: "Oh no, the Fennimals have lost their hats! Let's help return these hats to their correct owner. Unfortunately, the post office forgot to print the names on the boxes. Instead, we need to rely on your memories. One hat at a time, we will give you a description of a Fennimal. First, answer a few questions to help you picture that Fennimal. Then place this Fennimal's hat in the shipping box."
                     },
-                   
                     {
                         kind: "join",
                         flavour: "exam"
                     },
+                    
+                   
+                    
                     {
                         kind: "retraining",
                         cover_story: "Let's double-check that we can still match each Fennimal to their hat. You will see a photo of a Fennimal — pick the hat that belongs to them."
+                    },
+
+                    {
+                        kind: "binding",
+                        flavour: "laundry",
+                        cover_story: "It's laundry day! All the Fennimals have had their hats washed and dried. Unfortunately, the name-tags also got washed and are now unusable. Instead, you will have to help match a new tag to the correct hat. First, answer a few questions to help you picture the Fennimal. Then place the tag on that Fennimal's hat."
                     },
                     
                     {
@@ -573,11 +548,11 @@ let StimulusSettings = function () {
                         flavour: "shipping"
                     },
                     
-                    //{
-                    //    kind: "binding",
-                    //    flavour: "gift_shop",
-                    //    cover_story: "Let's buy some new hats for the Fennimals! One hat at a time, we will give you a description of a Fennimal. First, answer a few questions to help you picture that Fennimal. Then place a new version of this Fennimal's hat in the shopping cart."
-                    //},
+                    {
+                        kind: "binding",
+                        flavour: "gift_shop",
+                        cover_story: "Let's buy some new hats for the Fennimals! One hat at a time, we will give you a description of a Fennimal. First, answer a few questions to help you picture that Fennimal. Then place a new version of this Fennimal's hat in the shopping cart."
+                    },
                     {
                         kind: "join",
                         flavour: "party"
@@ -600,12 +575,17 @@ let StimulusSettings = function () {
                 skip_practice: false,
                 partner_behavior: "absent",
                 trial_speed: 5000,
+                // F/J identity keys: "hats" (default) | "heads" (grayscale) | "names".
+                response_key_icons: "names",
+                // After the name quiz, lift the head [?]: true = show the prime
+                // head; false = hat only (empty space, no head or smear).
+                show_head_on_prime: false,
                 // leftover-of-trio primes (A/C/D; B is name-quiz lure).
                 // MorphTask expands morphs × mixes × pairs × both targets, then
                 // assigns one morph from morphs[] per subject (between-subjects).
                 names_options: ["A", "B", "C", "D"],
-                morphs: ["crossfade", "silhouette"], //"mesh", 
-                mixes: [50, 60,70],
+                morphs: ["crossfade"], //"mesh", "silhouette", 
+                mixes: [50, 60,65],
                 pairs: [
                     { prime: "A", fenA: "C", fenB: "D" },
                     { prime: "C", fenA: "A", fenB: "D" },
@@ -660,7 +640,7 @@ let StimulusSettings = function () {
         // so mesh trials always morph between distinct shapes.
         test: ["tomato", "pig", "aliengrey", "cupcake"],
         semantic_learning: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
-        semantic_learning_star: ["tomato", "pig", "bell"],
+        semantic_learning_star: ["bell", "pig", "bun"],
 
         mentalizing: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
         mentalizing_AB: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
@@ -1615,4 +1595,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("P2STIM-READY")
+console.log("P5L-READY")

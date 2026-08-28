@@ -506,6 +506,15 @@ class DataController {
             joining_features: Array.isArray(record.joining_features)
                 ? record.joining_features.slice()
                 : (prev && Array.isArray(prev.joining_features) ? prev.joining_features.slice() : []),
+            use_head_gist_descriptions: Object.prototype.hasOwnProperty.call(record, "use_head_gist_descriptions")
+                ? record.use_head_gist_descriptions === true
+                : (prev ? prev.use_head_gist_descriptions === true : false),
+            use_region_gist_descriptions: Object.prototype.hasOwnProperty.call(record, "use_region_gist_descriptions")
+                ? record.use_region_gist_descriptions === true
+                : (prev ? prev.use_region_gist_descriptions === true : false),
+            use_toy_gist_descriptions: Object.prototype.hasOwnProperty.call(record, "use_toy_gist_descriptions")
+                ? record.use_toy_gist_descriptions === true
+                : (prev ? prev.use_toy_gist_descriptions === true : false),
             // Name-recall freebie. Binding reconstructs this object without these
             // fields; keep a prior pick unless the caller is explicitly setting them.
             starter_name_id: Object.prototype.hasOwnProperty.call(record, "starter_name_id")
@@ -1581,6 +1590,21 @@ class TrialGenerator {
                 }
                 if (phase.skip_practice !== undefined && typeof phase.skip_practice !== "boolean") {
                     errors.push(`${label} skip_practice must be true or false when set.`);
+                }
+                if (phase.response_key_icons !== undefined && phase.response_key_icons !== null && String(phase.response_key_icons).trim() !== "") {
+                    let icons = String(phase.response_key_icons).trim().toLowerCase();
+                    let allowedIcons = (typeof MorphTaskController !== "undefined"
+                        && typeof MorphTaskController.responseKeyIconKinds === "function")
+                        ? MorphTaskController.responseKeyIconKinds()
+                        : ["hats", "heads", "names"];
+                    if (!allowedIcons.includes(icons)) {
+                        errors.push(
+                            `${label} response_key_icons must be "hats" | "heads" | "names" (got "${phase.response_key_icons}").`
+                        );
+                    }
+                }
+                if (phase.show_head_on_prime !== undefined && typeof phase.show_head_on_prime !== "boolean") {
+                    errors.push(`${label} show_head_on_prime must be true or false when set.`);
                 }
                 if (phase.trial_speed !== undefined && phase.trial_speed !== null && phase.trial_speed !== "") {
                     let speed = Number(phase.trial_speed);
@@ -3414,7 +3438,8 @@ class ExperimentController {
                     this.instrCont.initializeMorphTaskInstructions(
                         this.currentDayNum,
                         this.currentPhaseData.day_title,
-                        this.currentPhaseData.day_body
+                        this.currentPhaseData.day_body,
+                        this.currentPhaseData.response_key_icons
                     );
                 }
                 break;

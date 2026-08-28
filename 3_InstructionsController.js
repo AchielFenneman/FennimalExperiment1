@@ -1913,7 +1913,7 @@ class InstructionsController {
         this.addClosingButtonToParent("bottom-center", false, deleteBonusStarIcons, 1300);
     }
 
-    initializeMorphTaskInstructions(currentBlockNum, dayTitle, dayBody) {
+    initializeMorphTaskInstructions(currentBlockNum, dayTitle, dayBody, responseKeyIcons) {
         this.currentInstructionType = "morph_task";
         this.clearInstructions();
         this.currentInstructionsSVG = this.createBasicInstructionElements();
@@ -1928,9 +1928,15 @@ class InstructionsController {
         document.getElementsByClassName("instructions_element_cover")[0].style.fill =
             GenParam.background_fill_for_instructions_where_stars_can_be_earned;
 
-        let body = dayBody || morphCopy.dayBody || (
-            "Each polaroid caught two Fennimals in one frame. The photo slowly settles into the one who was really there — pick which one, as quickly as you can."
-        );
+        let mode = String(responseKeyIcons || morphCopy.responseKeyIcons || "hats").trim().toLowerCase();
+        let body = dayBody;
+        if (!body) {
+            if (mode === "heads") body = morphCopy.dayBodyHeads;
+            else if (mode === "names") body = morphCopy.dayBodyNames;
+            body = body || morphCopy.dayBody || (
+                "Each polaroid caught two Fennimals in one frame. The photo slowly settles into the one who was really there — pick which one, as quickly as you can."
+            );
+        }
         this.textElemMainInstructions = create_SVG_text_in_foreign_element(
             body + "<br><br><br><br><br>",
             0.12 * GenParam.SVG_width, 140,

@@ -7,9 +7,11 @@
  *
  * Visualization:
  *   group_based — gist checks on each hop of the two-hop bound trials (the two
- *     joining features of the selected triad). The leftover unused arm is an
- *     unbound hat-gist. Hub B never gets its own hat-selection trial (B is only
- *     the middle hop).
+ *     joining features of the selected triad). Early hops also ask that
+ *     Fennimal's hat after the joining features; the last hop does not (the
+ *     flavour task is the hat pick). The leftover unused arm is an unbound
+ *     hat-gist. Hub B never gets its own hat-selection trial (B is only the
+ *     middle hop, plus a hat gist on that hop).
  *   control — hat-gist for every self trial, including hub B.
  *   pair_based — honor-system "I can picture this Fennimal" (no gist). If this
  *     condition is re-implemented with gist, focus the questions on hub B.
@@ -69,6 +71,9 @@ class HatBindingTaskController {
         this.phaseData.binding_selected_arms = this.graph.selectedArmIds.slice();
         this.phaseData.binding_selected_triad = this.graph.selectedTriad.slice();
         this.phaseData.binding_joining_features = this.graph.joiningFeatureKinds.slice();
+        this.phaseData.use_head_gist_descriptions = this._usesGistDescription("head");
+        this.phaseData.use_region_gist_descriptions = this._usesGistDescription("region");
+        this.phaseData.use_toy_gist_descriptions = this._usesGistDescription("toy");
         this.phaseData.answers = this.answers;
         if (this.expCont && this.expCont.dataCont && this.expCont.dataCont.setHatBindingAssignment) {
             this.expCont.dataCont.setHatBindingAssignment({
@@ -78,7 +83,10 @@ class HatBindingTaskController {
                 hub: this.graph.hubId,
                 fillers: this.graph.fillerIds.slice(),
                 all_arms: this.graph.armIds.slice(),
-                joining_features: this.graph.joiningFeatureKinds.slice()
+                joining_features: this.graph.joiningFeatureKinds.slice(),
+                use_head_gist_descriptions: this.phaseData.use_head_gist_descriptions,
+                use_region_gist_descriptions: this.phaseData.use_region_gist_descriptions,
+                use_toy_gist_descriptions: this.phaseData.use_toy_gist_descriptions
             });
         }
     }
@@ -840,6 +848,27 @@ class HatBindingTaskController {
         return (this.params && this.params.gist) ? this.params.gist : {};
     }
 
+    _gistFlagKey(kind) {
+        if (kind === "head") return "use_head_gist_descriptions";
+        if (kind === "region") return "use_region_gist_descriptions";
+        if (kind === "toy") return "use_toy_gist_descriptions";
+        return null;
+    }
+
+    // Hats always use gist lines. Linking features (head / region / toy) use
+    // gistDescriptions only when the matching flag is strictly true; otherwise
+    // questions fall back to generic names (region map labels, Tomato, Globe, …).
+    // phaseData overrides GenParam.HatBinding.gist when the key is present.
+    _usesGistDescription(kind) {
+        if (kind === "hat") return true;
+        let key = this._gistFlagKey(kind);
+        if (!key) this._fail(`unknown gist feature "${kind}".`);
+        if (this.phaseData && Object.prototype.hasOwnProperty.call(this.phaseData, key)) {
+            return this.phaseData[key] === true;
+        }
+        return this._gistCfg()[key] === true;
+    }
+
     _usesGistQuestions() {
         // pair_based keeps the honor-system visualize button (no gist). If gist
         // is added later, focus questions on hub B — group_based never gives B
@@ -869,7 +898,7 @@ class HatBindingTaskController {
         collect("hat", this.hatFens);
         if (this.condition === "group_based") {
             (this.graph.joiningFeatureKinds || []).forEach((kind) => {
-                collect(kind, this._rosterFens());
+                if (this._usesGistDescription(kind)) collect(kind, this._rosterFens());
             });
         }
         if (missing.length) {
@@ -915,6 +944,25 @@ class HatBindingTaskController {
             this._fail(`missing gistDescriptions.${bucket}["${featureId}"].`);
         }
         return String(lines[Math.floor(Math.random() * lines.length)]);
+    }
+
+    _genericFeatureName(kind, featureId) {
+        let id = this._normalizeFeatureId(kind, featureId);
+        if (!id) this._fail(`Fennimal has no ${kind} name for questions.`);
+        if (kind === "region") {
+            let data = (typeof GenParam !== "undefined" && GenParam.RegionData)
+                ? GenParam.RegionData[id]
+                : null;
+            let label = data && data.display_name;
+            if (!label) this._fail(`missing RegionData["${id}"].display_name for questions.`);
+            return String(label);
+        }
+        return String(id).charAt(0).toUpperCase() + String(id).slice(1);
+    }
+
+    _featureQuestionText(kind, featureId) {
+        if (this._usesGistDescription(kind)) return this._sampleGistText(kind, featureId);
+        return this._genericFeatureName(kind, featureId);
     }
 
     _uniqueFeatureIds(kind, fens) {
@@ -979,13 +1027,15 @@ class HatBindingTaskController {
             this._fail(`gist ${kind} pool is missing "${correctId}" for "${fen.id}".`);
         }
         shuffleArray(optionIds);
+        let usedGist = this._usesGistDescription(kind);
         let options = optionIds.map((id) => ({
             value: id,
-            text: this._sampleGistText(kind, id)
+            text: this._featureQuestionText(kind, id)
         }));
         let correctOpt = options.filter((o) => o.value === correctId)[0];
         return {
             feature: kind,
+            used_gist: usedGist,
             stem: this._gistStem(kind, subject),
             correct_value: correctId,
             correct_text: correctOpt.text,
@@ -993,10 +1043,23 @@ class HatBindingTaskController {
         };
     }
 
+    // Joining features stay shuffled among themselves. Hat, if present, is last.
+    _orderGistKinds(kinds) {
+        let joining = [];
+        let nHats = 0;
+        (kinds || []).forEach((kind) => {
+            if (kind === "hat") nHats += 1;
+            else joining.push(kind);
+        });
+        let ordered = shuffleArray(joining.slice());
+        for (let i = 0; i < nHats; i++) ordered.push("hat");
+        return ordered;
+    }
+
     _makeGistPage(trial, hopIndex, kinds, isLast) {
         let fen = this._fenAtHop(trial, hopIndex);
         let subject = this._gistSubjectPhrase(trial, hopIndex);
-        let qKinds = shuffleArray(kinds.slice());
+        let qKinds = this._orderGistKinds(kinds);
         return {
             leadHtml: this._gistLeadHtml(trial, hopIndex),
             isLast: !!isLast,
@@ -1019,11 +1082,14 @@ class HatBindingTaskController {
         if (this._isSelfTrial(trial)) {
             pages = [this._makeGistPage(trial, 0, ["hat"], true)];
         } else {
-            let kinds = (this.graph.joiningFeatureKinds || []).slice();
+            let joining = (this.graph.joiningFeatureKinds || []).slice();
             let nHops = (trial.path || []).length;
             pages = [];
             for (let hop = 0; hop <= nHops; hop++) {
-                pages.push(this._makeGistPage(trial, hop, kinds, hop === nHops));
+                let isLast = hop === nHops;
+                let kinds = joining.slice();
+                if (!isLast) kinds.push("hat");
+                pages.push(this._makeGistPage(trial, hop, kinds, isLast));
             }
         }
         let out = {
@@ -1234,6 +1300,7 @@ class HatBindingTaskController {
                 nErrors += row.n_errors;
                 return {
                     feature: row.question.feature,
+                    used_gist: !!row.question.used_gist,
                     stem: row.question.stem,
                     correct_value: row.question.correct_value,
                     correct_text: row.question.correct_text,

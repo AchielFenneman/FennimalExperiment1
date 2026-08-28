@@ -1236,6 +1236,16 @@ GENERALPARAM = function () {
                 "A plump head with a little ring-shaped handle at the crown, and a ball at the chin",
                 "A flared-base head small loop sitting on the very top, and a dark lip along the bottom"
             ],
+            bun: [
+                "A wide, low head, like a squat loaf, with a crusty top",
+                "A head that is much wider than it is tall, looks like baked in an oven",
+                "A flattened oval head with no snout and no leafy tuft, with some sesame seeds on top"
+            ],
+            cloud: [
+                "A puffy head whose outline is looks like its made of mist",
+                "A a shoft head, like something you could see floating in the sky",
+                "A fluffy head that looks like it could just fly away into the sky "
+            ],
             aliengrey: [
                 "A tall oval head with huge slanted eyes",
                 "A bald, oblong head whose eyes take up most of the face",
@@ -1384,6 +1394,13 @@ GENERALPARAM = function () {
             continueLabel: "Continue",
             selectHatLine: "Now select this Fennimal's hat.",
             placeholder: "Choose one…",
+            // Linking-feature question copy (hops + join). true = gistDescriptions
+            // lines, sampled as now. Anything other than true = generic names
+            // (region map labels; head ids; toy ids). Hats always stay gist.
+            // A hat_binding_task block can override any of these on phaseData.
+            use_head_gist_descriptions: true,
+            use_region_gist_descriptions: true,
+            use_toy_gist_descriptions: true,
             stems: {
                 head: "What does {subject}'s head look like?",
                 region: "Where does {subject} live?",
@@ -1659,7 +1676,8 @@ GENERALPARAM = function () {
     // Snapshot of MorphTask before the extra-wide two-spot polaroid redesign.
     this.MorphTaskTwoStageDevelopment = Object.assign({}, this.MorphTask);
 
-    // Live morph_task: extra-wide two-spot polaroid, static jumble, hat 2AFC.
+    // Live morph_task: extra-wide two-spot polaroid, static jumble.
+    // F/J 2AFC icons: phase.response_key_icons = "hats"|"heads"|"names".
     this.MorphTask = {
         trialSpeedMs: 5000,
         resolveTrial: false,
@@ -1695,6 +1713,9 @@ GENERALPARAM = function () {
         primeNameIncorrectMs: 1000,
         jumbleFadeMs: 1400,
         primeRevealHoldMs: 1000,
+        // After the name quiz, lift the head [?]: true = show the prime head;
+        // false = hat only (empty space). Phase show_head_on_prime overrides this.
+        showHeadOnPrime: true,
         identityKeyW: 112,
         identityKeyH: 88,
         identityKeyYFrac: 0.52,
@@ -1748,14 +1769,29 @@ GENERALPARAM = function () {
         barTop: 0.12,
         barBottom: 0.92,
         identityPrompt: "Who does this most look like? Which is their hat?",
+        identityPromptHeads: "Who does this most look like? Which is their head?",
+        identityPromptNames: "Who does this most look like?",
         identityPromptMesh: "Who does this most look like? Which is their hat?",
         identityPromptPractice: "Which shape does this most look like?",
         primePrompt: "Whose hat is this?",
         primePromptPractice: "What shape is this?",
+        // F/J identity keys: "hats" (default) | "heads" | "names". Phase
+        // response_key_icons overrides this.
+        responseKeyIcons: "hats",
+        identityNameFontSize: 36,
+        identityNameFontSizeMin: 18,
         dayTitle: "a blurry double exposure",
         dayBody:
             "The camera glitched this morning. Each polaroid has two shots: a small preview on the left, and a mixed picture on the right.<br><br>" +
             "The preview already shows a hat. Name who is wearing it (F / J to move, Space to confirm). Then the mix is uncovered — two Fennimals in one frame. Use F and J to pick which hat belongs to the mix, as quickly as you can. Faster correct answers leave more points (100 points = 1 bonus star). An incorrect answer quietly costs points — there is no trial-by-trial feedback.<br><br>" +
+            "We will start with two practice rounds using simple shapes.",
+        dayBodyHeads:
+            "The camera glitched this morning. Each polaroid has two shots: a small preview on the left, and a mixed picture on the right.<br><br>" +
+            "The preview already shows a hat. Name who is wearing it (F / J to move, Space to confirm). Then the mix is uncovered — two Fennimals in one frame. Use F and J to pick which head belongs to the mix, as quickly as you can. Faster correct answers leave more points (100 points = 1 bonus star). An incorrect answer quietly costs points — there is no trial-by-trial feedback.<br><br>" +
+            "We will start with two practice rounds using simple shapes.",
+        dayBodyNames:
+            "The camera glitched this morning. Each polaroid has two shots: a small preview on the left, and a mixed picture on the right.<br><br>" +
+            "The preview already shows a hat. Name who is wearing it (F / J to move, Space to confirm). Then the mix is uncovered — two Fennimals in one frame. Use F and J to pick which Fennimal the mix looks like, as quickly as you can. Faster correct answers leave more points (100 points = 1 bonus star). An incorrect answer quietly costs points — there is no trial-by-trial feedback.<br><br>" +
             "We will start with two practice rounds using simple shapes."
     };
 

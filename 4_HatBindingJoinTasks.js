@@ -44,8 +44,9 @@
         return out;
     };
 
-    P._joinClauseHtml = function (kind, gistText) {
-        let gist = "<i>" + this._joinEscape(this._joinDecap(gistText)) + "</i>";
+    P._joinClauseHtml = function (kind, gistText, usedGist) {
+        let shown = usedGist ? this._joinDecap(gistText) : gistText;
+        let gist = "<i>" + this._joinEscape(shown) + "</i>";
         if (kind === "head") return "whose head is " + gist;
         if (kind === "region") return "who resides in " + gist;
         if (kind === "toy") return "who plays with a toy which is " + gist;
@@ -53,8 +54,9 @@
         return gist;
     };
 
-    P._joinWhoTailHtml = function (kind, gistText) {
-        let gist = "<i>" + this._joinEscape(this._joinDecap(gistText)) + "</i>";
+    P._joinWhoTailHtml = function (kind, gistText, usedGist) {
+        let shown = usedGist ? this._joinDecap(gistText) : gistText;
+        let gist = "<i>" + this._joinEscape(shown) + "</i>";
         if (kind === "head") return "has a head which is " + gist;
         if (kind === "region") return "resides in " + gist;
         if (kind === "toy") return "plays with a toy which is " + gist;
@@ -67,10 +69,12 @@
         let tmpl = cfg.promptTemplate
             || "Please select the hat(s) of every Fennimal {clause1}, <b>and/or</b> every Fennimal who {who2}.";
         return this._joinFillTemplate(tmpl, {
-            clause1: this._joinClauseHtml(gists[0].kind, gists[0].text),
-            clause2: this._joinClauseHtml(gists[1].kind, gists[1].text),
-            who2: this._joinWhoTailHtml(gists[1].kind, gists[1].text),
-            gist2: "<i>" + this._joinEscape(this._joinDecap(gists[1].text)) + "</i>"
+            clause1: this._joinClauseHtml(gists[0].kind, gists[0].text, gists[0].used_gist),
+            clause2: this._joinClauseHtml(gists[1].kind, gists[1].text, gists[1].used_gist),
+            who2: this._joinWhoTailHtml(gists[1].kind, gists[1].text, gists[1].used_gist),
+            gist2: "<i>" + this._joinEscape(
+                gists[1].used_gist ? this._joinDecap(gists[1].text) : gists[1].text
+            ) + "</i>"
         });
     };
 
@@ -80,10 +84,12 @@
             || "Table {n}: {clause1}, <b>and/or</b> every Fennimal who {who2}";
         return this._joinFillTemplate(tmpl, {
             n: String(n),
-            clause1: this._joinClauseHtml(gists[0].kind, gists[0].text),
-            clause2: this._joinClauseHtml(gists[1].kind, gists[1].text),
-            who2: this._joinWhoTailHtml(gists[1].kind, gists[1].text),
-            gist2: "<i>" + this._joinEscape(this._joinDecap(gists[1].text)) + "</i>"
+            clause1: this._joinClauseHtml(gists[0].kind, gists[0].text, gists[0].used_gist),
+            clause2: this._joinClauseHtml(gists[1].kind, gists[1].text, gists[1].used_gist),
+            who2: this._joinWhoTailHtml(gists[1].kind, gists[1].text, gists[1].used_gist),
+            gist2: "<i>" + this._joinEscape(
+                gists[1].used_gist ? this._joinDecap(gists[1].text) : gists[1].text
+            ) + "</i>"
         });
     };
 
@@ -107,7 +113,8 @@
             return {
                 kind: kind,
                 value: value,
-                text: this._sampleGistText(kind, value)
+                used_gist: this._usesGistDescription(kind),
+                text: this._featureQuestionText(kind, value)
             };
         });
         let correctIds = this._joinMatchingIds(valuesByKind);
@@ -669,7 +676,12 @@
             questions: questions.map((q) => ({
                 role: q.role,
                 prompt: q.prompt,
-                gists: q.gists.map((g) => ({ kind: g.kind, value: g.value, text: g.text })),
+                gists: q.gists.map((g) => ({
+                    kind: g.kind,
+                    value: g.value,
+                    text: g.text,
+                    used_gist: !!g.used_gist
+                })),
                 correct_ids: q.correctIds.slice(),
                 hat_order: q.hatOrder.slice()
             })),
