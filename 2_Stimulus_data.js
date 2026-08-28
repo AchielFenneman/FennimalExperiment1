@@ -632,10 +632,10 @@ let StimulusSettings = function () {
                 // appendages. Dropped elephant, cupcake, aliengrey, jackolantern.
                 // Tomato / pig / bell / cloud / bun. Astro is a temporary extra
                 // (visor may still pop).
-                heads: ["tomato", "pig", "bell", "astro", "cloud", "bun"],
+                heads: ["tomato", "pig", "bell", "cloud", "bun"],
                 n_heads_sampled: 3,
                 morphs: ["crossfade", "silhouette"],
-                mixes: [50,60,70]
+                mixes: [50,55,60]
             }
         ]
     };
@@ -1615,4 +1615,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("P-READY")
+console.log("P2STIM-READY")
