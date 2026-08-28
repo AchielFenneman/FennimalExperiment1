@@ -75,22 +75,37 @@
 
             // 4. If login succeeds, Firebase allows this read request!
             const querySnapshot = await getDocs(collection(db, colName));
+            let dumpSnapshot = null;
+            try {
+                dumpSnapshot = await getDocs(collection(db, "fennimals_save_dumps"));
+            } catch (dumpErr) {
+                console.warn("Could not read fennimals_save_dumps", dumpErr);
+            }
 
-            if (querySnapshot.empty) {
+            if (querySnapshot.empty && (!dumpSnapshot || dumpSnapshot.empty)) {
                 statusEl.innerText = `No data found in collection: '${colName}'`;
                 statusEl.style.color = "red";
-                // Optionally log them out here so the session doesn't hang open
                 auth.signOut();
                 return;
             }
 
             // 5. Collect the raw JSON objects
             let allParticipants = [];
-            querySnapshot.forEach((doc) => {
-                let rawData = doc.data();
-                rawData["Document_ID"] = doc.id;
+            querySnapshot.forEach((docSnap) => {
+                let rawData = docSnap.data();
+                rawData["Document_ID"] = docSnap.id;
                 allParticipants.push(rawData);
             });
+
+            let saveDumps = [];
+            if (dumpSnapshot && !dumpSnapshot.empty) {
+                dumpSnapshot.forEach((docSnap) => {
+                    let rawData = docSnap.data();
+                    rawData["Document_ID"] = docSnap.id;
+                    let exp = rawData.expCode || rawData.originalCollection;
+                    if (!exp || exp === colName) saveDumps.push(rawData);
+                });
+            }
 
             // NEW: Filter for only completed experiments
             // We check both the root and nested levels defensively, depending on how the data was merged into Firebase
@@ -113,19 +128,26 @@
             };
 
             // 6. Download the full dataset immediately
-            downloadJSON(allParticipants, `${colName}_all_data.json`);
+            if (allParticipants.length) {
+                downloadJSON(allParticipants, `${colName}_all_data.json`);
+            }
 
-            // Download the completed dataset after a tiny 500ms delay
-            // (This prevents the browser from blocking multiple simultaneous downloads!)
             setTimeout(() => {
-                downloadJSON(completedParticipants, `${colName}_completed_data.json`);
+                if (completedParticipants.length) {
+                    downloadJSON(completedParticipants, `${colName}_completed_data.json`);
+                }
             }, 500);
 
-            // Update the UI with both counts!
-            statusEl.innerText = `Success! Downloaded ${allParticipants.length} total participants (${completedParticipants.length} completed).`;
+            setTimeout(() => {
+                if (saveDumps.length) {
+                    downloadJSON(saveDumps, `${colName}_save_dumps.json`);
+                }
+            }, 1000);
+
+            statusEl.innerText = `Success! Downloaded ${allParticipants.length} total (${completedParticipants.length} completed)`
+                + (saveDumps.length ? `, plus ${saveDumps.length} last-resort dump docs.` : ".");
             statusEl.style.color = "green";
 
-            // 7. Log out immediately after downloading to maintain security
             auth.signOut();
         } catch (error) {
             console.error(error);

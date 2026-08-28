@@ -1,12 +1,14 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["semantic_learning_star"];
+    this.Experiment_Code = ["morph_head_pilot"];
+    // Stimulus pilot (jumble 2AFC, no map): ["morph_head_pilot"]
 
     const All_Instructions_At_Start = {
         test: [],
         semantic_learning: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview"],
-        semantic_learning_star: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview"],
+       // semantic_learning_star: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview"],
         mentalizing_between_subjects: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
+        morph_head_pilot: ["browser_check_and_full_screen_prompt", "consent", "single_sitting"],
 
     };
 
@@ -432,6 +434,52 @@ let StimulusSettings = function () {
 
         semantic_learning_star: [
 
+            {type: "hat_binding_task",
+                skip_instructions: false,
+                randomization_id: "binding_search_condition",
+                arm_randomization_id: "binding_star_arms",
+                // Weighted by duplicates. One value is drawn per participant and persisted.
+                condition: ["group_based"], //["group_based", "pair_based", "control"]
+                retraining_fennimals: ["A", "B", "C", "D"],
+                blocks: [
+                    
+                   
+                    
+                    //{
+                    //    kind: "binding",
+                    //    flavour: "lost_and_found",
+                    //    cover_story: "Oh no, the Fennimals have lost their hats! Let's help return these hats to their correct owner. Unfortunately, the post office forgot to print the names on the boxes. Instead, we need to rely on your memories. One hat at a time, we will give you a description of a Fennimal. First, answer a few questions to help you picture that Fennimal. Then place this Fennimal's hat in the shipping box."
+                    //},
+                    
+                   
+                    {
+                        kind: "join",
+                        flavour: "exam"
+                    },
+                    {
+                        kind: "retraining",
+                        cover_story: "Let's double-check that we can still match each Fennimal to their hat. You will see a photo of a Fennimal — pick the hat that belongs to them."
+                    },
+                    
+                    {
+                        kind: "join",
+                        flavour: "shipping"
+                    },
+                    
+                    //{
+                    //    kind: "binding",
+                    //    flavour: "gift_shop",
+                    //    cover_story: "Let's buy some new hats for the Fennimals! One hat at a time, we will give you a description of a Fennimal. First, answer a few questions to help you picture that Fennimal. Then place a new version of this Fennimal's hat in the shopping cart."
+                    //},
+                    {
+                        kind: "join",
+                        flavour: "party"
+                    },
+                    
+                ]
+            },
+
+
             // TRAINING PHASE
             // Block 1: free exploration — photograph each Fennimal; polaroid introduces the name
             { type: "free_exploration",
@@ -568,6 +616,27 @@ let StimulusSettings = function () {
             
 
             
+        ],
+
+        // Head-selection stimulus pilot. Author heads here only — do not also
+        // fill All_Forced_Head_Lists / All_Fennimal_Sets for this code.
+        // Fennimals are synthesized (id === SVG head id) with an identity map.
+        morph_head_pilot: [
+            {
+                type: "morph_head_pilot",
+                skip_instructions: false,
+                skip_practice: false,
+                partner_behavior: "absent",
+                trial_speed: 60000,
+                // Compact "blob + face" prior: similar silhouette mass, no long
+                // appendages. Dropped elephant, cupcake, aliengrey, jackolantern.
+                // Tomato / pig / bell / cloud / bun. Astro is a temporary extra
+                // (visor may still pop).
+                heads: ["tomato", "pig", "bell", "astro", "cloud", "bun"],
+                n_heads_sampled: 3,
+                morphs: ["crossfade", "silhouette"],
+                mixes: [50,60,70]
+            }
         ]
     };
 
@@ -575,6 +644,7 @@ let StimulusSettings = function () {
         test: [],
         semantic_learning: ["demographics_questionnaire"],
         semantic_learning_star: ["demographics_questionnaire"],
+        morph_head_pilot: ["demographics_questionnaire"],
       
         mentalizing: ["demographics_questionnaire"],
         mentalizing_AB: ["demographics_questionnaire"],
@@ -626,6 +696,50 @@ let StimulusSettings = function () {
     this.forced_heads = All_Forced_Head_Lists[this.Experiment_Code] || false;
     this.allowed_head_groups = All_Allowed_Head_Groups_List[this.Experiment_Code] || false;
     this.banned_head_groups = All_Banned_Head_Groups_List[this.Experiment_Code] || false;
+
+    // morph_head_pilot: one authoring list (phase.heads). Copies onto
+    // forced_heads for SVGREDUCER and builds a 1:1 Fennimal dictionary so the
+    // FeatureMap does not shuffle SVG ids. Other experiment codes skip this.
+    if (this.Experiment_Code === "morph_head_pilot") {
+        let structure = this.Experiment_Structure;
+        if (!Array.isArray(structure) || !structure.length) {
+            throw new Error("morph_head_pilot: Experiment_Structure is missing.");
+        }
+        let phases = structure.filter((p) => p && p.type === "morph_head_pilot");
+        if (phases.length !== 1) {
+            throw new Error("morph_head_pilot: expected exactly one morph_head_pilot phase.");
+        }
+        if (All_Forced_Head_Lists.morph_head_pilot) {
+            throw new Error(
+                "morph_head_pilot: do not set All_Forced_Head_Lists; list SVG ids on phase.heads only."
+            );
+        }
+        if (All_Fennimal_Sets.morph_head_pilot) {
+            throw new Error(
+                "morph_head_pilot: do not set All_Fennimal_Sets; Fennimals are synthesized from phase.heads."
+            );
+        }
+        let heads = [];
+        let seen = {};
+        let rawHeads = phases[0].heads;
+        if (!Array.isArray(rawHeads) || rawHeads.length < 2) {
+            throw new Error("morph_head_pilot: phase.heads must list at least two SVG head ids.");
+        }
+        rawHeads.forEach((item, i) => {
+            let name = String(item == null ? "" : item).trim().replace(/^Fennimal_head_/, "");
+            if (!name) throw new Error("morph_head_pilot: heads[" + i + "] is empty.");
+            if (seen[name]) throw new Error('morph_head_pilot: duplicate head "' + name + '".');
+            seen[name] = true;
+            heads.push(name);
+        });
+        phases[0].heads = heads;
+        this.literal_svg_heads = true;
+        this.forced_heads = heads.slice();
+        this.Fennimal_Dictionary = {};
+        heads.forEach((name) => {
+            this.Fennimal_Dictionary[name] = { head: name, region: "A" };
+        });
+    }
 
     this.use_region_preferred_body_types = true;
     this.preferred_region_sample_order = [["Jungle", "Village", "North", "Desert"], ["Beach", "Mountains", "Flowerfields", "Swamp"]]; // [["Jungle", "Village", "North", "Desert","Beach", "Mountains", "Flowerfields", "Swamp"]] // [["Jungle", "Village", "North", "Desert"], ["Beach", "Mountains", "Flowerfields", "Swamp"]];
@@ -807,6 +921,23 @@ let StimulusTransformer = function (StimTemplate) {
         }
 
         function match_head_codes_to_head_names() {
+            // morph_head_pilot only: dictionary codes are already SVG ids.
+            // Do not shuffle forced_heads onto abstract A/B/C codes.
+            if (StimTemplate.literal_svg_heads === true) {
+                let MatchedHeads = {};
+                let availableNames = new Set(get_array_of_heads_in_svg().map((h) => h.name));
+                let requested = [...new Set(Object.values(StimTemplate.Fennimal_Dictionary).map((f) => f.head))];
+                let missing = requested.filter((code) => !availableNames.has(code));
+                if (missing.length) {
+                    throw new Error(
+                        "morph_head_pilot: Heads.svg is missing template(s): " + missing.join(", ") +
+                        " (ids must match Fennimal_head_*)."
+                    );
+                }
+                requested.forEach((code) => { MatchedHeads[code] = code; });
+                return MatchedHeads;
+            }
+
             let AvailableInSVG = get_heads_structure(get_all_allowed_heads_in_SVG());
             let MatchedHeads = {};
 
@@ -1021,7 +1152,13 @@ let StimulusTransformer = function (StimTemplate) {
             // Region & Location
             if (req.region) {
                 FenObj.region = Map.region[req.region].region;
-                FenObj.location = Map.region[req.region].Locations.shift(); // Destructive pull
+                // morph_head_pilot: every head shares one dummy region code. Do
+                // not consume unique map spots (this experiment never travels).
+                if (StimTemplate.literal_svg_heads === true) {
+                    FenObj.location = (Map.region[req.region].Locations || [])[0];
+                } else {
+                    FenObj.location = Map.region[req.region].Locations.shift(); // Destructive pull
+                }
             } else {
                 FenObj.region = shuffleArray(Unmapped_regions)[0];
             }
@@ -1241,7 +1378,10 @@ let StimulusTransformer = function (StimTemplate) {
     };
 
     this.get_all_locations_visited_during_experiment_with_regions = function () {
-        return FennimalObjArr.map(fen => [JSON.parse(JSON.stringify(fen.location)), JSON.parse(JSON.stringify(fen.region))]);
+        return FennimalObjArr.filter((fen) => fen && fen.location && fen.region).map((fen) => [
+            JSON.parse(JSON.stringify(fen.location)),
+            JSON.parse(JSON.stringify(fen.region))
+        ]);
     };
 
     this.get_all_map_codes_of_array = function (property_name, arr) {
@@ -1357,8 +1497,8 @@ let StimulusTransformer = function (StimTemplate) {
         let used = this.get_all_x_encountered_during_experiment("head") || [];
         return this.get_forced_heads().filter((h) => h && !used.includes(h));
     };
-    this.get_instruction_pages_arr = () => JSON.parse(JSON.stringify(StimTemplate.Instructions_at_start));
-    this.get_questionnaire_pages_arr = () => JSON.parse(JSON.stringify(StimTemplate.Pages_at_end));
+    this.get_instruction_pages_arr = () => JSON.parse(JSON.stringify(StimTemplate.Instructions_at_start || []));
+    this.get_questionnaire_pages_arr = () => JSON.parse(JSON.stringify(StimTemplate.Pages_at_end || []));
     this.get_bonus_details = () => JSON.parse(JSON.stringify(StimTemplate.BonusStarValue));
 
     // NEW: Updated to parse your block structure cleanly
@@ -1475,4 +1615,4 @@ let StimulusTransformer = function (StimTemplate) {
     };
 };
 
-console.log("STAR4GO-READY")
+console.log("P-READY")

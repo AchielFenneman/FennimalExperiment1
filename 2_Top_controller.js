@@ -318,7 +318,12 @@ class DataController {
 
         this.experimentData.storedData.push(clonedPhaseData);
         this.recordTimestamp(clonedPhaseData.type);
-        this.storeAllData(false);
+        let savePromise = this.storeAllData(false);
+        if (savePromise && typeof savePromise.catch === "function") {
+            savePromise.catch((err) => {
+                console.error("storePhaseData: Firebase save failed for", clonedPhaseData.type, err);
+            });
+        }
     }
 
     /**
@@ -593,7 +598,9 @@ class DataController {
             : Promise.resolve(true);
 
         if (bool_experiment_completed === true && this.experimentData.pid) {
-            return Promise.resolve(savePromise).then(() => this.writeSessionClaim(true));
+            // Never throw here: a failed primary save must not freeze submit.
+            // Last-resort dump (if any) already ran inside saveToFirebase.
+            return Promise.resolve(savePromise).then(() => this.writeSessionClaim(true), () => this.writeSessionClaim(true));
         }
         return savePromise;
     }
@@ -1583,6 +1590,62 @@ class TrialGenerator {
                 }
             }
 
+            // morph_head_pilot: pairwise jumble 2AFC. Does not use names_options / prime.
+            if (phase.type === "morph_head_pilot") {
+                if (!Array.isArray(phase.heads) || phase.heads.length < 2) {
+                    errors.push(`${label} heads must list at least two SVG head ids.`);
+                } else {
+                    phase.heads.forEach((id, i) => {
+                        if (id === undefined || id === null || String(id).trim() === "") {
+                            errors.push(`${label} heads[${i}] is empty.`);
+                            return;
+                        }
+                        let sid = String(id).trim().replace(/^Fennimal_head_/, "");
+                        if (!knownIdSet.has(sid)) {
+                            errors.push(
+                                `${label} heads[${i}] "${sid}" is not a Fennimal id ` +
+                                `(known: ${[...knownIdSet].join(", ")}).`
+                            );
+                        }
+                    });
+                }
+                let hasTrials = Array.isArray(phase.trials) && phase.trials.length > 0;
+                if (!hasTrials) {
+                    try {
+                        if (typeof MorphHeadPilotController === "undefined"
+                            || typeof MorphHeadPilotController.buildPairwiseTrialBlocks !== "function") {
+                            throw new Error("trials is empty and MorphHeadPilot trial builder is not loaded.");
+                        }
+                        // Dry-run only. Do not stamp trials here — the controller
+                        // samples n_heads_sampled at runtime.
+                        let n = phase.n_heads_sampled;
+                        if (n !== undefined && n !== null && n !== "") {
+                            n = Number(n);
+                            if (!Number.isInteger(n) || n < 2) {
+                                throw new Error(`n_heads_sampled must be an integer >= 2 (got "${phase.n_heads_sampled}").`);
+                            }
+                            if (Array.isArray(phase.heads) && n > phase.heads.length) {
+                                throw new Error(
+                                    `n_heads_sampled (${n}) is larger than heads.length (${phase.heads.length}).`
+                                );
+                            }
+                        }
+                        MorphHeadPilotController.buildPairwiseTrialBlocks(phase);
+                    } catch (err) {
+                        errors.push(`${label} ${err && err.message ? err.message : err}`);
+                    }
+                }
+                if (phase.skip_practice !== undefined && typeof phase.skip_practice !== "boolean") {
+                    errors.push(`${label} skip_practice must be true or false when set.`);
+                }
+                if (phase.trial_speed !== undefined && phase.trial_speed !== null && phase.trial_speed !== "") {
+                    let speed = Number(phase.trial_speed);
+                    if (!Number.isFinite(speed) || speed <= 0) {
+                        errors.push(`${label} trial_speed must be a positive number of milliseconds (got "${phase.trial_speed}").`);
+                    }
+                }
+            }
+
             if (phase.type === "hat_drop_task" || phase.type === "hat_drop_gonogo") {
                 if (!Array.isArray(phase.trials) || phase.trials.length === 0) {
                     errors.push(`${label} requires a non-empty trials array (hat-drop trialset lives in stimulus settings).`);
@@ -1757,6 +1820,7 @@ class TrialGenerator {
             "hat_binding_task",
             "chimera_feature_id",
             "morph_task",
+            "morph_head_pilot",
             "morph_task_two_cards",
             "morph_task_two_stage_development",
             "hat_drop_task",
@@ -1921,6 +1985,10 @@ class TrialGenerator {
                 }
                 if (!skipToken(trial.answer)) add(trial.answer, `trials[${i}].answer`);
             });
+        }
+
+        if (phase.type === "morph_head_pilot") {
+            addList(phase.heads, "heads");
         }
 
         if (phase.type === "morph_task" || phase.type === "morph_task_two_stage_development") {
@@ -3350,6 +3418,19 @@ class ExperimentController {
                     );
                 }
                 break;
+            case "morph_head_pilot":
+                this.flagMorphHeadPilotInstructionsShown = false;
+                if (this.currentPhaseData.skip_instructions === true) {
+                    this.flagMorphHeadPilotInstructionsShown = true;
+                    this.setupMorphHeadPilotPhase();
+                } else {
+                    this.instrCont.initializeMorphHeadPilotInstructions(
+                        this.currentDayNum,
+                        this.currentPhaseData.day_title,
+                        this.currentPhaseData.day_body
+                    );
+                }
+                break;
             case "morph_task_two_cards":
                 // Archived two-polaroid morph; not used by live structures.
                 this.flagMorphTaskInstructionsShown = false;
@@ -3592,6 +3673,41 @@ class ExperimentController {
             this
         );
         this.morphCont = currentTask;
+        currentTask.start_sequence();
+    }
+
+    // Stimulus pilot: jumble + head 2AFC. Same indoor overlay as morph_task.
+    setupMorphHeadPilotPhase() {
+        this.mapCont.disable_map_interactions();
+        if (this.mapCont.hide_request_instructions_button) this.mapCont.hide_request_instructions_button();
+        document.getElementById("Map").style.display = "none";
+        let iface = document.getElementById("Interface");
+        if (iface) iface.style.display = "inherit";
+        if (typeof Interface !== "undefined" && Interface.FenneFinder && Interface.FenneFinder.hide) {
+            Interface.FenneFinder.hide();
+        }
+
+        this.currentPhaseData.Data = [];
+        let pLayer = document.getElementById("Fennimals_Layer");
+        if (pLayer) pLayer.style.display = "inherit";
+        if (this.mapCont && this.mapCont.Map_Layer) this.mapCont.Map_Layer.style.display = "none";
+        this.mapCont.hide_all_locations();
+        this.mapCont.currently_in_location = false;
+
+        let currentTask = new MorphHeadPilotController(
+            pLayer,
+            this.currentPhaseData,
+            () => {
+                this.currentPhaseData.Data = this.currentPhaseData.answers || [];
+                currentTask.clean_up();
+                this.morphHeadPilotCont = null;
+                clear_Fennimals_interaction_layer();
+                document.getElementById("Map").style.display = "inherit";
+                this.phaseCompleted();
+            },
+            this
+        );
+        this.morphHeadPilotCont = currentTask;
         currentTask.start_sequence();
     }
 
@@ -4168,6 +4284,12 @@ class ExperimentController {
                 if (!this.flagMorphTaskInstructionsShown) {
                     this.flagMorphTaskInstructionsShown = true;
                     this.setupMorphTaskPhase();
+                }
+                break;
+            case "morph_head_pilot":
+                if (!this.flagMorphHeadPilotInstructionsShown) {
+                    this.flagMorphHeadPilotInstructionsShown = true;
+                    this.setupMorphHeadPilotPhase();
                 }
                 break;
             case "morph_task_two_cards":
@@ -4766,13 +4888,10 @@ class ExperimentController {
         // Call your new DRY function, passing true for the final save
         this.dataCont.storeAllData(true)
             .then(() => {
-                // SUCCESS: Redirect instantly
                 window.location.href = prolificURL;
             })
             .catch((error) => {
-                // FAILSAFE: If the internet drops at the exact moment they finish
                 console.error("Final save failed:", error);
-                alert("Your data is safe, but we had a connection hiccup. Your Prolific completion code is: " + completionCode + ". Click OK to return to Prolific.");
                 window.location.href = prolificURL;
             });
     }

@@ -681,10 +681,15 @@
 
     P._joinRecordSubmit = function (log, questions, selectedByQ, mistakes, grade) {
         log.n_submits += 1;
+        // Wrap each question's id list in an object. Firestore rejects arrays
+        // of arrays, and a failed save here poisons every later write.
         log.submits.push({
             mistakes: mistakes,
             grade: grade ? grade.letter : null,
-            selected: selectedByQ.map((ids) => ids.slice())
+            selected: selectedByQ.map((ids, qi) => ({
+                question_index: qi,
+                ids: (ids || []).slice()
+            }))
         });
         questions.forEach((q, i) => {
             q.selectedIds = (selectedByQ[i] || []).slice();

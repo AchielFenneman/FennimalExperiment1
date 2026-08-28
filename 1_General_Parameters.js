@@ -1759,6 +1759,27 @@ GENERALPARAM = function () {
             "We will start with two practice rounds using simple shapes."
     };
 
+    // Stimulus pilot (morph_head_pilot). Merged over MorphTask in the pilot
+    // controller. Live morph_task does not read this object.
+    this.MorphHeadPilot = {
+        jumbleSlot: { x: 0.02, y: 0.02, w: 0.96, h: 0.96 },
+        jumbleFillFrac: 0.96,
+        morphFitFrac: 0.90,
+        identityPrompt: "Which head do you see more clearly?",
+        identityPromptPractice: "Which shape does this most look like?",
+        polaroidScale: 0.84,
+        polaroidFrameW: 560,
+        polaroidFrameH: 740,
+        identityHatSlotW: 168,
+        identityHatSlotH: 168,
+        dayTitle: "Your task",
+        dayBody:
+            "On each trial you will see a picture that mixes two heads. The two original heads appear at the bottom of the screen, next to F and J.<br><br>" +
+            "Look at the mix, then press F or J to choose which head it looks more like.<br><br>" +
+            "Some mixes will be closer than others. There is no time pressure and no right or wrong answer — go with your first impression.<br><br>" +
+            "We will start with two short practice trials using simple shapes."
+    };
+
     this.HatDrop = {
         nReps: 1,
         instructionOrder: ["most_similar", "cousin", "neighbour"],

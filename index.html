@@ -49,14 +49,136 @@
     const db = getFirestore(app);
 
     window.SESSION_CLAIM_COLLECTION = "fennimals_claims";
+    window.SAVE_DUMP_COLLECTION = "fennimals_save_dumps";
+
+    // Firestore rejects arrays-of-arrays, undefined, and NaN. JSON.stringify
+    // allows all three, so a phase log can look fine in-memory and still fail
+    // the write — after which every later save of the same document fails too.
+    // Applied to every saveToFirebase payload (experiment docs and claims).
+    function sanitizeForFirestore(value, path, stats) {
+        if (value === undefined) return undefined;
+        if (typeof value === "number" && !Number.isFinite(value)) return null;
+        if (Array.isArray(value)) {
+            return value.map((item, i) => {
+                let nextPath = path + "[" + i + "]";
+                let converted = sanitizeForFirestore(item, nextPath, stats);
+                if (Array.isArray(converted)) {
+                    stats.nestedArrays.push(nextPath);
+                    return { values: converted };
+                }
+                return converted;
+            });
+        }
+        if (value && typeof value === "object") {
+            if (typeof Node !== "undefined" && value instanceof Node) return null;
+            if (value instanceof Date) return value;
+            let out = {};
+            Object.keys(value).forEach((key) => {
+                if (value[key] === undefined) return;
+                out[key] = sanitizeForFirestore(value[key], path ? path + "." + key : key, stats);
+            });
+            return out;
+        }
+        return value;
+    }
+
+    function experimentDataToJsonString(experiment_data) {
+        try {
+            return JSON.stringify(experiment_data);
+        } catch (e) {
+            try {
+                return JSON.stringify(sanitizeForFirestore(experiment_data, "", { nestedArrays: [] }));
+            } catch (e2) {
+                return JSON.stringify({
+                    stringifyFailed: String(e),
+                    sanitizeFailed: String(e2),
+                    pid: experiment_data && experiment_data.pid || null
+                });
+            }
+        }
+    }
+
+    // Last-resort backup when the structured experiment write fails.
+    // Strings are legal Firestore values, so this bypasses nested-array
+    // (and most schema) rejections. Chunks stay under the 1MB doc limit.
+    // Does not throw — a failed dump must never block the participant.
+    async function dumpExperimentLastResort(originalCollection, originalDocId, experiment_data, error) {
+        const json = experimentDataToJsonString(experiment_data);
+        const CHUNK = 800000;
+        const chunks = [];
+        for (let i = 0; i < json.length; i += CHUNK) chunks.push(json.slice(i, i + CHUNK));
+
+        const dumpedAt = new Date().toISOString();
+        const dumpId = String(originalDocId || ("unknown_" + Date.now()));
+        const col = window.SAVE_DUMP_COLLECTION;
+        const meta = {
+            kind: "meta",
+            pid: (experiment_data && experiment_data.pid) || null,
+            expCode: (experiment_data && experiment_data.expCode) || originalCollection,
+            attemptDocId: dumpId,
+            originalCollection: originalCollection,
+            originalDocId: originalDocId,
+            dumpedAt: dumpedAt,
+            saveError: (error && (error.message || String(error))) || "unknown",
+            saveErrorCode: (error && error.code) || null,
+            experimentCompleted: !!(experiment_data && experiment_data.experimentCompleted),
+            nChunks: chunks.length,
+            jsonChars: json.length,
+            encoding: "json-string-chunks",
+            howToReassemble: "Concatenate json (if present) or jsonChunk from __c0..__c{nChunks-1} in order, then JSON.parse."
+        };
+
+        if (chunks.length === 1) {
+            meta.json = chunks[0];
+            await setDoc(doc(db, col, dumpId), meta);
+            console.warn("Last-resort save dump written to", col + "/" + dumpId, "(" + json.length + " chars)");
+            return true;
+        }
+
+        meta.json = null;
+        await setDoc(doc(db, col, dumpId), meta);
+        for (let i = 0; i < chunks.length; i++) {
+            await setDoc(doc(db, col, dumpId + "__c" + i), {
+                kind: "chunk",
+                attemptDocId: dumpId,
+                originalCollection: originalCollection,
+                expCode: meta.expCode,
+                pid: meta.pid,
+                chunkIndex: i,
+                nChunks: chunks.length,
+                jsonChunk: chunks[i],
+                dumpedAt: dumpedAt
+            });
+        }
+        console.warn("Last-resort save dump written to", col + "/" + dumpId, "in", chunks.length, "chunks");
+        return true;
+    }
 
     window.saveToFirebase = async function(collection_name, doc_id, experiment_data) {
+        const stats = { nestedArrays: [] };
+        const payload = sanitizeForFirestore(experiment_data, "", stats);
+        if (stats.nestedArrays.length) {
+            console.warn(
+                "Firestore sanitize: wrapped nested arrays at",
+                stats.nestedArrays.slice(0, 12),
+                stats.nestedArrays.length > 12 ? ("… +" + (stats.nestedArrays.length - 12) + " more") : ""
+            );
+        }
         try {
             const docRef = doc(db, collection_name, doc_id);
-            await setDoc(docRef, experiment_data, { merge: true });
+            await setDoc(docRef, payload, { merge: true });
             return true;
         } catch (e) {
             console.error("Error saving to Firebase: ", e);
+            const skipDump = collection_name === window.SESSION_CLAIM_COLLECTION
+                || collection_name === window.SAVE_DUMP_COLLECTION;
+            if (!skipDump) {
+                try {
+                    await dumpExperimentLastResort(collection_name, doc_id, experiment_data, e);
+                } catch (dumpErr) {
+                    console.error("Last-resort dump also failed:", dumpErr);
+                }
+            }
             return false;
         }
     };
@@ -206,24 +328,25 @@
 <!-- Parked unused trial controllers (not loaded): 3_InteractiveFennimalController_archive.js -->
 <script type="text/javascript" src="1_Worldstate.js"></script>
 <script type="text/javascript" src="0_Loader.js"></script>
-<script type="text/javascript" src="1_General_Parameters.js?v=hat-join-8"></script>
-<script type="text/javascript" src="2_Stimulus_data.js?v=hat-bind-1"></script>
-<script type="text/javascript" src="3_InstructionsController.js?v=hat-bind-1"></script>
+<script type="text/javascript" src="1_General_Parameters.js?v=head-pilot-5"></script>
+<script type="text/javascript" src="2_Stimulus_data.js?v=head-pilot-5"></script>
+<script type="text/javascript" src="3_InstructionsController.js?v=head-pilot-6"></script>
 <script type="text/javascript" src="3_Map_controller.js?v=autotravel-lock"></script>
 <script type="text/javascript" src="PhoneRoomController.js"></script>
 <script type="text/javascript" src="4_SortingTasks.js"></script>
 <script type="text/javascript" src="4_HatBindingTask.js?v=binding-33"></script>
-<script type="text/javascript" src="4_HatBindingJoinTasks.js?v=join-9"></script>
+<script type="text/javascript" src="4_HatBindingJoinTasks.js?v=join-10"></script>
 <script type="text/javascript" src="4_ChimeraFeatureIdTask.js?v=chimera-names-5"></script>
 <script type="text/javascript" src="4_MorphTaskTwoCards.js?v=morph-archive-2"></script>
 <script type="text/javascript" src="4_MorphTaskTwoStageDevelopment.js?v=morph-archive-twostage-1"></script>
 <script type="text/javascript" src="4_MorphTask.js?v=morph-practice-7"></script>
+<script type="text/javascript" src="4_MorphHeadPilotTask.js?v=head-pilot-7"></script>
 <script type="text/javascript" src="4_HatDropTask.js?v=hatdrop-19"></script>
 <script type="text/javascript" src="1_SVGReducer.js?v=chimera-1"></script>
 <script type="text/javascript" src="AudioController.js"></script>
 <script type="text/javascript" src="4_AttentionCheckController.js"></script>
 <script type="text/javascript" src="3_Interface.js?v=chimera-25"></script>
-<script type="text/javascript" src="2_Top_controller.js?v=hat-bind-1"></script>
+<script type="text/javascript" src="2_Top_controller.js?v=hat-bind-5"></script>
 <script type="text/javascript" src="ItemCollections.js"></script>
 
 </html>

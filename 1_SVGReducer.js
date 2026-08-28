@@ -115,7 +115,8 @@ SVGREDUCER = function (Stimuli) {
             ? (Stimuli.get_forced_heads() || [])
             : []
         let keepHeads = new Set([...(Heads_in_exp || []), ...forcedHeads].filter(Boolean))
-        // Keep assigned Fennimal heads AND leftover forced_heads (chimera strangers, etc.).
+        // Keep assigned Fennimal heads AND leftover forced_heads (chimera strangers,
+        // morph_head_pilot templates copied from phase.heads, etc.).
         let Unused_heads = ALl_head_Ids.filter(x => x && !keepHeads.has(x))
 
         for (let i = 0; i < Unused_heads.length; i++) {

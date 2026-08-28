@@ -28,7 +28,7 @@ Experiment_Structure block
   Location entry → TrialFactory.build(FenObj.interaction_type, …)
 ```
 
-Some phases are **not** location trials (`partner_belief_multiple` / `partner_belief_individual_boxes`, sorting, `hat_binding_task`, `chimera_feature_id`, `morph_task`, `morph_task_two_cards` (archived), `morph_task_two_stage_development` (archived), `pseudoday`) and never call `TrialFactory`. `chimera_feature_id` and `morph_task` run as indoor polaroids (no map travel).
+Some phases are **not** location trials (`partner_belief_multiple` / `partner_belief_individual_boxes`, sorting, `hat_binding_task`, `chimera_feature_id`, `morph_task`, `morph_head_pilot`, `morph_task_two_cards` (archived), `morph_task_two_stage_development` (archived), `pseudoday`) and never call `TrialFactory`. `chimera_feature_id`, `morph_task`, and `morph_head_pilot` run as indoor polaroids (no map travel).
 
 ### Trial queue: default vs `trial_subblocks`
 
@@ -500,6 +500,28 @@ Speeded 2AFC identity DV on an **extra-wide indoor polaroid** (photo-room stage:
 **Scoring:** points decay over `trial_speed` from jumble-ready. Correct → remaining; incorrect → silent penalty. Name quiz unpaid. Practice unpaid. 50% mix always `scored_correct`.
 
 Controller: `MorphTaskController` (`4_MorphTask.js`). Tunables: `GenParam.MorphTask`.
+
+#### `morph_head_pilot`
+Short **stimulus pilot** (own experiment code `morph_head_pilot`). One polaroid, jumble only, F/J 2AFC with **head images** of the two parents. No prime, name quiz, hats, map, or stars. Uses the same jumble mixer as `morph_task` (prototype methods from `4_MorphTask.js`).
+
+**Authoring:** list SVG head ids once on `heads`. Do **not** also set `All_Forced_Head_Lists` or `All_Fennimal_Sets` for this code — those are synthesized (Fennimal id = SVG id, identity FeatureMap). `forced_heads` is filled internally so `SVGREDUCER` keeps the templates.
+
+| Field | Meaning |
+|---|---|
+| `heads` | Candidate SVG head ids (e.g. `["tomato","pig","bell"]`). **Only head list.** Kept in the SVG for every subject. |
+| `n_heads_sampled` | How many of `heads` this participant actually sees (integer ≥ 2). Pairwise trials are built from that sample. Omit to use the full list. Persisted on `phaseRandomizations.morph_head_pilot_sampled_heads`. |
+| `morphs` | Between-subjects renderer pool, same values as `morph_task`. |
+| `mixes` | Mix percents. Each mix × each pair × **both** majority directions (including `50`). |
+| `trials` | Optional explicit trialset. If omitted, built from `morphs` × `mixes` × pairs. |
+| `trial_speed` | Generous RT window (default 60000). Choice is still required. |
+| `skip_practice` | If `true`, omit the two unpaid shape-practice trials. |
+| `skip_instructions` | Skip Day N page. |
+
+**Count:** `n_heads_sampled` heads → `C(n,2)` pairs × each mix × both targets. With 3 heads and mixes `[50,60,70]` that is **18 paid trials** (plus two shape-practice trials unless `skip_practice`). Morph method is between-subjects (`assigned_morph` / `morph_method` / each row’s `morph`).
+
+**Logged answer rows** (`phase.answers` / `phase.Data`, also mirrored live on `experimentData.morphHeadPilotProgress.answers`): `pair_heads`, `mix`, `mix_toward_head` (the designated target parent), `selected_head`, `selected_key` (F/J), `left_head` / `right_head`, `correct_vs_target`, `balanced_mix` (`mix===50`), `morph` / `assigned_morph` / `morph_renderer`, `sampled_heads`, `reaction_time_ms`. Subject-level: `experimentData.morphAssignment`.
+
+Controller: `MorphHeadPilotController` (`4_MorphHeadPilotTask.js`). Tunables: `GenParam.MorphHeadPilot`. Switch `Experiment_Code` to `["morph_head_pilot"]` to run.
 
 #### `morph_task_two_cards` (archived)
 Former two-polaroid morph: static prime polaroid beside the morph photo, mouse name buttons + L/R click identity. Kept loadable via `MorphTaskTwoCardsController` (`4_MorphTaskTwoCards.js`) / `GenParam.MorphTaskTwoCards` for replay; **not used by live structures**. Prefer `morph_task`.

@@ -328,6 +328,14 @@ class InstructionsController {
         this.parentElem.style.display = "inherit";
         this.progressDiv.style.display = "none";
 
+        // Standalone stimulus pilot: no island map behind consent / task copy.
+        let experimentCode = this.stimuli && typeof this.stimuli.get_experiment_code === "function"
+            ? this.stimuli.get_experiment_code()
+            : (this.stimuli && this.stimuli.Experiment_Code);
+        if (experimentCode === "morph_head_pilot") {
+            includeMapBackground = false;
+        }
+
         if (includeMapBackground) {
             document.getElementById("Map").style.display = "inherit";
             let coverRect = document.getElementsByClassName("instruction_cover_rect")[0];
@@ -1954,6 +1962,31 @@ class InstructionsController {
         this.addClosingButtonToParent("bottom-center", false, deleteBonusStarIcons, 1300);
     }
 
+    initializeMorphHeadPilotInstructions(currentBlockNum, dayTitle, dayBody) {
+        this.showEmptyPage(false);
+        this.currentInstructionType = "morph_head_pilot";
+
+        let copy = (typeof GenParam !== "undefined" && GenParam.MorphHeadPilot) || {};
+        let title = dayTitle || copy.dayTitle || "Your task";
+        document.getElementById("Instructions_Title").innerHTML = title;
+
+        let body = dayBody || copy.dayBody || (
+            "On each trial you will see a picture that mixes two heads. Press F or J to choose which head it looks more like."
+        );
+        this.textElemMainInstructions = create_SVG_text_in_foreign_element(
+            body,
+            0.12 * GenParam.SVG_width, 180,
+            0.76 * GenParam.SVG_width,
+            520,
+            "instruction_element_text"
+        );
+        this.textElemMainInstructions.classList.add("instruction_element_nonbackground");
+        this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0].style.fontSize = "36px";
+        this.currentInstructionsSVG.appendChild(this.textElemMainInstructions);
+
+        this.addClosingButtonToParent("bottom-center", false, undefined, 1300);
+    }
+
     initializeHatDropInstructions(currentBlockNum, dayTitle, dayBody, phaseType) {
         this.currentInstructionType = phaseType || "hat_drop_task";
         this.clearInstructions();
@@ -3355,6 +3388,15 @@ class InstructionsController {
 
     showPaymentScreen(paymentData) {
         this.expPaymentData = paymentData;
+        let summary = (paymentData && paymentData.phases || []).find((p) => p && p.dayType === "summary");
+        let maxStars = summary && summary.maximumPossibleStars != null
+            ? Number(summary.maximumPossibleStars)
+            : 0;
+        // No-star studies (morph_head_pilot): skip the bonus-star recap.
+        if (!(maxStars > 0)) {
+            this.showCompletionCodeScreen();
+            return;
+        }
         let timer = 1000;
         this.showEmptyPage(true);
         document.getElementById("Instructions_Title").innerHTML = "Your bonus for this experiment";
