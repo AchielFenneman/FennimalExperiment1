@@ -328,14 +328,6 @@ class InstructionsController {
         this.parentElem.style.display = "inherit";
         this.progressDiv.style.display = "none";
 
-        // Standalone stimulus pilot: no island map behind consent / task copy.
-        let experimentCode = this.stimuli && typeof this.stimuli.get_experiment_code === "function"
-            ? this.stimuli.get_experiment_code()
-            : (this.stimuli && this.stimuli.Experiment_Code);
-        if (experimentCode === "morph_head_pilot") {
-            includeMapBackground = false;
-        }
-
         if (includeMapBackground) {
             document.getElementById("Map").style.display = "inherit";
             let coverRect = document.getElementsByClassName("instruction_cover_rect")[0];
@@ -1864,54 +1856,36 @@ class InstructionsController {
         this.addClosingButtonToParent("bottom-center", false, undefined, 500);
     }
 
-    initializeChimeraFeatureIdInstructions(currentBlockNum, dayTitle, dayBody) {
-        this.currentInstructionType = "chimera_feature_id";
+
+    initializeFeatureKitPilotInstructions(currentBlockNum, dayTitle, dayBody) {
+        this.currentInstructionType = "feature_kit_pilot";
         this.clearInstructions();
         this.currentInstructionsSVG = this.createBasicInstructionElements();
         this.parentElem.appendChild(this.currentInstructionsSVG);
         this.parentElem.style.display = "inherit";
 
-        let chimeraCopy = (typeof GenParam !== "undefined" && GenParam.ChimeraFeatureId) || {};
-        let title = dayTitle || chimeraCopy.dayTitle || "photos from this morning";
-        document.getElementById("Instructions_Title").innerHTML = `Day ${currentBlockNum}: ${title} (BONUS STAR DAY)`;
-        document.getElementsByClassName("instructions_element_background")[0].style.fill =
-            GenParam.background_fill_for_instructions_where_stars_can_be_earned;
-        document.getElementsByClassName("instructions_element_cover")[0].style.fill =
-            GenParam.background_fill_for_instructions_where_stars_can_be_earned;
+        let copy = (typeof GenParam !== "undefined" && GenParam.FeatureKitPilot) || {};
+        let title = dayTitle || copy.dayTitle || "Which heads look most alike?";
+        document.getElementById("Instructions_Title").innerHTML = title;
 
-        let body = dayBody || chimeraCopy.dayBody || (
-            "This morning's polaroids are still developing. Some shots are close-ups; others show more of the Fennimal. The picture takes a moment to appear."
-        );
+        let body = dayBody || copy.dayBody ||
+            "You'll see three heads. Go with your first impression: which lower head looks more like the top one? Press F for the left head, J for the right.";
         this.textElemMainInstructions = create_SVG_text_in_foreign_element(
-            body + "<br><br><br><br><br>",
-            0.12 * GenParam.SVG_width, 140,
+            body,
+            0.12 * GenParam.SVG_width, 160,
             0.76 * GenParam.SVG_width,
-            620,
+            560,
             "instruction_element_text"
         );
         this.textElemMainInstructions.classList.add("instruction_element_nonbackground");
-        this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0].style.fontSize = "34px";
+        this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0].style.fontSize = "32px";
         this.currentInstructionsSVG.appendChild(this.textElemMainInstructions);
 
-        setTimeout(() => {
-            showBonusStarOnScreen(
-                this.parentElem,
-                0.5 * GenParam.SVG_width,
-                0.62 * GenParam.SVG_height,
-                true,
-                "deletable_bonus_star",
-                1,
-                undefined
-            );
-        }, 300);
-
-        this.updateProgressNewDay(currentBlockNum);
+        this.updateProgressNewDay(false);
         this.updateProgressWithinDay(false);
-        const deleteBonusStarIcons = () => {
-            Array.from(document.getElementsByClassName("deletable_bonus_star")).forEach((s) => s.remove());
-        };
-        this.addClosingButtonToParent("bottom-center", false, deleteBonusStarIcons, 1300);
+        this.addClosingButtonToParent("bottom-center", false, undefined, 800);
     }
+
 
     initializeMorphTaskInstructions(currentBlockNum, dayTitle, dayBody, responseKeyIcons) {
         this.currentInstructionType = "morph_task";
@@ -1968,80 +1942,6 @@ class InstructionsController {
         this.addClosingButtonToParent("bottom-center", false, deleteBonusStarIcons, 1300);
     }
 
-    initializeMorphHeadPilotInstructions(currentBlockNum, dayTitle, dayBody) {
-        this.showEmptyPage(false);
-        this.currentInstructionType = "morph_head_pilot";
-
-        let copy = (typeof GenParam !== "undefined" && GenParam.MorphHeadPilot) || {};
-        let title = dayTitle || copy.dayTitle || "Your task";
-        document.getElementById("Instructions_Title").innerHTML = title;
-
-        let body = dayBody || copy.dayBody || (
-            "On each trial you will see a picture that mixes two heads. Press F or J to choose which head it looks more like."
-        );
-        this.textElemMainInstructions = create_SVG_text_in_foreign_element(
-            body,
-            0.12 * GenParam.SVG_width, 180,
-            0.76 * GenParam.SVG_width,
-            520,
-            "instruction_element_text"
-        );
-        this.textElemMainInstructions.classList.add("instruction_element_nonbackground");
-        this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0].style.fontSize = "36px";
-        this.currentInstructionsSVG.appendChild(this.textElemMainInstructions);
-
-        this.addClosingButtonToParent("bottom-center", false, undefined, 1300);
-    }
-
-    initializeHatDropInstructions(currentBlockNum, dayTitle, dayBody, phaseType) {
-        this.currentInstructionType = phaseType || "hat_drop_task";
-        this.clearInstructions();
-        this.currentInstructionsSVG = this.createBasicInstructionElements();
-        this.parentElem.appendChild(this.currentInstructionsSVG);
-        this.parentElem.style.display = "inherit";
-
-        let copy = (typeof GenParam !== "undefined" && GenParam.HatDrop) || {};
-        let isGng = phaseType === "hat_drop_gonogo";
-        let title = dayTitle || (isGng ? copy.gngDayTitle : copy.dayTitle) || "the warehouse chute";
-        document.getElementById("Instructions_Title").innerHTML = `Day ${currentBlockNum}: ${title} (BONUS STAR DAY)`;
-        document.getElementsByClassName("instructions_element_background")[0].style.fill =
-            GenParam.background_fill_for_instructions_where_stars_can_be_earned;
-        document.getElementsByClassName("instructions_element_cover")[0].style.fill =
-            GenParam.background_fill_for_instructions_where_stars_can_be_earned;
-
-        let body = dayBody || (isGng ? copy.gngDayBody : copy.dayBody) || (
-            "Hats are coming down the warehouse chute. Move the sled so each hat lands in the box you choose."
-        );
-        this.textElemMainInstructions = create_SVG_text_in_foreign_element(
-            body + "<br><br><br><br><br>",
-            0.12 * GenParam.SVG_width, 140,
-            0.76 * GenParam.SVG_width,
-            620,
-            "instruction_element_text"
-        );
-        this.textElemMainInstructions.classList.add("instruction_element_nonbackground");
-        this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0].style.fontSize = "32px";
-        this.currentInstructionsSVG.appendChild(this.textElemMainInstructions);
-
-        setTimeout(() => {
-            showBonusStarOnScreen(
-                this.parentElem,
-                0.5 * GenParam.SVG_width,
-                0.70 * GenParam.SVG_height,
-                true,
-                "deletable_bonus_star",
-                1,
-                undefined
-            );
-        }, 300);
-
-        this.updateProgressNewDay(currentBlockNum);
-        this.updateProgressWithinDay(false);
-        const deleteBonusStarIcons = () => {
-            Array.from(document.getElementsByClassName("deletable_bonus_star")).forEach((s) => s.remove());
-        };
-        this.addClosingButtonToParent("bottom-center", true, deleteBonusStarIcons, 1300);
-    }
 
     setup_on_call_trial_elements(fenObj) {
         // TODO: When on_call supports Fennimal_toy / toy_to_box (and other new
@@ -2391,6 +2291,20 @@ class InstructionsController {
         }
     }
 
+    /**
+     * Tag, hide, and register one or more elements as phone-room sequential hint elements.
+     * Does NOT append to the SVG — callers that need to append must do so first.
+     */
+    _registerHintElem(...elems) {
+        elems.forEach((elem) => {
+            elem.classList.add("instruction_element_nonbackground");
+            elem.classList.add("phone_room_hint_sequential");
+            elem.style.display = "none";
+            elem.style.opacity = 0;
+            this.phoneRoomHintSequentialElements.push(elem);
+        });
+    }
+
     createPhoneRoomHintVisual(hintConfig) {
         switch (hintConfig.type) {
             case "fennimal":
@@ -2437,12 +2351,7 @@ class InstructionsController {
             icon.classList.add("is-slumped");
         }
 
-        icon.classList.add("instruction_element_nonbackground");
-        icon.classList.add("phone_room_hint_sequential");
-        icon.style.display = "none";
-        icon.style.opacity = 0;
-
-        this.phoneRoomHintSequentialElements.push(icon);
+        this._registerHintElem(icon);
 
         if (slumped && GenParam.PhoneRoomFlair.showHintRainclouds) {
             this.createPhoneRoomHintRainclouds();
@@ -2465,12 +2374,7 @@ class InstructionsController {
         );
         set_toy_color_scheme(toyIcon, trialObj.toy, false);
         this.makePhoneRoomToyStatic(toyIcon, trialObj.toy);
-        toyIcon.classList.add("instruction_element_nonbackground");
-        toyIcon.classList.add("phone_room_hint_sequential");
-        toyIcon.style.display = "none";
-        toyIcon.style.opacity = 0;
-
-        this.phoneRoomHintSequentialElements.push(toyIcon);
+        this._registerHintElem(toyIcon);
     }
 
     createPhoneRoomSackHintVisual(trialObj) {
@@ -2493,12 +2397,7 @@ class InstructionsController {
         let closedGroup = sackIcon.querySelector(".sack_closed");
         if (closedGroup) closedGroup.style.display = "inline";
 
-        sackIcon.classList.add("instruction_element_nonbackground");
-        sackIcon.classList.add("phone_room_hint_sequential");
-        sackIcon.style.display = "none";
-        sackIcon.style.opacity = 0;
-
-        this.phoneRoomHintSequentialElements.push(sackIcon);
+        this._registerHintElem(sackIcon);
     }
 
     createPhoneRoomBoxHintVisual(trialObj) {
@@ -2519,14 +2418,8 @@ class InstructionsController {
             3
         );
         apply_toybox_decoration_visibility_to_element(boxIcon, boxId);
-
         // Closed box: keep back + front + lid (front is the visible body).
-        boxIcon.classList.add("instruction_element_nonbackground");
-        boxIcon.classList.add("phone_room_hint_sequential");
-        boxIcon.style.display = "none";
-        boxIcon.style.opacity = 0;
-
-        this.phoneRoomHintSequentialElements.push(boxIcon);
+        this._registerHintElem(boxIcon);
     }
 
     // box_room: show every toybox in the trial side-by-side.
@@ -2539,7 +2432,7 @@ class InstructionsController {
         group.classList.add("phone_room_hint_sequential");
         group.style.display = "none";
         group.style.opacity = 0;
-        this.currentInstructionsSVG.appendChild(group);
+        this.currentInstructionsSVG.appendChild(group); // appended early so children can position themselves
 
         let n = fens.length;
         let scale = n >= 3 ? 2.3 : 2.7;
@@ -2571,7 +2464,7 @@ class InstructionsController {
             return;
         }
 
-        this.phoneRoomHintSequentialElements.push(group);
+        this._registerHintElem(group); // already appended above
     }
 
     makePhoneRoomToyStatic(toyIcon, toyId) {
@@ -2642,7 +2535,7 @@ class InstructionsController {
         cloudGroup.style.display = "none";
         cloudGroup.style.opacity = 0;
         cloudGroup.style.transform = `translate(${GenParam.SVG_width / 2}px, ${GenParam.SVG_height / 2 - 410}px)`;
-        this.currentInstructionsSVG.appendChild(cloudGroup);
+        this.currentInstructionsSVG.appendChild(cloudGroup); // must append before getBBox calls below
 
         const cloudConfigs = [
             { dx: -90, dy: -20, scale: 1.7, delay: 0 },
@@ -2680,7 +2573,7 @@ class InstructionsController {
             });
         });
 
-        this.phoneRoomHintSequentialElements.push(cloudGroup);
+        this._registerHintElem(cloudGroup); // already appended above
     }
 
     createPhoneRoomPlaceholderHintVisual(hintConfig) {
@@ -2694,10 +2587,6 @@ class InstructionsController {
         placeholder.style.fill = "#DDDDDD";
         placeholder.style.stroke = "#555555";
         placeholder.style.strokeWidth = "8px";
-        placeholder.classList.add("instruction_element_nonbackground");
-        placeholder.classList.add("phone_room_hint_sequential");
-        placeholder.style.display = "none";
-        placeholder.style.opacity = 0;
         this.currentInstructionsSVG.appendChild(placeholder);
 
         let questionMark = create_SVG_text_elem(
@@ -2711,13 +2600,9 @@ class InstructionsController {
         questionMark.style.fontSize = "150px";
         questionMark.style.fontWeight = 900;
         questionMark.style.fill = "#555555";
-        questionMark.classList.add("instruction_element_nonbackground");
-        questionMark.classList.add("phone_room_hint_sequential");
-        questionMark.style.display = "none";
-        questionMark.style.opacity = 0;
         this.currentInstructionsSVG.appendChild(questionMark);
 
-        this.phoneRoomHintSequentialElements.push(placeholder, questionMark);
+        this._registerHintElem(placeholder, questionMark);
     }
 
     createPhoneRoomHintText(hintConfig) {
@@ -2732,10 +2617,6 @@ class InstructionsController {
         titleText.style.fontWeight = "bold";
         titleText.style.fontSize = "55px";
         titleText.style.textAnchor = "middle";
-        titleText.classList.add("instruction_element_nonbackground");
-        titleText.classList.add("phone_room_hint_sequential");
-        titleText.style.display = "none";
-        titleText.style.opacity = 0;
 
         let locationText = create_SVG_text_elem(
             GenParam.SVG_width / 2,
@@ -2747,10 +2628,6 @@ class InstructionsController {
         locationText.style.fill = "#555555";
         locationText.style.fontSize = "40px";
         locationText.style.textAnchor = "middle";
-        locationText.classList.add("instruction_element_nonbackground");
-        locationText.classList.add("phone_room_hint_sequential");
-        locationText.style.display = "none";
-        locationText.style.opacity = 0;
 
         let regionText = create_SVG_text_elem(
             GenParam.SVG_width / 2,
@@ -2762,10 +2639,6 @@ class InstructionsController {
         regionText.style.fill = "#555555";
         regionText.style.fontSize = "40px";
         regionText.style.textAnchor = "middle";
-        regionText.classList.add("instruction_element_nonbackground");
-        regionText.classList.add("phone_room_hint_sequential");
-        regionText.style.display = "none";
-        regionText.style.opacity = 0;
 
         let instructionText = create_SVG_text_elem(
             GenParam.SVG_width / 2,
@@ -2778,17 +2651,11 @@ class InstructionsController {
         instructionText.style.fontSize = "34px";
         instructionText.style.fontStyle = "italic";
         instructionText.style.textAnchor = "middle";
-        instructionText.classList.add("instruction_element_nonbackground");
-        instructionText.classList.add("phone_room_hint_sequential");
-        instructionText.style.display = "none";
-        instructionText.style.opacity = 0;
 
-        this.currentInstructionsSVG.appendChild(titleText);
-        this.currentInstructionsSVG.appendChild(locationText);
-        this.currentInstructionsSVG.appendChild(regionText);
-        this.currentInstructionsSVG.appendChild(instructionText);
-
-        this.phoneRoomHintSequentialElements.push(titleText, locationText, regionText, instructionText);
+        [titleText, locationText, regionText, instructionText].forEach((el) => {
+            this.currentInstructionsSVG.appendChild(el);
+        });
+        this._registerHintElem(titleText, locationText, regionText, instructionText);
     }
 
     showPhoneRoomHint() {
@@ -3100,27 +2967,6 @@ class InstructionsController {
         };
     }
 
-    startCardSortingTask(currentBlockNum, specialSettings) {
-        this.currentInstructionType = "card_sorting_task";
-        this.clearInstructions();
-
-        this.currentInstructionsSVG = create_SVG_group(0, 0, undefined, undefined);
-        this.parentElem.appendChild(this.currentInstructionsSVG);
-        this.parentElem.style.display = "inherit";
-
-        new CARDSORTINGTASK(currentBlockNum, this.parentElem, this.stimuli, (data) => this.cardSortingTaskCompleted(data), specialSettings);
-        let progressElem = this.createProgressElements();
-        progressElem.setAttribute("y", 1025);
-        progressElem.style.opacity = 0.5;
-        this.parentElem.appendChild(progressElem);
-
-        this.updateProgressNewDay(currentBlockNum);
-        this.updateProgressWithinDay(false);
-    }
-
-    cardSortingTaskCompleted(data) {
-        this.expCont.cardSortingTaskComplete(data); // CamelCased Hook
-    }
 
     showPseudoDayInformationPage(informationType, title, text, optionalInformation) {
         if (text) text = text.replaceAll("%PARTNERNAME%", this.worldState.get_partner_icon_settings().name);
@@ -3398,7 +3244,7 @@ class InstructionsController {
         let maxStars = summary && summary.maximumPossibleStars != null
             ? Number(summary.maximumPossibleStars)
             : 0;
-        // No-star studies (morph_head_pilot): skip the bonus-star recap.
+        // No-star studies: skip the bonus-star recap.
         if (!(maxStars > 0)) {
             this.showCompletionCodeScreen();
             return;

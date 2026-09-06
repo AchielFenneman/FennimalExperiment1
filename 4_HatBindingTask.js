@@ -131,7 +131,7 @@ class HatBindingTaskController {
         if (this.expCont && this.expCont.dataCont && this.expCont.dataCont.getOrCreateBindingSearchCondition) {
             return this.expCont.dataCont.getOrCreateBindingSearchCondition(key, pool);
         }
-        return pool[Math.floor(Math.random() * pool.length)];
+        return pickRandom(pool);
     }
 
     _allowedRelations() {
@@ -223,7 +223,7 @@ class HatBindingTaskController {
                 combos.push([armIds[i], armIds[j]]);
             }
         }
-        return combos[Math.floor(Math.random() * combos.length)].slice();
+        return pickRandom(combos).slice();
     }
 
     _inferHubAndArms() {
@@ -943,7 +943,7 @@ class HatBindingTaskController {
         if (!Array.isArray(lines) || lines.length === 0) {
             this._fail(`missing gistDescriptions.${bucket}["${featureId}"].`);
         }
-        return String(lines[Math.floor(Math.random() * lines.length)]);
+        return String(pickRandom(lines));
     }
 
     _genericFeatureName(kind, featureId) {

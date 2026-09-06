@@ -9,7 +9,7 @@
  * jumbleFadeMs. Identity 2AFC: F/J keycaps show the two jumble
  * parents (prime excluded). phase.response_key_icons selects the
  * property on those keys: "hats" (default), "heads" (grayscale,
- * as in morph_head_pilot), or "names". Polaroid flies to the chosen side.
+ * as in the archived morph_head_pilot), or "names". Polaroid flies to the chosen side.
  * No resolve / no trial-by-trial identity feedback. Caption stays ????.
  *
  * mix: integer percent target in the jumble (1–99). 50 is the unbiased
@@ -24,8 +24,8 @@
  * Practice (unless skip_practice): two unpaid shape trials on the same
  * two-spot polaroid (circle prime, square/triangle jumble).
  *
- * A snapshot of the previous developing-photo flow is
- * morph_task_two_stage_development (4_MorphTaskTwoStageDevelopment.js).
+ * A snapshot of the previous developing-photo flow is archived at
+ * archive/tasks/morph_two_stage/4_MorphTaskTwoStageDevelopment.js.
  */
 class MorphTaskController {
     constructor(parentLayer, phaseData, returnfunc, expCont) {
@@ -41,7 +41,6 @@ class MorphTaskController {
 
         this.fensById = this._indexFennimals(expCont && expCont.stimuli);
         this.trialSpeedMs = this._resolveTrialSpeed();
-        this.resolveTrial = false;
         this._ensureTrialList();
         this._assignSubjectMorph();
         this.trialSpecs = this._readTrialSpecs();
@@ -58,7 +57,6 @@ class MorphTaskController {
         this.destroyed = false;
         this.inputLocked = true;
         this.morphRaf = null;
-        this.resolveRaf = null;
         this.sceneRoot = null;
         this.layers = null;
         this.currentTrial = null;
@@ -112,6 +110,45 @@ class MorphTaskController {
     _mixWeight(trial) {
         let mix = trial && trial.mix != null ? Number(trial.mix) : 50;
         return Math.max(0, Math.min(1, mix / 100));
+    }
+
+    _morphPairProfileKey(headA, headB) {
+        return [headA, headB]
+            .map((h) => String(h || "").trim().toLowerCase().replace(/^Fennimal_head_/, ""))
+            .filter(Boolean)
+            .sort()
+            .join("|");
+    }
+
+    _morphPairProfile(trialOrHeadA, headB) {
+        let key;
+        if (trialOrHeadA && trialOrHeadA.targetFen && trialOrHeadA.otherFen) {
+            key = this._morphPairProfileKey(
+                trialOrHeadA.targetFen.head,
+                trialOrHeadA.otherFen.head
+            );
+        } else {
+            key = this._morphPairProfileKey(trialOrHeadA, headB);
+        }
+        let profiles = this.params.morphPairProfiles || {};
+        let defaults = this.params.meshShellDefaults || {};
+        return Object.assign({}, defaults, profiles[key] || {});
+    }
+
+    _displayMixWeight(trial, nominalM) {
+        let m = nominalM != null
+            ? Math.max(0, Math.min(1, Number(nominalM) || 0))
+            : this._mixWeight(trial);
+        let kind = this.activeRenderer || (trial && trial.morph);
+        if (!trial || (kind !== "mesh_shell" && kind !== "feature_anchored_mesh")) return m;
+        let profile = this._morphPairProfile(trial);
+        let offset = profile && profile.mixOffset != null ? Number(profile.mixOffset) : 0;
+        if (!Number.isFinite(offset)) offset = 0;
+        return Math.max(0, Math.min(1, m + offset / 100));
+    }
+
+    static meshShellRoleKeys() {
+        return ["nose", "ear_left", "ear_right", "crown"];
     }
 
     static responseKeyIconKinds() {
@@ -170,6 +207,30 @@ class MorphTaskController {
 
     static morphKinds() {
         return ["crossfade", "mesh", "silhouette"];
+    }
+
+    // Z-order for compositional head morphing (shell → features → crown).
+    static compositeLayerOrder() {
+        return ["shell", "eyes", "nose", "mouth", "ear_left", "ear_right", "crown"];
+    }
+
+    static compositeCrownRoles() {
+        return ["crown", "stem", "handle"];
+    }
+
+    static compositeShellOmitMorph() {
+        return [
+            "nose", "mouth", "ear_left", "ear_right", "crown", "stem", "handle",
+            "texture", "bell_clapper"
+        ];
+    }
+
+    // Standalone path-based feature morphs (compose onto head later).
+    static featureMorphRoles() {
+        return [
+            "nose", "mouth", "eyes", "eye_left", "eye_right",
+            "ear_left", "ear_right", "crown"
+        ];
     }
 
     // Percent target in the jumble. Renderer is mix/100; 50 is the unbiased score case.
@@ -860,36 +921,12 @@ class MorphTaskController {
             let stored = sides[trial.id];
             let valid = stored && trial.options.some((o) => o.id === stored);
             if (!valid) {
-                sides[trial.id] = trial.options[Math.floor(Math.random() * trial.options.length)].id;
+                sides[trial.id] = pickRandom(trial.options).id;
                 changed = true;
             }
         });
         if (changed || !existing) this._persistRandomization(key, { sides });
         return sides;
-    }
-
-    // ------------------------------------------------------------------
-    // Morph math
-    // ------------------------------------------------------------------
-
-    _morphSpec(trial) {
-        if (trial._morphSpec) return trial._morphSpec;
-        let T = this.trialSpeedMs;
-        let minF = this._num("midpointMinFrac", 0.15);
-        let maxF = this._num("midpointMaxFrac", 0.85);
-        let c = trial.morphCenterpoint != null ? trial.morphCenterpoint : 0.5;
-        let tMid = (minF + (maxF - minF) * c) * T;
-        let tau = Math.max(1, this._num("tauFrac", 0.30) * T);
-        trial._morphSpec = { T, tMid, tau };
-        return trial._morphSpec;
-    }
-
-    _morphWeightAt(elapsedMs, trial) {
-        let spec = this._morphSpec(trial);
-        const sig = (t) => 1 / (1 + Math.exp(-(t - spec.tMid) / spec.tau));
-        let s0 = sig(0);
-        let m = 0.5 + 0.5 * (sig(Math.max(0, elapsedMs)) - s0) / Math.max(1e-9, 1 - s0);
-        return Math.max(0.5, Math.min(1, m));
     }
 
     // ------------------------------------------------------------------
@@ -1044,6 +1081,1075 @@ class MorphTaskController {
     _stripHelperMarks(root) {
         if (!root || !root.querySelectorAll) return;
         root.querySelectorAll(".invisible_element, .prep_element_hidden").forEach((el) => el.remove());
+    }
+
+    _stripMorphDecor(root, roles) {
+        if (!root || !root.querySelectorAll) return;
+        let omit = roles || ["texture"];
+        omit.forEach((role) => {
+            root.querySelectorAll(`[data-morph="${role}"]`).forEach((el) => el.remove());
+        });
+    }
+
+    _stripMorphAnnotation(root) {
+        if (!root || !root.querySelectorAll) return;
+        root.querySelectorAll(".morph_lm, .morph_poly, .morph_anchors").forEach((el) => el.remove());
+    }
+
+    _hideCompositeSubtree(root) {
+        if (!root || !root.querySelectorAll) return;
+        root.querySelectorAll("path, circle, ellipse, line, polyline, polygon, rect, g").forEach((el) => {
+            el.setAttribute("data-composite-hidden", "1");
+        });
+    }
+
+    _unhideCompositeNode(el) {
+        let node = el;
+        while (node) {
+            node.removeAttribute("data-composite-hidden");
+            node = node.parentNode;
+        }
+        if (el && el.querySelectorAll) {
+            el.querySelectorAll("[data-composite-hidden]").forEach((child) => {
+                child.removeAttribute("data-composite-hidden");
+            });
+        }
+    }
+
+    _purgeCompositeHidden(root) {
+        if (!root || !root.querySelectorAll) return;
+        root.querySelectorAll("[data-composite-hidden]").forEach((el) => el.remove());
+    }
+
+    _keepCompositeSelectors(root, selectors) {
+        this._hideCompositeSubtree(root);
+        (selectors || []).forEach((selector) => {
+            root.querySelectorAll(selector).forEach((el) => this._unhideCompositeNode(el));
+        });
+        this._purgeCompositeHidden(root);
+    }
+
+    _stripForCompositeLayer(root, layer) {
+        if (!root) return;
+        this._stripHelperMarks(root);
+        this._stripMorphAnnotation(root);
+        this._stripMorphDecor(root, ["texture"]);
+
+        if (layer === "shell") {
+            MorphTaskController.compositeShellOmitMorph().forEach((role) => {
+                root.querySelectorAll(`[data-morph="${role}"]`).forEach((el) => el.remove());
+            });
+            root.querySelectorAll(".eye, .mouth_happy, .mouth_sad, .eyebrow_happy, .eyebrow_sad")
+                .forEach((el) => el.remove());
+            return;
+        }
+
+        const keepByLayer = {
+            eyes: [".eye"],
+            nose: ['[data-morph="nose"]'],
+            mouth: ['[data-morph="mouth"]', ".mouth_happy"],
+            ear_left: ['[data-morph="ear_left"]'],
+            ear_right: ['[data-morph="ear_right"]'],
+            crown: MorphTaskController.compositeCrownRoles().map((role) => `[data-morph="${role}"]`)
+        };
+        let selectors = keepByLayer[layer];
+        if (!selectors || !selectors.length) return;
+        this._keepCompositeSelectors(root, selectors);
+    }
+
+    async _rasterHeadClone(head, size) {
+        let ns = "http://www.w3.org/2000/svg";
+        let exportSvg = document.createElementNS(ns, "svg");
+        exportSvg.setAttribute("xmlns", ns);
+        exportSvg.setAttribute("viewBox", "0 0 400 400");
+        exportSvg.setAttribute("width", String(size));
+        exportSvg.setAttribute("height", String(size));
+        let exportHead = head.cloneNode(true);
+        this._stripHelperMarks(exportHead);
+        exportSvg.appendChild(exportHead);
+
+        let xml = new XMLSerializer().serializeToString(exportSvg);
+        let url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(xml);
+        let canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        let ctx = canvas.getContext("2d", { willReadFrequently: true });
+        await new Promise((resolve, reject) => {
+            let img = new Image();
+            let settled = false;
+            let timer = setTimeout(() => {
+                if (settled) return;
+                settled = true;
+                reject(new Error("composite layer raster timed out."));
+            }, 8000);
+            img.onload = () => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                ctx.clearRect(0, 0, size, size);
+                ctx.drawImage(img, 0, 0, size, size);
+                this._grayscaleCanvas(canvas);
+                resolve();
+            };
+            img.onerror = () => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                reject(new Error("could not rasterize composite layer."));
+            };
+            img.src = url;
+        });
+        return canvas;
+    }
+
+    async _compositeLayerRaster(fen, scheme, layer, size) {
+        size = size || Math.max(200, Math.round(this._num("meshRasterSize", 400)));
+        let head = this._meshHeadClone(fen, scheme);
+        let k = size / 400;
+        this._stripForCompositeLayer(head, layer);
+        let canvas = await this._rasterHeadClone(head, size);
+        return { canvas, scale: k };
+    }
+
+    async _buildCompositeLayerSet(fen, scheme, size) {
+        let layers = MorphTaskController.compositeLayerOrder();
+        let compositeLayers = {};
+        await Promise.all(layers.map(async (layer) => {
+            compositeLayers[layer] = (await this._compositeLayerRaster(fen, scheme, layer, size)).canvas;
+        }));
+        return compositeLayers;
+    }
+
+    _canvasHasOpaque(canvas, threshold) {
+        if (!canvas) return false;
+        threshold = threshold || Math.max(1, Math.min(255, Math.round(this._num("meshAlphaThreshold", 18))));
+        let size = canvas.width;
+        let d = canvas.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, size, size).data;
+        for (let i = 3; i < d.length; i += 4) {
+            if (d[i] >= threshold) return true;
+        }
+        return false;
+    }
+
+    _compositeLayerCanvas(src, layer, size) {
+        if (src && src.compositeLayers && src.compositeLayers[layer]) {
+            return src.compositeLayers[layer];
+        }
+        let key = "_compositeEmpty_" + layer;
+        let c = this._ensureScratchCanvas(key, size, size);
+        let ctx = c.getContext("2d");
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, size, size);
+        return c;
+    }
+
+    // ------------------------------------------------------------------
+    // Path-based feature morphs (build per-feature SVG, compose later)
+    // ------------------------------------------------------------------
+
+    _featureSelectorsForRole(role) {
+        const map = {
+            eyes: [".eye"],
+            eye_left: [".eye.eye_left"],
+            eye_right: [".eye.eye_right"],
+            nose: ['[data-morph="nose"]'],
+            mouth: ['[data-morph="mouth"]', ".mouth_happy"],
+            ear_left: ['[data-morph="ear_left"]'],
+            ear_right: ['[data-morph="ear_right"]'],
+            crown: MorphTaskController.compositeCrownRoles().map((r) => `[data-morph="${r}"]`)
+        };
+        return map[role] || [];
+    }
+
+    _featureMeasureSvg() {
+        let ns = "http://www.w3.org/2000/svg";
+        if (!this._featureMeasureHost) {
+            let svg = document.createElementNS(ns, "svg");
+            svg.setAttribute("viewBox", "0 0 400 400");
+            svg.setAttribute("width", "400");
+            svg.setAttribute("height", "400");
+            svg.style.position = "fixed";
+            svg.style.left = "-10000px";
+            svg.style.top = "-10000px";
+            svg.style.pointerEvents = "none";
+            document.body.appendChild(svg);
+            this._featureMeasureHost = svg;
+        }
+        return this._featureMeasureHost;
+    }
+
+    _measureSvgNode(node) {
+        let host = this._featureMeasureSvg();
+        let ns = "http://www.w3.org/2000/svg";
+        while (host.firstChild) host.removeChild(host.firstChild);
+        let wrap = document.createElementNS(ns, "g");
+        wrap.appendChild(node.cloneNode(true));
+        host.appendChild(wrap);
+        try {
+            let b = wrap.getBBox();
+            if (!(b.width > 0 && b.height > 0)) return null;
+            return {
+                x: b.x, y: b.y, width: b.width, height: b.height,
+                cx: b.x + b.width / 2, cy: b.y + b.height / 2,
+                maxSide: Math.max(b.width, b.height)
+            };
+        } catch (e) {
+            return null;
+        }
+    }
+
+    _extractIsolatedFeatureGroup(head, role) {
+        let ns = "http://www.w3.org/2000/svg";
+        let clone = head.cloneNode(true);
+        this._stripHelperMarks(clone);
+        this._stripMorphAnnotation(clone);
+        this._stripMorphDecor(clone, ["texture"]);
+        let selectors = this._featureSelectorsForRole(role);
+        if (!selectors.length) return null;
+        this._keepCompositeSelectors(clone, selectors);
+        let group = document.createElementNS(ns, "g");
+        group.setAttribute("class", "feature_morph_paths");
+        group.setAttribute("data-morph-role", role);
+        while (clone.firstChild) {
+            group.appendChild(clone.firstChild);
+        }
+        if (!group.childNodes.length) return null;
+        return group;
+    }
+
+    _headEyeSpan(head) {
+        let left = this._meshBBox(head.querySelector(".eye.eye_left"));
+        let right = this._meshBBox(head.querySelector(".eye.eye_right"));
+        if (!left || !right) return 120;
+        return Math.max(24, Math.hypot(
+            (right.x + right.width / 2) - (left.x + left.width / 2),
+            (right.y + right.height / 2) - (left.y + left.height / 2)
+        ));
+    }
+
+    _headEyeMid(head) {
+        let left = this._meshBBox(head.querySelector(".eye.eye_left"));
+        let right = this._meshBBox(head.querySelector(".eye.eye_right"));
+        if (!left || !right) return { x: 200, y: 200 };
+        return {
+            x: (left.x + left.width / 2 + right.x + right.width / 2) / 2,
+            y: (left.y + left.height / 2 + right.y + right.height / 2) / 2
+        };
+    }
+
+    _lmPoint(head, key, index) {
+        let el = head.querySelector(`.morph_lm[data-morph="${key}"]`);
+        if (!el) return null;
+        let x = parseFloat(el.getAttribute("cx"));
+        let y = parseFloat(el.getAttribute("cy"));
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+        return { x, y };
+    }
+
+    _featurePlacement(head, role, group, bbox) {
+        let eyeSpan = this._headEyeSpan(head);
+        let eyeMid = this._headEyeMid(head);
+        let mouth = this._meshMarker(head, ".Fennimal_head_mouth_point");
+        let angle = 0;
+        let anchor = bbox ? { x: bbox.cx, y: bbox.cy } : { x: eyeMid.x, y: eyeMid.y };
+        let span = bbox ? Math.max(16, bbox.maxSide) : eyeSpan * 0.3;
+
+        if (role === "eyes") {
+            anchor = eyeMid;
+            span = eyeSpan;
+            let l = this._meshBBox(head.querySelector(".eye.eye_left"));
+            let r = this._meshBBox(head.querySelector(".eye.eye_right"));
+            if (l && r) {
+                angle = Math.atan2(
+                    (r.y + r.height / 2) - (l.y + l.height / 2),
+                    (r.x + r.width / 2) - (l.x + l.width / 2)
+                );
+            }
+        } else if (role === "eye_left" || role === "eye_right") {
+            let side = role === "eye_left" ? ".eye.eye_left" : ".eye.eye_right";
+            let box = this._meshBBox(head.querySelector(side));
+            if (box) {
+                anchor = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+                span = Math.max(box.width, box.height);
+            }
+        } else if (role === "mouth" && mouth) {
+            anchor = mouth;
+            span = eyeSpan * 0.44;
+        } else if (role === "nose") {
+            let nose = this._lmPoint(head, "nose");
+            if (nose) anchor = nose;
+            span = eyeSpan * 0.26;
+        } else if (role === "ear_left" || role === "ear_right") {
+            let side = role === "ear_left" ? "ear_left" : "ear_right";
+            let up = this._lmPoint(head, side + "_base_upper");
+            let lo = this._lmPoint(head, side + "_base_lower");
+            if (up && lo) {
+                anchor = { x: (up.x + lo.x) / 2, y: (up.y + lo.y) / 2 };
+                span = Math.max(16, Math.hypot(lo.x - up.x, lo.y - up.y) * 2.2);
+                angle = Math.atan2(lo.y - up.y, lo.x - up.x) + Math.PI / 2;
+            }
+        } else if (role === "crown") {
+            let brow = this._lmPoint(head, "brow_mid");
+            let topL = this._lmPoint(head, "outline_top_left");
+            let topR = this._lmPoint(head, "outline_top_right");
+            if (brow) anchor = { x: brow.x, y: brow.y - eyeSpan * 0.12 };
+            else if (topL && topR) anchor = { x: (topL.x + topR.x) / 2, y: (topL.y + topR.y) / 2 };
+            span = Math.max(bbox ? bbox.maxSide : 0, eyeSpan * 0.55);
+        }
+
+        return { anchor, span, angle, eyeSpan };
+    }
+
+    buildFeatureMorphSpec(fen, scheme, role) {
+        let head = this._meshHeadClone(fen, scheme);
+        let group = this._extractIsolatedFeatureGroup(head, role);
+        if (!group) {
+            return { role, head: fen.head, present: false };
+        }
+        let bbox = this._measureSvgNode(group);
+        if (!bbox) {
+            return { role, head: fen.head, present: false };
+        }
+        let placement = this._featurePlacement(head, role, group, bbox);
+        return {
+            role,
+            head: fen.head,
+            present: true,
+            group,
+            bbox,
+            anchor: placement.anchor,
+            span: placement.span,
+            angle: placement.angle,
+            eyeSpan: placement.eyeSpan,
+            eyeMid: this._headEyeMid(head)
+        };
+    }
+
+    _placementFromSpec(spec) {
+        if (!spec || !spec.present) return null;
+        let anchor = spec.anchor;
+        if (!anchor || !Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)) {
+            anchor = spec.eyeMid || { x: 200, y: 200 };
+        }
+        return {
+            anchor: { x: anchor.x, y: anchor.y },
+            span: Math.max(1, Number.isFinite(spec.span) ? spec.span : 40),
+            angle: Number.isFinite(spec.angle) ? spec.angle : 0
+        };
+    }
+
+    _lerpFeaturePlacement(a, b, m) {
+        let pa = this._placementFromSpec(a);
+        let pb = this._placementFromSpec(b);
+        if (!pa && !pb) return null;
+        if (!pa) return pb;
+        if (!pb) return pa;
+        let da = pb.angle - pa.angle;
+        while (da > Math.PI) da -= Math.PI * 2;
+        while (da < -Math.PI) da += Math.PI * 2;
+        return {
+            anchor: {
+                x: pa.anchor.x + (pb.anchor.x - pa.anchor.x) * m,
+                y: pa.anchor.y + (pb.anchor.y - pa.anchor.y) * m
+            },
+            span: pa.span + (pb.span - pa.span) * m,
+            angle: pa.angle + da * m
+        };
+    }
+
+    _featureShapeWeight(m, side, shapeMode) {
+        shapeMode = shapeMode != null ? shapeMode : this._num("featureMorphShapeMode", 0);
+        // m = 1 → specA (headA), m = 0 → specB (headB)
+        if (shapeMode >= 1.5 && shapeMode < 2.5) return 1;
+        if (shapeMode >= 0.5 && shapeMode < 1.5) return side === "a" ? m : (1 - m);
+        if (m < 0.5) return side === "b" ? 1 : 0;
+        if (m > 0.5) return side === "a" ? 1 : 0;
+        return side === "b" ? 1 : 0;
+    }
+
+    _samplePathElementPoints(el, samples, closed) {
+        if (!el || typeof el.getTotalLength !== "function") return null;
+        let len = 0;
+        try {
+            len = el.getTotalLength();
+        } catch (e) {
+            return null;
+        }
+        if (!Number.isFinite(len) || len <= 0) return null;
+        let pts = [];
+        let count = Math.max(3, samples);
+        for (let i = 0; i < count; i++) {
+            let t = closed
+                ? (i / count)
+                : (count > 1 ? i / (count - 1) : 0);
+            let pt = el.getPointAtLength(t * len);
+            if (!pt || !Number.isFinite(pt.x) || !Number.isFinite(pt.y)) continue;
+            pts.push({ x: pt.x, y: pt.y });
+        }
+        return pts.length >= 3 ? pts : null;
+    }
+
+    _sampleGroupPathPoints(group, samples, closed) {
+        if (!group) return null;
+        let paths = group.querySelectorAll("path");
+        if (!paths.length) return null;
+        if (paths.length === 1) {
+            return this._samplePathElementPoints(paths[0], samples, closed);
+        }
+        let lengths = [];
+        let total = 0;
+        for (let i = 0; i < paths.length; i++) {
+            let len = 0;
+            try {
+                len = paths[i].getTotalLength();
+            } catch (e) {
+                len = 0;
+            }
+            if (!Number.isFinite(len) || len < 0) len = 0;
+            lengths.push(len);
+            total += len;
+        }
+        if (total <= 0) return null;
+        let count = Math.max(3, samples);
+        let pts = [];
+        for (let si = 0; si < count; si++) {
+            let target = closed
+                ? (si / count) * total
+                : (count > 1 ? si / (count - 1) : 0) * total;
+            let acc = 0;
+            let pushed = false;
+            for (let pi = 0; pi < paths.length; pi++) {
+                if (acc + lengths[pi] >= target || pi === paths.length - 1) {
+                    let local = lengths[pi] > 0 ? (target - acc) / lengths[pi] : 0;
+                    local = Math.max(0, Math.min(1, local));
+                    let pt;
+                    try {
+                        pt = paths[pi].getPointAtLength(local * lengths[pi]);
+                    } catch (e) {
+                        pt = null;
+                    }
+                    if (!pt || !Number.isFinite(pt.x) || !Number.isFinite(pt.y)) {
+                        pt = pts.length ? pts[pts.length - 1] : { x: 0, y: 0 };
+                    }
+                    pts.push({ x: pt.x, y: pt.y });
+                    pushed = true;
+                    break;
+                }
+                acc += lengths[pi];
+            }
+            if (!pushed) {
+                pts.push(pts.length ? pts[pts.length - 1] : { x: 0, y: 0 });
+            }
+        }
+        return pts.length >= 3 ? pts : null;
+    }
+
+    _featureMorphPoly(head, role) {
+        if (!head) return null;
+        let poly = head.querySelector(`.morph_poly[data-morph="${role}"]`);
+        if (!poly && role === "crown") {
+            poly = head.querySelector('.morph_poly[data-morph="crown"]');
+        }
+        return poly;
+    }
+
+    _prepareFeatureSampleLoop(points, anchor, closed) {
+        if (!points || !points.length) return points;
+        let pts = points.map((p) => ({ x: p.x, y: p.y }));
+        if (closed) {
+            if (anchor) pts = this._rotateBoundaryToAnchor(pts, anchor);
+            pts = this._normalizeBoundaryWinding(pts, true);
+        } else if (anchor) {
+            pts = this._rotateBoundaryToAnchor(pts, anchor);
+        }
+        return pts;
+    }
+
+    _loopMatchCost(a, b) {
+        let n = Math.min(a.length, b.length);
+        let cost = 0;
+        for (let i = 0; i < n; i++) {
+            cost += Math.hypot(a[i].x - b[i].x, a[i].y - b[i].y);
+        }
+        return cost;
+    }
+
+    _alignClosedLoops(a, b) {
+        if (!a.length || a.length !== b.length) return b;
+        let n = a.length;
+        let best = b.slice();
+        let bestCost = Infinity;
+        for (let rev = 0; rev < 2; rev++) {
+            let bb = rev ? b.slice().reverse() : b.slice();
+            for (let shift = 0; shift < n; shift++) {
+                let rotated = bb.slice(shift).concat(bb.slice(0, shift));
+                let cost = this._loopMatchCost(a, rotated);
+                if (cost < bestCost) {
+                    bestCost = cost;
+                    best = rotated;
+                }
+            }
+        }
+        return best;
+    }
+
+    _alignOpenPolylines(a, b) {
+        if (!a.length || a.length !== b.length) return b;
+        let brev = b.slice().reverse();
+        return this._loopMatchCost(a, brev) < this._loopMatchCost(a, b) ? brev : b;
+    }
+
+    _smoothPointLoop(points, closed, passes) {
+        if (!points || points.length < 3 || passes <= 0) return points;
+        let pts = points.map((p) => ({ x: p.x, y: p.y }));
+        for (let pass = 0; pass < passes; pass++) {
+            let next = [];
+            for (let i = 0; i < pts.length; i++) {
+                let prev = closed
+                    ? pts[(i - 1 + pts.length) % pts.length]
+                    : pts[Math.max(0, i - 1)];
+                let cur = pts[i];
+                let nxt = closed
+                    ? pts[(i + 1) % pts.length]
+                    : pts[Math.min(pts.length - 1, i + 1)];
+                next.push({
+                    x: cur.x * 0.5 + (prev.x + nxt.x) * 0.25,
+                    y: cur.y * 0.5 + (prev.y + nxt.y) * 0.25
+                });
+            }
+            pts = next;
+        }
+        return pts;
+    }
+
+    _denseFeatureLoop(spec, role, closed, denseCount) {
+        if (!spec || !spec.present) return null;
+        let head = document.getElementById("Fennimal_head_" + spec.head);
+        let preferPoly = this._num("featureMorphPreferPoly", 1) > 0;
+        let pts = null;
+        if (preferPoly) {
+            let poly = this._featureMorphPoly(head, role);
+            if (poly) pts = this._samplePathElementPoints(poly, denseCount, closed);
+        }
+        if (!pts && spec.group) {
+            pts = this._sampleGroupPathPoints(spec.group, denseCount, closed);
+        }
+        return pts;
+    }
+
+    _raySegmentDist(orig, dx, dy, p1, p2) {
+        let sx = p2.x - p1.x;
+        let sy = p2.y - p1.y;
+        let denom = dx * sy - dy * sx;
+        if (Math.abs(denom) < 1e-9) return 0;
+        let t = ((p1.x - orig.x) * sy - (p1.y - orig.y) * sx) / denom;
+        let u = ((p1.x - orig.x) * dy - (p1.y - orig.y) * dx) / denom;
+        if (t >= 0 && u >= 0 && u <= 1) return t;
+        return 0;
+    }
+
+    _raycastRadius(points, anchor, angle) {
+        if (!points || !points.length || !anchor) return 0;
+        let rdx = Math.cos(angle);
+        let rdy = Math.sin(angle);
+        let maxR = 0;
+        let n = points.length;
+        for (let i = 0; i < n; i++) {
+            let p1 = points[i];
+            let p2 = points[(i + 1) % n];
+            let r = this._raySegmentDist(anchor, rdx, rdy, p1, p2);
+            if (r > maxR) maxR = r;
+        }
+        return maxR;
+    }
+
+    _resamplePolarLoop(densePts, anchor, samples) {
+        let pts = [];
+        for (let i = 0; i < samples; i++) {
+            let angle = (i / samples) * 2 * Math.PI;
+            let r = this._raycastRadius(densePts, anchor, angle);
+            pts.push({
+                x: anchor.x + Math.cos(angle) * r,
+                y: anchor.y + Math.sin(angle) * r
+            });
+        }
+        return pts;
+    }
+
+    _polarRadiiCanonical(densePts, anchor, angle, span, samples) {
+        let polarWorld = this._resamplePolarLoop(densePts, anchor, samples);
+        return polarWorld.map((p) => {
+            let c = this._pointToCanonical(p, anchor, angle, span);
+            return Math.hypot(c.x, c.y);
+        });
+    }
+
+    _rebuildFromPolarRadii(radii, anchor, angle, span) {
+        let pts = [];
+        let n = radii.length;
+        for (let i = 0; i < n; i++) {
+            let theta = (i / n) * 2 * Math.PI;
+            let c = {
+                x: Math.cos(theta) * radii[i],
+                y: Math.sin(theta) * radii[i]
+            };
+            pts.push(this._pointFromCanonical(c, anchor, angle, span));
+        }
+        return pts;
+    }
+
+    _smoothRadii(radii, passes) {
+        if (!radii || radii.length < 3 || passes <= 0) return radii;
+        let vals = radii.slice();
+        let n = vals.length;
+        for (let pass = 0; pass < passes; pass++) {
+            let next = [];
+            for (let i = 0; i < n; i++) {
+                let prev = vals[(i - 1 + n) % n];
+                let cur = vals[i];
+                let nxt = vals[(i + 1) % n];
+                next.push(cur * 0.5 + (prev + nxt) * 0.25);
+            }
+            vals = next;
+        }
+        return vals;
+    }
+
+    _pairedFeatureSamples(specA, specB, samples, role) {
+        let closed = role !== "mouth";
+        let srcA = specA.present ? specA : specB;
+        let srcB = specB.present ? specB : specA;
+        let headA = document.getElementById("Fennimal_head_" + srcA.head);
+        let headB = document.getElementById("Fennimal_head_" + srcB.head);
+        let placeA = this._placementFromSpec(srcA);
+        let placeB = this._placementFromSpec(srcB);
+        let preferPoly = this._num("featureMorphPreferPoly", 1) > 0;
+        let ptsA = null;
+        let ptsB = null;
+        let homologous = false;
+
+        if (preferPoly) {
+            let polyA = this._featureMorphPoly(headA, role);
+            let polyB = this._featureMorphPoly(headB, role);
+            if (polyA && polyB) {
+                ptsA = this._samplePathElementPoints(polyA, samples, closed);
+                ptsB = this._samplePathElementPoints(polyB, samples, closed);
+                homologous = !!(ptsA && ptsB);
+            }
+        }
+
+        if (!ptsA && srcA.present) {
+            ptsA = this._sampleGroupPathPoints(srcA.group, samples, closed);
+        }
+        if (!ptsB && srcB.present) {
+            ptsB = this._sampleGroupPathPoints(srcB.group, samples, closed);
+        }
+
+        if (!ptsA && !ptsB) return null;
+        if (!ptsA) ptsA = ptsB.slice();
+        if (!ptsB) ptsB = ptsA.slice();
+
+        let n = Math.min(ptsA.length, ptsB.length, samples);
+        ptsA = ptsA.slice(0, n);
+        ptsB = ptsB.slice(0, n);
+
+        if (placeA && placeA.anchor) {
+            ptsA = this._prepareFeatureSampleLoop(ptsA, placeA.anchor, closed);
+        }
+        if (placeB && placeB.anchor) {
+            ptsB = this._prepareFeatureSampleLoop(ptsB, placeB.anchor, closed);
+        }
+
+        return { ptsA, ptsB, closed, homologous };
+    }
+
+    _featureWorldSamples(spec, samples, closed) {
+        if (!spec || !spec.present) return null;
+        closed = closed !== false && spec.role !== "mouth";
+        let fromGroup = this._sampleGroupPathPoints(spec.group, samples, closed);
+        if (fromGroup) return fromGroup;
+        let head = document.getElementById("Fennimal_head_" + spec.head);
+        let poly = this._featureMorphPoly(head, spec.role);
+        if (poly) return this._samplePathElementPoints(poly, samples, closed);
+        return null;
+    }
+
+    _pointToCanonical(p, anchor, angle, span) {
+        if (!p || !anchor) return { x: 0, y: 0 };
+        let dx = p.x - anchor.x;
+        let dy = p.y - anchor.y;
+        let cos = Math.cos(-angle);
+        let sin = Math.sin(-angle);
+        let rx = dx * cos - dy * sin;
+        let ry = dx * sin + dy * cos;
+        let s = Math.max(1, span);
+        return { x: rx / s, y: ry / s };
+    }
+
+    _pointFromCanonical(p, anchor, angle, span) {
+        if (!p || !anchor) return { x: 200, y: 200 };
+        let s = Math.max(1, span);
+        let sx = p.x * s;
+        let sy = p.y * s;
+        let cos = Math.cos(angle);
+        let sin = Math.sin(angle);
+        return {
+            x: anchor.x + sx * cos - sy * sin,
+            y: anchor.y + sx * sin + sy * cos
+        };
+    }
+
+    _lerpPoints(a, b, m) {
+        return a.map((p, i) => {
+            let q = b[i];
+            if (!p || !q) return p || q || { x: 0, y: 0 };
+            return {
+                x: p.x + (q.x - p.x) * m,
+                y: p.y + (q.y - p.y) * m
+            };
+        });
+    }
+
+    _pointsToPathD(points, closed) {
+        if (!points || points.length < 2) return "";
+        if (points.length === 2) {
+            return `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)} L ${points[1].x.toFixed(2)} ${points[1].y.toFixed(2)}`;
+        }
+        let d = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+        let n = points.length;
+        for (let i = 0; i < n; i++) {
+            let p0 = points[(i - 1 + n) % n];
+            let p1 = points[i];
+            let p2 = points[(i + 1) % n];
+            let p3 = points[(i + 2) % n];
+            if (!closed) {
+                if (i === 0) continue;
+                if (i >= n - 1) {
+                    d += ` L ${p1.x.toFixed(2)} ${p1.y.toFixed(2)}`;
+                    break;
+                }
+                p0 = points[Math.max(0, i - 1)];
+                p3 = points[Math.min(n - 1, i + 2)];
+            }
+            let cp1x = p1.x + (p2.x - p0.x) / 6;
+            let cp1y = p1.y + (p2.y - p0.y) / 6;
+            let cp2x = p2.x - (p3.x - p1.x) / 6;
+            let cp2y = p2.y - (p3.y - p1.y) / 6;
+            d += ` C ${cp1x.toFixed(2)} ${cp1y.toFixed(2)} ${cp2x.toFixed(2)} ${cp2y.toFixed(2)} ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
+            if (!closed && i >= n - 2) break;
+        }
+        if (closed) d += " Z";
+        return d;
+    }
+
+    _headWorldToView(p, morphed, viewCenter, frame) {
+        if (frame === "head") return p;
+        return {
+            x: p.x - morphed.anchor.x + viewCenter.x,
+            y: p.y - morphed.anchor.y + viewCenter.y
+        };
+    }
+
+    _featurePathStyle(spec, weight) {
+        let fill = "#8e8e8e";
+        let stroke = "#1f2a33";
+        let strokeWidth = "3";
+        if (spec && spec.group) {
+            let path = spec.group.querySelector("path");
+            if (path) {
+                if (path.getAttribute("fill") && path.getAttribute("fill") !== "none") {
+                    fill = path.getAttribute("fill");
+                }
+                if (path.getAttribute("stroke")) stroke = path.getAttribute("stroke");
+                if (path.getAttribute("stroke-width")) strokeWidth = path.getAttribute("stroke-width");
+            }
+        }
+        return { fill, stroke, strokeWidth, opacity: Math.max(0, Math.min(1, weight)) };
+    }
+
+    _appendGeometryMorphLayer(svg, specA, specB, m, morphed, viewCenter, frame, role) {
+        let ns = "http://www.w3.org/2000/svg";
+        let samples = Math.max(12, Math.round(this._num("featureMorphPathSamples", 48)));
+        let smoothPasses = Math.max(0, Math.round(this._num("featureMorphSmoothPasses", 2)));
+        let srcA = specA.present ? specA : specB;
+        let srcB = specB.present ? specB : specA;
+        let placeA = this._placementFromSpec(srcA);
+        let placeB = this._placementFromSpec(srcB);
+        if (!placeA || !placeB || !morphed || !morphed.anchor) return false;
+
+        let closed = role !== "mouth";
+        let useRadial = closed && this._num("featureMorphUseRadial", 1) > 0;
+        let viewPts = null;
+
+        if (useRadial) {
+            let denseN = Math.max(samples * 3, 96);
+            let denseA = specA.present
+                ? this._denseFeatureLoop(specA, role, closed, denseN)
+                : null;
+            let denseB = specB.present
+                ? this._denseFeatureLoop(specB, role, closed, denseN)
+                : null;
+            if (!denseA && !denseB) return false;
+            if (!denseA) denseA = denseB.slice();
+            if (!denseB) denseB = denseA.slice();
+
+            let radA = specA.present
+                ? this._polarRadiiCanonical(
+                    denseA, placeA.anchor, placeA.angle, placeA.span, samples
+                )
+                : new Array(samples).fill(0);
+            let radB = specB.present
+                ? this._polarRadiiCanonical(
+                    denseB, placeB.anchor, placeB.angle, placeB.span, samples
+                )
+                : new Array(samples).fill(0);
+            let radM = radA.map((r, i) => r * (1 - m) + radB[i] * m);
+            radM = this._smoothRadii(radM, smoothPasses);
+            let worldM = this._rebuildFromPolarRadii(
+                radM, morphed.anchor, morphed.angle, morphed.span
+            );
+            viewPts = worldM.map((p) => this._headWorldToView(p, morphed, viewCenter, frame));
+        } else {
+            let paired = this._pairedFeatureSamples(specA, specB, samples, role);
+            if (!paired || !paired.ptsA.length) return false;
+            let ptsA = paired.ptsA;
+            let ptsB = paired.ptsB;
+            closed = paired.closed;
+
+            let canonA = ptsA.map((p) => this._pointToCanonical(
+                p, placeA.anchor, placeA.angle, placeA.span
+            ));
+            let canonB = ptsB.map((p) => this._pointToCanonical(
+                p, placeB.anchor, placeB.angle, placeB.span
+            ));
+            if (closed) {
+                canonB = this._alignClosedLoops(canonA, canonB);
+            } else {
+                canonB = this._alignOpenPolylines(canonA, canonB);
+            }
+            let canonM = this._lerpPoints(canonA, canonB, m);
+            canonM = this._smoothPointLoop(canonM, closed, smoothPasses);
+            let worldM = canonM.map((p) => this._pointFromCanonical(
+                p, morphed.anchor, morphed.angle, morphed.span
+            ));
+            viewPts = worldM.map((p) => this._headWorldToView(p, morphed, viewCenter, frame));
+        }
+
+        if (!viewPts || !viewPts.length) return false;
+
+        let path = document.createElementNS(ns, "path");
+        path.setAttribute("d", this._pointsToPathD(viewPts, closed));
+        path.setAttribute("class", "feature_morph_geometry");
+        let styleA = this._featurePathStyle(srcA, 1);
+        let styleB = this._featurePathStyle(srcB, 1);
+        path.setAttribute("fill", m < 0.5 ? styleB.fill : styleA.fill);
+        path.setAttribute("stroke", m < 0.5 ? styleB.stroke : styleA.stroke);
+        path.setAttribute("stroke-width", styleA.strokeWidth);
+        path.setAttribute("stroke-linejoin", "round");
+        path.setAttribute("stroke-linecap", "round");
+        path.setAttribute("vector-effect", "non-scaling-stroke");
+        path.setAttribute("opacity", "0.95");
+        svg.appendChild(path);
+        return true;
+    }
+
+    _lerpFeatureEyeMid(specA, specB, m) {
+        let a = (specA.present && specA.eyeMid) || (specA.present && specA.anchor);
+        let b = (specB.present && specB.eyeMid) || (specB.present && specB.anchor);
+        if (!a && !b) return { x: 200, y: 200 };
+        if (!a) return { x: b.x, y: b.y };
+        if (!b) return { x: a.x, y: a.y };
+        return { x: a.x + (b.x - a.x) * m, y: a.y + (b.y - a.y) * m };
+    }
+
+    _featurePlacementTransform(spec, morphed, viewCenter) {
+        let place = this._placementFromSpec(spec);
+        if (!place || !morphed || !morphed.anchor) return "";
+        let ax = place.anchor.x;
+        let ay = place.anchor.y;
+        let scale = morphed.span / Math.max(1, place.span);
+        let rot = (morphed.angle - place.angle) * 180 / Math.PI;
+        return [
+            `translate(${viewCenter.x} ${viewCenter.y})`,
+            `rotate(${rot.toFixed(4)})`,
+            `scale(${scale.toFixed(6)})`,
+            `translate(${(-ax).toFixed(3)} ${(-ay).toFixed(3)})`
+        ].join(" ");
+    }
+
+    _shellOutlinePath(head) {
+        let poly = head.querySelector('.morph_poly[data-morph="head_shell"]');
+        if (!poly || typeof poly.getTotalLength !== "function") return null;
+        let len = poly.getTotalLength();
+        if (!Number.isFinite(len) || len <= 0) return null;
+        let samples = Math.max(12, Math.round(this._num("meshRegionPolySamples", 32)));
+        let pts = [];
+        for (let i = 0; i < samples; i++) {
+            let pt = poly.getPointAtLength((i / samples) * len);
+            pts.push({ x: pt.x, y: pt.y });
+        }
+        if (!pts.length) return null;
+        let d = `M ${pts[0].x.toFixed(2)} ${pts[0].y.toFixed(2)}`;
+        for (let i = 1; i < pts.length; i++) {
+            d += ` L ${pts[i].x.toFixed(2)} ${pts[i].y.toFixed(2)}`;
+        }
+        return d + " Z";
+    }
+
+    _morphedShellPathD(specA, specB, m) {
+        let headA = document.getElementById("Fennimal_head_" + specA.head);
+        let headB = document.getElementById("Fennimal_head_" + specB.head);
+        if (!headA || !headB) return null;
+        let polyA = headA.querySelector('.morph_poly[data-morph="head_shell"]');
+        let polyB = headB.querySelector('.morph_poly[data-morph="head_shell"]');
+        if (!polyA || !polyB) return null;
+        let samples = Math.max(12, Math.round(this._num("meshRegionPolySamples", 32)));
+        let ptsA = [];
+        let ptsB = [];
+        try {
+            let lenA = polyA.getTotalLength();
+            let lenB = polyB.getTotalLength();
+            for (let i = 0; i < samples; i++) {
+                let t = i / samples;
+                ptsA.push(polyA.getPointAtLength(t * lenA));
+                ptsB.push(polyB.getPointAtLength(t * lenB));
+            }
+        } catch (e) {
+            return null;
+        }
+        if (ptsA.length !== ptsB.length || !ptsA.length) return null;
+        let pts = ptsA.map((p, i) => ({
+            x: p.x + (ptsB[i].x - p.x) * m,
+            y: p.y + (ptsB[i].y - p.y) * m
+        }));
+        let d = `M ${pts[0].x.toFixed(2)} ${pts[0].y.toFixed(2)}`;
+        for (let i = 1; i < pts.length; i++) {
+            d += ` L ${pts[i].x.toFixed(2)} ${pts[i].y.toFixed(2)}`;
+        }
+        return d + " Z";
+    }
+
+    /**
+     * Build morphed feature as live SVG (vector paths). mix 0 = specA, 1 = specB.
+     * opts.frame: "isolated" (default) | "head"
+     * opts.showShell: faint head outline for spatial context
+     */
+    renderFeatureMorphSvg(specA, specB, mix, opts) {
+        opts = opts || {};
+        let m = Math.max(0, Math.min(1, Number(mix) || 0));
+        let ns = "http://www.w3.org/2000/svg";
+        let frame = opts.frame || "isolated";
+        let size = frame === "head" ? 400 : 200;
+        let viewCenter = frame === "head"
+            ? { x: 200, y: 200 }
+            : { x: size / 2, y: size / 2 };
+
+        let svg = document.createElementNS(ns, "svg");
+        svg.setAttribute("xmlns", ns);
+        svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
+        svg.setAttribute("width", String(size));
+        svg.setAttribute("height", String(size));
+        svg.setAttribute("class", "feature_morph_svg");
+
+        if (!specA.present && !specB.present) return svg;
+
+        let morphed = this._lerpFeaturePlacement(specA, specB, m);
+        if (!morphed) return svg;
+
+        if (opts.showShell) {
+            let shellD = this._morphedShellPathD(
+                specA.present ? specA : specB,
+                specB.present ? specB : specA,
+                m
+            );
+            if (shellD) {
+                let shell = document.createElementNS(ns, "path");
+                shell.setAttribute("d", shellD);
+                shell.setAttribute("fill", "none");
+                shell.setAttribute("stroke", "#9aa3ad");
+                shell.setAttribute("stroke-width", frame === "head" ? "2.5" : "1.5");
+                shell.setAttribute("stroke-dasharray", "6 5");
+                shell.setAttribute("opacity", "0.55");
+                shell.setAttribute("class", "feature_morph_shell");
+                if (frame === "isolated") {
+                    let shellMid = this._lerpFeatureEyeMid(specA, specB, m);
+                    shell.setAttribute("transform", [
+                        `translate(${viewCenter.x} ${viewCenter.y})`,
+                        `translate(${(-shellMid.x).toFixed(2)} ${(-shellMid.y).toFixed(2)})`
+                    ].join(" "));
+                }
+                svg.appendChild(shell);
+            }
+        }
+
+        let shapeMode = opts.shapeMode != null ? opts.shapeMode : this._num("featureMorphShapeMode", 0);
+        let dualOutline = shapeMode >= 1.5 && shapeMode < 2.5;
+        let geometryMode = shapeMode >= 2.5;
+
+        if (geometryMode) {
+            let role = (specA.present && specA.role) ? specA.role : specB.role;
+            if (!this._appendGeometryMorphLayer(
+                svg, specA, specB, m, morphed, viewCenter, frame, role
+            )) {
+                geometryMode = false;
+            }
+        }
+
+        if (!geometryMode) {
+        ["a", "b"].forEach((side) => {
+            let spec = side === "a" ? specA : specB;
+            if (!spec || !spec.present) return;
+            let weight = this._featureShapeWeight(m, side, shapeMode);
+            if (weight <= 0.001 && !dualOutline) return;
+
+            let layer = document.createElementNS(ns, "g");
+            layer.setAttribute("class", "feature_morph_layer feature_morph_layer_" + side);
+            layer.setAttribute("data-source-head", spec.head);
+            layer.setAttribute("transform", this._featurePlacementTransform(spec, morphed, viewCenter));
+
+            let shape = spec.group.cloneNode(true);
+            if (dualOutline) {
+                shape.querySelectorAll("path, circle, ellipse, line, polyline, polygon").forEach((el) => {
+                    el.setAttribute("fill", "none");
+                    el.setAttribute("stroke", side === "a" ? "#5a6f86" : "#2f6b4f");
+                    el.setAttribute("stroke-width", "2.5");
+                });
+                layer.setAttribute("opacity", "0.9");
+            } else {
+                layer.setAttribute("opacity", String(Math.max(0, Math.min(1, weight))));
+            }
+            layer.appendChild(shape);
+            svg.appendChild(layer);
+        });
+        }
+
+        let marker = document.createElementNS(ns, "circle");
+        marker.setAttribute("cx", String(viewCenter.x));
+        marker.setAttribute("cy", String(viewCenter.y));
+        marker.setAttribute("r", "2.5");
+        marker.setAttribute("fill", "#c45c26");
+        marker.setAttribute("opacity", "0.65");
+        marker.setAttribute("class", "feature_morph_anchor");
+        if (this._num("featureMorphShowAnchor", 1) > 0) {
+            svg.appendChild(marker);
+        }
+
+        return svg;
+    }
+
+    renderFeatureMorphForPair(headA, headB, role, mixPercent, targetHead, opts) {
+        let m = Math.max(0, Math.min(1, (Number(mixPercent) || 0) / 100));
+        let targetIsA = targetHead === headA;
+        if (!targetIsA) m = 1 - m;
+
+        let trial = {
+            targetFen: { id: headA, head: headA },
+            otherFen: { id: headB, head: headB }
+        };
+        let schemes = this._schemesForMorphTrial(trial);
+        let specA = this.buildFeatureMorphSpec(trial.targetFen, schemes.target, role);
+        let specB = this.buildFeatureMorphSpec(trial.otherFen, schemes.other, role);
+        return this.renderFeatureMorphSvg(specA, specB, m, opts);
     }
 
     _freezeHappyExpression(root) {
@@ -1217,8 +2323,6 @@ class MorphTaskController {
 
     _clearScene() {
         this._stopMorph();
-        this._stopResolveAnim();
-        this._stopNoise(true);
         this._clearNameQuizUi();
         this._clearIdentityKeys();
         this._clearStartSpaceKey();
@@ -1255,13 +2359,6 @@ class MorphTaskController {
         this.targetIcon = null;
         this.otherIcon = null;
         this.filmRect = null;
-        this.noiseGroup = null;
-        this.noiseInterval = null;
-        this.noiseFadeTimeout = null;
-        this._noisePeak = 0;
-        this._noiseAmount = 0;
-        this._noiseRedraw = null;
-        this._noiseRampRaf = null;
         this.morphCanvas = null;
         this.meshCanvas = null;
         this.meshData = null;
@@ -1582,411 +2679,6 @@ class MorphTaskController {
             : "none";
     }
 
-    async _holdThenClearPrime() {
-        await wait(Math.max(0, Math.round(this._num("primeHoldMs", 400))));
-    }
-
-    _clearPrimeFromWell() {
-        if (this.primeGroup && this.primeGroup.parentNode) this.primeGroup.remove();
-        this.primeGroup = null;
-        if (this.primeFilmRect) {
-            this.primeFilmRect.remove();
-            this.primeFilmRect = null;
-        }
-    }
-
-    _loadCanvasFromSvgElement(svgEl, canvas) {
-        let ctx = canvas.getContext("2d");
-        let xml = new XMLSerializer().serializeToString(svgEl);
-        if (xml.indexOf("xmlns") < 0) {
-            xml = xml.replace("<svg", '<svg xmlns="http://www.w3.org/2000/svg"');
-        }
-        let url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(xml);
-        return new Promise((resolve, reject) => {
-            let img = new Image();
-            let settled = false;
-            let timer = setTimeout(() => {
-                if (settled) return;
-                settled = true;
-                reject(new Error("prime/jumble raster timed out."));
-            }, 8000);
-            img.onload = () => {
-                if (settled) return;
-                settled = true;
-                clearTimeout(timer);
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                resolve(canvas);
-            };
-            img.onerror = () => {
-                if (settled) return;
-                settled = true;
-                clearTimeout(timer);
-                reject(new Error("prime/jumble raster failed to decode."));
-            };
-            img.src = url;
-        });
-    }
-
-    // Rasterize well-local SVG nodes onto a square canvas (paper bg + clones).
-    async _rasterizeWellNodes(nodes, well, size) {
-        let ns = "http://www.w3.org/2000/svg";
-        let svg = document.createElementNS(ns, "svg");
-        svg.setAttribute("xmlns", ns);
-        svg.setAttribute("viewBox", `${well.x} ${well.y} ${well.width} ${well.height}`);
-        svg.setAttribute("width", String(size));
-        svg.setAttribute("height", String(size));
-        let bg = document.createElementNS(ns, "rect");
-        bg.setAttribute("x", String(well.x));
-        bg.setAttribute("y", String(well.y));
-        bg.setAttribute("width", String(well.width));
-        bg.setAttribute("height", String(well.height));
-        bg.setAttribute("rx", String(well.rx || 0));
-        bg.setAttribute("ry", String(well.ry || 0));
-        bg.setAttribute("fill", this.params.polaroidWellFill || this.params.polaroidPaperFill || "#e2dfd8");
-        svg.appendChild(bg);
-        (nodes || []).forEach((node) => {
-            if (!node) return;
-            try {
-                svg.appendChild(node.cloneNode(true));
-            } catch (e) { /* skip undonable node */ }
-        });
-        let canvas = document.createElement("canvas");
-        canvas.width = size;
-        canvas.height = size;
-        await this._loadCanvasFromSvgElement(svg, canvas);
-        return canvas;
-    }
-
-    _placeWellCanvasOverlay(well, size) {
-        let ns = "http://www.w3.org/2000/svg";
-        let foreign = document.createElementNS(ns, "foreignObject");
-        foreign.setAttribute("x", String(well.x));
-        foreign.setAttribute("y", String(well.y));
-        foreign.setAttribute("width", String(well.width));
-        foreign.setAttribute("height", String(well.height));
-        foreign.style.pointerEvents = "none";
-        foreign.style.overflow = "hidden";
-        foreign.classList.add("morph_prime_jumble_crossfade");
-        let canvas = document.createElement("canvas");
-        canvas.width = size;
-        canvas.height = size;
-        canvas.style.width = "100%";
-        canvas.style.height = "100%";
-        canvas.style.display = "block";
-        foreign.appendChild(canvas);
-        // On top of photo content, under the polaroid frame path.
-        this._insertInPhotoWell(foreign, this._photoWellPath());
-        return { foreign, canvas, ctx: canvas.getContext("2d") };
-    }
-
-    _cloneCanvas(src) {
-        let c = document.createElement("canvas");
-        c.width = src.width;
-        c.height = src.height;
-        c.getContext("2d").drawImage(src, 0, 0);
-        return c;
-    }
-
-    // Build mesh landmarks from a raster (same topology as _meshRasterSource).
-    _meshSourceFromCanvas(canvas, diagnostics) {
-        let size = canvas.width;
-        let ctx = canvas.getContext("2d", { willReadFrequently: true });
-        let pixels = ctx.getImageData(0, 0, size, size).data;
-        let threshold = Math.max(1, Math.min(255, Math.round(this._num("meshAlphaThreshold", 18))));
-        let leftCenter = { x: size * 0.36, y: size * 0.42 };
-        let rightCenter = { x: size * 0.64, y: size * 0.42 };
-        let eyeMid = {
-            x: (leftCenter.x + rightCenter.x) / 2,
-            y: (leftCenter.y + rightCenter.y) / 2
-        };
-        let mouthCenter = { x: eyeMid.x, y: size * 0.65 };
-        let proposedCenter = {
-            x: eyeMid.x * 0.72 + mouthCenter.x * 0.28,
-            y: eyeMid.y * 0.58 + mouthCenter.y * 0.42
-        };
-        let center = this._meshNearestOpaque(pixels, size, proposedCenter, threshold);
-        let contourCount = Math.max(12, Math.round(this._num("meshContourPoints", 48)));
-        let contour = this._meshRadialContour(pixels, size, center, contourCount, threshold);
-        let neck = { x: size * 0.5, y: size * 0.88 };
-        let brow = this._meshNearestOpaque(pixels, size, {
-            x: eyeMid.x,
-            y: eyeMid.y - size * 0.10
-        }, threshold);
-        let chin = this._meshNearestOpaque(pixels, size, {
-            x: mouthCenter.x,
-            y: mouthCenter.y * 0.45 + neck.y * 0.55
-        }, threshold);
-        let points = [];
-        points = points.concat(contour);
-        points = points.concat(this._meshBoxPoints(null, leftCenter));
-        points = points.concat(this._meshBoxPoints(null, rightCenter));
-        points = points.concat(this._meshBoxPoints(null, mouthCenter));
-        points.push(center);
-        points.push(neck);
-        points.push(brow);
-        points.push(chin);
-        return {
-            canvas,
-            points,
-            anchors: {
-                leftEye: leftCenter,
-                rightEye: rightCenter,
-                mouth: mouthCenter,
-                neck,
-                center
-            },
-            diagnostics: diagnostics || { raster_size: size, contour_points: contourCount, center }
-        };
-    }
-
-    // Rasterize the live prime SVG into the mesh FO square, then landmark it.
-    async _meshRasterPrimeNode(primeNode, foreign) {
-        let size = Math.max(200, Math.round(this._num("meshRasterSize", 400)));
-        let fx = parseFloat(foreign.getAttribute("x"));
-        let fy = parseFloat(foreign.getAttribute("y"));
-        let fw = parseFloat(foreign.getAttribute("width"));
-        let fh = parseFloat(foreign.getAttribute("height"));
-        if (![fx, fy, fw, fh].every(Number.isFinite)) {
-            throw new Error("mesh FO geometry missing for prime raster.");
-        }
-        let ns = "http://www.w3.org/2000/svg";
-        let svg = document.createElementNS(ns, "svg");
-        svg.setAttribute("xmlns", ns);
-        svg.setAttribute("viewBox", `${fx} ${fy} ${fw} ${fh}`);
-        svg.setAttribute("width", String(size));
-        svg.setAttribute("height", String(size));
-        // Transparent bg — paper is composited by _renderMeshMorph.
-        svg.appendChild(primeNode.cloneNode(true));
-        let canvas = document.createElement("canvas");
-        canvas.width = size;
-        canvas.height = size;
-        await this._loadCanvasFromSvgElement(svg, canvas);
-        return this._meshSourceFromCanvas(canvas, { kind: "prime", raster_size: size });
-    }
-
-    // Morph weight 0→1 over a fixed window, using the same logistic shape as
-    // the scored morph (tauFrac), but with duration = windowMs (not trial_speed).
-    _meshWeightOverWindow(elapsedMs, windowMs) {
-        let T = Math.max(1, windowMs);
-        let tau = Math.max(1, this._num("tauFrac", 0.30) * T);
-        let tMid = 0.5 * T;
-        const sig = (t) => 1 / (1 + Math.exp(-(t - tMid) / tau));
-        let s0 = sig(0);
-        let s1 = sig(T);
-        let m = (sig(Math.max(0, Math.min(T, elapsedMs))) - s0) / Math.max(1e-9, s1 - s0);
-        return Math.max(0, Math.min(1, m));
-    }
-
-    async _animateMeshMorphWindow(fromM, toM, windowMs) {
-        let ms = Math.max(1, Math.round(windowMs));
-        let start = performance.now();
-        await new Promise((resolve) => {
-            const tick = (now) => {
-                if (this.destroyed) return resolve();
-                let elapsed = now - start;
-                let u = this._meshWeightOverWindow(elapsed, ms);
-                let m = fromM + (toM - fromM) * u;
-                this._renderMeshMorph(m);
-                this._currentMorphLevel = m;
-                if (elapsed >= ms) {
-                    this._renderMeshMorph(toM);
-                    this._currentMorphLevel = toM;
-                    return resolve();
-                }
-                requestAnimationFrame(tick);
-            };
-            requestAnimationFrame(tick);
-        });
-    }
-
-    // Build jumble (mesh), then mesh-morph prime → jumble while noise ramps
-    // 0 → peak, pause at peak, hand off to jumble → target (noise peak → 0).
-    async _transitionPrimeToMorph(trial) {
-        await this._holdThenClearPrime();
-        let well = this._photoWellBox();
-        let prime = this.primeGroup;
-        let dissolveMs = Math.max(1, Math.round(this._num("primeToJumbleMs", 3000)));
-
-        if (!well || !prime) {
-            await this._placeMorphStimulus(trial);
-            this._placeNoiseOverlay(trial);
-            this._bringNoiseToFront();
-            this._clearPrimeFromWell();
-            this._clearNameQuizHint();
-            await this._rampNoise(0, this._noisePeak, dissolveMs);
-            await wait(Math.max(0, Math.round(this._num("jumbleHoldMs", 1000))));
-            return;
-        }
-
-        let placeOpts = { before: prime };
-        try {
-            await this._placeMorphStimulus(trial, placeOpts);
-        } catch (err) {
-            console.error("MorphTask: failed to place morph stimulus after prime name:", err);
-            this.meshFallbackReason = err && err.message ? err.message : String(err);
-            if (trial.morph === "mesh") {
-                let saved = trial.morph;
-                trial.morph = "crossfade";
-                try {
-                    await this._placeMorphStimulus(trial, placeOpts);
-                } finally {
-                    trial.morph = saved;
-                }
-            } else {
-                throw err;
-            }
-        }
-        this._placeNoiseOverlay(trial);
-        this._stackPrimeAboveJumble();
-        this._bringNoiseToFront();
-
-        // Mesh path: geometric warp prime → jumble (same renderer as jumble→target).
-        if (this.activeRenderer === "mesh" && this.meshCanvas && this.meshData && this.meshForeignObject) {
-            try {
-                await Promise.all([
-                    this._runPrimeToJumbleMeshMorph(prime, dissolveMs),
-                    this._rampNoise(0, this._noisePeak, dissolveMs)
-                ]);
-                this._clearNameQuizHint();
-                await wait(Math.max(0, Math.round(this._num("jumbleHoldMs", 1000))));
-                return;
-            } catch (err) {
-                console.warn("MorphTask: prime→jumble mesh morph failed, falling back to still blend:", err);
-                this._setNoiseAmount(0);
-            }
-        }
-
-        // Non-mesh / fallback: still-image canvas crossfade + noise ramp.
-        await Promise.all([
-            this._runPrimeToJumbleStillBlend(prime, well, dissolveMs),
-            this._rampNoise(0, this._noisePeak, dissolveMs)
-        ]);
-        this._clearNameQuizHint();
-        await wait(Math.max(0, Math.round(this._num("jumbleHoldMs", 1000))));
-    }
-
-    async _runPrimeToJumbleMeshMorph(prime, dissolveMs) {
-        let foreign = this.meshForeignObject;
-        let parentData = this.meshData;
-        let primeSource = await this._meshRasterPrimeNode(prime, foreign);
-
-        // Jumble still = current live mesh frame at m=0.5; landmarks = midpoint
-        // of the fenA/fenB sources so topology stays compatible.
-        this._renderMeshMorph(0.5);
-        let jumbleCanvas = this._cloneCanvas(this.meshCanvas);
-        let jumblePoints = parentData.other.points.map((p, i) => ({
-            x: (p.x + parentData.target.points[i].x) / 2,
-            y: (p.y + parentData.target.points[i].y) / 2
-        }));
-        if (primeSource.points.length !== jumblePoints.length) {
-            // Remake prime landmarks with the fen topology length by resampling
-            // is awkward; fall back to alpha landmarks on the jumble canvas.
-            let jumbleSourceAlt = this._meshSourceFromCanvas(jumbleCanvas, { kind: "jumble" });
-            if (primeSource.points.length !== jumbleSourceAlt.points.length) {
-                throw new Error(
-                    `prime/jumble landmark mismatch (${primeSource.points.length} vs ${jumbleSourceAlt.points.length}).`
-                );
-            }
-            jumblePoints = jumbleSourceAlt.points;
-        }
-        let jumbleSource = {
-            canvas: jumbleCanvas,
-            points: jumblePoints,
-            diagnostics: { kind: "jumble_m05" }
-        };
-
-        let average = primeSource.points.map((p, i) => ({
-            x: (p.x + jumbleSource.points[i].x) / 2,
-            y: (p.y + jumbleSource.points[i].y) / 2
-        }));
-        let triangles = this._meshDelaunay(average);
-        if (!triangles.length) throw new Error("prime→jumble Delaunay produced no triangles.");
-
-        this.meshData = {
-            other: primeSource,   // m=0
-            target: jumbleSource, // m=1
-            triangles
-        };
-        this._renderMeshMorph(0);
-        this._currentMorphLevel = 0;
-
-        // Hide the SVG prime; the mesh FO carries the morph.
-        prime.style.visibility = "hidden";
-        // Ensure mesh FO is under the live noise overlay.
-        this._insertInPhotoWell(foreign, this._photoWellPath());
-        this._bringNoiseToFront();
-
-        await this._waitForPaint();
-        await this._animateMeshMorphWindow(0, 1, dissolveMs);
-
-        // Hand off to scored jumble→target mesh (resume at m=0.5).
-        this.meshData = parentData;
-        this._renderMeshMorph(0.5);
-        this._currentMorphLevel = 0.5;
-        this._clearPrimeFromWell();
-        this._bringNoiseToFront();
-    }
-
-    async _runPrimeToJumbleStillBlend(prime, well, dissolveMs) {
-        let size = Math.max(280, Math.round(Math.min(well.width, well.height)));
-        let fromCanvas = null;
-        let toCanvas = null;
-        try {
-            fromCanvas = await this._rasterizeWellNodes([prime], well, size);
-        } catch (err) {
-            console.warn("MorphTask: prime snapshot failed:", err);
-        }
-        let jumbleNodes = [this.morphGroup, this.filmRect].filter(Boolean);
-        if (this.activeRenderer === "mesh" && this.meshCanvas) {
-            toCanvas = document.createElement("canvas");
-            toCanvas.width = size;
-            toCanvas.height = size;
-            let tctx = toCanvas.getContext("2d");
-            tctx.fillStyle = this.params.polaroidWellFill || this.params.polaroidPaperFill || "#e2dfd8";
-            tctx.fillRect(0, 0, size, size);
-            tctx.drawImage(this.meshCanvas, 0, 0, size, size);
-        } else {
-            try {
-                toCanvas = await this._rasterizeWellNodes(jumbleNodes, well, size);
-            } catch (err) {
-                console.warn("MorphTask: jumble snapshot failed:", err);
-            }
-        }
-        if (!fromCanvas || !toCanvas) {
-            this._clearPrimeFromWell();
-            return;
-        }
-        let overlay = this._placeWellCanvasOverlay(well, size);
-        this._bringNoiseToFront();
-        overlay.ctx.drawImage(fromCanvas, 0, 0, size, size);
-        prime.style.visibility = "hidden";
-        jumbleNodes.forEach((n) => { n.style.visibility = "hidden"; });
-        await this._waitForPaint();
-        let start = performance.now();
-        await new Promise((resolve) => {
-            const tick = (now) => {
-                if (this.destroyed) return resolve();
-                let elapsed = now - start;
-                let u = this._meshWeightOverWindow(elapsed, dissolveMs);
-                let ctx = overlay.ctx;
-                ctx.clearRect(0, 0, size, size);
-                ctx.globalAlpha = 1 - u;
-                ctx.drawImage(fromCanvas, 0, 0, size, size);
-                ctx.globalAlpha = u;
-                ctx.drawImage(toCanvas, 0, 0, size, size);
-                ctx.globalAlpha = 1;
-                if (elapsed >= dissolveMs) return resolve();
-                requestAnimationFrame(tick);
-            };
-            requestAnimationFrame(tick);
-        });
-        if (overlay.foreign && overlay.foreign.parentNode) overlay.foreign.remove();
-        jumbleNodes.forEach((n) => { n.style.visibility = ""; });
-        this._clearPrimeFromWell();
-        this._bringNoiseToFront();
-    }
-
     _keepMysteryCaption(trial) {
         let frame = this.polaroidMount && this.polaroidMount.frame;
         if (frame) this._setPolaroidCaption(frame, "????");
@@ -2182,227 +2874,6 @@ class MorphTaskController {
         wrap.appendChild(node);
         wrap.style.pointerEvents = "none";
         return wrap;
-    }
-
-    // ------------------------------------------------------------------
-    // Moving binary static overlay. Coverage stays fixed; individual speckles refresh.
-    // ------------------------------------------------------------------
-
-    _hashString(str) {
-        let h = 2166136261;
-        for (let i = 0; i < str.length; i++) {
-            h ^= str.charCodeAt(i);
-            h = Math.imul(h, 16777619);
-        }
-        return h >>> 0;
-    }
-
-    _seededRand(seed) {
-        let s = seed >>> 0;
-        return function () {
-            s = Math.imul(1664525, s) + 1013904223;
-            return ((s >>> 0) / 4294967296);
-        };
-    }
-
-    // Keep the moving static above photo content (mesh/prime/film), under the
-    // polaroid frame stroke.
-    _bringNoiseToFront() {
-        let g = this.noiseGroup;
-        if (!g || !g.parentNode) return;
-        let host = g.parentNode;
-        let frame = this._photoWellPath();
-        if (frame && frame.parentNode === host) host.insertBefore(g, frame);
-        else host.appendChild(g);
-    }
-
-    // trial.noise = peak coverage fraction. Overlay starts at 0 and is driven
-    // by _setNoiseAmount / _rampNoise (0→peak over prime→jumble, peak→0 over
-    // trial_speed).
-    _placeNoiseOverlay(trial) {
-        if (!trial) return;
-        this._stopNoise(true);
-        let peak = trial.noise == null ? 0 : Number(trial.noise);
-        if (!Number.isFinite(peak) || peak <= 0) {
-            this._noisePeak = 0;
-            this._noiseAmount = 0;
-            return;
-        }
-        peak = Math.max(0, Math.min(1, peak));
-        this._noisePeak = peak;
-        this._noiseAmount = 0;
-
-        let well = this._photoWellBox();
-        if (!well) return;
-
-        let cell = Math.max(2, Math.round(this._num("noiseCellSizePx", 8)));
-        let cols = Math.max(1, Math.ceil(well.width / cell));
-        let rows = Math.max(1, Math.ceil(well.height / cell));
-        let nCells = cols * rows;
-        let nPeak = Math.max(1, Math.round(nCells * peak));
-        let rand = this._seededRand(this._hashString(String(trial.id || "") + "|morph_noise"));
-        let cells = [];
-        for (let i = 0; i < nCells; i++) cells.push(i);
-
-        let g = create_SVG_group(0, 0, "morph_noise_overlay");
-        g.style.pointerEvents = "none";
-        for (let i = 0; i < nPeak; i++) {
-            let r = create_SVG_rect(0, 0, 0, 0);
-            r.setAttribute("stroke", "none");
-            r.setAttribute("stroke-width", "0");
-            r.style.pointerEvents = "none";
-            g.appendChild(r);
-        }
-        this._insertInPhotoWell(g, this._photoWellPath());
-        this.noiseGroup = g;
-        this._bringNoiseToFront();
-
-        let rects = Array.from(g.children);
-        // Fixed layout: shuffle + fills once; density envelope only shows/hides
-        // that static pattern (no reshuffle while the trial runs).
-        for (let i = cells.length - 1; i > 0; i--) {
-            let j = Math.floor(rand() * (i + 1));
-            let tmp = cells[i];
-            cells[i] = cells[j];
-            cells[j] = tmp;
-        }
-        for (let i = 0; i < rects.length; i++) {
-            let idx = cells[i];
-            let col = idx % cols;
-            let row = Math.floor(idx / cols);
-            let x = well.x + col * cell;
-            let y = well.y + row * cell;
-            let w = Math.min(cell, well.x + well.width - x);
-            let h = Math.min(cell, well.y + well.height - y);
-            let fill = rand() < 0.5 ? "#000000" : "#ffffff";
-            let r = rects[i];
-            r.setAttribute("x", String(x));
-            r.setAttribute("y", String(y));
-            r.setAttribute("width", "0");
-            r.setAttribute("height", "0");
-            r.setAttribute("data-noise-w", String(Math.max(0, w)));
-            r.setAttribute("data-noise-h", String(Math.max(0, h)));
-            r.setAttribute("fill", fill);
-            r.setAttribute("stroke", fill);
-            r.setAttribute("stroke-width", "0");
-        }
-        const paint = () => {
-            let amount = this._noiseAmount || 0;
-            let nActive = Math.max(0, Math.min(rects.length, Math.round(nCells * amount)));
-            for (let i = 0; i < rects.length; i++) {
-                let r = rects[i];
-                if (i >= nActive) {
-                    r.setAttribute("width", "0");
-                    r.setAttribute("height", "0");
-                } else {
-                    r.setAttribute("width", r.getAttribute("data-noise-w") || "0");
-                    r.setAttribute("height", r.getAttribute("data-noise-h") || "0");
-                }
-            }
-        };
-        this._noiseRedraw = paint;
-        paint();
-    }
-
-    _setNoiseAmount(amount) {
-        let peak = this._noisePeak || 0;
-        let next = Number(amount);
-        if (!Number.isFinite(next)) next = 0;
-        this._noiseAmount = Math.max(0, Math.min(peak, next));
-        if (this._noiseRedraw) this._noiseRedraw();
-    }
-
-    async _rampNoise(fromAmount, toAmount, ms) {
-        let peak = this._noisePeak || 0;
-        if (peak <= 0 || !this.noiseGroup) {
-            this._setNoiseAmount(toAmount);
-            return;
-        }
-        let from = Math.max(0, Math.min(peak, fromAmount));
-        let to = Math.max(0, Math.min(peak, toAmount));
-        let dur = Math.max(0, Math.round(ms));
-        if (dur <= 0) {
-            this._setNoiseAmount(to);
-            return;
-        }
-        if (this._noiseRampRaf) {
-            cancelAnimationFrame(this._noiseRampRaf);
-            this._noiseRampRaf = null;
-        }
-        let start = performance.now();
-        await new Promise((resolve) => {
-            const tick = (now) => {
-                if (this.destroyed) {
-                    this._noiseRampRaf = null;
-                    return resolve();
-                }
-                let u = Math.min(1, (now - start) / dur);
-                this._setNoiseAmount(from + (to - from) * u);
-                if (u >= 1) {
-                    this._noiseRampRaf = null;
-                    return resolve();
-                }
-                this._noiseRampRaf = requestAnimationFrame(tick);
-            };
-            this._noiseRampRaf = requestAnimationFrame(tick);
-        });
-    }
-
-    _stopNoise(removeOverlay) {
-        if (this._noiseRampRaf) {
-            cancelAnimationFrame(this._noiseRampRaf);
-            this._noiseRampRaf = null;
-        }
-        if (this.noiseInterval) {
-            clearInterval(this.noiseInterval);
-            this.noiseInterval = null;
-        }
-        if (this.noiseFadeTimeout) {
-            clearTimeout(this.noiseFadeTimeout);
-            this.noiseFadeTimeout = null;
-        }
-        this._noiseRedraw = null;
-        if (removeOverlay && this.noiseGroup) {
-            this.noiseGroup.remove();
-            this.noiseGroup = null;
-        }
-        if (removeOverlay) {
-            this._noisePeak = 0;
-            this._noiseAmount = 0;
-        }
-    }
-
-    _fadeOutNoise() {
-        this._stopNoise(false);
-        let g = this.noiseGroup;
-        if (!g) return;
-        let ms = Math.max(0, Math.round(this._num("noiseFadeMs", 350)));
-        if (ms <= 0) {
-            this._stopNoise(true);
-            return;
-        }
-        g.style.pointerEvents = "none";
-        g.style.transition = `opacity ${ms}ms ease-out`;
-        g.style.opacity = "1";
-        void g.getBoundingClientRect();
-        g.style.opacity = "0";
-        this.noiseFadeTimeout = setTimeout(() => {
-            this.noiseFadeTimeout = null;
-            if (this.noiseGroup === g) {
-                g.remove();
-                this.noiseGroup = null;
-            }
-            this._noisePeak = 0;
-            this._noiseAmount = 0;
-            this._noiseRedraw = null;
-        }, ms + 40);
-    }
-
-    // After a choice: resolve_trial true fades leftover static; false freezes
-    // the current speckles (noise normally already ramped toward 0).
-    _handleNoiseAfterChoice() {
-        if (this.resolveTrial) this._fadeOutNoise();
-        else this._stopNoise(false);
     }
 
     // ------------------------------------------------------------------
@@ -2638,6 +3109,499 @@ class MorphTaskController {
         return (Number.isFinite(x) && Number.isFinite(y)) ? { x, y } : null;
     }
 
+    _meshMorphLandmarks(root) {
+        let landmarks = {};
+        if (!root || !root.querySelectorAll) return landmarks;
+        root.querySelectorAll(".morph_lm[data-morph]").forEach((el) => {
+            let key = el.getAttribute("data-morph");
+            if (!key) return;
+            let x = parseFloat(el.getAttribute("cx"));
+            let y = parseFloat(el.getAttribute("cy"));
+            if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+            let optional = el.classList.contains("morph_lm_optional");
+            if (!landmarks[key]) {
+                landmarks[key] = { points: [], optional };
+            } else {
+                landmarks[key].optional = landmarks[key].optional && optional;
+            }
+            landmarks[key].points.push({ x, y });
+        });
+        Object.keys(landmarks).forEach((key) => {
+            if (landmarks[key].points.length > 1) {
+                landmarks[key].points.sort((a, b) => a.x - b.x || a.y - b.y);
+            }
+        });
+        return landmarks;
+    }
+
+    _sharedMorphLandmarkSlots(target, other) {
+        let slots = [];
+        let keys = new Set([
+            ...Object.keys((target && target.landmarks) || {}),
+            ...Object.keys((other && other.landmarks) || {})
+        ]);
+        [...keys].sort().forEach((key) => {
+            let ta = target.landmarks[key];
+            let tb = other.landmarks[key];
+            if (!ta || !tb || !ta.points.length || !tb.points.length) return;
+            let count = Math.min(ta.points.length, tb.points.length);
+            for (let i = 0; i < count; i++) {
+                slots.push({ key, index: i });
+            }
+        });
+        return slots;
+    }
+
+    _meshMorphPolys(root, scale) {
+        let regions = {};
+        if (!root || !root.querySelectorAll) return regions;
+        let samples = Math.max(8, Math.round(this._num("meshRegionPolySamples", 32)));
+        root.querySelectorAll(".morph_poly[data-morph]").forEach((el) => {
+            let role = el.getAttribute("data-morph");
+            if (!role || regions[role]) return;
+            let len = 0;
+            try {
+                len = el.getTotalLength();
+            } catch (err) {
+                return;
+            }
+            if (!Number.isFinite(len) || len <= 0) return;
+            let points = [];
+            for (let i = 0; i < samples; i++) {
+                let pt = el.getPointAtLength((i / samples) * len);
+                points.push({ x: pt.x * scale, y: pt.y * scale });
+            }
+            regions[role] = { points, samples };
+        });
+        return regions;
+    }
+
+    _sharedMorphRegionRoles(target, other) {
+        let keys = new Set([
+            ...Object.keys((target && target.regions) || {}),
+            ...Object.keys((other && other.regions) || {})
+        ]);
+        return [...keys].sort().filter((role) => {
+            let a = target.regions[role];
+            let b = other.regions[role];
+            return a && b && a.points && a.points.length && b.points && b.points.length;
+        });
+    }
+
+    _shellLandmarkSlots(landmarkSlots) {
+        return (landmarkSlots || []).filter((slot) => {
+            return !slot.key.startsWith("ear_") && !slot.key.startsWith("outline_");
+        });
+    }
+
+    _copyRegionBoundary(src, role) {
+        let region = (src.regions || {})[role];
+        if (!region || !region.points || !region.points.length) return false;
+        let points = region.points.map((p) => ({ x: p.x, y: p.y }));
+        let anchor = this._regionBoundaryAnchor(src);
+        if (anchor) points = this._rotateBoundaryToAnchor(points, anchor);
+        src["regionBoundary_" + role] = this._normalizeBoundaryWinding(points, true);
+        return true;
+    }
+
+    _regionBoundaryAnchor(src) {
+        let lm = (src && src.landmarks) || {};
+        if (lm.outline_top_left && lm.outline_top_left.points[0]) {
+            return lm.outline_top_left.points[0];
+        }
+        if (lm.brow_mid && lm.brow_mid.points[0]) {
+            return lm.brow_mid.points[0];
+        }
+        let a = (src && src.anchors) || {};
+        return a.center || a.leftEye || null;
+    }
+
+    _rotateBoundaryToAnchor(points, anchor) {
+        if (!points.length || !anchor) return points;
+        let best = 0;
+        let bestD = Infinity;
+        for (let i = 0; i < points.length; i++) {
+            let d = Math.hypot(points[i].x - anchor.x, points[i].y - anchor.y);
+            if (d < bestD) {
+                bestD = d;
+                best = i;
+            }
+        }
+        if (!best) return points;
+        return points.slice(best).concat(points.slice(0, best));
+    }
+
+    _boundarySignedArea(points) {
+        let area = 0;
+        for (let i = 0; i < points.length; i++) {
+            let j = (i + 1) % points.length;
+            area += points[i].x * points[j].y - points[j].x * points[i].y;
+        }
+        return area * 0.5;
+    }
+
+    _normalizeBoundaryWinding(points, counterClockwise) {
+        if (!points.length) return points;
+        let ccw = this._boundarySignedArea(points) > 0;
+        if (ccw !== counterClockwise) {
+            return points.slice().reverse();
+        }
+        return points;
+    }
+
+    _regionOverlayMeshPointsFromBoundary(src, role) {
+        let boundary = src["regionBoundary_" + role];
+        if (!boundary || !boundary.length) return null;
+        let points = boundary.map((p) => ({ x: p.x, y: p.y }));
+        let cx = 0;
+        let cy = 0;
+        points.forEach((p) => {
+            cx += p.x;
+            cy += p.y;
+        });
+        cx /= points.length;
+        cy /= points.length;
+        points.push({ x: cx, y: cy });
+        return points;
+    }
+
+    _overlayMeshTriangles(boundaryCount, centroidIndex, points) {
+        let average = points;
+        let tris = this._meshDelaunay(average);
+        if (!tris.length) {
+            return this._meshFanTriangles(boundaryCount, centroidIndex);
+        }
+        let maxIdx = boundaryCount;
+        return tris.filter((tri) => tri.every((idx) => idx <= maxIdx));
+    }
+
+    _meshFanTriangles(boundaryCount, centroidIndex) {
+        let triangles = [];
+        for (let i = 0; i < boundaryCount; i++) {
+            let j = (i + 1) % boundaryCount;
+            triangles.push([centroidIndex, i, j]);
+        }
+        return triangles;
+    }
+
+    _prepareMeshRegionsPair(target, other, landmarkSlots) {
+        if (!target.regions || !other.regions
+            || !target.regions.head_shell || !other.regions.head_shell) {
+            return null;
+        }
+        if (!this._copyRegionBoundary(target, "head_shell")
+            || !this._copyRegionBoundary(other, "head_shell")) {
+            return null;
+        }
+        let regionData = { head_shell: { maskOnly: true } };
+        let overlayRoles = [];
+        const overlayOrder = ["ear_left", "ear_right", "crown", "nose"];
+
+        let setupPairedOverlay = (role) => {
+            if (!this._copyRegionBoundary(target, role)
+                || !this._copyRegionBoundary(other, role)) {
+                return false;
+            }
+            let ptsO = this._regionOverlayMeshPointsFromBoundary(other, role);
+            let ptsT = this._regionOverlayMeshPointsFromBoundary(target, role);
+            if (!ptsO || !ptsT || ptsO.length !== ptsT.length) return false;
+            let boundaryCount = ptsO.length - 1;
+            let centroidIndex = boundaryCount;
+            let triangles = this._overlayMeshTriangles(boundaryCount, centroidIndex, ptsO);
+            if (!triangles.length) return false;
+            other["regionPoints_" + role] = ptsO;
+            target["regionPoints_" + role] = ptsT;
+            regionData[role] = { triangles, paired: true, boundaryCount };
+            return true;
+        };
+
+        let setupSingleOverlay = (role, side) => {
+            let src = side === "target" ? target : other;
+            if (!this._copyRegionBoundary(src, role)) return false;
+            let pts = this._regionOverlayMeshPointsFromBoundary(src, role);
+            if (!pts) return false;
+            let boundaryCount = pts.length - 1;
+            let centroidIndex = boundaryCount;
+            let triangles = this._overlayMeshTriangles(boundaryCount, centroidIndex, pts);
+            if (!triangles.length) return false;
+            src["regionPoints_" + role] = pts;
+            regionData[role] = { triangles, single: side, boundaryCount };
+            return true;
+        };
+
+        overlayOrder.forEach((role) => {
+            let hasO = other.regions[role];
+            let hasT = target.regions[role];
+            if (hasO && hasT) {
+                if (setupPairedOverlay(role)) overlayRoles.push(role);
+            } else if (hasT && setupSingleOverlay(role, "target")) {
+                overlayRoles.push(role);
+            } else if (hasO && setupSingleOverlay(role, "other")) {
+                overlayRoles.push(role);
+            }
+        });
+
+        return {
+            regionData,
+            baseRole: "head_shell",
+            overlayRoles
+        };
+    }
+
+    _resolveMeshShellRoleMode(profile, role, regionData) {
+        let mode = profile && profile[role];
+        if (!mode || mode === "auto") {
+            let meta = regionData && regionData[role];
+            if (meta && (meta.paired || meta.single)) return "regional";
+            return "singular";
+        }
+        return mode;
+    }
+
+    _prepareMeshShellPair(target, other, profile) {
+        profile = profile || this.params.meshShellDefaults || {};
+        let base = this._prepareMeshRegionsPair(target, other, null);
+        if (!base) return null;
+
+        let shellRoleModes = {};
+        MorphTaskController.meshShellRoleKeys().forEach((role) => {
+            shellRoleModes[role] = this._resolveMeshShellRoleMode(
+                profile, role, base.regionData
+            );
+            if (shellRoleModes[role] !== "regional") {
+                delete base.regionData[role];
+                base.overlayRoles = (base.overlayRoles || []).filter((r) => r !== role);
+            }
+            if (shellRoleModes[role] === "off") {
+                delete base.regionData[role];
+                base.overlayRoles = (base.overlayRoles || []).filter((r) => r !== role);
+            }
+        });
+
+        return Object.assign(base, {
+            shellProfile: profile,
+            shellRoleModes
+        });
+    }
+
+    _meshShellFeather(profile) {
+        if (profile && profile.feather != null) {
+            return Math.max(0.08, Math.min(0.65, Number(profile.feather)));
+        }
+        return Math.max(0.08, Math.min(0.65, this._num("layerMorphFeather", 0.38)));
+    }
+
+    _meshShellRoleRadius(role, eyeSpan, profile) {
+        profile = profile || {};
+        if (role === "nose") {
+            return eyeSpan * (profile.noseRadiusFrac != null
+                ? profile.noseRadiusFrac
+                : this._num("layerMorphNoseRadiusFrac", 0.26));
+        }
+        if (role === "crown") {
+            return eyeSpan * (profile.crownRadiusFrac != null
+                ? profile.crownRadiusFrac
+                : this._num("layerMorphCrownRadiusFrac", 0.52));
+        }
+        if (role === "ear_left" || role === "ear_right") {
+            return eyeSpan * (profile.earRadiusFrac != null
+                ? profile.earRadiusFrac
+                : this._num("meshShellEarRadiusFrac", 0.38));
+        }
+        return eyeSpan * 0.3;
+    }
+
+    _meshShellRoleCenter(data, m, role, eyeSpan) {
+        if (role === "nose") return this._morphedLandmarkPoint(data, m, "nose");
+        if (role === "crown") return this._layerMorphCrownCenter(data, m, eyeSpan);
+        if (role === "ear_left" || role === "ear_right") {
+            let boundary = this._interpolatedRegionBoundary(data, m, role);
+            if (boundary && boundary.length) {
+                let cx = 0;
+                let cy = 0;
+                boundary.forEach((p) => {
+                    cx += p.x;
+                    cy += p.y;
+                });
+                return { x: cx / boundary.length, y: cy / boundary.length };
+            }
+            let side = role === "ear_left" ? "left" : "right";
+            let lo = this._morphedLandmarkPoint(data, m, "ear_" + side + "_base_lower");
+            let hi = this._morphedLandmarkPoint(data, m, "ear_" + side + "_base_upper");
+            if (lo && hi) return { x: (lo.x + hi.x) / 2, y: (lo.y + hi.y) / 2 };
+            return lo || hi;
+        }
+        return null;
+    }
+
+    _buildMeshShellSingularZones(data, m) {
+        let profile = data.shellProfile || this.params.meshShellDefaults || {};
+        let roleModes = data.shellRoleModes || {};
+        let anchors = this._morphedAnchors(data, m);
+        let L = anchors.leftEye;
+        let R = anchors.rightEye;
+        let M = anchors.mouth;
+        if (!L || !R) return [];
+        let eyeSpan = Math.max(12, Math.hypot(R.x - L.x, R.y - L.y));
+        let feather = this._meshShellFeather(profile);
+        let zones = [];
+
+        if (profile.eyes !== "off") {
+            let r = eyeSpan * (profile.eyeRadiusFrac != null
+                ? profile.eyeRadiusFrac
+                : this._num("layerMorphEyeRadiusFrac", 0.36));
+            zones.push({ x: L.x, y: L.y, r, feather });
+            zones.push({ x: R.x, y: R.y, r, feather });
+        }
+        if (profile.mouth !== "off" && M) {
+            zones.push({
+                x: M.x,
+                y: M.y,
+                r: eyeSpan * (profile.mouthRadiusFrac != null
+                    ? profile.mouthRadiusFrac
+                    : this._num("layerMorphMouthRadiusFrac", 0.44)),
+                feather
+            });
+        }
+        MorphTaskController.meshShellRoleKeys().forEach((role) => {
+            if (roleModes[role] !== "singular") return;
+            let center = this._meshShellRoleCenter(data, m, role, eyeSpan);
+            if (!center) return;
+            zones.push({
+                x: center.x,
+                y: center.y,
+                r: this._meshShellRoleRadius(role, eyeSpan, profile),
+                feather: role === "crown" ? feather * 0.92 : feather
+            });
+        });
+        return zones;
+    }
+
+    _composeSingularZonesDirected(warpA, warpB, dest, zones, m) {
+        if (!zones || !zones.length) return;
+        let size = dest.width;
+        let ctxA = warpA.getContext("2d", { willReadFrequently: true });
+        let ctxB = warpB.getContext("2d", { willReadFrequently: true });
+        let ctxD = dest.getContext("2d", { willReadFrequently: true });
+        let a = ctxA.getImageData(0, 0, size, size);
+        let b = ctxB.getImageData(0, 0, size, size);
+        let d = ctxD.getImageData(0, 0, size, size);
+        let pa = a.data;
+        let pb = b.data;
+        let po = d.data;
+        let preferTarget = m > 0.5 ? true : (m < 0.5 ? false : null);
+
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                let w = 0;
+                for (let zi = 0; zi < zones.length; zi++) {
+                    let z = zones[zi];
+                    w = Math.max(w, this._landmarkZoneWeight(x, y, z.x, z.y, z.r, z.feather));
+                }
+                if (w <= 0) continue;
+                let i = (y * size + x) * 4;
+                let aA = pa[i + 3];
+                let aB = pb[i + 3];
+                if (aA < 8 && aB < 8) continue;
+                let pickTarget;
+                if (preferTarget === true) pickTarget = true;
+                else if (preferTarget === false) pickTarget = false;
+                else {
+                    let sa = pa[i] * aA + pa[i + 1] * aA + pa[i + 2] * aA;
+                    let sb = pb[i] * aB + pb[i + 1] * aB + pb[i + 2] * aB;
+                    pickTarget = aB > aA || (aB === aA && sb > sa);
+                }
+                let wr = pickTarget ? pb[i] : pa[i];
+                let wg = pickTarget ? pb[i + 1] : pa[i + 1];
+                let wb = pickTarget ? pb[i + 2] : pa[i + 2];
+                let wa = pickTarget ? aB : aA;
+                po[i] = Math.round(po[i] + (wr - po[i]) * w);
+                po[i + 1] = Math.round(po[i + 1] + (wg - po[i + 1]) * w);
+                po[i + 2] = Math.round(po[i + 2] + (wb - po[i + 2]) * w);
+                po[i + 3] = Math.round(po[i + 3] + (wa - po[i + 3]) * w);
+            }
+        }
+        ctxD.putImageData(d, 0, 0);
+    }
+
+    _renderMeshShell(m) {
+        let dest = this.morphCanvas || this.meshCanvas;
+        let data = this.meshData || this.morphPair;
+        if (!dest || !data || !data.regionData) {
+            this._renderLayerMorph(m);
+            return;
+        }
+
+        this._paintShellMeshMasked(data, m, dest);
+
+        const overlayOrder = ["ear_left", "ear_right", "crown", "nose"];
+        overlayOrder.forEach((role) => {
+            if (data.shellRoleModes && data.shellRoleModes[role] !== "regional") return;
+            let alpha = this._regionLayerAlpha(data, role, m);
+            if (alpha <= 0.001) return;
+            this._paintRegionOverlay(data, m, dest, role, alpha);
+        });
+
+        let warps = this._drawDualMeshWarps(data, m, dest.width);
+        if (warps) {
+            let zones = this._buildMeshShellSingularZones(data, m);
+            this._composeSingularZonesDirected(warps.warpA, warps.warpB, dest, zones, m);
+        }
+
+        let profile = data.shellProfile || {};
+        if (profile.outline !== false) {
+            let shell = this._interpolatedRegionBoundary(data, m, "head_shell");
+            if (shell && warps) {
+                this._composeOutlineRing(warps.warpA, warps.warpB, dest, shell);
+            }
+        }
+
+        this._sealAlphaCracks(dest, 2);
+    }
+
+    _pointInPolygon(x, y, poly) {
+        let inside = false;
+        for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+            let xi = poly[i].x;
+            let yi = poly[i].y;
+            let xj = poly[j].x;
+            let yj = poly[j].y;
+            if (((yi > y) !== (yj > y))
+                && (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-6) + xi)) {
+                inside = !inside;
+            }
+        }
+        return inside;
+    }
+
+    _polygonBBox(poly) {
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        poly.forEach((p) => {
+            minX = Math.min(minX, p.x);
+            minY = Math.min(minY, p.y);
+            maxX = Math.max(maxX, p.x);
+            maxY = Math.max(maxY, p.y);
+        });
+        return { minX, minY, maxX, maxY };
+    }
+
+    _interpolatedRegionBoundary(data, m, role) {
+        let key = "regionBoundary_" + role;
+        let ptsO = data.other[key];
+        let ptsT = data.target[key];
+        if (!ptsO && !ptsT) return null;
+        if (!ptsO) return ptsT.map((p) => ({ x: p.x, y: p.y }));
+        if (!ptsT) return ptsO.map((p) => ({ x: p.x, y: p.y }));
+        if (ptsO.length !== ptsT.length) return ptsT;
+        return ptsO.map((p, i) => ({
+            x: p.x + (ptsT[i].x - p.x) * m,
+            y: p.y + (ptsT[i].y - p.y) * m
+        }));
+    }
+
     _meshBoxPoints(box, fallback) {
         if (!box) {
             return [
@@ -2725,6 +3689,9 @@ class MorphTaskController {
         let mouthBox = this._meshBBox(head.querySelector(".mouth_happy"));
         let mouthMarker = this._meshMarker(head, ".Fennimal_head_mouth_point");
         let neckMarker = this._meshMarker(head, ".Fennimal_head_neck_point");
+        let morphLandmarks = this._meshMorphLandmarks(head);
+        let k = size / 400;
+        let morphRegions = this._meshMorphPolys(head, k);
 
         let exportSvg = document.createElementNS(ns, "svg");
         exportSvg.setAttribute("xmlns", ns);
@@ -2732,6 +3699,9 @@ class MorphTaskController {
         exportSvg.setAttribute("width", String(size));
         exportSvg.setAttribute("height", String(size));
         let exportHead = head.cloneNode(true);
+        if (this._num("morphOmitTextures", 1) > 0) {
+            this._stripMorphDecor(exportHead, ["texture"]);
+        }
         this._stripHelperMarks(exportHead);
         exportSvg.appendChild(exportHead);
         measureSvg.remove();
@@ -2770,7 +3740,6 @@ class MorphTaskController {
 
         // Landmarks are measured in the native 400-unit head coordinates.
         // Scale them to the raster so source points and source pixels match.
-        let k = size / 400;
         const scalePoint = (p) => p ? ({ x: p.x * k, y: p.y * k }) : null;
         const scaleBox = (b) => b ? ({
             x: b.x * k, y: b.y * k, width: b.width * k, height: b.height * k
@@ -2780,6 +3749,13 @@ class MorphTaskController {
         mouthBox = scaleBox(mouthBox);
         mouthMarker = scalePoint(mouthMarker);
         neckMarker = scalePoint(neckMarker);
+        let landmarks = {};
+        Object.keys(morphLandmarks).forEach((key) => {
+            landmarks[key] = {
+                optional: morphLandmarks[key].optional,
+                points: morphLandmarks[key].points.map(scalePoint)
+            };
+        });
 
         let leftCenter = leftBox
             ? { x: leftBox.x + leftBox.width / 2, y: leftBox.y + leftBox.height / 2 }
@@ -2827,6 +3803,8 @@ class MorphTaskController {
         return {
             canvas,
             points,
+            landmarks,
+            regions: morphRegions,
             anchors: {
                 leftEye: leftCenter,
                 rightEye: rightCenter,
@@ -2841,7 +3819,9 @@ class MorphTaskController {
                 center: center,
                 left_eye_found: !!leftBox,
                 right_eye_found: !!rightBox,
-                mouth_found: !!mouthBox
+                mouth_found: !!mouthBox,
+                morph_landmarks: Object.keys(landmarks),
+                morph_regions: Object.keys(morphRegions)
             }
         };
     }
@@ -3039,10 +4019,28 @@ class MorphTaskController {
         Object.keys(src.anchors || {}).forEach((key) => {
             anchors[key] = this._applySimilarity(src.anchors[key], xf);
         });
+        let landmarks = {};
+        Object.keys(src.landmarks || {}).forEach((key) => {
+            let entry = src.landmarks[key];
+            landmarks[key] = {
+                optional: entry.optional,
+                points: entry.points.map((p) => this._applySimilarity(p, xf))
+            };
+        });
+        let regions = {};
+        Object.keys(src.regions || {}).forEach((key) => {
+            let entry = src.regions[key];
+            regions[key] = {
+                samples: entry.samples,
+                points: entry.points.map((p) => this._applySimilarity(p, xf))
+            };
+        });
         let ext = this._sourceExtents(src, threshold);
         return {
             canvas: this._warpCanvasBySimilarity(src.canvas, xf),
             points: (src.points || []).map((p) => this._applySimilarity(p, xf)),
+            landmarks,
+            regions,
             anchors,
             diagnostics: Object.assign({}, src.diagnostics || {}, {
                 silhouette_max_side: Math.round(ext.size * 10) / 10,
@@ -3061,7 +4059,7 @@ class MorphTaskController {
         };
     }
 
-    _homologousMeshPoints(src, center, contourCount, innerFrac, threshold) {
+    _homologousMeshPoints(src, center, contourCount, innerFrac, threshold, landmarkSlots) {
         let canvas = src.canvas;
         let size = canvas.width;
         let ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -3079,7 +4077,12 @@ class MorphTaskController {
         points.push(a.rightEye || { x: center.x + 24, y: center.y });
         points.push(a.mouth || { x: center.x, y: center.y + 28 });
         points.push(a.neck || { x: center.x, y: center.y + 70 });
-        points.push(center);
+        points.push(a.center || center);
+        (landmarkSlots || []).forEach((slot) => {
+            let entry = (src.landmarks || {})[slot.key];
+            if (!entry || !entry.points[slot.index]) return;
+            points.push(entry.points[slot.index]);
+        });
         return points;
     }
 
@@ -3387,26 +4390,642 @@ class MorphTaskController {
         this._renderRefinedMesh(m);
     }
 
-    _renderAlignedCrossfade(m) {
-        let dest = this.morphCanvas || this.meshCanvas;
-        let data = this.morphPair || this.meshData;
-        if (!dest || !data) return;
-        this._lerpCanvases(data.other.canvas, data.target.canvas, m, dest);
+    _usesMeshTriangulation(kind) {
+        return kind === "mesh" || kind === "mesh_landmark" || kind === "mesh_regions"
+            || kind === "mesh_shell" || kind === "feature_anchored_mesh"
+            || kind === "layer_morph" || kind === "composite_morph";
     }
 
-    _renderRefinedMesh(m) {
-        let dest = this.morphCanvas || this.meshCanvas;
-        let data = this.meshData || this.morphPair;
-        if (!dest || !data) return;
+    _usesLayerMorph(kind) {
+        return kind === "layer_morph";
+    }
+
+    _usesCompositeMorph(kind) {
+        return kind === "composite_morph";
+    }
+
+    _usesMeshRegions(kind) {
+        return kind === "mesh_regions";
+    }
+
+    _usesMeshShell(kind) {
+        return kind === "mesh_shell";
+    }
+
+    _usesFeatureAnchoredMesh(kind) {
+        return kind === "feature_anchored_mesh";
+    }
+
+    _prepareFeatureAnchoredPair(target, other, profile, headA, headB) {
+        profile = profile || {};
+        if (!target.regions || !other.regions
+            || !target.regions.head_shell || !other.regions.head_shell) {
+            return null;
+        }
+        if (!this._copyRegionBoundary(target, "head_shell")
+            || !this._copyRegionBoundary(other, "head_shell")) {
+            return null;
+        }
+
+        let regionData = { head_shell: { maskOnly: true } };
+        let overlayRoles = [];
+        let roles = this._resolveChimeraRoles(profile, headA, headB, null);
+        if (!Array.isArray(roles)) roles = ["crown", "nose"];
+
+        let setupPairedOverlay = (role) => {
+            if (!this._copyRegionBoundary(target, role)
+                || !this._copyRegionBoundary(other, role)) {
+                return false;
+            }
+            let ptsO = this._regionOverlayMeshPointsFromBoundary(other, role);
+            let ptsT = this._regionOverlayMeshPointsFromBoundary(target, role);
+            if (!ptsO || !ptsT || ptsO.length !== ptsT.length) return false;
+            let boundaryCount = ptsO.length - 1;
+            let centroidIndex = boundaryCount;
+            let triangles = this._overlayMeshTriangles(boundaryCount, centroidIndex, ptsO);
+            if (!triangles.length) return false;
+            other["regionPoints_" + role] = ptsO;
+            target["regionPoints_" + role] = ptsT;
+            regionData[role] = { triangles, paired: true, boundaryCount };
+            return true;
+        };
+
+        let setupSingleOverlay = (role, side) => {
+            let src = side === "target" ? target : other;
+            if (!this._copyRegionBoundary(src, role)) return false;
+            let pts = this._regionOverlayMeshPointsFromBoundary(src, role);
+            if (!pts) return false;
+            let boundaryCount = pts.length - 1;
+            let centroidIndex = boundaryCount;
+            let triangles = this._overlayMeshTriangles(boundaryCount, centroidIndex, pts);
+            if (!triangles.length) return false;
+            src["regionPoints_" + role] = pts;
+            regionData[role] = { triangles, single: side, boundaryCount };
+            return true;
+        };
+
+        roles.forEach((role) => {
+            let hasO = other.regions[role];
+            let hasT = target.regions[role];
+            if (hasO && hasT) {
+                if (setupPairedOverlay(role)) overlayRoles.push(role);
+            } else if (hasT && setupSingleOverlay(role, "target")) {
+                overlayRoles.push(role);
+            } else if (hasO && setupSingleOverlay(role, "other")) {
+                overlayRoles.push(role);
+            }
+        });
+
+        return {
+            regionData,
+            overlayRoles,
+            chimeraRoles: roles.slice(),
+            baseRole: "head_shell"
+        };
+    }
+
+    _normalizeHeadRoleKey(head) {
+        return String(head || "").trim().toLowerCase().replace(/^fennimal_head_/, "");
+    }
+
+    _headHeroRoles(headName) {
+        let key = this._normalizeHeadRoleKey(headName);
+        let profile = (this.params.headHeroProfiles || {})[key];
+        if (profile && profile.chimera && profile.chimera.length) {
+            return profile.chimera.map((entry) => entry.role);
+        }
+        let heroes = this.params.headHeroElements || {};
+        let roles = heroes[key];
+        if (!roles) return [];
+        return Array.isArray(roles) ? roles.slice() : [];
+    }
+
+    _headHeroChimeraEntries(headName) {
+        let key = this._normalizeHeadRoleKey(headName);
+        let profile = (this.params.headHeroProfiles || {})[key];
+        if (profile && profile.chimera && profile.chimera.length) {
+            return profile.chimera.map((entry) => Object.assign({ mode: "native", strength: 1 }, entry));
+        }
+        return this._headHeroRoles(headName).map((role) => ({
+            role,
+            mode: role === "bell_clapper" ? "zone" : "native",
+            strength: role === "crown" ? 0.92 : 0.85
+        }));
+    }
+
+    _headHeroOutlineEntries(headName) {
+        let key = this._normalizeHeadRoleKey(headName);
+        let profile = (this.params.headHeroProfiles || {})[key];
+        if (profile && profile.outline && profile.outline.length) {
+            return profile.outline.map((entry) => Object.assign({
+                role: "head_shell",
+                native: true,
+                strength: 0.8,
+                parent: "self"
+            }, entry));
+        }
+        let outlineHero = (this.params.headOutlineHero || {})[key];
+        if (outlineHero) {
+            return [{ role: outlineHero, native: true, strength: 0.9, parent: "self" }];
+        }
+        return [];
+    }
+
+    _resolveChimeraRoles(profile, headA, headB, data) {
+        profile = profile || {};
+        if (profile.chimeraRoles && profile.chimeraRoles.length) {
+            return profile.chimeraRoles.slice();
+        }
+        if (data && data.chimeraRoles && data.chimeraRoles.length) {
+            return data.chimeraRoles.slice();
+        }
+        let roles = new Set();
+        this._headHeroRoles(headA).forEach((role) => roles.add(role));
+        this._headHeroRoles(headB).forEach((role) => roles.add(role));
+        if (!roles.size) {
+            return (this.params.featureAnchoredChimeraRoles || ["crown", "nose"]).slice();
+        }
+        return [...roles];
+    }
+
+    _regionBoundaryCentroid(src, role) {
+        let boundary = src && src["regionBoundary_" + role];
+        if (!boundary || !boundary.length) return null;
+        let cx = 0;
+        let cy = 0;
+        boundary.forEach((p) => {
+            cx += p.x;
+            cy += p.y;
+        });
+        return { x: cx / boundary.length, y: cy / boundary.length };
+    }
+
+    _chimeraZoneCenter(data, role, side) {
+        let src = side === "target" ? data.target : data.other;
+        if (!src) return null;
+        if (role === "bell_clapper") {
+            let chin = (src.landmarks || {}).chin;
+            let bottom = (src.landmarks || {}).outline_bottom;
+            let chinPt = chin && chin.points && chin.points[0];
+            let bottomPt = bottom && bottom.points && bottom.points[0];
+            if (chinPt && bottomPt) {
+                return {
+                    x: chinPt.x * 0.25 + bottomPt.x * 0.75,
+                    y: chinPt.y * 0.2 + bottomPt.y * 0.8
+                };
+            }
+            if (chinPt) return { x: chinPt.x, y: chinPt.y };
+            if (bottomPt) return { x: bottomPt.x, y: bottomPt.y };
+        }
+        return this._regionBoundaryCentroid(src, role);
+    }
+
+    _chimeraZoneRadius(role, eyeSpan, profile) {
+        profile = profile || {};
+        if (role === "crown") {
+            let frac = profile.chimeraCrownRadiusFrac != null
+                ? Number(profile.chimeraCrownRadiusFrac)
+                : this._num("featureAnchoredChimeraCrownRadiusFrac", 0.34);
+            return eyeSpan * frac;
+        }
+        if (role === "bell_clapper") {
+            let frac = profile.chimeraClapperRadiusFrac != null
+                ? Number(profile.chimeraClapperRadiusFrac)
+                : this._num("featureAnchoredChimeraClapperRadiusFrac", 0.48);
+            return eyeSpan * frac;
+        }
+        let frac = profile.chimeraRegionalRadiusFrac != null
+            ? Number(profile.chimeraRegionalRadiusFrac)
+            : this._num("featureAnchoredChimeraRegionalRadiusFrac", 0.4);
+        return eyeSpan * frac;
+    }
+
+    _chimeraSalienceWeight(m, profile) {
+        profile = profile || {};
+        let strength = profile.chimeraStrength != null
+            ? Number(profile.chimeraStrength)
+            : this._num("featureAnchoredChimeraStrength", 0.72);
+        if (!Number.isFinite(strength) || strength <= 0) return 0;
+        strength = Math.max(0, Math.min(1, strength));
+        // Peaks at m=0.5, fades toward 0 and 1 (keeps ladder endpoints clean).
+        let bell = 4 * m * (1 - m);
+        return strength * bell;
+    }
+
+    _composeForcedParentZones(warpA, warpB, dest, zones, strength) {
+        if (!zones || !zones.length) return;
+        strength = strength == null ? 1 : Math.max(0, Math.min(1, strength));
+        if (strength <= 0.001) return;
         let size = dest.width;
-        if (!data.triangles || !data.triangles.length
-            || data.other.points.length !== data.target.points.length) {
-            this._lerpCanvases(data.other.canvas, data.target.canvas, m, dest);
+        let ctxA = warpA.getContext("2d", { willReadFrequently: true });
+        let ctxB = warpB.getContext("2d", { willReadFrequently: true });
+        let ctxD = dest.getContext("2d", { willReadFrequently: true });
+        let a = ctxA.getImageData(0, 0, size, size);
+        let b = ctxB.getImageData(0, 0, size, size);
+        let d = ctxD.getImageData(0, 0, size, size);
+        let pa = a.data;
+        let pb = b.data;
+        let po = d.data;
+
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                let w = 0;
+                let pickFromA = false;
+                for (let zi = 0; zi < zones.length; zi++) {
+                    let z = zones[zi];
+                    let zw = this._landmarkZoneWeight(x, y, z.x, z.y, z.r, z.feather);
+                    if (zw <= w) continue;
+                    w = zw;
+                    pickFromA = z.parent === "other";
+                }
+                if (w <= 0) continue;
+                w *= strength;
+                let i = (y * size + x) * 4;
+                let aA = pa[i + 3];
+                let aB = pb[i + 3];
+                if (aA < 8 && aB < 8) continue;
+                let wr = pickFromA ? pa[i] : pb[i];
+                let wg = pickFromA ? pa[i + 1] : pb[i + 1];
+                let wb = pickFromA ? pa[i + 2] : pb[i + 2];
+                let wa = pickFromA ? aA : aB;
+                po[i] = Math.round(po[i] + (wr - po[i]) * w);
+                po[i + 1] = Math.round(po[i + 1] + (wg - po[i + 1]) * w);
+                po[i + 2] = Math.round(po[i + 2] + (wb - po[i + 2]) * w);
+                po[i + 3] = Math.round(po[i + 3] + (wa - po[i + 3]) * w);
+            }
+        }
+        ctxD.putImageData(d, 0, 0);
+    }
+
+    _paintParentNativeRegionSalience(data, dest, role, side, alpha, warps, partition) {
+        if (alpha <= 0.001 || !warps) return;
+        let meta = data.regionData && data.regionData[role];
+        if (meta && side === "target" && meta.single === "other") return;
+        if (meta && side === "other" && meta.single === "target") return;
+        let srcSide = side === "target" ? data.target : data.other;
+        let mask = srcSide && srcSide["regionBoundary_" + role];
+        if (!mask || !mask.length) return;
+        let scratch = this._ensureScratchCanvas("_chimeraSalience", dest.width, dest.height);
+        let ctx = scratch.getContext("2d");
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.clearRect(0, 0, dest.width, dest.height);
+        let src = side === "target" ? warps.warpB : warps.warpA;
+        ctx.drawImage(src, 0, 0);
+        this._compositeRegionLayer(dest, scratch, mask, alpha, partition);
+    }
+
+    _dualHeroRoleCentroids(data, role) {
+        let meta = data.regionData && data.regionData[role];
+        if (!meta || !meta.paired) return null;
+        let targetC = this._regionBoundaryCentroid(data.target, role);
+        let otherC = this._regionBoundaryCentroid(data.other, role);
+        if (!targetC || !otherC) return null;
+        return { target: targetC, other: otherC };
+    }
+
+    _heroRolePartition(data, role, side, eyeSpan, anchors) {
+        let dual = this._dualHeroRoleCentroids(data, role);
+        if (!dual) return null;
+        let ownCenter = side === "target" ? dual.target : dual.other;
+        let rivalCenter = side === "target" ? dual.other : dual.target;
+        let band = eyeSpan * this._num("featureAnchoredChimeraPartitionBandFrac", 0.07);
+        let closeFrac = this._num("featureAnchoredChimeraCentroidCloseFrac", 0.18);
+        let close = Math.hypot(ownCenter.x - rivalCenter.x, ownCenter.y - rivalCenter.y)
+            < eyeSpan * closeFrac;
+        let midX = anchors && anchors.leftEye && anchors.rightEye
+            ? (anchors.leftEye.x + anchors.rightEye.x) / 2
+            : (ownCenter.x + rivalCenter.x) / 2;
+        return {
+            ownCenter,
+            rivalCenter,
+            band: Math.max(2, band),
+            midX,
+            useLateral: close,
+            side
+        };
+    }
+
+    _pairUsesHeroRole(headA, headB, role) {
+        let hasA = this._headHeroChimeraEntries(headA).some((h) => h.role === role);
+        let hasB = this._headHeroChimeraEntries(headB).some((h) => h.role === role);
+        return hasA && hasB;
+    }
+
+    _paintChimeraHeroSalience(data, m, dest, profile, warps) {
+        let baseWeight = this._chimeraSalienceWeight(m, profile);
+        if (baseWeight <= 0.001 || !warps) return;
+        let headA = data.headTarget || (this.morphRenderTrial && this.morphRenderTrial.targetFen
+            && this.morphRenderTrial.targetFen.head);
+        let headB = data.headOther || (this.morphRenderTrial && this.morphRenderTrial.otherFen
+            && this.morphRenderTrial.otherFen.head);
+        let anchors = this._morphedAnchors(data, m);
+        if (!anchors.leftEye || !anchors.rightEye) return;
+        let eyeSpan = Math.max(12, Math.hypot(
+            anchors.rightEye.x - anchors.leftEye.x,
+            anchors.rightEye.y - anchors.leftEye.y
+        ));
+        let feather = Math.max(0.06, Math.min(0.45, profile.chimeraFeather != null
+            ? Number(profile.chimeraFeather)
+            : this._num("featureAnchoredChimeraFeather", 0.22)));
+
+        [
+            { side: "target", head: headA },
+            { side: "other", head: headB }
+        ].forEach(({ side, head }) => {
+            this._headHeroChimeraEntries(head).forEach((hero) => {
+                let strength = baseWeight * (hero.strength != null ? Number(hero.strength) : 1);
+                if (!Number.isFinite(strength) || strength <= 0.001) return;
+                let mode = hero.mode || (hero.role === "bell_clapper" ? "zone" : "native");
+                if (mode === "native" || hero.role === "crown" || hero.role === "nose") {
+                    if (data.regionData && data.regionData[hero.role]) {
+                        let partition = null;
+                        if (this._pairUsesHeroRole(headA, headB, hero.role)) {
+                            partition = this._heroRolePartition(
+                                data, hero.role, side, eyeSpan, anchors
+                            );
+                        }
+                        this._paintParentNativeRegionSalience(
+                            data, dest, hero.role, side, strength, warps, partition
+                        );
+                        return;
+                    }
+                    if (hero.role !== "bell_clapper") return;
+                    mode = "zone";
+                }
+                if (mode !== "zone") return;
+                let center = this._chimeraZoneCenter(data, hero.role, side);
+                if (!center) return;
+                this._composeForcedParentZones(warps.warpA, warps.warpB, dest, [{
+                    x: center.x,
+                    y: center.y,
+                    r: this._chimeraZoneRadius(hero.role, eyeSpan, profile),
+                    feather,
+                    parent: side
+                }], strength);
+            });
+        });
+    }
+
+    _paintChimeraCrispSalience(data, m, dest, profile, warps) {
+        let weight = this._chimeraSalienceWeight(m, profile);
+        if (weight <= 0.001 || !warps) return;
+        let headA = data.headTarget || (this.morphRenderTrial && this.morphRenderTrial.targetFen
+            && this.morphRenderTrial.targetFen.head);
+        let headB = data.headOther || (this.morphRenderTrial && this.morphRenderTrial.otherFen
+            && this.morphRenderTrial.otherFen.head);
+        let roles = this._resolveChimeraRoles(profile, headA, headB, data);
+        let anchors = this._morphedAnchors(data, m);
+        if (!anchors.leftEye || !anchors.rightEye) return;
+        let eyeSpan = Math.max(12, Math.hypot(
+            anchors.rightEye.x - anchors.leftEye.x,
+            anchors.rightEye.y - anchors.leftEye.y
+        ));
+        let feather = Math.max(0.08, Math.min(0.55, profile.chimeraFeather != null
+            ? Number(profile.chimeraFeather)
+            : this._num("featureAnchoredChimeraFeather", 0.26)));
+        let zones = [];
+
+        roles.forEach((role) => {
+            ["target", "other"].forEach((side) => {
+                let center = this._chimeraZoneCenter(data, role, side);
+                if (!center) return;
+                let meta = data.regionData && data.regionData[role];
+                if (meta && side === "target" && meta.single === "other") return;
+                if (meta && side === "other" && meta.single === "target") return;
+                zones.push({
+                    x: center.x,
+                    y: center.y,
+                    r: this._chimeraZoneRadius(role, eyeSpan, profile),
+                    feather,
+                    parent: side
+                });
+            });
+        });
+        if (!zones.length) return;
+        this._composeForcedParentZones(warps.warpA, warps.warpB, dest, zones, weight);
+    }
+
+    _paintParentRegionSalience(data, m, dest, role, side, alpha) {
+        if (alpha <= 0.001) return;
+        let meta = data.regionData && data.regionData[role];
+        if (!meta) return;
+        if (side === "target" && meta.single === "other") return;
+        if (side === "other" && meta.single === "target") return;
+
+        let warps = this._drawDualRegionWarps(data, m, dest.width, role);
+        if (!warps) return;
+        let scratch = this._ensureScratchCanvas("_chimeraSalience", dest.width, dest.height);
+        let ctx = scratch.getContext("2d");
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.clearRect(0, 0, dest.width, dest.height);
+        let src = side === "target" ? warps.warpB : warps.warpA;
+        ctx.drawImage(src, 0, 0);
+        let mask = this._interpolatedRegionBoundary(data, m, role);
+        if (!mask) return;
+        this._compositeRegionLayer(dest, scratch, mask, alpha);
+    }
+
+    _paintChimeraSalienceOverlays(data, m, dest, profile, warps) {
+        if (!this._num("featureAnchoredChimeraSalience", 1)) return;
+        profile = profile || {};
+        let mode = profile.chimeraMode
+            || this.params.featureAnchoredChimeraMode
+            || "hero";
+        if (mode === "hero" || mode === "crisp") {
+            if (mode === "hero") {
+                this._paintChimeraHeroSalience(data, m, dest, profile, warps);
+            } else {
+                this._paintChimeraCrispSalience(data, m, dest, profile, warps);
+            }
             return;
         }
-        let destPts = data.other.points.map((p, i) => ({
-            x: p.x + (data.target.points[i].x - p.x) * m,
-            y: p.y + (data.target.points[i].y - p.y) * m
+        let weight = this._chimeraSalienceWeight(m, profile);
+        if (weight <= 0.001) return;
+        let headA = data.headTarget || (this.morphRenderTrial && this.morphRenderTrial.targetFen
+            && this.morphRenderTrial.targetFen.head);
+        let headB = data.headOther || (this.morphRenderTrial && this.morphRenderTrial.otherFen
+            && this.morphRenderTrial.otherFen.head);
+        let roles = this._resolveChimeraRoles(profile, headA, headB, data);
+        roles.forEach((role) => {
+            this._paintParentRegionSalience(data, m, dest, role, "target", weight);
+            this._paintParentRegionSalience(data, m, dest, role, "other", weight);
+        });
+    }
+
+    _usesMeanShapeWarp(kind) {
+        return kind === "mean_shape";
+    }
+
+    _sparseMorphPoints(src, center, contourCount, threshold) {
+        let canvas = src.canvas;
+        let size = canvas.width;
+        let ctx = canvas.getContext("2d", { willReadFrequently: true });
+        let pixels = ctx.getImageData(0, 0, size, size).data;
+        let contour = this._meshRadialContour(pixels, size, center, contourCount, threshold);
+        let a = src.anchors || {};
+        let samples = Math.max(4, Math.round(this._num("meanShapeContourSamples", 8)));
+        let points = [];
+        for (let i = 0; i < samples; i++) {
+            let idx = Math.round(i * contourCount / samples) % contourCount;
+            points.push(contour[idx]);
+        }
+        points.push(a.leftEye || { x: center.x - 24, y: center.y });
+        points.push(a.rightEye || { x: center.x + 24, y: center.y });
+        points.push(a.mouth || { x: center.x, y: center.y + 28 });
+        points.push(a.neck || { x: center.x, y: center.y + 70 });
+        points.push(a.center || center);
+        return points;
+    }
+
+    _buildBeierNeelyLines(src, contourCount) {
+        let a = src.anchors || {};
+        let L = a.leftEye;
+        let R = a.rightEye;
+        let M = a.mouth;
+        let N = a.neck;
+        let C = a.center;
+        let pts = src.points || [];
+        let contour = pts.length >= contourCount ? pts.slice(0, contourCount) : [];
+        let lines = [];
+        let add = (p, q) => {
+            if (!p || !q) return;
+            if (Math.hypot(q.x - p.x, q.y - p.y) < 3) return;
+            lines.push({ p0: { x: p.x, y: p.y }, p1: { x: q.x, y: q.y } });
+        };
+        add(L, R);
+        if (M) {
+            let span = (L && R) ? Math.hypot(R.x - L.x, R.y - L.y) * 0.44 : 30;
+            add({ x: M.x - span, y: M.y }, { x: M.x + span, y: M.y });
+        }
+        add(L, M);
+        add(R, M);
+        add(M, N);
+        add(C, N);
+        add(L, C);
+        add(R, C);
+        if (contour.length >= 8 && C) {
+            let step = Math.max(1, Math.floor(contourCount / 8));
+            for (let i = 0; i < contourCount; i += step) add(C, contour[i]);
+        }
+        if (contour.length >= 12) {
+            let seg = Math.max(1, Math.floor(contourCount / 12));
+            for (let i = 0; i < contourCount; i += seg) {
+                add(contour[i], contour[(i + seg) % contourCount]);
+            }
+        }
+        return lines;
+    }
+
+    _beierNeelyLineWeight(x, y, line, aPow, bPow, pPow) {
+        let px = line.p0.x;
+        let py = line.p0.y;
+        let qx = line.p1.x;
+        let qy = line.p1.y;
+        let dx = qx - px;
+        let dy = qy - py;
+        let len = Math.hypot(dx, dy);
+        if (len < 1e-6) return 0;
+        let dist = Math.abs(dy * (x - px) - dx * (y - py)) / len;
+        return Math.pow(len, pPow) / Math.pow(aPow + dist, bPow);
+    }
+
+    _beierNeelyWarpPoint(x, y, destLine, srcLine) {
+        let dp = destLine.p0;
+        let dq = destLine.p1;
+        let sp = srcLine.p0;
+        let sq = srcLine.p1;
+        let ddx = dq.x - dp.x;
+        let ddy = dq.y - dp.y;
+        let sdx = sq.x - sp.x;
+        let sdy = sq.y - sp.y;
+        let dd2 = ddx * ddx + ddy * ddy;
+        if (dd2 < 1e-6) return { x, y };
+        let xmd = x - dp.x;
+        let ymd = y - dp.y;
+        let u = (xmd * ddx + ymd * ddy) / dd2;
+        let v = (xmd * (-ddy) + ymd * ddx) / dd2;
+        return {
+            x: sp.x + u * sdx - v * sdy,
+            y: sp.y + u * sdy + v * sdx
+        };
+    }
+
+    _beierNeelySourceAt(x, y, destLines, srcLines, aPow, bPow, pPow) {
+        let sumX = 0;
+        let sumY = 0;
+        let sumW = 0;
+        for (let i = 0; i < destLines.length; i++) {
+            let w = this._beierNeelyLineWeight(x, y, destLines[i], aPow, bPow, pPow);
+            if (w <= 0) continue;
+            let pt = this._beierNeelyWarpPoint(x, y, destLines[i], srcLines[i]);
+            sumX += w * pt.x;
+            sumY += w * pt.y;
+            sumW += w;
+        }
+        if (sumW < 1e-8) return { x, y };
+        return { x: sumX / sumW, y: sumY / sumW };
+    }
+
+    _interpolateBeierNeelyLines(linesA, linesB, m) {
+        let n = Math.min(linesA.length, linesB.length);
+        let out = [];
+        for (let i = 0; i < n; i++) {
+            let a = linesA[i];
+            let b = linesB[i];
+            out.push({
+                p0: {
+                    x: a.p0.x + (b.p0.x - a.p0.x) * m,
+                    y: a.p0.y + (b.p0.y - a.p0.y) * m
+                },
+                p1: {
+                    x: a.p1.x + (b.p1.x - a.p1.x) * m,
+                    y: a.p1.y + (b.p1.y - a.p1.y) * m
+                }
+            });
+        }
+        return out;
+    }
+
+    _sampleRGBA(data, size, x, y) {
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return [0, 0, 0, 0];
+        if (x < 0 || y < 0 || x >= size - 1 || y >= size - 1) {
+            let ix = Math.max(0, Math.min(size - 1, Math.round(x)));
+            let iy = Math.max(0, Math.min(size - 1, Math.round(y)));
+            let i = (iy * size + ix) * 4;
+            return [data[i], data[i + 1], data[i + 2], data[i + 3]];
+        }
+        let x0 = Math.floor(x);
+        let y0 = Math.floor(y);
+        let fx = x - x0;
+        let fy = y - y0;
+        let i00 = (y0 * size + x0) * 4;
+        let i10 = i00 + 4;
+        let i01 = i00 + size * 4;
+        let i11 = i01 + 4;
+        let r = data[i00] * (1 - fx) * (1 - fy) + data[i10] * fx * (1 - fy)
+            + data[i01] * (1 - fx) * fy + data[i11] * fx * fy;
+        let g = data[i00 + 1] * (1 - fx) * (1 - fy) + data[i10 + 1] * fx * (1 - fy)
+            + data[i01 + 1] * (1 - fx) * fy + data[i11 + 1] * fx * fy;
+        let b = data[i00 + 2] * (1 - fx) * (1 - fy) + data[i10 + 2] * fx * (1 - fy)
+            + data[i01 + 2] * (1 - fx) * fy + data[i11 + 2] * fx * fy;
+        let a = data[i00 + 3] * (1 - fx) * (1 - fy) + data[i10 + 3] * fx * (1 - fy)
+            + data[i01 + 3] * (1 - fx) * fy + data[i11 + 3] * fx * fy;
+        return [r, g, b, a];
+    }
+
+    _drawDualMeshWarps(data, m, size, pointKey) {
+        pointKey = pointKey || "points";
+        let otherPts = data.other[pointKey];
+        let targetPts = data.target[pointKey];
+        if (!data.triangles || !data.triangles.length
+            || !otherPts || !targetPts || otherPts.length !== targetPts.length) {
+            return null;
+        }
+        let destPts = otherPts.map((p, i) => ({
+            x: p.x + (targetPts[i].x - p.x) * m,
+            y: p.y + (targetPts[i].y - p.y) * m
         }));
         let warpA = this._ensureScratchCanvas("_morphWarpA", size, size);
         let warpB = this._ensureScratchCanvas("_morphWarpB", size, size);
@@ -3418,10 +5037,1091 @@ class MorphTaskController {
             ctx.globalCompositeOperation = "source-over";
             ctx.clearRect(0, 0, size, size);
         });
-        this._meshDrawWarped(ctxA, data.other.canvas, data.other.points, destPts, data.triangles, 1);
-        this._meshDrawWarped(ctxB, data.target.canvas, data.target.points, destPts, data.triangles, 1);
+        this._meshDrawWarped(ctxA, data.other.canvas, otherPts, destPts, data.triangles, 1);
+        this._meshDrawWarped(ctxB, data.target.canvas, targetPts, destPts, data.triangles, 1);
+        return { warpA, warpB };
+    }
+
+    _drawDualRegionWarps(data, m, size, role) {
+        let pointKey = "regionPoints_" + role;
+        let regionMeta = data.regionData && data.regionData[role];
+        if (!regionMeta) return null;
+        let triangles = regionMeta.triangles;
+        if (!triangles || !triangles.length) return null;
+
+        let warpA = this._ensureScratchCanvas("_morphWarpA", size, size);
+        let warpB = this._ensureScratchCanvas("_morphWarpB", size, size);
+        let ctxA = warpA.getContext("2d");
+        let ctxB = warpB.getContext("2d");
+        [ctxA, ctxB].forEach((ctx) => {
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.globalAlpha = 1;
+            ctx.globalCompositeOperation = "source-over";
+            ctx.clearRect(0, 0, size, size);
+        });
+
+        if (regionMeta.single === "target") {
+            let targetPts = data.target[pointKey];
+            if (!targetPts) return null;
+            this._meshDrawWarped(ctxB, data.target.canvas, targetPts, targetPts, triangles, 1);
+            return { warpA, warpB };
+        }
+        if (regionMeta.single === "other") {
+            let otherPts = data.other[pointKey];
+            if (!otherPts) return null;
+            this._meshDrawWarped(ctxA, data.other.canvas, otherPts, otherPts, triangles, 1);
+            return { warpA, warpB };
+        }
+
+        let otherPts = data.other[pointKey];
+        let targetPts = data.target[pointKey];
+        if (!otherPts || !targetPts || otherPts.length !== targetPts.length) return null;
+        let destPts = otherPts.map((p, i) => ({
+            x: p.x + (targetPts[i].x - p.x) * m,
+            y: p.y + (targetPts[i].y - p.y) * m
+        }));
+        this._meshDrawWarped(ctxA, data.other.canvas, otherPts, destPts, triangles, 1);
+        this._meshDrawWarped(ctxB, data.target.canvas, targetPts, destPts, triangles, 1);
+        return { warpA, warpB };
+    }
+
+    _compositeRegionLayer(dest, source, maskPoly, layerAlpha, partition) {
+        if (!maskPoly || !maskPoly.length || layerAlpha <= 0.001) return;
+        partition = partition || null;
+        let size = dest.width;
+        let bbox = this._polygonBBox(maskPoly);
+        let minX = Math.max(0, Math.floor(bbox.minX) - 1);
+        let minY = Math.max(0, Math.floor(bbox.minY) - 1);
+        let maxX = Math.min(size - 1, Math.ceil(bbox.maxX) + 1);
+        let maxY = Math.min(size - 1, Math.ceil(bbox.maxY) + 1);
+        let ctxD = dest.getContext("2d", { willReadFrequently: true });
+        let ctxS = source.getContext("2d", { willReadFrequently: true });
+        let d = ctxD.getImageData(0, 0, size, size);
+        let s = ctxS.getImageData(0, 0, size, size);
+        let pd = d.data;
+        let ps = s.data;
+        let la = Math.max(0, Math.min(1, layerAlpha));
+        let ownCenter = partition && partition.ownCenter;
+        let rivalCenter = partition && partition.rivalCenter;
+        let band = partition && partition.band != null ? partition.band : 0;
+        let midX = partition && partition.midX != null ? partition.midX : null;
+        let side = partition && partition.side;
+        for (let y = minY; y <= maxY; y++) {
+            for (let x = minX; x <= maxX; x++) {
+                if (!this._pointInPolygon(x + 0.5, y + 0.5, maskPoly)) continue;
+                let partW = 1;
+                if (partition && rivalCenter && ownCenter) {
+                    if (midX != null && partition.useLateral) {
+                        let edge = side === "target" ? (midX - x) : (x - midX);
+                        if (edge <= -band) partW = 0;
+                        else if (edge >= band) partW = 1;
+                        else partW = (edge + band) / Math.max(1, 2 * band);
+                    } else if (band > 0) {
+                        let distOwn = Math.hypot(x + 0.5 - ownCenter.x, y + 0.5 - ownCenter.y);
+                        let distRival = Math.hypot(x + 0.5 - rivalCenter.x, y + 0.5 - rivalCenter.y);
+                        let edge = distRival - distOwn;
+                        if (edge <= -band) partW = 0;
+                        else if (edge >= band) partW = 1;
+                        else partW = (edge + band) / (2 * band);
+                    }
+                }
+                if (partW <= 0.001) continue;
+                let i = (y * size + x) * 4;
+                let sa = (ps[i + 3] / 255) * la * partW;
+                if (sa < 0.02) continue;
+                let sr = ps[i];
+                let sg = ps[i + 1];
+                let sb = ps[i + 2];
+                let da = pd[i + 3] / 255;
+                let outA = sa + da * (1 - sa);
+                if (outA < 0.02) {
+                    pd[i + 3] = 0;
+                    continue;
+                }
+                pd[i] = Math.round((sr * sa + pd[i] * da * (1 - sa)) / outA);
+                pd[i + 1] = Math.round((sg * sa + pd[i + 1] * da * (1 - sa)) / outA);
+                pd[i + 2] = Math.round((sb * sa + pd[i + 2] * da * (1 - sa)) / outA);
+                pd[i + 3] = Math.round(outA * 255);
+            }
+        }
+        ctxD.putImageData(d, 0, 0);
+    }
+
+    _paintShellMeshMasked(data, m, dest) {
+        let warps = this._drawDualMeshWarps(data, m, dest.width);
+        if (!warps) {
+            this._lerpCanvases(data.other.canvas, data.target.canvas, m, dest);
+            return;
+        }
+        let scratch = this._ensureScratchCanvas("_regionBlend", dest.width, dest.height);
+        this._lerpCanvases(warps.warpA, warps.warpB, m, scratch);
+        let ctx = dest.getContext("2d");
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+        ctx.clearRect(0, 0, dest.width, dest.height);
+        let mask = this._interpolatedRegionBoundary(data, m, "head_shell");
+        if (!mask) {
+            ctx.drawImage(scratch, 0, 0);
+            return;
+        }
+        this._compositeRegionLayer(dest, scratch, mask, 1);
+    }
+
+    _paintRegionOverlay(data, m, dest, role, layerAlpha) {
+        if (layerAlpha <= 0.001) return;
+        let warps = this._drawDualRegionWarps(data, m, dest.width, role);
+        if (!warps) return;
+        let scratch = this._ensureScratchCanvas("_regionOverlay", dest.width, dest.height);
+        this._lerpCanvases(warps.warpA, warps.warpB, m, scratch);
+        let mask = this._interpolatedRegionBoundary(data, m, role);
+        if (!mask) return;
+        this._compositeRegionLayer(dest, scratch, mask, layerAlpha);
+    }
+
+    _regionLayerAlpha(data, role, m) {
+        let meta = data.regionData && data.regionData[role];
+        if (!meta) return 0;
+        if (meta.paired) return 1;
+        if (meta.single === "target") return m;
+        if (meta.single === "other") return 1 - m;
+        return 0;
+    }
+
+    _morphedAnchors(data, m) {
+        let o = (data.other && data.other.anchors) || {};
+        let t = (data.target && data.target.anchors) || {};
+        let lerp = (key) => {
+            let a = o[key];
+            let b = t[key];
+            if (!a || !b) return null;
+            return { x: a.x + (b.x - a.x) * m, y: a.y + (b.y - a.y) * m };
+        };
+        return { leftEye: lerp("leftEye"), rightEye: lerp("rightEye"), mouth: lerp("mouth") };
+    }
+
+    _landmarkZoneWeight(x, y, cx, cy, radius, feather) {
+        let dist = Math.hypot(x - cx, y - cy);
+        if (dist >= radius) return 0;
+        let inner = radius * (1 - feather);
+        if (dist <= inner) return 1;
+        return 1 - (dist - inner) / Math.max(1, radius * feather);
+    }
+
+    _morphedLandmarkPoint(data, m, key) {
+        let o = (data.other.landmarks || {})[key];
+        let t = (data.target.landmarks || {})[key];
+        let po = o && o.points && o.points[0];
+        let pt = t && t.points && t.points[0];
+        if (!po && !pt) return null;
+        if (!po) return { x: pt.x, y: pt.y };
+        if (!pt) return { x: po.x, y: po.y };
+        return { x: po.x + (pt.x - po.x) * m, y: po.y + (pt.y - po.y) * m };
+    }
+
+    _prepareLayerMorphPair(target, other) {
+        if (!target.regions || !other.regions) return false;
+        this._copyRegionBoundary(target, "head_shell");
+        this._copyRegionBoundary(other, "head_shell");
+        if (target.regions.crown) this._copyRegionBoundary(target, "crown");
+        if (other.regions.crown) this._copyRegionBoundary(other, "crown");
+        return true;
+    }
+
+    _layerMorphCrownCenter(data, m, eyeSpan) {
+        let boundary = this._interpolatedRegionBoundary(data, m, "crown");
+        if (boundary && boundary.length) {
+            let cx = 0;
+            let cy = 0;
+            boundary.forEach((p) => {
+                cx += p.x;
+                cy += p.y;
+            });
+            return { x: cx / boundary.length, y: cy / boundary.length };
+        }
+        let topL = this._morphedLandmarkPoint(data, m, "outline_top_left");
+        let topR = this._morphedLandmarkPoint(data, m, "outline_top_right");
+        if (topL && topR) {
+            return { x: (topL.x + topR.x) / 2, y: (topL.y + topR.y) / 2 };
+        }
+        let brow = this._morphedLandmarkPoint(data, m, "brow_mid");
+        if (brow) return { x: brow.x, y: brow.y - eyeSpan * 0.55 };
+        return null;
+    }
+
+    _buildLayerMorphZones(data, m) {
+        let anchors = this._morphedAnchors(data, m);
+        let L = anchors.leftEye;
+        let R = anchors.rightEye;
+        let M = anchors.mouth;
+        if (!L || !R) return [];
+        let eyeSpan = Math.max(12, Math.hypot(R.x - L.x, R.y - L.y));
+        let feather = Math.max(0.08, Math.min(0.65, this._num("layerMorphFeather", 0.38)));
+        let zones = [
+            {
+                x: L.x,
+                y: L.y,
+                r: eyeSpan * this._num("layerMorphEyeRadiusFrac", 0.36),
+                feather
+            },
+            {
+                x: R.x,
+                y: R.y,
+                r: eyeSpan * this._num("layerMorphEyeRadiusFrac", 0.36),
+                feather
+            }
+        ];
+        if (M) {
+            zones.push({
+                x: M.x,
+                y: M.y,
+                r: eyeSpan * this._num("layerMorphMouthRadiusFrac", 0.44),
+                feather
+            });
+        }
+        let nose = this._morphedLandmarkPoint(data, m, "nose");
+        if (nose) {
+            zones.push({
+                x: nose.x,
+                y: nose.y,
+                r: eyeSpan * this._num("layerMorphNoseRadiusFrac", 0.26),
+                feather
+            });
+        }
+        let crown = this._layerMorphCrownCenter(data, m, eyeSpan);
+        if (crown) {
+            zones.push({
+                x: crown.x,
+                y: crown.y,
+                r: eyeSpan * this._num("layerMorphCrownRadiusFrac", 0.52),
+                feather: feather * 0.92
+            });
+        }
+        return zones;
+    }
+
+    _pointToSegmentDistance(px, py, x0, y0, x1, y1) {
+        let dx = x1 - x0;
+        let dy = y1 - y0;
+        let len2 = dx * dx + dy * dy;
+        if (len2 < 1e-8) return Math.hypot(px - x0, py - y0);
+        let t = ((px - x0) * dx + (py - y0) * dy) / len2;
+        t = Math.max(0, Math.min(1, t));
+        return Math.hypot(px - (x0 + t * dx), py - (y0 + t * dy));
+    }
+
+    _distanceToPolygonBoundary(x, y, poly) {
+        let minD = Infinity;
+        for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+            let d = this._pointToSegmentDistance(x, y, poly[j].x, poly[j].y, poly[i].x, poly[i].y);
+            if (d < minD) minD = d;
+        }
+        return minD;
+    }
+
+    _outlineRingWeight(x, y, boundary, width, feather) {
+        let dist = this._distanceToPolygonBoundary(x + 0.5, y + 0.5, boundary);
+        if (dist > width + feather) return 0;
+        if (dist <= width) return 1;
+        return 1 - (dist - width) / Math.max(1, feather);
+    }
+
+    _composeSingularZones(warpA, warpB, dest, zones) {
+        if (!zones || !zones.length) return;
+        let size = dest.width;
+        let ctxA = warpA.getContext("2d", { willReadFrequently: true });
+        let ctxB = warpB.getContext("2d", { willReadFrequently: true });
+        let ctxD = dest.getContext("2d", { willReadFrequently: true });
+        let a = ctxA.getImageData(0, 0, size, size);
+        let b = ctxB.getImageData(0, 0, size, size);
+        let d = ctxD.getImageData(0, 0, size, size);
+        let pa = a.data;
+        let pb = b.data;
+        let po = d.data;
+
+        for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+                let w = 0;
+                for (let zi = 0; zi < zones.length; zi++) {
+                    let z = zones[zi];
+                    w = Math.max(w, this._landmarkZoneWeight(x, y, z.x, z.y, z.r, z.feather));
+                }
+                if (w <= 0) continue;
+                let i = (y * size + x) * 4;
+                let aA = pa[i + 3];
+                let aB = pb[i + 3];
+                if (aA < 8 && aB < 8) continue;
+                let sa = pa[i] * aA + pa[i + 1] * aA + pa[i + 2] * aA;
+                let sb = pb[i] * aB + pb[i + 1] * aB + pb[i + 2] * aB;
+                let pickA = aA > aB || (aA === aB && sa >= sb);
+                let wr = pickA ? pa[i] : pb[i];
+                let wg = pickA ? pa[i + 1] : pb[i + 1];
+                let wb = pickA ? pa[i + 2] : pb[i + 2];
+                let wa = pickA ? aA : aB;
+                po[i] = Math.round(po[i] + (wr - po[i]) * w);
+                po[i + 1] = Math.round(po[i + 1] + (wg - po[i + 1]) * w);
+                po[i + 2] = Math.round(po[i + 2] + (wb - po[i + 2]) * w);
+                po[i + 3] = Math.round(po[i + 3] + (wa - po[i + 3]) * w);
+            }
+        }
+        ctxD.putImageData(d, 0, 0);
+    }
+
+    _composeOutlineRing(warpA, warpB, dest, boundary, opts) {
+        if (!boundary || boundary.length < 3) return;
+        opts = opts || {};
+        let size = dest.width;
+        let widthFrac = opts.widthFrac != null
+            ? opts.widthFrac
+            : this._num("layerMorphOutlineWidthFrac", 0.022);
+        let width = Math.max(2, size * widthFrac);
+        let featherMul = opts.featherFrac != null
+            ? opts.featherFrac
+            : 1.4;
+        let feather = width * featherMul;
+        let bbox = this._polygonBBox(boundary);
+        let minX = Math.max(0, Math.floor(bbox.minX - width - feather - 2));
+        let minY = Math.max(0, Math.floor(bbox.minY - width - feather - 2));
+        let maxX = Math.min(size - 1, Math.ceil(bbox.maxX + width + feather + 2));
+        let maxY = Math.min(size - 1, Math.ceil(bbox.maxY + width + feather + 2));
+        let ctxA = warpA.getContext("2d", { willReadFrequently: true });
+        let ctxB = warpB.getContext("2d", { willReadFrequently: true });
+        let ctxD = dest.getContext("2d", { willReadFrequently: true });
+        let a = ctxA.getImageData(0, 0, size, size);
+        let b = ctxB.getImageData(0, 0, size, size);
+        let d = ctxD.getImageData(0, 0, size, size);
+        let pa = a.data;
+        let pb = b.data;
+        let po = d.data;
+
+        for (let y = minY; y <= maxY; y++) {
+            for (let x = minX; x <= maxX; x++) {
+                let w = this._outlineRingWeight(x, y, boundary, width, feather);
+                if (w <= 0) continue;
+                let i = (y * size + x) * 4;
+                let aA = pa[i + 3];
+                let aB = pb[i + 3];
+                if (aA < 8 && aB < 8) continue;
+                let sa = pa[i] * aA + pa[i + 1] * aA + pa[i + 2] * aA;
+                let sb = pb[i] * aB + pb[i + 1] * aB + pb[i + 2] * aB;
+                let pickA;
+                if (opts.parent === "other") pickA = true;
+                else if (opts.parent === "target") pickA = false;
+                else pickA = aA > aB || (aA === aB && sa >= sb);
+                let ringStrength = opts.strength != null ? Math.max(0, Math.min(1, opts.strength)) : 1;
+                w *= ringStrength;
+                if (w <= 0) continue;
+                let wr = pickA ? pa[i] : pb[i];
+                let wg = pickA ? pa[i + 1] : pb[i + 1];
+                let wb = pickA ? pa[i + 2] : pb[i + 2];
+                let wa = pickA ? aA : aB;
+                po[i] = Math.round(po[i] + (wr - po[i]) * w);
+                po[i + 1] = Math.round(po[i + 1] + (wg - po[i + 1]) * w);
+                po[i + 2] = Math.round(po[i + 2] + (wb - po[i + 2]) * w);
+                po[i + 3] = Math.round(po[i + 3] + (wa - po[i + 3]) * w);
+            }
+        }
+        ctxD.putImageData(d, 0, 0);
+    }
+
+    _composeLandmarkWarped(warpA, warpB, m, dest, data) {
+        let size = dest.width;
         this._lerpCanvases(warpA, warpB, m, dest);
+        let anchors = this._morphedAnchors(data, m);
+        if (!anchors.leftEye || !anchors.rightEye || !anchors.mouth) return;
+
+        let L = anchors.leftEye;
+        let R = anchors.rightEye;
+        let M = anchors.mouth;
+        let eyeSpan = Math.max(12, Math.hypot(R.x - L.x, R.y - L.y));
+        let eyeR = eyeSpan * this._num("meshLandmarkEyeRadiusFrac", 0.36);
+        let mouthR = eyeSpan * this._num("meshLandmarkMouthRadiusFrac", 0.44);
+        let feather = Math.max(0.08, Math.min(0.65, this._num("meshLandmarkFeather", 0.38)));
+        this._composeSingularZones(warpA, warpB, dest, [
+            { x: L.x, y: L.y, r: eyeR, feather },
+            { x: R.x, y: R.y, r: eyeR, feather },
+            { x: M.x, y: M.y, r: mouthR, feather }
+        ]);
+    }
+
+    _composeFeatureAnchoredLandmarks(warpA, warpB, m, dest, data) {
+        this._lerpCanvases(warpA, warpB, m, dest);
+        let anchors = this._morphedAnchors(data, m);
+        if (!anchors.leftEye || !anchors.rightEye || !anchors.mouth) return;
+
+        let M = anchors.mouth;
+        let eyeSpan = Math.max(12, Math.hypot(
+            anchors.rightEye.x - anchors.leftEye.x,
+            anchors.rightEye.y - anchors.leftEye.y
+        ));
+        let mouthR = eyeSpan * this._num("meshLandmarkMouthRadiusFrac", 0.44);
+        let mouthFeather = Math.max(0.08, Math.min(0.65, this._num("meshLandmarkFeather", 0.38)));
+        let zones = [{ x: M.x, y: M.y, r: mouthR, feather: mouthFeather }];
+        let brow = this._morphedLandmarkPoint(data, m, "brow_mid");
+        if (brow) {
+            let browR = eyeSpan * this._num("featureAnchoredBrowRadiusFrac", 0.24);
+            let browFeather = Math.max(0.08, Math.min(0.55, this._num("featureAnchoredBrowFeather", 0.3)));
+            zones.push({
+                x: brow.x,
+                y: brow.y - eyeSpan * 0.08,
+                r: browR,
+                feather: browFeather
+            });
+        }
+        this._composeSingularZones(warpA, warpB, dest, zones);
+    }
+
+    _featureAnchoredOutlineWeight(m) {
+        let bell = 4 * m * (1 - m);
+        return 0.72 + 0.28 * bell;
+    }
+
+    _composeFeatureAnchoredOutlines(data, m, warps, dest, profile) {
+        profile = profile || {};
+        let headA = data.headTarget || (this.morphRenderTrial && this.morphRenderTrial.targetFen
+            && this.morphRenderTrial.targetFen.head);
+        let headB = data.headOther || (this.morphRenderTrial && this.morphRenderTrial.otherFen
+            && this.morphRenderTrial.otherFen.head);
+        let outlineWeight = this._featureAnchoredOutlineWeight(m);
+        let outlineOpts = {
+            widthFrac: this._num("featureAnchoredOutlineWidthFrac", 0.034),
+            featherFrac: this._num("featureAnchoredOutlineFeatherFrac", 0.72)
+        };
+        let entries = [];
+        [
+            { side: "target", head: headA },
+            { side: "other", head: headB }
+        ].forEach(({ side, head }) => {
+            this._headHeroOutlineEntries(head).forEach((entry) => {
+                entries.push(Object.assign({ side }, entry));
+            });
+        });
+
+        if (!entries.length) {
+            let shell = this._interpolatedRegionBoundary(data, m, "head_shell");
+            if (shell) {
+                this._composeOutlineRing(warps.warpA, warps.warpB, dest, shell, outlineOpts);
+            }
+            return;
+        }
+
+        entries.forEach((entry) => {
+            let src = entry.side === "target" ? data.target : data.other;
+            let boundary = src && src["regionBoundary_" + (entry.role || "head_shell")];
+            if (!boundary || !boundary.length) return;
+            let strength = outlineWeight * (entry.strength != null ? Number(entry.strength) : 0.8);
+            this._composeOutlineRing(warps.warpA, warps.warpB, dest, boundary, Object.assign({}, outlineOpts, {
+                strength,
+                parent: entry.side
+            }));
+        });
+    }
+
+    _featureAnchoredOutlineShellMix(data, m, profile) {
+        profile = profile || {};
+        if (profile.outlineShellMix != null && Number.isFinite(Number(profile.outlineShellMix))) {
+            return Math.max(0, Math.min(1, Number(profile.outlineShellMix)));
+        }
+        let bias = profile.outlineShellBias;
+        let headA = data.headTarget || (this.morphRenderTrial && this.morphRenderTrial.targetFen
+            && this.morphRenderTrial.targetFen.head);
+        let headB = data.headOther || (this.morphRenderTrial && this.morphRenderTrial.otherFen
+            && this.morphRenderTrial.otherFen.head);
+        let outlineHero = this.params.headOutlineHero || {};
+        let cloudKey = this._normalizeHeadRoleKey("cloud");
+        let targetKey = this._normalizeHeadRoleKey(headA);
+        let otherKey = this._normalizeHeadRoleKey(headB);
+        let cloudSide = null;
+        if (targetKey === cloudKey) cloudSide = "target";
+        else if (otherKey === cloudKey) cloudSide = "other";
+        if (!bias && cloudSide && outlineHero[cloudKey]) {
+            bias = "cloud";
+        }
+        if (!bias) return m;
+        let mix = this._num("featureAnchoredOutlineShellMix", 0.38);
+        if (bias === "cloud" && cloudSide) {
+            return cloudSide === "target" ? mix : 1 - mix;
+        }
+        if (bias === "target") return mix;
+        if (bias === "other") return 1 - mix;
+        let biasKey = this._normalizeHeadRoleKey(bias);
+        if (biasKey === targetKey) return mix;
+        if (biasKey === otherKey) return 1 - mix;
+        return m;
+    }
+
+    _pruneAlphaSpecks(canvas, minNeighbors) {
+        minNeighbors = Math.max(2, Math.round(minNeighbors || 4));
+        let size = canvas.width;
+        let ctx = canvas.getContext("2d", { willReadFrequently: true });
+        let img = ctx.getImageData(0, 0, size, size);
+        let p = img.data;
+        let copy = new Uint8ClampedArray(p);
+        for (let y = 1; y < size - 1; y++) {
+            for (let x = 1; x < size - 1; x++) {
+                let i = (y * size + x) * 4;
+                if (copy[i + 3] < 20) continue;
+                let n = 0;
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        if (!dx && !dy) continue;
+                        let j = ((y + dy) * size + (x + dx)) * 4;
+                        if (copy[j + 3] >= 48) n++;
+                    }
+                }
+                if (n < minNeighbors) p[i + 3] = 0;
+            }
+        }
+        ctx.putImageData(img, 0, 0);
+    }
+
+    _renderLayerMorph(m) {
+        let dest = this.morphCanvas || this.meshCanvas;
+        let data = this.meshData || this.morphPair;
+        if (!dest || !data) return;
+        let warps = this._drawDualMeshWarps(data, m, dest.width);
+        if (!warps) {
+            this._lerpCanvases(data.other.canvas, data.target.canvas, m, dest);
+            return;
+        }
+        this._lerpCanvases(warps.warpA, warps.warpB, m, dest);
+        let zones = this._buildLayerMorphZones(data, m);
+        this._composeSingularZones(warps.warpA, warps.warpB, dest, zones);
+        let shell = this._interpolatedRegionBoundary(data, m, "head_shell");
+        if (shell) this._composeOutlineRing(warps.warpA, warps.warpB, dest, shell);
         this._sealAlphaCracks(dest, 2);
+    }
+
+    _prepareCompositePair(target, other, landmarkSlots) {
+        if (!target.regions || !other.regions
+            || !target.regions.head_shell || !other.regions.head_shell) {
+            return null;
+        }
+        if (!this._copyRegionBoundary(target, "head_shell")
+            || !this._copyRegionBoundary(other, "head_shell")) {
+            return null;
+        }
+
+        let threshold = Math.max(1, Math.min(255, Math.round(this._num("meshAlphaThreshold", 18))));
+        let regionData = { head_shell: { maskOnly: true } };
+        let compositeMeta = {};
+        let overlayRoles = [];
+
+        let noteLayer = (layer, opts) => {
+            let hasO = this._canvasHasOpaque(target.compositeLayers && target.compositeLayers[layer], threshold);
+            let hasT = this._canvasHasOpaque(other.compositeLayers && other.compositeLayers[layer], threshold);
+            if (!hasO && !hasT) return;
+            let meta = Object.assign({
+                hasOther: hasO,
+                hasTarget: hasT,
+                warp: "global",
+                singular: false,
+                regionWarp: false
+            }, opts || {});
+            if (hasO && hasT) {
+                meta.paired = true;
+                meta.single = null;
+            } else if (hasT) {
+                meta.paired = false;
+                meta.single = "target";
+            } else {
+                meta.paired = false;
+                meta.single = "other";
+            }
+            compositeMeta[layer] = meta;
+        };
+
+        noteLayer("shell", { singular: false });
+
+        const setupPairedOverlay = (role) => {
+            if (!this._copyRegionBoundary(target, role)
+                || !this._copyRegionBoundary(other, role)) {
+                return false;
+            }
+            let ptsO = this._regionOverlayMeshPointsFromBoundary(other, role);
+            let ptsT = this._regionOverlayMeshPointsFromBoundary(target, role);
+            if (!ptsO || !ptsT || ptsO.length !== ptsT.length) return false;
+            let boundaryCount = ptsO.length - 1;
+            let centroidIndex = boundaryCount;
+            let triangles = this._overlayMeshTriangles(boundaryCount, centroidIndex, ptsO);
+            if (!triangles.length) return false;
+            other["regionPoints_" + role] = ptsO;
+            target["regionPoints_" + role] = ptsT;
+            regionData[role] = { triangles, paired: true, boundaryCount };
+            return true;
+        };
+
+        const setupSingleOverlay = (role, side) => {
+            let src = side === "target" ? target : other;
+            if (!this._copyRegionBoundary(src, role)) return false;
+            let pts = this._regionOverlayMeshPointsFromBoundary(src, role);
+            if (!pts) return false;
+            let boundaryCount = pts.length - 1;
+            let centroidIndex = boundaryCount;
+            let triangles = this._overlayMeshTriangles(boundaryCount, centroidIndex, pts);
+            if (!triangles.length) return false;
+            src["regionPoints_" + role] = pts;
+            regionData[role] = { triangles, single: side, boundaryCount };
+            return true;
+        };
+
+        noteLayer("eyes", { singular: true });
+        noteLayer("nose", { singular: true });
+        noteLayer("mouth", { singular: true });
+
+        ["ear_left", "ear_right", "crown"].forEach((role) => {
+            let hasO = this._canvasHasOpaque(target.compositeLayers && target.compositeLayers[role], threshold);
+            let hasT = this._canvasHasOpaque(other.compositeLayers && other.compositeLayers[role], threshold);
+            if (!hasO && !hasT) return;
+            let regional = false;
+            if (hasO && hasT) {
+                regional = setupPairedOverlay(role);
+            } else if (hasT) {
+                regional = setupSingleOverlay(role, "target");
+            } else {
+                regional = setupSingleOverlay(role, "other");
+            }
+            if (regional) overlayRoles.push(role);
+            noteLayer(role, { singular: false, regionWarp: regional });
+        });
+
+        if (!compositeMeta.shell) return null;
+
+        return {
+            regionData,
+            compositeMeta,
+            baseRole: "head_shell",
+            overlayRoles
+        };
+    }
+
+    _drawDualLayerMeshWarps(data, m, size, layer) {
+        let patch = {
+            other: Object.assign({}, data.other, {
+                canvas: this._compositeLayerCanvas(data.other, layer, size)
+            }),
+            target: Object.assign({}, data.target, {
+                canvas: this._compositeLayerCanvas(data.target, layer, size)
+            }),
+            triangles: data.triangles
+        };
+        return this._drawDualMeshWarps(patch, m, size);
+    }
+
+    _drawDualRegionWarpsOnLayers(data, m, size, role) {
+        let patch = {
+            other: Object.assign({}, data.other, {
+                canvas: this._compositeLayerCanvas(data.other, role, size)
+            }),
+            target: Object.assign({}, data.target, {
+                canvas: this._compositeLayerCanvas(data.target, role, size)
+            }),
+            regionData: data.regionData
+        };
+        return this._drawDualRegionWarps(patch, m, size, role);
+    }
+
+    _compositeLayerAlpha(meta, m) {
+        if (!meta) return 0;
+        if (meta.paired) return 1;
+        if (meta.single === "target") return m;
+        if (meta.single === "other") return 1 - m;
+        return 0;
+    }
+
+    _compositeFeatureFrame(src, layer) {
+        let a = (src && src.anchors) || {};
+        let L = a.leftEye;
+        let R = a.rightEye;
+        let M = a.mouth;
+        let eyeSpan = (L && R) ? Math.max(12, Math.hypot(R.x - L.x, R.y - L.y)) : 48;
+        if (layer === "eyes" && L && R) {
+            return {
+                x: (L.x + R.x) / 2,
+                y: (L.y + R.y) / 2,
+                span: eyeSpan,
+                angle: Math.atan2(R.y - L.y, R.x - L.x)
+            };
+        }
+        if (layer === "mouth" && M) {
+            return { x: M.x, y: M.y, span: eyeSpan * 0.44, angle: 0 };
+        }
+        if (layer === "nose") {
+            let nose = (src.landmarks || {}).nose;
+            let p = nose && nose.points && nose.points[0];
+            if (!p) return null;
+            return { x: p.x, y: p.y, span: eyeSpan * 0.26, angle: 0 };
+        }
+        return null;
+    }
+
+    _morphedCompositeFrame(data, m, layer) {
+        let o = this._compositeFeatureFrame(data.other, layer);
+        let t = this._compositeFeatureFrame(data.target, layer);
+        if (!o && !t) return null;
+        if (!o) return { x: t.x, y: t.y, span: t.span, angle: t.angle };
+        if (!t) return { x: o.x, y: o.y, span: o.span, angle: o.angle };
+        let da = t.angle - o.angle;
+        while (da > Math.PI) da -= Math.PI * 2;
+        while (da < -Math.PI) da += Math.PI * 2;
+        return {
+            x: o.x + (t.x - o.x) * m,
+            y: o.y + (t.y - o.y) * m,
+            span: o.span + (t.span - o.span) * m,
+            angle: o.angle + da * m
+        };
+    }
+
+    _blitAnchoredLayer(destCanvas, sourceCanvas, srcFrame, dstFrame) {
+        if (!sourceCanvas || !srcFrame || !dstFrame) return;
+        let ctx = destCanvas.getContext("2d");
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+        let scale = dstFrame.span / Math.max(1, srcFrame.span);
+        ctx.save();
+        ctx.translate(dstFrame.x, dstFrame.y);
+        ctx.rotate(dstFrame.angle - srcFrame.angle);
+        ctx.scale(scale, scale);
+        ctx.translate(-srcFrame.x, -srcFrame.y);
+        ctx.drawImage(sourceCanvas, 0, 0);
+        ctx.restore();
+    }
+
+    _paintCompositeSingularAnchored(data, m, dest, layer, meta) {
+        let morphed = this._morphedCompositeFrame(data, m, layer);
+        if (!morphed) return;
+
+        let size = dest.width;
+        let placedA = this._ensureScratchCanvas("_compositePlacedA", size, size);
+        let placedB = this._ensureScratchCanvas("_compositePlacedB", size, size);
+        [placedA, placedB].forEach((c) => {
+            let ctx = c.getContext("2d");
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, size, size);
+        });
+
+        let frameO = this._compositeFeatureFrame(data.other, layer);
+        let frameT = this._compositeFeatureFrame(data.target, layer);
+        if (meta.hasOther && frameO) {
+            this._blitAnchoredLayer(
+                placedA,
+                this._compositeLayerCanvas(data.other, layer, size),
+                frameO,
+                morphed
+            );
+        }
+        if (meta.hasTarget && frameT) {
+            this._blitAnchoredLayer(
+                placedB,
+                this._compositeLayerCanvas(data.target, layer, size),
+                frameT,
+                morphed
+            );
+        }
+
+        let scratch = this._ensureScratchCanvas("_compositeBlend", size, size);
+        let sctx = scratch.getContext("2d");
+        sctx.setTransform(1, 0, 0, 1, 0, 0);
+        sctx.clearRect(0, 0, size, size);
+
+        if (meta.paired) {
+            let zones = this._buildCompositeSingularZones(data, m, layer);
+            this._composeSingularZones(placedA, placedB, scratch, zones);
+        } else if (meta.single === "target") {
+            sctx.drawImage(placedB, 0, 0);
+        } else {
+            sctx.drawImage(placedA, 0, 0);
+        }
+
+        let mask = (layer === "eyes")
+            ? this._interpolatedRegionBoundary(data, m, "head_shell")
+            : null;
+        this._compositeRegionLayer(dest, scratch, mask, this._compositeLayerAlpha(meta, m));
+    }
+
+    _buildCompositeSingularZones(data, m, layer) {
+        let anchors = this._morphedAnchors(data, m);
+        let L = anchors.leftEye;
+        let R = anchors.rightEye;
+        let M = anchors.mouth;
+        if (!L || !R) return [];
+        let eyeSpan = Math.max(12, Math.hypot(R.x - L.x, R.y - L.y));
+        let feather = Math.max(0.08, Math.min(0.65, this._num("layerMorphFeather", 0.38)));
+        if (layer === "eyes") {
+            let r = eyeSpan * this._num("layerMorphEyeRadiusFrac", 0.36);
+            return [
+                { x: L.x, y: L.y, r, feather },
+                { x: R.x, y: R.y, r, feather }
+            ];
+        }
+        if (layer === "mouth" && M) {
+            return [{
+                x: M.x,
+                y: M.y,
+                r: eyeSpan * this._num("layerMorphMouthRadiusFrac", 0.44),
+                feather
+            }];
+        }
+        if (layer === "nose") {
+            let nose = this._morphedLandmarkPoint(data, m, "nose");
+            if (!nose) return [];
+            return [{
+                x: nose.x,
+                y: nose.y,
+                r: eyeSpan * this._num("layerMorphNoseRadiusFrac", 0.26),
+                feather
+            }];
+        }
+        return [];
+    }
+
+    _paintCompositeLayer(data, m, dest, layer) {
+        let meta = data.compositeMeta && data.compositeMeta[layer];
+        if (!meta) return;
+        let alpha = this._compositeLayerAlpha(meta, m);
+        if (alpha <= 0.001) return;
+
+        if (meta.singular && (layer === "eyes" || layer === "nose" || layer === "mouth")) {
+            this._paintCompositeSingularAnchored(data, m, dest, layer, meta);
+            return;
+        }
+
+        let useRegion = meta.regionWarp && data.regionData && data.regionData[layer];
+        let warps = useRegion
+            ? this._drawDualRegionWarpsOnLayers(data, m, dest.width, layer)
+            : this._drawDualLayerMeshWarps(data, m, dest.width, layer);
+        if (!warps) return;
+
+        let scratch = this._ensureScratchCanvas("_compositeBlend", dest.width, dest.height);
+        let sctx = scratch.getContext("2d");
+        sctx.setTransform(1, 0, 0, 1, 0, 0);
+        sctx.globalAlpha = 1;
+        sctx.globalCompositeOperation = "source-over";
+        sctx.clearRect(0, 0, dest.width, dest.height);
+
+        if (meta.paired) {
+            this._lerpCanvases(warps.warpA, warps.warpB, m, scratch);
+        } else if (meta.single === "target") {
+            sctx.drawImage(warps.warpB, 0, 0);
+        } else {
+            sctx.drawImage(warps.warpA, 0, 0);
+        }
+
+        let mask = null;
+        if (layer === "shell") {
+            mask = this._interpolatedRegionBoundary(data, m, "head_shell");
+        } else if (useRegion) {
+            mask = this._interpolatedRegionBoundary(data, m, layer);
+        }
+        this._compositeRegionLayer(dest, scratch, mask, alpha);
+    }
+
+    _renderCompositeMorph(m) {
+        let dest = this.morphCanvas || this.meshCanvas;
+        let data = this.meshData || this.morphPair;
+        if (!dest || !data || !data.compositeMeta) {
+            this._renderLayerMorph(m);
+            return;
+        }
+
+        let ctx = dest.getContext("2d");
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+        ctx.clearRect(0, 0, dest.width, dest.height);
+
+        MorphTaskController.compositeLayerOrder().forEach((layer) => {
+            this._paintCompositeLayer(data, m, dest, layer);
+        });
+
+        if (this._num("compositeMorphOutline", 1) > 0) {
+            let shell = this._interpolatedRegionBoundary(data, m, "head_shell");
+            if (shell) {
+                let warps = this._drawDualLayerMeshWarps(data, m, dest.width, "shell");
+                if (warps) {
+                    this._composeOutlineRing(warps.warpA, warps.warpB, dest, shell);
+                }
+            }
+        }
+
+        this._sealAlphaCracks(dest, 2);
+    }
+
+    _renderAlignedCrossfade(m) {
+        let dest = this.morphCanvas || this.meshCanvas;
+        let data = this.morphPair || this.meshData;
+        if (!dest || !data) return;
+        this._lerpCanvases(data.other.canvas, data.target.canvas, m, dest);
+    }
+
+    _interlaceCanvases(canvasOther, canvasTarget, m, dest) {
+        if (!canvasOther || !canvasTarget || !dest) return;
+        let size = dest.width;
+        if (canvasOther.width !== size || canvasTarget.width !== size) return;
+        m = Math.max(0, Math.min(1, m));
+        let ctxD = dest.getContext("2d", { willReadFrequently: true });
+        ctxD.setTransform(1, 0, 0, 1, 0, 0);
+        ctxD.globalAlpha = 1;
+        ctxD.globalCompositeOperation = "source-over";
+        ctxD.clearRect(0, 0, size, size);
+
+        if (m <= 0) {
+            ctxD.drawImage(canvasOther, 0, 0);
+            return;
+        }
+        if (m >= 1) {
+            ctxD.drawImage(canvasTarget, 0, 0);
+            return;
+        }
+
+        // CRT scanlines: copy whole horizontal bands from one parent, then alternate.
+        let rowHeight = Math.max(1, Math.round(this._num("interlaceRowHeight", 8)));
+        let phase = Math.round(this._num("interlacePhase", 0)) & 1;
+        ctxD.imageSmoothingEnabled = false;
+
+        for (let y = 0; y < size; y += rowHeight) {
+            let band = Math.floor(y / rowHeight);
+            let useTarget = ((band + phase) & 1) === 1;
+            let src = useTarget ? canvasTarget : canvasOther;
+            let h = Math.min(rowHeight, size - y);
+            ctxD.drawImage(src, 0, y, size, h, 0, y, size, h);
+        }
+    }
+
+    _renderInterlaceMorph(m) {
+        let dest = this.morphCanvas || this.meshCanvas;
+        let data = this.morphPair || this.meshData;
+        if (!dest || !data) return;
+        this._interlaceCanvases(data.other.canvas, data.target.canvas, m, dest);
+    }
+
+    _renderMeanShapeMorph(m) {
+        let dest = this.morphCanvas || this.meshCanvas;
+        let data = this.meshData || this.morphPair;
+        if (!dest || !data) return;
+        let warps = this._drawDualMeshWarps(data, m, dest.width, "sparsePoints");
+        if (!warps) {
+            this._lerpCanvases(data.other.canvas, data.target.canvas, m, dest);
+            return;
+        }
+        this._lerpCanvases(warps.warpA, warps.warpB, m, dest);
+        this._sealAlphaCracks(dest, 2);
+    }
+
+    _renderBeierNeelyMorph(m) {
+        let dest = this.morphCanvas || this.meshCanvas;
+        let data = this.meshData || this.morphPair;
+        if (!dest || !data || !data.otherLines || !data.targetLines
+            || !data.otherLines.length || data.otherLines.length !== data.targetLines.length) {
+            this._renderAlignedCrossfade(m);
+            return;
+        }
+        let size = dest.width;
+        let step = Math.max(1, Math.round(this._num("beierNeelyStep", 1)));
+        let aPow = Math.max(0.5, this._num("beierNeelyA", 10));
+        let bPow = Math.max(0.25, this._num("beierNeelyB", 1));
+        let pPow = this._num("beierNeelyP", 0);
+        let morphLines = this._interpolateBeierNeelyLines(data.otherLines, data.targetLines, m);
+        let ctxA = data.other.canvas.getContext("2d", { willReadFrequently: true });
+        let ctxB = data.target.canvas.getContext("2d", { willReadFrequently: true });
+        let ctxD = dest.getContext("2d", { willReadFrequently: true });
+        let pa = ctxA.getImageData(0, 0, size, size).data;
+        let pb = ctxB.getImageData(0, 0, size, size).data;
+        let out = ctxD.createImageData(size, size);
+        let po = out.data;
+        let wB = m;
+        let wA = 1 - m;
+        for (let y = 0; y < size; y += step) {
+            for (let x = 0; x < size; x += step) {
+                let srcA = this._beierNeelySourceAt(x, y, morphLines, data.otherLines, aPow, bPow, pPow);
+                let srcB = this._beierNeelySourceAt(x, y, morphLines, data.targetLines, aPow, bPow, pPow);
+                let sa = this._sampleRGBA(pa, size, srcA.x, srcA.y);
+                let sb = this._sampleRGBA(pb, size, srcB.x, srcB.y);
+                let r = wA * sa[0] * sa[3] + wB * sb[0] * sb[3];
+                let g = wA * sa[1] * sa[3] + wB * sb[1] * sb[3];
+                let bl = wA * sa[2] * sa[3] + wB * sb[2] * sb[3];
+                let alpha = wA * sa[3] + wB * sb[3];
+                let rr = alpha > 0 ? r / alpha : 0;
+                let gg = alpha > 0 ? g / alpha : 0;
+                let bb = alpha > 0 ? bl / alpha : 0;
+                for (let dy = 0; dy < step && y + dy < size; dy++) {
+                    for (let dx = 0; dx < step && x + dx < size; dx++) {
+                        let i = ((y + dy) * size + (x + dx)) * 4;
+                        po[i] = rr;
+                        po[i + 1] = gg;
+                        po[i + 2] = bb;
+                        po[i + 3] = alpha;
+                    }
+                }
+            }
+        }
+        ctxD.putImageData(out, 0, 0);
+        this._sealAlphaCracks(dest, 1);
+    }
+
+    _renderRefinedMesh(m) {
+        let dest = this.morphCanvas || this.meshCanvas;
+        let data = this.meshData || this.morphPair;
+        if (!dest || !data) return;
+        let warps = this._drawDualMeshWarps(data, m, dest.width);
+        if (!warps) {
+            this._lerpCanvases(data.other.canvas, data.target.canvas, m, dest);
+            return;
+        }
+        this._lerpCanvases(warps.warpA, warps.warpB, m, dest);
+        this._sealAlphaCracks(dest, 2);
+    }
+
+    _renderMeshRegions(m) {
+        let dest = this.morphCanvas || this.meshCanvas;
+        let data = this.meshData || this.morphPair;
+        if (!dest || !data || !data.regionData) {
+            this._renderRefinedMesh(m);
+            return;
+        }
+        this._paintShellMeshMasked(data, m, dest);
+        const overlayOrder = ["ear_left", "ear_right", "crown", "nose"];
+        overlayOrder.forEach((role) => {
+            let alpha = this._regionLayerAlpha(data, role, m);
+            if (alpha <= 0.001) return;
+            this._paintRegionOverlay(data, m, dest, role, alpha);
+        });
+        this._sealAlphaCracks(dest, 2);
+    }
+
+    _renderLandmarkMesh(m) {
+        let dest = this.morphCanvas || this.meshCanvas;
+        let data = this.meshData || this.morphPair;
+        if (!dest || !data) return;
+        let warps = this._drawDualMeshWarps(data, m, dest.width);
+        if (!warps) {
+            this._lerpCanvases(data.other.canvas, data.target.canvas, m, dest);
+            return;
+        }
+        this._composeLandmarkWarped(warps.warpA, warps.warpB, m, dest, data);
+        this._sealAlphaCracks(dest, 2);
+    }
+
+    _renderFeatureAnchoredMesh(m) {
+        let dest = this.morphCanvas || this.meshCanvas;
+        let data = this.meshData || this.morphPair;
+        if (!dest || !data) return;
+        let warps = this._drawDualMeshWarps(data, m, dest.width);
+        if (!warps) {
+            this._lerpCanvases(data.other.canvas, data.target.canvas, m, dest);
+            return;
+        }
+        this._composeFeatureAnchoredLandmarks(warps.warpA, warps.warpB, m, dest, data);
+        let profile = (data.shellProfile)
+            || (this.morphRenderTrial && this._morphPairProfile(this.morphRenderTrial))
+            || {};
+        this._paintChimeraSalienceOverlays(data, m, dest, profile, warps);
+        if (this._num("featureAnchoredMeshOutline", 1)) {
+            this._composeFeatureAnchoredOutlines(data, m, warps, dest, profile);
+        }
+        this._sealAlphaCracks(dest, 2);
+        this._pruneAlphaSpecks(dest, 5);
     }
 
     _renderSilhouetteMorph(m) {
@@ -3467,7 +6167,10 @@ class MorphTaskController {
         let size = Math.max(200, Math.round(this._num("meshRasterSize", 400)));
         let schemes = this._schemesForMorphTrial(trial);
         let kind = trial.morph || "crossfade";
-        if (kind !== "crossfade" && kind !== "mesh" && kind !== "silhouette") {
+        if (kind !== "crossfade" && kind !== "interlace" && kind !== "mesh" && kind !== "mesh_landmark"
+            && kind !== "feature_anchored_mesh" && kind !== "layer_morph" && kind !== "mesh_regions"
+            && kind !== "mesh_shell" && kind !== "mean_shape" && kind !== "beier_neely"
+            && kind !== "silhouette" && kind !== "composite_morph") {
             kind = "crossfade";
         }
         let ns = "http://www.w3.org/2000/svg";
@@ -3503,10 +6206,16 @@ class MorphTaskController {
             let contourCount = Math.max(12, Math.round(this._num("meshContourPoints", 48)));
             let innerFrac = Math.max(0, Math.min(0.9, this._num("meshInnerRingFrac", 0.55)));
             let center = aligned.frame.eyeMid;
-            target.points = this._homologousMeshPoints(target, center, contourCount, innerFrac, threshold);
-            other.points = this._homologousMeshPoints(other, center, contourCount, innerFrac, threshold);
+            let landmarkSlots = this._sharedMorphLandmarkSlots(target, other);
+            target.points = this._homologousMeshPoints(
+                target, center, contourCount, innerFrac, threshold, landmarkSlots
+            );
+            other.points = this._homologousMeshPoints(
+                other, center, contourCount, innerFrac, threshold, landmarkSlots
+            );
             let triangles = null;
-            if (kind === "mesh") {
+            let sparseTriangles = null;
+            if (this._usesMeshTriangulation(kind)) {
                 let average = other.points.map((p, i) => ({
                     x: (p.x + target.points[i].x) / 2,
                     y: (p.y + target.points[i].y) / 2
@@ -3517,6 +6226,32 @@ class MorphTaskController {
                     console.warn("MorphTask mesh renderer fell back to crossfade:", this.meshFallbackReason);
                     kind = "crossfade";
                     triangles = null;
+                }
+            }
+            if (this._usesMeanShapeWarp(kind)) {
+                target.sparsePoints = this._sparseMorphPoints(target, center, contourCount, threshold);
+                other.sparsePoints = this._sparseMorphPoints(other, center, contourCount, threshold);
+                let average = other.sparsePoints.map((p, i) => ({
+                    x: (p.x + target.sparsePoints[i].x) / 2,
+                    y: (p.y + target.sparsePoints[i].y) / 2
+                }));
+                sparseTriangles = this._meshDelaunay(average);
+                if (!sparseTriangles.length) {
+                    console.warn("MorphTask mean_shape fell back to crossfade.");
+                    kind = "crossfade";
+                    sparseTriangles = null;
+                }
+            }
+            let otherLines = null;
+            let targetLines = null;
+            if (kind === "beier_neely") {
+                otherLines = this._buildBeierNeelyLines(other, contourCount);
+                targetLines = this._buildBeierNeelyLines(target, contourCount);
+                if (!otherLines.length || otherLines.length !== targetLines.length) {
+                    console.warn("MorphTask beier_neely fell back to crossfade.");
+                    kind = "crossfade";
+                    otherLines = null;
+                    targetLines = null;
                 }
             }
             if (kind === "silhouette") {
@@ -3532,10 +6267,76 @@ class MorphTaskController {
                 size,
                 target,
                 other,
-                triangles,
+                triangles: kind === "mean_shape" ? sparseTriangles : triangles,
+                otherLines,
+                targetLines,
                 fillGray,
-                renderer: kind
+                renderer: kind,
+                headTarget: trial.targetFen.head,
+                headOther: trial.otherFen.head
             };
+            if (this._usesLayerMorph(kind)) {
+                this._prepareLayerMorphPair(target, other);
+            }
+            if (this._usesCompositeMorph(kind)) {
+                target.compositeLayers = await this._buildCompositeLayerSet(
+                    trial.targetFen, schemes.target, size
+                );
+                other.compositeLayers = await this._buildCompositeLayerSet(
+                    trial.otherFen, schemes.other, size
+                );
+                let compositeSetup = this._prepareCompositePair(target, other, landmarkSlots);
+                if (!compositeSetup) {
+                    console.warn("MorphTask composite_morph fell back to layer_morph (missing head_shell).");
+                    kind = "layer_morph";
+                    pair.renderer = kind;
+                    this._prepareLayerMorphPair(target, other);
+                } else {
+                    Object.assign(pair, compositeSetup);
+                }
+            }
+            if (this._usesMeshRegions(kind)) {
+                let regionSetup = this._prepareMeshRegionsPair(target, other, landmarkSlots);
+                if (!regionSetup) {
+                    console.warn("MorphTask mesh_regions fell back to mesh (missing head_shell regions).");
+                    kind = "mesh";
+                    pair.renderer = kind;
+                    let average = other.points.map((p, i) => ({
+                        x: (p.x + target.points[i].x) / 2,
+                        y: (p.y + target.points[i].y) / 2
+                    }));
+                    pair.triangles = this._meshDelaunay(average);
+                } else {
+                    Object.assign(pair, regionSetup);
+                }
+            }
+            if (this._usesMeshShell(kind)) {
+                let profile = this._morphPairProfile(trial);
+                let shellSetup = this._prepareMeshShellPair(target, other, profile);
+                if (!shellSetup) {
+                    console.warn("MorphTask mesh_shell fell back to layer_morph (missing head_shell regions).");
+                    kind = "layer_morph";
+                    pair.renderer = kind;
+                    this._prepareLayerMorphPair(target, other);
+                } else {
+                    Object.assign(pair, shellSetup);
+                }
+            }
+            if (this._usesFeatureAnchoredMesh(kind)) {
+                let profile = this._morphPairProfile(trial);
+                let anchoredSetup = this._prepareFeatureAnchoredPair(
+                    target, other, profile, trial.targetFen.head, trial.otherFen.head
+                );
+                if (!anchoredSetup) {
+                    console.warn("MorphTask feature_anchored_mesh fell back to mesh_landmark (missing head_shell).");
+                    kind = "mesh_landmark";
+                    pair.renderer = kind;
+                } else {
+                    Object.assign(pair, anchoredSetup);
+                    pair.shellProfile = profile;
+                }
+            }
+            this.morphRenderTrial = trial;
             this.morphCanvas = canvas;
             this.meshCanvas = canvas;
             this.meshForeignObject = foreign;
@@ -3609,12 +6410,25 @@ class MorphTaskController {
         m = Math.max(0, Math.min(1, m));
         this._currentMorphLevel = m;
         let kind = this.activeRenderer || "crossfade";
+        let renderM = m;
+        if ((kind === "mesh_shell" || kind === "feature_anchored_mesh") && this.morphRenderTrial) {
+            renderM = this._displayMixWeight(this.morphRenderTrial, m);
+        }
         if (kind === "shape-crossfade") {
-            if (this.targetIcon) this.targetIcon.style.opacity = String(m);
-            if (this.otherIcon) this.otherIcon.style.opacity = String(1 - m);
-        } else if (kind === "silhouette") this._renderSilhouetteMorph(m);
-        else if (kind === "mesh") this._renderRefinedMesh(m);
-        else this._renderAlignedCrossfade(m);
+            if (this.targetIcon) this.targetIcon.style.opacity = String(renderM);
+            if (this.otherIcon) this.otherIcon.style.opacity = String(1 - renderM);
+        } else if (kind === "interlace") this._renderInterlaceMorph(renderM);
+        else if (kind === "silhouette") this._renderSilhouetteMorph(renderM);
+        else if (kind === "mesh_landmark") this._renderLandmarkMesh(renderM);
+        else if (kind === "feature_anchored_mesh") this._renderFeatureAnchoredMesh(renderM);
+        else if (kind === "layer_morph") this._renderLayerMorph(renderM);
+        else if (kind === "mesh_shell") this._renderMeshShell(renderM);
+        else if (kind === "composite_morph") this._renderCompositeMorph(renderM);
+        else if (kind === "mesh_regions") this._renderMeshRegions(renderM);
+        else if (kind === "mean_shape") this._renderMeanShapeMorph(renderM);
+        else if (kind === "beier_neely") this._renderBeierNeelyMorph(renderM);
+        else if (kind === "mesh") this._renderRefinedMesh(renderM);
+        else this._renderAlignedCrossfade(renderM);
         if (this.morphGroup) this.morphGroup.style.filter = "none";
         if (this.filmRect) this.filmRect.style.opacity = "0";
     }
@@ -4894,34 +7708,6 @@ class MorphTaskController {
         this._choiceResolve = null;
     }
 
-    _stopResolveAnim() {
-        if (this.resolveRaf) {
-            cancelAnimationFrame(this.resolveRaf);
-            this.resolveRaf = null;
-        }
-    }
-
-    _resolveToTruth() {
-        return new Promise((resolve) => {
-            let fromM = this._currentMorphLevel != null ? this._currentMorphLevel : 0.5;
-            let dur = Math.max(1, this._num("resolveAnimMs", 450));
-            let start = performance.now();
-            const tick = (now) => {
-                if (this.destroyed) return resolve();
-                let t = Math.min(1, (now - start) / dur);
-                let eased = 1 - Math.pow(1 - t, 2);
-                this._applyMorph(fromM + (1 - fromM) * eased);
-                if (t >= 1) {
-                    this.resolveRaf = null;
-                    resolve();
-                    return;
-                }
-                this.resolveRaf = requestAnimationFrame(tick);
-            };
-            this.resolveRaf = requestAnimationFrame(tick);
-        });
-    }
-
     async _flyPolaroidToSide(side) {
         let mount = this.polaroidMount;
         if (!mount || !mount.groupTranslate) return;
@@ -5195,8 +7981,6 @@ class MorphTaskController {
     clean_up() {
         this.destroyed = true;
         this._stopMorph();
-        this._stopResolveAnim();
-        this._stopNoise(true);
         if (this._boundKeyDown) window.removeEventListener("keydown", this._boundKeyDown);
         if (this._boundKeyUp) window.removeEventListener("keyup", this._boundKeyUp);
         if (typeof Interface !== "undefined" && Interface.PartnerSpeechBubble) {

@@ -1,8 +1,94 @@
+// ----------------------------------------------------
+// Seeded experiment RNG
+//
+// Stimuli, trial order, and between-subjects draws go through experimentRandom()
+// (and therefore shuffleArray / randomIntFromInterval). Cosmetic Math.random
+// (confetti, instruction weather, drag ids) is left unseeded so animations
+// cannot desync the stimulus stream.
+//
+// URL: ?SEED=slides01   (reload → same world)
+//      ?EXP=feature_kit_pilot   (optional experiment-code override)
+//      ?SKIP_INTRO=1    (skip consent / character-creation / overview pages)
+// ----------------------------------------------------
+let _experimentRandomFn = Math.random.bind(Math);
+
+function getUrlSearchParam(name) {
+    try {
+        return new URL(window.location.href).searchParams.get(name);
+    } catch (e) {
+        return null;
+    }
+}
+
+function hashStringToUint32(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+}
+
+function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function () {
+        a |= 0;
+        a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = t + Math.imul(t ^ (t >>> 7), 61 | t) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+function installExperimentSeed(seedText) {
+    let seed = String(seedText == null ? "" : seedText).trim();
+    if (!seed) return false;
+    _experimentRandomFn = mulberry32(hashStringToUint32(seed));
+    window.__EXPERIMENT_SEED__ = seed;
+    console.log("%c Experiment RNG seeded: " + JSON.stringify(seed), "color:purple; font-weight:bold");
+    return true;
+}
+
+function installExperimentSeedFromUrl() {
+    let seed = getUrlSearchParam("SEED");
+    if (seed == null || seed === "") seed = getUrlSearchParam("seed");
+    if (seed) installExperimentSeed(seed);
+
+    let exp = getUrlSearchParam("EXP");
+    if (exp == null || exp === "") exp = getUrlSearchParam("experiment");
+    if (exp) {
+        window.__FORCE_EXPERIMENT_CODE__ = exp;
+        window.__EXPERIMENT_CODE_FROM_URL__ = exp;
+        console.log("%c Experiment code from URL: " + exp, "color:purple; font-weight:bold");
+    }
+
+    let skip = getUrlSearchParam("SKIP_INTRO");
+    if (skip === "1" || skip === "true") {
+        window.__SKIP_INTRO__ = true;
+        console.log("%c SKIP_INTRO: start instruction pages will be skipped", "color:purple");
+    }
+}
+
+function experimentRandom() {
+    return _experimentRandomFn();
+}
+
+function experimentRandomInt(n) {
+    let size = Number(n) || 0;
+    if (size <= 0) return 0;
+    return Math.floor(experimentRandom() * size);
+}
+
+function pickRandom(arr) {
+    if (!arr || !arr.length) return undefined;
+    return arr[experimentRandomInt(arr.length)];
+}
+
 //Uses Fisher-Yates to shuffle a provided array
 function shuffleArray(arr) {
     var j, x, i;
     for (i = arr.length - 1; i > 0; i--) {
-        j = Math.floor(Math.random() * (i + 1));
+        j = experimentRandomInt(i + 1);
         x = arr[i];
         arr[i] = arr[j];
         arr[j] = x;
@@ -18,7 +104,7 @@ function sortArrayByKey(array, key) {
 }
 
 function randomIntFromInterval(min, max) { // min and max included
-    return Math.floor(Math.random() * (max - min + 1) + min)
+    return Math.floor(experimentRandom() * (max - min + 1) + min)
 }
 
 function delete_elements_by_class_name(class_name) {
@@ -580,7 +666,7 @@ function pick_flanking_item_x(screenW, containerCenterX, containerHalfW, itemHal
         candidates = [clampedLeft, clampedRight];
     }
 
-    return candidates[Math.floor(Math.random() * candidates.length)];
+    return pickRandom(candidates);
 }
 
 function getSVGInternalCenter(element) {
@@ -1720,7 +1806,7 @@ function pick_and_apply_curated_color_set(fennimalArr) {
 
     const boxes = Object.keys(box_regions);
     const toys = Object.keys(toy_region);
-    const set = sets[Math.floor(Math.random() * sets.length)];
+    const set = pickRandom(sets);
 
     function candidate_ok_for_bans(candidate, banned) {
         let hues = [];
@@ -1754,7 +1840,7 @@ function pick_and_apply_curated_color_set(fennimalArr) {
             );
             if (freeish.length) preferred = freeish;
         }
-        return preferred[Math.floor(Math.random() * preferred.length)];
+        return pickRandom(preferred);
     }
 
     // Boxes: hardest bans first (shared boxes with 2 region hues).

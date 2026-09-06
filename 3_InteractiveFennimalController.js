@@ -11951,14 +11951,14 @@ class HatLaundryTrialController {
 
 
 class TrialFactory {
-    // Archived interaction types live in 3_InteractiveFennimalController_archive.js
+    // Archived interaction types live in archive/controllers/3_InteractiveFennimalController_archive.js
     // (not loaded by index.html). The cases below stay wired; loading that script
-    // after this file restores them. See the manifest at the top of the archive.
+    // after this file restores them. See archive/MANIFEST.md.
 
     static missingArchived(interaction_type, className) {
         console.error(
             `[TrialFactory] Interaction type "${interaction_type}" is archived ` +
-            `(${className} in 3_InteractiveFennimalController_archive.js, not loaded by index.html). ` +
+            `(${className} in archive/controllers/3_InteractiveFennimalController_archive.js, not loaded by index.html). ` +
             `Add that script tag after 3_InteractiveFennimalController.js to restore it.`
         );
         return null;

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feature Kit Lab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="morph_lab.css">
+    <link rel="stylesheet" href="feature_kit_lab.css">
+</head>
+<body>
+    <header class="lab-header">
+        <h1>Feature Kit Lab</h1>
+        <p class="lab-sub">
+            Mix-and-match test for the new modular heads
+            (<code>SVG/Heads features.svg</code>).
+            Ears sit behind the shell; eyes, lower face, and hair sit in front.
+            Right ear and right eye are mirrored copies of the left-side templates.
+        </p>
+    </header>
+
+    <p id="statusLine" class="status" aria-live="polite">Loading kit…</p>
+
+    <div class="kit-layout">
+        <div class="kit-side">
+            <section class="kit-card" id="slotCard">
+                <h2>Slots</h2>
+                <div id="slotControls"></div>
+                <div class="field toggles" style="margin-top:10px">
+                    <label><input id="exprHappy" type="radio" name="expression" value="happy" checked> Happy</label>
+                    <label><input id="exprSad" type="radio" name="expression" value="sad"> Sad</label>
+                    <label><input id="markersInput" type="checkbox"> Show placement markers</label>
+                </div>
+                <div class="actions">
+                    <button id="randomBtn" type="button">Randomize unlocked</button>
+                    <button id="resetScaleBtn" type="button" class="secondary">Reset scales</button>
+                    <button id="saveBBtn" type="button" class="secondary">Save as parent B</button>
+                </div>
+            </section>
+
+            <details class="kit-card" open>
+                <summary>SVG notes</summary>
+                <ul id="notesList" class="notes-list"></ul>
+            </details>
+        </div>
+
+        <div>
+            <section class="kit-stage-wrap">
+                <div id="mainStage" class="kit-stage"></div>
+                <p id="recipeLine" class="recipe-line"></p>
+            </section>
+
+            <section class="kit-card" style="margin-top:18px">
+                <h2>Vary one slot</h2>
+                <p class="lab-note" style="margin-top:0">Hold the current recipe fixed and swap only this part.</p>
+                <div id="varySlotButtons" class="actions"></div>
+                <div id="variantRow" class="variant-row"></div>
+            </section>
+
+            <section class="kit-card" style="margin-top:18px">
+                <h2>Chimera</h2>
+                <p class="lab-note" style="margin-top:0">
+                    Parent A is the live recipe. Parent B is a snapshot (save with the button).
+                    Pick which parent each slot comes from.
+                </p>
+                <div id="mixToggles" class="mix-toggles"></div>
+                <div id="chimeraRow" class="chimera-row"></div>
+            </section>
+        </div>
+    </div>
+
+    <script src="FeatureKit.js?v=feature-kit-lab-1"></script>
+    <script src="FeatureKitLab.js?v=feature-kit-lab-1"></script>
+</body>
+</html>

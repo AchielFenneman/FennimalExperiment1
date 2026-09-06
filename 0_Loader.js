@@ -195,8 +195,11 @@ async function attempt_raster_swap_for_regions(regions_array) {
 
 //This sets all the global variables
 async function set_all_global_variables(){
-    //Loading SVG Elements
-    //SVG_loader = new SVG_LOADER()
+    // Install URL seed / EXP / SKIP_INTRO immediately before any world construction
+    // so shuffleArray draws start at index 0 of the seeded stream.
+    if (typeof installExperimentSeedFromUrl === "function") {
+        installExperimentSeedFromUrl();
+    }
 
     //Creating a General Parameters object
     GenParam = new GENERALPARAM()
@@ -212,19 +215,32 @@ async function set_all_global_variables(){
     // Module scripts are deferred; wait briefly so Firebase helpers are on window.
     await waitForFirebaseSessionHelpers();
 
-    // Layer 1: resolve PID claim before building / randomizing the experiment world
-    let earlySession = { mode: "anonymous", sessionId: String(Date.now()) };
-    if (typeof window.resolveParticipantSessionClaim === "function") {
-        try {
-            earlySession = await window.resolveParticipantSessionClaim();
-        } catch (err) {
-            console.warn("Session claim lookup failed; continuing as new session", err);
-            let pid = null;
+    let pidFromUrl = null;
+    try {
+        let raw = new URL(window.location.href).searchParams.get("PROLIFIC_PID");
+        pidFromUrl = raw ? raw.substring(0, 10) : null;
+    } catch (e) { /* ignore */ }
+
+    // Seeded mock / recording runs: rebuild from the seed every reload.
+    // Skip Layer 1 restore and the completed-PID lock so SEED is the source of truth.
+    let earlySession;
+    if (window.__EXPERIMENT_SEED__) {
+        let seedKey = String(window.__EXPERIMENT_SEED__).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 40);
+        earlySession = {
+            mode: pidFromUrl ? "new" : "anonymous",
+            pid: pidFromUrl,
+            sessionId: "seed_" + seedKey
+        };
+        console.log("%c Seeded run: skipping session restore", "color:purple");
+    } else {
+        earlySession = { mode: "anonymous", sessionId: String(Date.now()) };
+        if (typeof window.resolveParticipantSessionClaim === "function") {
             try {
-                let raw = new URL(window.location.href).searchParams.get("PROLIFIC_PID");
-                pid = raw ? raw.substring(0, 10) : null;
-            } catch (e) { /* ignore */ }
-            earlySession = { mode: "new", pid: pid, sessionId: String(Date.now()) };
+                earlySession = await window.resolveParticipantSessionClaim();
+            } catch (err) {
+                console.warn("Session claim lookup failed; continuing as new session", err);
+                earlySession = { mode: "new", pid: pidFromUrl, sessionId: String(Date.now()) };
+            }
         }
     }
 
@@ -233,7 +249,7 @@ async function set_all_global_variables(){
         return;
     }
 
-    if (earlySession.expCode) {
+    if (earlySession.expCode && !window.__EXPERIMENT_CODE_FROM_URL__) {
         window.__FORCE_EXPERIMENT_CODE__ = earlySession.expCode;
     }
 
@@ -357,4 +373,4 @@ loadMainElements()
 
 
 //Adapt head sorting task to two rows if more than 4 regions selected
-console.log("Ready new!")
+console.log("Ready STIM")

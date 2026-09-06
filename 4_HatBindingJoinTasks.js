@@ -713,6 +713,39 @@
         if (grade) log.grade_final = grade.letter;
     };
 
+    /**
+     * Shared submit loop for shipping + party join tasks.
+     * Renders a status bubble + "Check Answers" button; loops until all correct.
+     * @param {{ cellGroups, questions, log, centers, cfg, checkYFrac }} opts
+     */
+    P._joinRunCheckLoop = async function ({ cellGroups, questions, log, centers, cfg, checkYFrac }) {
+        let status = this._joinStatusBubble();
+        let btn = this._joinPlaceCheckButton(cfg.checkLabel || "Check Answers", checkYFrac);
+        let busy = false;
+        await new Promise((resolve) => {
+            btn.onpointerdown = () => {
+                if (busy) return;
+                busy = true;
+                this._joinPlay("button_click");
+                status.hide();
+                let selectedByQ = cellGroups.map((cells) => this._joinSelectedFromCells(cells));
+                let mistakes = this._joinMistakeCount(questions, selectedByQ);
+                this._joinRecordSubmit(log, questions, selectedByQ, mistakes, null);
+                if (mistakes === 0) {
+                    cellGroups.forEach((cells) => cells.forEach((c) => c.setLocked(true)));
+                    btn.style.pointerEvents = "none";
+                    this._joinPlay("positive");
+                    (centers || []).forEach((c) => this._joinConfetti(c.x, c.y, 24));
+                    this._joinSuccessBeat().then(() => resolve());
+                    return;
+                }
+                status.show(cfg.shippingError || "There are some mistakes on your answers — please check again.");
+                this._joinPlay("rejected");
+                busy = false;
+            };
+        });
+    };
+
     P._runJoinBlock = async function (block, blockIndex) {
         let questions = this._buildJoinQuestions();
         this._clearScene();
@@ -945,31 +978,7 @@
             });
         });
 
-        let status = this._joinStatusBubble();
-        let btn = this._joinPlaceCheckButton(cfg.checkLabel || "Check Answers", 0.925);
-        let busy = false;
-        await new Promise((resolve) => {
-            btn.onpointerdown = () => {
-                if (busy) return;
-                busy = true;
-                this._joinPlay("button_click");
-                status.hide();
-                let selectedByQ = cellGroups.map((cells) => this._joinSelectedFromCells(cells));
-                let mistakes = this._joinMistakeCount(questions, selectedByQ);
-                this._joinRecordSubmit(log, questions, selectedByQ, mistakes, null);
-                if (mistakes === 0) {
-                    cellGroups.forEach((cells) => cells.forEach((c) => c.setLocked(true)));
-                    btn.style.pointerEvents = "none";
-                    this._joinPlay("positive");
-                    centers.forEach((c) => this._joinConfetti(c.x, c.y, 24));
-                    this._joinSuccessBeat().then(() => resolve());
-                    return;
-                }
-                status.show(cfg.shippingError || "There are some mistakes on your answers — please check again.");
-                this._joinPlay("rejected");
-                busy = false;
-            };
-        });
+        await this._joinRunCheckLoop({ cellGroups, questions, log, centers, cfg, checkYFrac: 0.925 });
     };
 
     P._joinSeeded = function (seedStr) {
@@ -1279,30 +1288,6 @@
             });
         });
 
-        let status = this._joinStatusBubble();
-        let btn = this._joinPlaceCheckButton(cfg.checkLabel || "Check Answers", 0.93);
-        let busy = false;
-        await new Promise((resolve) => {
-            btn.onpointerdown = () => {
-                if (busy) return;
-                busy = true;
-                this._joinPlay("button_click");
-                status.hide();
-                let selectedByQ = cellGroups.map((cells) => this._joinSelectedFromCells(cells));
-                let mistakes = this._joinMistakeCount(questions, selectedByQ);
-                this._joinRecordSubmit(log, questions, selectedByQ, mistakes, null);
-                if (mistakes === 0) {
-                    cellGroups.forEach((cells) => cells.forEach((c) => c.setLocked(true)));
-                    btn.style.pointerEvents = "none";
-                    this._joinPlay("positive");
-                    centers.forEach((c) => this._joinConfetti(c.x, c.y, 24));
-                    this._joinSuccessBeat().then(() => resolve());
-                    return;
-                }
-                status.show(cfg.shippingError || "There are some mistakes on your answers — please check again.");
-                this._joinPlay("rejected");
-                busy = false;
-            };
-        });
+        await this._joinRunCheckLoop({ cellGroups, questions, log, centers, cfg, checkYFrac: 0.93 });
     };
 })();

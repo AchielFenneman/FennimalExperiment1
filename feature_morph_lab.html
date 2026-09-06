@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feature Morph Lab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="morph_lab.css">
+    <style>
+        .feature-svg-holder {
+            width: 104px;
+            height: 104px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #faf8f4;
+            border: 1px solid #d7d2c8;
+        }
+        .feature-svg-holder svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        .feature-role-block {
+            margin-bottom: 18px;
+        }
+        .lab-note {
+            max-width: 760px;
+            margin: 0 0 16px;
+            color: #4a5560;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <svg id="Scannimals_Task_SVG" width="1920" height="1080" viewBox="0 0 1920 1080"
+         style="position:absolute;left:-9999px;width:0;height:0;overflow:hidden"
+         aria-hidden="true"></svg>
+
+    <header class="lab-header">
+        <h1>Feature Morph Lab</h1>
+        <p class="lab-note">
+            Build morphs <strong>one feature at a time</strong> as crisp SVG paths.
+            Placement (position, scale, angle) is interpolated; shape comes from one parent per mix
+            (or dissolve / dual-outline modes). Compose onto a full face later.
+        </p>
+    </header>
+
+    <section class="lab-controls">
+        <label class="field">
+            <span>Heads (comma-separated)</span>
+            <input id="headsInput" type="text" spellcheck="false" value="tomato,pig,bell">
+        </label>
+        <label class="field">
+            <span>Mixes (percent toward target)</span>
+            <input id="mixesInput" type="text" spellcheck="false" value="50,55,60,65">
+        </label>
+        <label class="field">
+            <span>View frame</span>
+            <select id="frameInput">
+                <option value="isolated" selected>isolated (feature centered)</option>
+                <option value="head">head coordinates (400²)</option>
+            </select>
+        </label>
+        <label class="field">
+            <span>Shape blend</span>
+            <select id="shapeModeInput">
+                <option value="0" selected>pick parent (crisp paths)</option>
+                <option value="1">dissolve (opacity crossfade)</option>
+                <option value="2">dual outline (both paths)</option>
+                <option value="3">geometry (path lerp)</option>
+            </select>
+        </label>
+        <fieldset class="field morphs-field">
+            <legend>Features</legend>
+            <label><input type="checkbox" name="role" value="nose" checked> nose</label>
+            <label><input type="checkbox" name="role" value="mouth" checked> mouth</label>
+            <label><input type="checkbox" name="role" value="eyes" checked> eyes</label>
+            <label><input type="checkbox" name="role" value="eye_left"> eye L</label>
+            <label><input type="checkbox" name="role" value="eye_right"> eye R</label>
+            <label><input type="checkbox" name="role" value="ear_left" checked> ear L</label>
+            <label><input type="checkbox" name="role" value="ear_right" checked> ear R</label>
+            <label><input type="checkbox" name="role" value="crown" checked> crown</label>
+        </fieldset>
+        <div class="field toggles">
+            <label><input id="shellInput" type="checkbox"> Faint morphed head outline</label>
+        </div>
+        <div class="actions">
+            <button id="renderBtn" type="button">Generate grid</button>
+        </div>
+        <p id="statusLine" class="status" aria-live="polite">Starting…</p>
+    </section>
+
+    <main id="gridRoot" class="grid-root"></main>
+
+    <script src="1_General_functions.js?v=feature-morph-lab"></script>
+    <script src="1_General_Parameters.js?v=feature-morph-lab"></script>
+    <script src="4_MorphTask.js?v=feature-morph-lab-5"></script>
+    <script src="FeatureMorphLab.js?v=feature-morph-lab-5"></script>
+</body>
+</html>

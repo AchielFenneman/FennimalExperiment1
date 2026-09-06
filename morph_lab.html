@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Morph Lab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="morph_lab.css">
+</head>
+<body>
+    <!-- GENERALPARAM reads Scannimals_Task_SVG dimensions at boot. -->
+    <svg id="Scannimals_Task_SVG" width="1920" height="1080" viewBox="0 0 1920 1080"
+         style="position:absolute;left:-9999px;width:0;height:0;overflow:hidden"
+         aria-hidden="true"></svg>
+
+    <header class="lab-header">
+        <h1>Morph Lab</h1>
+        <p class="lab-sub">
+            Stimulus QA for head morphs. Uses the live <code>MorphTask</code> renderer
+            (feature_anchored_mesh, mesh_landmark, …). Benchmark mixes should be identifiable;
+            50/50 should stay ambiguous.
+        </p>
+    </header>
+
+    <section class="lab-controls">
+        <label class="field">
+            <span>Heads (comma-separated SVG ids)</span>
+            <input id="headsInput" type="text" spellcheck="false"
+                   value="tomato,bun,bell,cloud">
+        </label>
+        <fieldset class="field morphs-field">
+            <legend>Methods</legend>
+            <label><input type="checkbox" name="morph" value="crossfade"> crossfade</label>
+            <label><input type="checkbox" name="morph" value="interlace"> interlace</label>
+            <label><input type="checkbox" name="morph" value="feature_anchored_mesh" checked> feature_anchored_mesh</label>
+            <label><input type="checkbox" name="morph" value="mesh_landmark"> mesh_landmark</label>
+            <label><input type="checkbox" name="morph" value="mesh"> mesh</label>
+            <label><input type="checkbox" name="morph" value="layer_morph"> layer_morph</label>
+            <label><input type="checkbox" name="morph" value="mesh_shell"> mesh_shell</label>
+            <label><input type="checkbox" name="morph" value="composite_morph"> composite_morph</label>
+            <label><input type="checkbox" name="morph" value="mesh_regions"> mesh_regions</label>
+            <label><input type="checkbox" name="morph" value="mean_shape"> mean_shape</label>
+            <label><input type="checkbox" name="morph" value="beier_neely"> beier_neely</label>
+            <label><input type="checkbox" name="morph" value="silhouette"> silhouette</label>
+        </fieldset>
+        <label class="field">
+            <span>Mixes (percent toward target)</span>
+            <input id="mixesInput" type="text" spellcheck="false" value="50,55,60,65">
+        </label>
+        <div class="field toggles">
+            <label><input id="blindInput" type="checkbox"> Blind labels (for silicon pass)</label>
+            <label><input id="parentsInput" type="checkbox" checked> Show parent heads</label>
+        </div>
+        <div class="actions">
+            <button id="renderBtn" type="button">Generate grid</button>
+            <button id="shuffleBtn" type="button" disabled>Shuffle for silicon pass</button>
+            <button id="restoreOrderBtn" type="button" class="secondary" disabled>Restore ladder order</button>
+            <button id="revealBtn" type="button" disabled>Reveal labels</button>
+            <button id="exportBtn" type="button" disabled>Export PNG sheet</button>
+        </div>
+        <p id="statusLine" class="status" aria-live="polite">Starting…</p>
+    </section>
+
+    <main id="gridRoot" class="grid-root"></main>
+
+    <script src="1_General_functions.js?v=morph-lab"></script>
+    <script src="1_General_Parameters.js?v=morph-lab-31"></script>
+    <script src="4_MorphTask.js?v=morph-lab-31"></script>
+    <script src="MorphLab.js?v=morph-lab-31"></script>
+</body>
+</html>

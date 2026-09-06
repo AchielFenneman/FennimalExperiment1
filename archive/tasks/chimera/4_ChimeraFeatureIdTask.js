@@ -180,8 +180,8 @@ class ChimeraFeatureIdController {
         for (let n = 0; n < count; n++) {
             let placed = null;
             for (let attempt = 0; attempt < 80; attempt++) {
-                let u = 0.18 + Math.random() * 0.64;
-                let v = 0.18 + Math.random() * 0.64;
+                let u = 0.18 + experimentRandom() * 0.64;
+                let v = 0.18 + experimentRandom() * 0.64;
                 let far = holes.every((h) => {
                     let du = h.u - u;
                     let dv = h.v - v;
@@ -197,8 +197,8 @@ class ChimeraFeatureIdController {
                 scale = scales[n % scales.length];
             }
             holes.push({
-                u: placed ? placed.u : (0.18 + Math.random() * 0.64),
-                v: placed ? placed.v : (0.18 + Math.random() * 0.64),
+                u: placed ? placed.u : (0.18 + experimentRandom() * 0.64),
+                v: placed ? placed.v : (0.18 + experimentRandom() * 0.64),
                 scale: scale,
                 delay: count <= 1 ? 0 : stagger * n / (count - 1)
             });
@@ -471,7 +471,7 @@ class ChimeraFeatureIdController {
             this._answerIds().forEach((id) => { answerLock[id] = true; });
             let remaining = nameIds.filter((id) => id !== trial.correctId && !omit[id] && !answerLock[id]);
             while (nameIds.length - Object.keys(omit).length > keep && remaining.length) {
-                let pick = remaining.splice(Math.floor(Math.random() * remaining.length), 1)[0];
+                let pick = remaining.splice(experimentRandomInt(remaining.length), 1)[0];
                 omit[pick] = true;
                 extra.push(pick);
             }
@@ -688,7 +688,7 @@ class ChimeraFeatureIdController {
             let minSlot = Math.max(0, restI + 2);
             if (minSlot > list.length) minSlot = list.length;
             let span = list.length - minSlot + 1;
-            let slot = minSlot + Math.floor(Math.random() * Math.max(1, span));
+            let slot = minSlot + experimentRandomInt(Math.max(1, span));
             list.splice(Math.min(slot, list.length), 0, later);
         });
         if (!this._rhHrOrderOk([firstId].concat(list.map((t) => t.id)))) {

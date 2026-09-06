@@ -2,6 +2,8 @@
 
 Living overview of **what trials exist**, **which phase blocks run them**, and **which optional settings** they accept.
 
+Live experiment code is `feature_kit_pilot` (index.html). `semantic_learning_star` and `mentalizing_between_subjects` remain loadable via `?EXP=`. Older DVs live in [`archive/`](archive/MANIFEST.md) and are not loaded.
+
 **Primary sources**
 
 | Area | File |
@@ -28,7 +30,7 @@ Experiment_Structure block
   Location entry → TrialFactory.build(FenObj.interaction_type, …)
 ```
 
-Some phases are **not** location trials (`partner_belief_multiple` / `partner_belief_individual_boxes`, sorting, `hat_binding_task`, `chimera_feature_id`, `morph_task`, `morph_head_pilot`, `morph_task_two_cards` (archived), `morph_task_two_stage_development` (archived), `pseudoday`) and never call `TrialFactory`. `chimera_feature_id`, `morph_task`, and `morph_head_pilot` run as indoor polaroids (no map travel).
+Some phases are **not** location trials (`partner_belief_multiple` / `partner_belief_individual_boxes`, sorting, `hat_binding_task`, `chimera_feature_id`, `morph_task`, `feature_kit_pilot`, `morph_head_pilot`, `morph_task_two_cards` (archived), `morph_task_two_stage_development` (archived), `pseudoday`) and never call `TrialFactory`. `chimera_feature_id`, `morph_task`, `feature_kit_pilot`, and `morph_head_pilot` run as indoor polaroids (no map travel).
 
 ### Trial queue: default vs `trial_subblocks`
 
@@ -500,6 +502,36 @@ Speeded 2AFC identity DV on an **extra-wide indoor polaroid** (photo-room stage:
 **Scoring:** points decay over `trial_speed` from jumble-ready. Correct → remaining; incorrect → silent penalty. Name quiz unpaid. Practice unpaid. 50% mix always `scored_correct`.
 
 Controller: `MorphTaskController` (`4_MorphTask.js`). Tunables: `GenParam.MorphTask`.
+
+#### `feature_kit_pilot`
+Short **stimulus pilot** (own experiment code `feature_kit_pilot`). Indoor photo-room 3-up 2AFC: a center **probe** kit-head between two parent kit-heads. No morphing, names, hats, map, or stars. Tokens are discovered from `SVG/Heads features.svg` at load, so art can still change.
+
+Default live `Experiment_Code` is `feature_kit_pilot` (`index.html`). Switch back with `?EXP=semantic_learning_star`. Add `&SKIP_INTRO=1` to skip consent / single-sitting.
+
+**Design.** Five slots (`shell`, `ear`, `eye`, `lowerFace`, `hair`). Between-subjects, each participant is assigned **3 tokens per slot** (independent draws, persisted on `phaseRandomizations.feature_kit_pilot_tokens`). Paid trials are **slot duels**: parents A and B share the other three slots and differ on two. The probe takes slot X from A and slot Y from B. Choosing A means slot X won; choosing B means slot Y won.
+
+**Count / adaptive tail.** Cap stays `C(5,2) × n_duel_reps` duels + `n_catch` catch + 2 practice (default **35**). Coverage wave: one of each slot pair + most catch trials, shuffled. Remaining duels (the 2nd and 3rd reps) are drawn on the fly, weighted toward (1) close slot races, (2) currently strong slots, (3) under-sampled pairs. Set `adaptive: false` to shuffle all reps up front as before. Logged as `wave` (`coverage` | `adaptive` | `practice`); adaptive rows also store `slot_win_rates` at draw time.
+
+Heads render in **true grayscale** (`url(#kit_pilot_gray)`). Answers sit below the probe, equal well size, navy outline; probe is on top with a lighter frame. F/J ignored for the first `minChoiceMs` (750) to block double-presses. Green time bars sit just outside the answer wells, with a visible empty track.
+
+| Field | Meaning |
+|---|---|
+| `n_tokens_sampled` | Tokens kept per slot (default 3; at least 2). Drawn from whatever groups exist in the SVG (drops `"none"`). |
+| `n_duel_reps` | Repetitions of each unordered slot pair (default 3). With `adaptive: true`, the first rep is coverage; later reps are weighted. |
+| `n_catch` | Catch trials: probe identical to A or B (default 3). |
+| `adaptive` | If `true` (default), leftover duels after one coverage pass are sampled from running slot win-rates. Cap is unchanged. |
+| `trial_speed` | Response window ms (default 7500). Choice is still required after timeout; `late` is logged. Bars are a pace cue, not a scored deadline. |
+| `minChoiceMs` | Ignore F/J / clicks until this many ms after trial onset (default 750). |
+| `skip_practice` | If `true`, omit the two unpaid circle/square practice trials. |
+| `skip_instructions` | Skip Day N page. |
+| `day_title` / `day_body` | Optional Day N overrides. |
+| `partner_behavior` | Use `"absent"`. |
+
+**Prompt:** “Which one looks more like the top head?” **F** / **J** (clicking a side head also works). Happy expression locked. First practice trial and first paid trial get a short coaching line.
+
+**Logged answer rows** (`phase.answers` / `phase.Data`, also `experimentData.featureKitPilotProgress`): `kind` (`duel` / `catch` / `practice`), `wave`, `head_top` / `head_left` / `head_right` (and `probe` / `parent_a` / `parent_b`), `selected_key` (F/J), `selected_side` (`left`/`right`), `selected_parent`, `response_mode` (`key`/`click`), `reaction_time_ms`, `late`, plus duel fields (`slot_x` / `slot_y`, tokens, `winner_slot` / `winner_token`) and `catch_correct`. Saved to Firebase after every trial (`storeAllData`) as well as at phase end.
+
+Controller: `FeatureKitPilotController` (`4_FeatureKitPilotTask.js`). Composer: `FeatureKit.js`. Tunables: `GenParam.FeatureKitPilot`. Dummy Fennimal `P` exists only so FeatureMap / the map can boot; kit heads do not come from the Fennimal dictionary.
 
 #### `morph_head_pilot`
 Short **stimulus pilot** (own experiment code `morph_head_pilot`). One polaroid, jumble only, F/J 2AFC with **head images** of the two parents. No prime, name quiz, hats, map, or stars. Uses the same jumble mixer as `morph_task` (prototype methods from `4_MorphTask.js`).

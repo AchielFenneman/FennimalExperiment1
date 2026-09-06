@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2340 600" width="2340" height="600" role="img">
+  <title>Keep-group overview: original n=12 beside expanded n=20</title>
+  <rect width="2340" height="600" fill="#ffffff"/>
+  <text x="580" y="28" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="16" font-weight="600" fill="#1a1a1a">Original sample  |  n = 12</text>
+  <text x="1760" y="28" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="16" font-weight="600" fill="#1a1a1a">Expanded sample  |  n = 20</text>
+  <line x1="1170" y1="8" x2="1170" y2="592" stroke="#d0d0d0" stroke-width="1"/>
+  <svg x="0" y="40" width="1160" height="540" viewBox="0 0 1160 540">
+<title id="title">Keep group morph figure, original Pilot 4 (submits at most 7, n = 12)</title>
+  <desc id="desc">Left: 50/50 in-group 62.5% vs out-of-triad 37.5%. Right: P(correct) at mix 60 and 65. Help 75 then 87.5; control 66.7 then 58.3; hurt 58.3 then 83.3.</desc>
+
+  <rect width="1160" height="540" fill="#ffffff"/>
+  <text x="580" y="32" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="20" font-weight="600" fill="#1a1a1a">Join submits &lt;= 7  |  n = 12  |  original sample</text>
+
+  <g transform="translate(0,10)">
+    <text x="220" y="52" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="16" font-weight="600" fill="#1a1a1a">50 / 50 - who they picked</text>
+
+    <g font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="12" fill="#5c5c5c">
+      <text x="60" y="88" text-anchor="end">100%</text>
+      <text x="60" y="170" text-anchor="end">75%</text>
+      <text x="60" y="252" text-anchor="end">50%</text>
+      <text x="60" y="334" text-anchor="end">25%</text>
+      <text x="60" y="416" text-anchor="end">0%</text>
+    </g>
+    <g stroke="#e6e6e6" stroke-width="1" fill="none">
+      <line x1="72" y1="84" x2="360" y2="84"/>
+      <line x1="72" y1="166" x2="360" y2="166"/>
+      <line x1="72" y1="248" x2="360" y2="248"/>
+      <line x1="72" y1="330" x2="360" y2="330"/>
+      <line x1="72" y1="412" x2="360" y2="412"/>
+    </g>
+
+    <rect x="150" y="207" width="132" height="205" fill="#2E79B5"/>
+    <rect x="150" y="84" width="132" height="123" fill="#B4B4C0"/>
+    <text x="216" y="318" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="16" font-weight="600" fill="#ffffff">62.5%</text>
+    <text x="216" y="152" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="16" font-weight="600" fill="#2a2a2a">37.5%</text>
+
+    <line x1="72" y1="248" x2="360" y2="248" stroke="#6b6b6b" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <text x="368" y="252" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="12" fill="#6b6b6b">chance</text>
+    <line x1="72" y1="84" x2="72" y2="412" stroke="#8a8a8a" stroke-width="1"/>
+    <line x1="72" y1="412" x2="360" y2="412" stroke="#8a8a8a" stroke-width="1"/>
+    <text x="216" y="436" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="13" fill="#1a1a1a">50 / 50</text>
+    <text x="18" y="248" text-anchor="middle" transform="rotate(-90 18 248)" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="13" fill="#5c5c5c">Percent of choices</text>
+
+    <g font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="13" fill="#1a1a1a">
+      <rect x="78" y="468" width="14" height="14" fill="#2E79B5"/>
+      <text x="98" y="480">In-group</text>
+      <rect x="196" y="468" width="14" height="14" fill="#B4B4C0"/>
+      <text x="216" y="480">Out-of-triad</text>
+    </g>
+  </g>
+
+  <g transform="translate(430,10)">
+    <text x="360" y="52" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="16" font-weight="600" fill="#1a1a1a">60 and 65 - P(correct)</text>
+
+    <g font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="12" fill="#5c5c5c">
+      <text x="60" y="88" text-anchor="end">100%</text>
+      <text x="60" y="170" text-anchor="end">75%</text>
+      <text x="60" y="252" text-anchor="end">50%</text>
+      <text x="60" y="334" text-anchor="end">25%</text>
+      <text x="60" y="416" text-anchor="end">0%</text>
+    </g>
+    <g stroke="#e6e6e6" stroke-width="1" fill="none">
+      <line x1="72" y1="84" x2="640" y2="84"/>
+      <line x1="72" y1="166" x2="640" y2="166"/>
+      <line x1="72" y1="248" x2="640" y2="248"/>
+      <line x1="72" y1="330" x2="640" y2="330"/>
+      <line x1="72" y1="412" x2="640" y2="412"/>
+    </g>
+
+    <line x1="72" y1="248" x2="640" y2="248" stroke="#6b6b6b" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <text x="652" y="252" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="12" fill="#6b6b6b">chance</text>
+
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="214,166 498,125" stroke="#1F8A65" stroke-width="3"/>
+      <polyline points="214,193.2 498,220.8" stroke="#6B6B7B" stroke-width="3"/>
+      <polyline points="214,220.8 498,138.8" stroke="#C44848" stroke-width="3"/>
+    </g>
+    <g stroke="#ffffff" stroke-width="2">
+      <circle cx="214" cy="166" r="6" fill="#1F8A65"/>
+      <circle cx="498" cy="125" r="6" fill="#1F8A65"/>
+      <circle cx="214" cy="193.2" r="6" fill="#6B6B7B"/>
+      <circle cx="498" cy="220.8" r="6" fill="#6B6B7B"/>
+      <circle cx="214" cy="220.8" r="6" fill="#C44848"/>
+      <circle cx="498" cy="138.8" r="6" fill="#C44848"/>
+    </g>
+    <g font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="13" font-weight="600">
+      <text x="214" y="152" text-anchor="middle" fill="#1F8A65">75%</text>
+      <text x="498" y="111" text-anchor="middle" fill="#1F8A65">87.5%</text>
+      <text x="238" y="188" text-anchor="start" fill="#6B6B7B">66.7%</text>
+      <text x="498" y="244" text-anchor="middle" fill="#6B6B7B">58.3%</text>
+      <text x="214" y="244" text-anchor="middle" fill="#C44848">58.3%</text>
+      <text x="524" y="142" text-anchor="start" fill="#C44848">83.3%</text>
+    </g>
+
+    <line x1="72" y1="84" x2="72" y2="412" stroke="#8a8a8a" stroke-width="1"/>
+    <line x1="72" y1="412" x2="640" y2="412" stroke="#8a8a8a" stroke-width="1"/>
+    <g font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="13" fill="#1a1a1a">
+      <text x="214" y="436" text-anchor="middle">60 / 40</text>
+      <text x="498" y="436" text-anchor="middle">65 / 35</text>
+    </g>
+    <text x="18" y="248" text-anchor="middle" transform="rotate(-90 18 248)" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="13" fill="#5c5c5c">Percent correct</text>
+
+    <g font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="13" fill="#1a1a1a">
+      <line x1="72" y1="484" x2="100" y2="484" stroke="#1F8A65" stroke-width="3"/>
+      <circle cx="86" cy="484" r="5" fill="#1F8A65"/>
+      <text x="108" y="489">Help</text>
+      <line x1="176" y1="484" x2="204" y2="484" stroke="#6B6B7B" stroke-width="3"/>
+      <circle cx="190" cy="484" r="5" fill="#6B6B7B"/>
+      <text x="212" y="489">Control</text>
+      <line x1="300" y1="484" x2="328" y2="484" stroke="#C44848" stroke-width="3"/>
+      <circle cx="314" cy="484" r="5" fill="#C44848"/>
+      <text x="336" y="489">Hurt</text>
+    </g>
+  </g>
+  </svg>
+  <svg x="1180" y="40" width="1160" height="540" viewBox="0 0 1160 540">
+<title id="title">Keep group morph figure, expanded Pilot 4 (submits at most 7, n = 20)</title>
+  <desc id="desc">Left: 50/50 in-group 55% vs out-of-triad 45%. Right: P(correct) at mix 60 and 65 for help, control, and hurt.</desc>
+
+  <rect width="1160" height="540" fill="#ffffff"/>
+  <text x="580" y="32" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="20" font-weight="600" fill="#1a1a1a">Join submits &lt;= 7  |  n = 20  |  expanded sample</text>
+
+  <g transform="translate(0,10)">
+    <text x="220" y="52" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="16" font-weight="600" fill="#1a1a1a">50 / 50 - who they picked</text>
+
+    <g font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="12" fill="#5c5c5c">
+      <text x="60" y="88" text-anchor="end">100%</text>
+      <text x="60" y="170" text-anchor="end">75%</text>
+      <text x="60" y="252" text-anchor="end">50%</text>
+      <text x="60" y="334" text-anchor="end">25%</text>
+      <text x="60" y="416" text-anchor="end">0%</text>
+    </g>
+    <g stroke="#e6e6e6" stroke-width="1" fill="none">
+      <line x1="72" y1="84" x2="360" y2="84"/>
+      <line x1="72" y1="166" x2="360" y2="166"/>
+      <line x1="72" y1="248" x2="360" y2="248"/>
+      <line x1="72" y1="330" x2="360" y2="330"/>
+      <line x1="72" y1="412" x2="360" y2="412"/>
+    </g>
+
+    <rect x="150" y="231.6" width="132" height="180.4" fill="#2E79B5"/>
+    <rect x="150" y="84" width="132" height="147.6" fill="#B4B4C0"/>
+    <text x="216" y="330" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="16" font-weight="600" fill="#ffffff">55%</text>
+    <text x="216" y="164" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="16" font-weight="600" fill="#2a2a2a">45%</text>
+
+    <line x1="72" y1="248" x2="360" y2="248" stroke="#6b6b6b" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <text x="368" y="252" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="12" fill="#6b6b6b">chance</text>
+    <line x1="72" y1="84" x2="72" y2="412" stroke="#8a8a8a" stroke-width="1"/>
+    <line x1="72" y1="412" x2="360" y2="412" stroke="#8a8a8a" stroke-width="1"/>
+    <text x="216" y="436" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="13" fill="#1a1a1a">50 / 50</text>
+    <text x="18" y="248" text-anchor="middle" transform="rotate(-90 18 248)" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="13" fill="#5c5c5c">Percent of choices</text>
+
+    <g font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="13" fill="#1a1a1a">
+      <rect x="78" y="468" width="14" height="14" fill="#2E79B5"/>
+      <text x="98" y="480">In-group</text>
+      <rect x="196" y="468" width="14" height="14" fill="#B4B4C0"/>
+      <text x="216" y="480">Out-of-triad</text>
+    </g>
+  </g>
+
+  <g transform="translate(430,10)">
+    <text x="360" y="52" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="16" font-weight="600" fill="#1a1a1a">60 and 65 - P(correct)</text>
+
+    <g font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="12" fill="#5c5c5c">
+      <text x="60" y="88" text-anchor="end">100%</text>
+      <text x="60" y="170" text-anchor="end">75%</text>
+      <text x="60" y="252" text-anchor="end">50%</text>
+      <text x="60" y="334" text-anchor="end">25%</text>
+      <text x="60" y="416" text-anchor="end">0%</text>
+    </g>
+    <g stroke="#e6e6e6" stroke-width="1" fill="none">
+      <line x1="72" y1="84" x2="640" y2="84"/>
+      <line x1="72" y1="166" x2="640" y2="166"/>
+      <line x1="72" y1="248" x2="640" y2="248"/>
+      <line x1="72" y1="330" x2="640" y2="330"/>
+      <line x1="72" y1="412" x2="640" y2="412"/>
+    </g>
+
+    <line x1="72" y1="248" x2="640" y2="248" stroke="#6b6b6b" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <text x="652" y="252" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="12" fill="#6b6b6b">chance</text>
+
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="214,174.2 498,133.2" stroke="#1F8A65" stroke-width="3"/>
+      <polyline points="214,166 498,190.6" stroke="#6B6B7B" stroke-width="3"/>
+      <polyline points="214,190.6 498,157.8" stroke="#C44848" stroke-width="3"/>
+    </g>
+    <g stroke="#ffffff" stroke-width="2">
+      <circle cx="214" cy="174.2" r="6" fill="#1F8A65"/>
+      <circle cx="498" cy="133.2" r="6" fill="#1F8A65"/>
+      <circle cx="214" cy="166" r="6" fill="#6B6B7B"/>
+      <circle cx="498" cy="190.6" r="6" fill="#6B6B7B"/>
+      <circle cx="214" cy="190.6" r="6" fill="#C44848"/>
+      <circle cx="498" cy="157.8" r="6" fill="#C44848"/>
+    </g>
+    <g font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="13" font-weight="600">
+      <text x="190" y="178" text-anchor="end" fill="#1F8A65">72.5%</text>
+      <text x="498" y="119" text-anchor="middle" fill="#1F8A65">85%</text>
+      <text x="214" y="152" text-anchor="middle" fill="#6B6B7B">75%</text>
+      <text x="498" y="214" text-anchor="middle" fill="#6B6B7B">67.5%</text>
+      <text x="214" y="214" text-anchor="middle" fill="#C44848">67.5%</text>
+      <text x="524" y="162" text-anchor="start" fill="#C44848">77.5%</text>
+    </g>
+
+    <line x1="72" y1="84" x2="72" y2="412" stroke="#8a8a8a" stroke-width="1"/>
+    <line x1="72" y1="412" x2="640" y2="412" stroke="#8a8a8a" stroke-width="1"/>
+    <g font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="13" fill="#1a1a1a">
+      <text x="214" y="436" text-anchor="middle">60 / 40</text>
+      <text x="498" y="436" text-anchor="middle">65 / 35</text>
+    </g>
+    <text x="18" y="248" text-anchor="middle" transform="rotate(-90 18 248)" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="13" fill="#5c5c5c">Percent correct</text>
+
+    <g font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="13" fill="#1a1a1a">
+      <line x1="72" y1="484" x2="100" y2="484" stroke="#1F8A65" stroke-width="3"/>
+      <circle cx="86" cy="484" r="5" fill="#1F8A65"/>
+      <text x="108" y="489">Help</text>
+      <line x1="176" y1="484" x2="204" y2="484" stroke="#6B6B7B" stroke-width="3"/>
+      <circle cx="190" cy="484" r="5" fill="#6B6B7B"/>
+      <text x="212" y="489">Control</text>
+      <line x1="300" y1="484" x2="328" y2="484" stroke="#C44848" stroke-width="3"/>
+      <circle cx="314" cy="484" r="5" fill="#C44848"/>
+      <text x="336" y="489">Hurt</text>
+    </g>
+  </g>
+  </svg>
+</svg>

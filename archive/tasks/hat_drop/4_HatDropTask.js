@@ -274,7 +274,7 @@ class HatDropTaskController {
             t.correct_side = (i % 2 === 0) ? "left" : "right";
         });
         trials.forEach((t) => {
-            if (!t.correct_side) t.correct_side = Math.random() < 0.5 ? "left" : "right";
+            if (!t.correct_side) t.correct_side = experimentRandom() < 0.5 ? "left" : "right";
         });
         return trials;
     }
@@ -347,8 +347,8 @@ class HatDropTaskController {
         if (this.isGng) return this._gngPracticeTrials();
         const orange = "#e67e22";
         const blue = "#2980b9";
-        let colorLeft = Math.random() < 0.5;
-        let shapeLeft = Math.random() < 0.5;
+        let colorLeft = experimentRandom() < 0.5;
+        let shapeLeft = experimentRandom() < 0.5;
         return [
             {
                 id: "practice_color",

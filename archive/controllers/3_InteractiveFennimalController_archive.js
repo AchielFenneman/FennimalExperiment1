@@ -6,9 +6,10 @@
  *
  * TO RESTORE one or more of these interactions:
  *   Add this script AFTER 3_InteractiveFennimalController.js in index.html:
- *     <script type="text/javascript" src="3_InteractiveFennimalController_archive.js"></script>
- *   TrialFactory cases (and the partner_belief_multiple phase in Top_controller)
- *   are still wired; they construct these classes once this file is loaded.
+ *     <script type="text/javascript" src="archive/controllers/3_InteractiveFennimalController_archive.js"></script>
+ *   TrialFactory cases are still in 3_InteractiveFennimalController.js; they
+ *   construct these classes once this file is loaded.
+ *   partner_belief_multiple phase wiring: archive/wiring/top_controller_archived_phases.js
  *   Exception: hat_blown_away_drag_box is a sunset snapshot only — not wired.
  *
  * MANIFEST

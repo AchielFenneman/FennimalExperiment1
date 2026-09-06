@@ -1,0 +1,212 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 24px 28px 48px;
+    font-family: "Source Sans 3", "PT Sans", sans-serif;
+    font-size: 15px;
+    line-height: 1.45;
+    color: #1f2a33;
+    background: #f4f1ea;
+}
+
+.lab-header h1 {
+    margin: 0 0 8px;
+    font-size: 26px;
+    font-weight: 600;
+}
+
+.lab-sub {
+    margin: 0 0 20px;
+    max-width: 720px;
+    color: #4a5560;
+}
+
+.lab-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px 20px;
+    padding: 16px 18px;
+    margin-bottom: 24px;
+    background: #fff;
+    border: 1px solid #d7d2c8;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.field span,
+.morphs-field legend {
+    font-size: 13px;
+    font-weight: 600;
+    color: #4a5560;
+}
+
+.field input[type="text"] {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #c9c2b6;
+    font: inherit;
+}
+
+.morphs-field {
+    border: none;
+    margin: 0;
+    padding: 0;
+}
+
+.morphs-field label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-right: 12px;
+    font-size: 14px;
+}
+
+.toggles label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    grid-column: 1 / -1;
+}
+
+button {
+    padding: 9px 16px;
+    border: 1px solid #4a5560;
+    background: #1f2a33;
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+button.secondary {
+    background: #fff;
+    color: #1f2a33;
+}
+
+.status {
+    grid-column: 1 / -1;
+    margin: 0;
+    font-size: 13px;
+    color: #4a5560;
+}
+
+.grid-root {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+}
+
+.pair-block {
+    background: #fff;
+    border: 1px solid #d7d2c8;
+    padding: 16px;
+}
+
+.pair-title {
+    margin: 0 0 12px;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.method-block + .method-block {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid #ece7dc;
+}
+
+.method-title {
+    margin: 0 0 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #4a5560;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.ladder-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+.morph-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 112px;
+}
+
+.morph-cell img,
+.morph-cell canvas {
+    width: 104px;
+    height: 104px;
+    display: block;
+    background: #e8e4db;
+    border: 1px solid #cfc8b8;
+    image-rendering: auto;
+}
+
+.morph-cell.interlace canvas,
+.morph-cell.interlace img,
+.morph-output-interlace {
+    image-rendering: pixelated !important;
+    image-rendering: crisp-edges !important;
+}
+
+.morph-cell.parent img {
+    border-color: #8e9aa6;
+}
+
+.cell-label {
+    font-size: 11px;
+    text-align: center;
+    color: #4a5560;
+    min-height: 2.6em;
+}
+
+.cell-label.blind {
+    letter-spacing: 0.08em;
+    font-weight: 600;
+}
+
+.cell-label .hint {
+    display: block;
+    font-size: 10px;
+    color: #8e9aa6;
+    font-weight: 400;
+}
+
+.residual {
+    font-size: 10px;
+    color: #6b7280;
+}
+
+.pair-block.is-blind .cell-label:not(.parent-label) {
+    visibility: hidden;
+}
+
+.pair-block.is-blind.revealed .cell-label {
+    visibility: visible;
+}
