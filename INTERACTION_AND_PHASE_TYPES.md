@@ -2,7 +2,7 @@
 
 Living overview of **what trials exist**, **which phase blocks run them**, and **which optional settings** they accept.
 
-Live experiment code is `feature_kit_pilot` (index.html). `semantic_learning_star` and `mentalizing_between_subjects` remain loadable via `?EXP=`. Older DVs live in [`archive/`](archive/MANIFEST.md) and are not loaded.
+Live experiment code is `feature_kit_combo_pilot` (index.html). `feature_kit_pilot`, `semantic_learning_star`, and `mentalizing_between_subjects` remain loadable via `?EXP=`. Older DVs live in [`archive/`](archive/MANIFEST.md) and are not loaded.
 
 **Primary sources**
 
@@ -30,7 +30,7 @@ Experiment_Structure block
   Location entry → TrialFactory.build(FenObj.interaction_type, …)
 ```
 
-Some phases are **not** location trials (`partner_belief_multiple` / `partner_belief_individual_boxes`, sorting, `hat_binding_task`, `chimera_feature_id`, `morph_task`, `feature_kit_pilot`, `morph_head_pilot`, `morph_task_two_cards` (archived), `morph_task_two_stage_development` (archived), `pseudoday`) and never call `TrialFactory`. `chimera_feature_id`, `morph_task`, `feature_kit_pilot`, and `morph_head_pilot` run as indoor polaroids (no map travel).
+Some phases are **not** location trials (`partner_belief_multiple` / `partner_belief_individual_boxes`, sorting, `hat_binding_task`, `chimera_feature_id`, `morph_task`, `feature_kit_pilot`, `feature_kit_combo_pilot`, `morph_head_pilot`, `morph_task_two_cards` (archived), `morph_task_two_stage_development` (archived), `pseudoday`) and never call `TrialFactory`. `chimera_feature_id`, `morph_task`, `feature_kit_pilot`, `feature_kit_combo_pilot`, and `morph_head_pilot` run as indoor polaroids (no map travel).
 
 ### Trial queue: default vs `trial_subblocks`
 
@@ -506,7 +506,7 @@ Controller: `MorphTaskController` (`4_MorphTask.js`). Tunables: `GenParam.MorphT
 #### `feature_kit_pilot`
 Short **stimulus pilot** (own experiment code `feature_kit_pilot`). Indoor photo-room 3-up 2AFC: a center **probe** kit-head between two parent kit-heads. No morphing, names, hats, map, or stars. Tokens are discovered from `SVG/Heads features.svg` at load, so art can still change.
 
-Default live `Experiment_Code` is `feature_kit_pilot` (`index.html`). Switch back with `?EXP=semantic_learning_star`. Add `&SKIP_INTRO=1` to skip consent / single-sitting.
+Default live `Experiment_Code` is `feature_kit_combo_pilot`. Load this 1-vs-1 version with `?EXP=feature_kit_pilot`. Switch back to training with `?EXP=semantic_learning_star`. Add `&SKIP_INTRO=1` to skip consent / single-sitting.
 
 **Design.** Five slots (`shell`, `ear`, `eye`, `lowerFace`, `hair`). Between-subjects, each participant is assigned **3 tokens per slot** (independent draws, persisted on `phaseRandomizations.feature_kit_pilot_tokens`). Paid trials are **slot duels**: parents A and B share the other three slots and differ on two. The probe takes slot X from A and slot Y from B. Choosing A means slot X won; choosing B means slot Y won.
 
@@ -532,6 +532,26 @@ Heads render in **true grayscale** (`url(#kit_pilot_gray)`). Answers sit below t
 **Logged answer rows** (`phase.answers` / `phase.Data`, also `experimentData.featureKitPilotProgress`): `kind` (`duel` / `catch` / `practice`), `wave`, `head_top` / `head_left` / `head_right` (and `probe` / `parent_a` / `parent_b`), `selected_key` (F/J), `selected_side` (`left`/`right`), `selected_parent`, `response_mode` (`key`/`click`), `reaction_time_ms`, `late`, plus duel fields (`slot_x` / `slot_y`, tokens, `winner_slot` / `winner_token`) and `catch_correct`. Saved to Firebase after every trial (`storeAllData`) as well as at phase end.
 
 Controller: `FeatureKitPilotController` (`4_FeatureKitPilotTask.js`). Composer: `FeatureKit.js`. Tunables: `GenParam.FeatureKitPilot`. Dummy Fennimal `P` exists only so FeatureMap / the map can boot; kit heads do not come from the Fennimal dictionary.
+
+#### `feature_kit_combo_pilot`
+Second **stimulus pilot** (own experiment code `feature_kit_combo_pilot`). Same indoor 3-up 2AFC and grayscale kit heads as `feature_kit_pilot`, but the probe is a **coalition** mix: several slots from parent A, several from parent B. Used to find which *groups of* features land near 50/50, including non-additive 2-vs-2 and 2-vs-3 fights.
+
+Default live `Experiment_Code` is `feature_kit_combo_pilot`. First-wave 1-vs-1 duels: `?EXP=feature_kit_pilot`.
+
+**Families** (strong = shell + lowerFace; weak = ear, eye, hair), from the first-wave ranking:
+
+| Family | Split | n types |
+|---|---|---|
+| `balanced_2v2` | One strong + one weak vs the other strong + other weak; leftover weak shared | 6 |
+| `strong2_vs_weak2` | Shell+mouth vs two weaks; leftover weak shared | 3 |
+| `strong2_vs_weak3` | Shell+mouth vs ear+eye+hair (no shared) | 1 |
+| `strong1_vs_weak2` | One strong vs two weaks; other strong + leftover weak shared | 6 |
+
+**Count / adaptive.** Cap is `16 × n_duel_reps` duels + `n_catch` + 2 practice (default **37** with `n_duel_reps: 2`). Coverage: one of each family type + most catch. Adaptive tail oversamples partitions whose running P(A) is closest to 50/50. Logged `partition_id` (canonical `set vs set | shared`), `family`, `set_a` / `set_b`, `winner_slots` / `loser_slots`, `n_a` / `n_b`.
+
+Same UI, 750 ms lock, 7500 ms pace cue, catch, and every-trial Firebase save as the first kit pilot. Collection name is the experiment code (`feature_kit_combo_pilot`).
+
+Controller: same `FeatureKitPilotController` with `combo: true`. Tunables: `GenParam.FeatureKitComboPilot` (falls back to `FeatureKitPilot`).
 
 #### `morph_head_pilot`
 Short **stimulus pilot** (own experiment code `morph_head_pilot`). One polaroid, jumble only, F/J 2AFC with **head images** of the two parents. No prime, name quiz, hats, map, or stars. Uses the same jumble mixer as `morph_task` (prototype methods from `4_MorphTask.js`).

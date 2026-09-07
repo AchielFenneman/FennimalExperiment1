@@ -7,7 +7,7 @@
 // cannot desync the stimulus stream.
 //
 // URL: ?SEED=slides01   (reload → same world)
-//      ?EXP=feature_kit_pilot   (optional experiment-code override)
+//      ?EXP=feature_kit_combo_pilot   (optional experiment-code override)
 //      ?SKIP_INTRO=1    (skip consent / character-creation / overview pages)
 // ----------------------------------------------------
 let _experimentRandomFn = Math.random.bind(Math);

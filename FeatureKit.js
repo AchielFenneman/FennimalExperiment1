@@ -3,7 +3,7 @@
  * Loads SVG/Heads features.svg, catalogs tokens, and assembles a Fennimal head
  * by placing shell / ears / eyes / lower-face / hair on the shell markers.
  *
- * Used by feature_kit_lab.html and the feature_kit_pilot experiment.
+ * Used by feature_kit_lab.html and the feature_kit_pilot / feature_kit_combo_pilot experiments.
  */
 (function (global) {
     "use strict";

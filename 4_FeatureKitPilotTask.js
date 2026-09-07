@@ -1,9 +1,11 @@
 /**
  * Feature-kit stimulus pilot: slot-duel 2AFC.
  *
- * Center probe is a recombination of two parent heads that share three slots
- * and differ on two. Choosing a parent means that parent's unique slot won
- * the duel. Between-subjects: 3 tokens sampled per slot from the live SVG.
+ * Default: 1-vs-1 slot duels (share three, differ on two).
+ * Combo mode (`combo: true` / `feature_kit_combo_pilot`): coalition duels
+ * (2v2, 2v3, 1v2) to find non-additive ~50/50 mixes.
+ *
+ * Between-subjects: 3 tokens sampled per slot from the live SVG.
  * No morphing, names, hats, map, or bonus stars.
  */
 class FeatureKitPilotController {
@@ -13,6 +15,12 @@ class FeatureKitPilotController {
         this.returnfunc = returnfunc;
         this.expCont = expCont;
         this.params = (typeof GenParam !== "undefined" && GenParam.FeatureKitPilot) || {};
+        this.combo = phaseData.combo === true
+            || phaseData.mode === "combo"
+            || phaseData.type === "feature_kit_combo_pilot";
+        if (this.combo && typeof GenParam !== "undefined" && GenParam.FeatureKitComboPilot) {
+            this.params = Object.assign({}, this.params, GenParam.FeatureKitComboPilot);
+        }
         this.W = GenParam.SVG_width;
         this.H = GenParam.SVG_height;
         this.trialSpeedMs = this._num("trialSpeedMs", this.phaseData.trial_speed || 7500);
@@ -160,6 +168,8 @@ class FeatureKitPilotController {
         this.phaseData.n_duel_reps = this.nDuelReps;
         this.phaseData.n_catch = this.nCatch;
         this.phaseData.slot_keys = (this.slotKeys || []).slice();
+        this.phaseData.combo = !!this.combo;
+        if (this.combo) this.phaseData.combo_partitions = this._comboPartitions().map((p) => p.id);
         if (typeof this.returnfunc === "function") this.returnfunc();
     }
 
@@ -174,7 +184,7 @@ class FeatureKitPilotController {
             this.catalogTokens[key] = this.kit.tokensForPilot(key).slice();
         });
 
-        let stored = this._restore("feature_kit_pilot_tokens");
+        let stored = this._restore(this._storeKey("tokens"));
         let sampled = {};
         let validStored = stored
             && stored.tokens
@@ -197,7 +207,7 @@ class FeatureKitPilotController {
             sampled[key] = shuffled.slice(0, n);
         });
         this.sampledTokens = sampled;
-        this._persist("feature_kit_pilot_tokens", {
+        this._persist(this._storeKey("tokens"), {
             tokens: JSON.parse(JSON.stringify(sampled)),
             catalog: JSON.parse(JSON.stringify(this.catalogTokens)),
             n_tokens_sampled: this.nTokensSampled,
@@ -241,14 +251,81 @@ class FeatureKitPilotController {
         return this._fillRecipe(rec);
     }
 
+    _storeKey(kind) {
+        let prefix = this.combo ? "feature_kit_combo_pilot_" : "feature_kit_pilot_";
+        return prefix + kind;
+    }
+
+    _canonSet(arr) {
+        return (arr || []).slice().sort().join("+");
+    }
+
+    _partitionId(setA, setB, shared) {
+        let a = this._canonSet(setA);
+        let b = this._canonSet(setB);
+        let left = a < b ? a : b;
+        let right = a < b ? b : a;
+        let sh = this._canonSet(shared);
+        return left + " vs " + right + (sh ? " | " + sh : "");
+    }
+
+    _comboPartitions() {
+        if (this._comboPartCache) return this._comboPartCache;
+        let keys = this.slotKeys || [];
+        let strong = ["shell", "lowerFace"].filter((s) => keys.indexOf(s) >= 0);
+        let weak = ["ear", "eye", "hair"].filter((s) => keys.indexOf(s) >= 0);
+        if (strong.length < 2 || weak.length < 3) {
+            this._fail("combo mode needs shell, lowerFace, and ear/eye/hair in the SVG catalog.");
+        }
+        let parts = [];
+        let push = (family, setA, setB, shared) => {
+            parts.push({
+                family: family,
+                set_a: setA.slice(),
+                set_b: setB.slice(),
+                shared: (shared || []).slice(),
+                id: this._partitionId(setA, setB, shared)
+            });
+        };
+        for (let s = 0; s < weak.length; s++) {
+            let shared = [weak[s]];
+            let rest = weak.filter((_, i) => i !== s);
+            push("balanced_2v2", [strong[0], rest[0]], [strong[1], rest[1]], shared);
+            push("balanced_2v2", [strong[0], rest[1]], [strong[1], rest[0]], shared);
+        }
+        for (let i = 0; i < weak.length; i++) {
+            for (let j = i + 1; j < weak.length; j++) {
+                let pair = [weak[i], weak[j]];
+                let leftover = weak.filter((w) => pair.indexOf(w) < 0);
+                push("strong2_vs_weak2", strong.slice(), pair, leftover);
+            }
+        }
+        push("strong2_vs_weak3", strong.slice(), weak.slice(), []);
+        strong.forEach((one) => {
+            let otherStrong = strong.filter((s) => s !== one);
+            for (let i = 0; i < weak.length; i++) {
+                for (let j = i + 1; j < weak.length; j++) {
+                    let pair = [weak[i], weak[j]];
+                    let leftoverWeak = weak.filter((w) => pair.indexOf(w) < 0);
+                    push("strong1_vs_weak2", [one], pair, otherStrong.concat(leftoverWeak));
+                }
+            }
+        });
+        this._comboPartCache = parts;
+        return parts;
+    }
+
     _plannedCount() {
-        let nPairs = FeatureKit.unorderedPairs(this.slotKeys || []).length;
-        return (this.skipPractice ? 0 : 2) + nPairs * this.nDuelReps + this.nCatch;
+        let nTypes = this.combo
+            ? this._comboPartitions().length
+            : FeatureKit.unorderedPairs(this.slotKeys || []).length;
+        return (this.skipPractice ? 0 : 2) + nTypes * this.nDuelReps + this.nCatch;
     }
 
     _persistQueue() {
-        this._persist("feature_kit_pilot_trials", {
-            version: 2,
+        this._persist(this._storeKey("trials"), {
+            version: this.combo ? 3 : 2,
+            combo: !!this.combo,
             adaptive: this.adaptive,
             queue: this.queue
         });
@@ -279,6 +356,7 @@ class FeatureKitPilotController {
     }
 
     _maxDuels() {
+        if (this.combo) return this._comboPartitions().length * this.nDuelReps;
         return FeatureKit.unorderedPairs(this.slotKeys || []).length * this.nDuelReps;
     }
 
@@ -302,6 +380,25 @@ class FeatureKitPilotController {
         return rates;
     }
 
+    _partitionWinRates() {
+        let wins = {};
+        let n = {};
+        this.answers.forEach((row) => {
+            if (!row || row.kind !== "duel" || !row.partition_id) return;
+            let id = row.partition_id;
+            n[id] = (n[id] || 0) + 1;
+            if (row.selected_parent === "A") wins[id] = (wins[id] || 0) + 1;
+        });
+        let rates = {};
+        this._comboPartitions().forEach((p) => {
+            let nn = n[p.id] || 0;
+            let w = wins[p.id] || 0;
+            rates[p.id] = nn ? w / nn : 0.5;
+            rates[p.id + "__n"] = nn;
+        });
+        return rates;
+    }
+
     _pairWeight(sx, sy) {
         let rates = this._slotWinRates();
         let close = 1 - Math.abs((rates[sx] || 0.5) - (rates[sy] || 0.5));
@@ -311,6 +408,16 @@ class FeatureKitPilotController {
         )).length;
         let explore = 1 / (1 + seen);
         return 0.45 * close + 0.35 * strong + 0.20 * explore;
+    }
+
+    _partitionWeight(part) {
+        let rates = this._partitionWinRates();
+        let p = rates[part.id];
+        if (p == null) p = 0.5;
+        let close = 1 - Math.abs(p - 0.5) * 2;
+        let seen = this.queue.filter((t) => t.kind === "duel" && t.partition_id === part.id).length;
+        let explore = 1 / (1 + seen);
+        return 0.70 * close + 0.30 * explore;
     }
 
     _pickAdaptivePair() {
@@ -323,6 +430,67 @@ class FeatureKitPilotController {
             if (pick <= 0) return pairs[i];
         }
         return pairs[pairs.length - 1];
+    }
+
+    _pickAdaptivePartition() {
+        let parts = this._comboPartitions();
+        let weights = parts.map((p) => Math.max(0.02, this._partitionWeight(p)));
+        let sum = weights.reduce((a, b) => a + b, 0);
+        let pick = experimentRandom() * sum;
+        for (let i = 0; i < parts.length; i++) {
+            pick -= weights[i];
+            if (pick <= 0) return parts[i];
+        }
+        return parts[parts.length - 1];
+    }
+
+    _makeComboTrial(part, wave) {
+        let contested = {};
+        let tokensA = {};
+        let tokensB = {};
+        (part.set_a.concat(part.set_b)).forEach((slot) => {
+            if (contested[slot]) return;
+            let pair = this._nextTokenPair(slot);
+            contested[slot] = pair;
+            tokensA[slot] = pair[0];
+            tokensB[slot] = pair[1];
+        });
+        let shared = {};
+        (part.shared || []).forEach((slot) => {
+            let pool = this.sampledTokens[slot];
+            shared[slot] = pool[experimentRandomInt(pool.length)];
+        });
+        let specA = Object.assign({}, shared, tokensA);
+        let specB = Object.assign({}, shared, tokensB);
+        let specP = Object.assign({}, shared);
+        part.set_a.forEach((slot) => { specP[slot] = tokensA[slot]; });
+        part.set_b.forEach((slot) => { specP[slot] = tokensB[slot]; });
+        this._adaptiveSeq += 1;
+        return {
+            id: "duel_" + wave + "_" + part.family + "_" + this._adaptiveSeq,
+            kind: "duel",
+            is_practice: false,
+            wave: wave,
+            combo: true,
+            family: part.family,
+            partition_id: part.id,
+            set_a: part.set_a.slice(),
+            set_b: part.set_b.slice(),
+            shared_slots: (part.shared || []).slice(),
+            tokens_a: Object.fromEntries(part.set_a.map((s) => [s, tokensA[s]])),
+            tokens_b: Object.fromEntries(part.set_b.map((s) => [s, tokensB[s]])),
+            n_a: part.set_a.length,
+            n_b: part.set_b.length,
+            slot_x: part.set_a.length === 1 ? part.set_a[0] : null,
+            slot_y: part.set_b.length === 1 ? part.set_b[0] : null,
+            shared_tokens: shared,
+            parentA: this._fillRecipe(specA),
+            parentB: this._fillRecipe(specB),
+            probe: this._fillRecipe(specP),
+            left_parent: experimentRandom() < 0.5 ? "A" : "B",
+            tutorial: null,
+            partition_win_rates: wave === "adaptive" ? this._partitionWinRates() : null
+        };
     }
 
     _makeDuelTrial(sx, sy, wave) {
@@ -387,14 +555,16 @@ class FeatureKitPilotController {
         let catchLeft = Math.max(0, this.nCatch - nCatch);
         let takeCatch = catchLeft > 0 && (duelsLeft <= 0 || experimentRandom() < catchLeft / (duelsLeft + catchLeft));
         if (takeCatch) return this._makeCatchTrial("adaptive");
+        if (this.combo) return this._makeComboTrial(this._pickAdaptivePartition(), "adaptive");
         let pair = this._pickAdaptivePair();
         return this._makeDuelTrial(pair[0], pair[1], "adaptive");
     }
 
     _buildQueue() {
         this._initTokenPairDecks();
-        let stored = this._restore("feature_kit_pilot_trials");
-        if (stored && stored.version === 2 && Array.isArray(stored.queue) && stored.queue.length
+        let stored = this._restore(this._storeKey("trials"));
+        let wantVersion = this.combo ? 3 : 2;
+        if (stored && stored.version === wantVersion && Array.isArray(stored.queue) && stored.queue.length
             && this._queueUsesCurrentTokens(stored.queue)) {
             this.queue = stored.queue;
             this.phaseData.morph_trial_order = this.queue.map((t) => t.id);
@@ -410,11 +580,19 @@ class FeatureKitPilotController {
         let coverageReps = this.adaptive ? 1 : this.nDuelReps;
         let coverageCatch = this.adaptive ? Math.max(0, this.nCatch - 1) : this.nCatch;
         let paid = [];
-        FeatureKit.unorderedPairs(this.slotKeys).forEach((pair) => {
-            for (let r = 0; r < coverageReps; r++) {
-                paid.push(this._makeDuelTrial(pair[0], pair[1], "coverage"));
-            }
-        });
+        if (this.combo) {
+            this._comboPartitions().forEach((part) => {
+                for (let r = 0; r < coverageReps; r++) {
+                    paid.push(this._makeComboTrial(part, "coverage"));
+                }
+            });
+        } else {
+            FeatureKit.unorderedPairs(this.slotKeys).forEach((pair) => {
+                for (let r = 0; r < coverageReps; r++) {
+                    paid.push(this._makeDuelTrial(pair[0], pair[1], "coverage"));
+                }
+            });
+        }
         for (let c = 0; c < coverageCatch; c++) {
             paid.push(this._makeCatchTrial("coverage"));
         }
@@ -424,7 +602,8 @@ class FeatureKitPilotController {
         if (firstPaid) firstPaid.tutorial = "paid";
         this._persistQueue();
         console.log(
-            "%c FeatureKitPilot: coverage " + this._countKind("duel") + " duels / " +
+            "%c FeatureKitPilot: " + (this.combo ? "combo " : "") +
+            "coverage " + this._countKind("duel") + " duels / " +
             this._countKind("catch") + " catch" +
             (this.adaptive ? (" → adaptive to " + this._plannedCount() + " total") : "") +
             ", " + (this.skipPractice ? 0 : 2) + " practice",
@@ -465,7 +644,11 @@ class FeatureKitPilotController {
             let trial = queue[t];
             if (!trial || trial.kind === "practice") continue;
             if (trial.kind === "duel") {
-                if (this.slotKeys.indexOf(trial.slot_x) < 0 || this.slotKeys.indexOf(trial.slot_y) < 0) {
+                if (this.combo) {
+                    if (!trial.partition_id || !Array.isArray(trial.set_a) || !Array.isArray(trial.set_b)) {
+                        return false;
+                    }
+                } else if (this.slotKeys.indexOf(trial.slot_x) < 0 || this.slotKeys.indexOf(trial.slot_y) < 0) {
                     return false;
                 }
             }
@@ -908,11 +1091,20 @@ class FeatureKitPilotController {
         let loserSlot = null;
         let winnerToken = null;
         let loserToken = null;
+        let winnerSlots = null;
+        let loserSlots = null;
         if (trial.kind === "duel") {
-            winnerSlot = selectedParent === "A" ? trial.slot_x : trial.slot_y;
-            loserSlot = selectedParent === "A" ? trial.slot_y : trial.slot_x;
-            winnerToken = selectedParent === "A" ? trial.token_x_a : trial.token_y_b;
-            loserToken = selectedParent === "A" ? trial.token_y_b : trial.token_x_a;
+            if (trial.combo && Array.isArray(trial.set_a) && Array.isArray(trial.set_b)) {
+                winnerSlots = selectedParent === "A" ? trial.set_a.slice() : trial.set_b.slice();
+                loserSlots = selectedParent === "A" ? trial.set_b.slice() : trial.set_a.slice();
+                winnerSlot = this._canonSet(winnerSlots);
+                loserSlot = this._canonSet(loserSlots);
+            } else {
+                winnerSlot = selectedParent === "A" ? trial.slot_x : trial.slot_y;
+                loserSlot = selectedParent === "A" ? trial.slot_y : trial.slot_x;
+                winnerToken = selectedParent === "A" ? trial.token_x_a : trial.token_y_b;
+                loserToken = selectedParent === "A" ? trial.token_y_b : trial.token_x_a;
+            }
         }
         let catchCorrect = null;
         if (trial.kind === "catch" || trial.kind === "practice") {
@@ -945,14 +1137,27 @@ class FeatureKitPilotController {
             response_mode: choice.mode,
             winner_slot: winnerSlot,
             loser_slot: loserSlot,
+            winner_slots: winnerSlots,
+            loser_slots: loserSlots,
             winner_token: winnerToken,
             loser_token: loserToken,
+            combo: !!trial.combo,
+            family: trial.family || null,
+            partition_id: trial.partition_id || null,
+            set_a: trial.set_a || null,
+            set_b: trial.set_b || null,
+            shared_slots: trial.shared_slots || null,
+            tokens_a: trial.tokens_a || null,
+            tokens_b: trial.tokens_b || null,
+            n_a: trial.n_a || null,
+            n_b: trial.n_b || null,
             catch_parent: trial.catch_parent || null,
             catch_correct: catchCorrect,
             reaction_time_ms: choice.rt,
             late: !!choice.late,
             wave: trial.wave || (trial.is_practice ? "practice" : "coverage"),
             slot_win_rates: trial.slot_win_rates || null,
+            partition_win_rates: trial.partition_win_rates || null,
             sampled_tokens: this.sampledTokens,
             catalog_tokens: this.catalogTokens
         };

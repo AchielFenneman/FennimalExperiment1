@@ -1,6 +1,6 @@
 # Archive
 
-Parked pilots, leftover experiment recipes, and unused DVs from the 2026-09-03 cleanup. **Not loaded.** Live codes in `2_Stimulus_data.js` are `semantic_learning_star`, `mentalizing_between_subjects`, and stimulus-pilot `feature_kit_pilot`.
+Parked pilots, leftover experiment recipes, and unused DVs from the 2026-09-03 cleanup. **Not loaded.** Live codes in `2_Stimulus_data.js` are `semantic_learning_star`, `mentalizing_between_subjects`, stimulus-pilot `feature_kit_pilot`, and `feature_kit_combo_pilot`.
 
 Restore a piece by copying it back to the repo root (or pasting a recipe/param/wiring snippet into the live file) and adding the matching `<script>` tag in `index.html`. Details per folder below.
 

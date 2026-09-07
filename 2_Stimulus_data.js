@@ -1,7 +1,7 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["feature_kit_pilot"];
-    // Live default: feature_kit_pilot. Other codes: semantic_learning_star | mentalizing_between_subjects
+    this.Experiment_Code = ["feature_kit_combo_pilot"];
+    // Live default: feature_kit_combo_pilot. Other codes: feature_kit_pilot | semantic_learning_star | mentalizing_between_subjects
     // Override (no file edit): ?EXP=semantic_learning_star&SEED=slides01&SKIP_INTRO=1
     // Archived recipes: archive/experiments/ (see archive/MANIFEST.md)
 
@@ -9,6 +9,7 @@ let StimulusSettings = function () {
         semantic_learning_star: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview"],
         mentalizing_between_subjects: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
         feature_kit_pilot: ["browser_check_and_full_screen_prompt", "consent", "single_sitting"],
+        feature_kit_combo_pilot: ["browser_check_and_full_screen_prompt", "consent", "single_sitting"],
     };
 
     // ----------------------------------------------------
@@ -41,6 +42,9 @@ let StimulusSettings = function () {
         // Dummy roster so the FeatureMap / map boot. Kit heads come from
         // SVG/Heads features.svg at runtime, not from this dictionary.
         feature_kit_pilot: {
+            "P": { head: "A", region: "A" }
+        },
+        feature_kit_combo_pilot: {
             "P": { head: "A", region: "A" }
         },
     };
@@ -316,12 +320,27 @@ let StimulusSettings = function () {
                 adaptive: true
             }
         ],
+        feature_kit_combo_pilot: [
+            {
+                type: "feature_kit_combo_pilot",
+                combo: true,
+                skip_instructions: false,
+                skip_practice: false,
+                partner_behavior: "absent",
+                trial_speed: 7500,
+                n_tokens_sampled: 3,
+                n_duel_reps: 2,
+                n_catch: 3,
+                adaptive: true
+            }
+        ],
     };
 
     const All_Questionnaire_Page_sets = {
         semantic_learning_star: ["demographics_questionnaire"],
         mentalizing_between_subjects: ["demographics_questionnaire"],
         feature_kit_pilot: [],
+        feature_kit_combo_pilot: [],
     };
 
     const All_Allowed_Head_Lists = {};
@@ -330,6 +349,7 @@ let StimulusSettings = function () {
         semantic_learning_star: ["bell", "pig", "bun"],
         mentalizing_between_subjects: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
         feature_kit_pilot: ["bell"],
+        feature_kit_combo_pilot: ["bell"],
     };
 
     const All_Allowed_Head_Groups_List = {};
@@ -353,7 +373,7 @@ let StimulusSettings = function () {
     if (!this.Experiment_Structure || !this.Fennimal_Dictionary) {
         throw new Error(
             'Unknown experiment code "' + this.Experiment_Code + '". ' +
-            'Live codes: semantic_learning_star, mentalizing_between_subjects, feature_kit_pilot. ' +
+            'Live codes: semantic_learning_star, mentalizing_between_subjects, feature_kit_pilot, feature_kit_combo_pilot. ' +
             'Archived recipes are in archive/experiments/ (see archive/MANIFEST.md).'
         );
     }

@@ -1524,6 +1524,7 @@ class TrialGenerator {
             "hat_binding_task",
             "morph_task",
             "feature_kit_pilot",
+            "feature_kit_combo_pilot",
             "pseudoday"
         ]);
     }
@@ -3057,6 +3058,7 @@ class ExperimentController {
                 }
                 break;
             case "feature_kit_pilot":
+            case "feature_kit_combo_pilot":
                 this.flagFeatureKitPilotInstructionsShown = false;
                 if (this.currentPhaseData.skip_instructions === true) {
                     this.flagFeatureKitPilotInstructionsShown = true;
@@ -3664,6 +3666,7 @@ class ExperimentController {
                 }
                 break;
             case "feature_kit_pilot":
+            case "feature_kit_combo_pilot":
                 if (!this.flagFeatureKitPilotInstructionsShown) {
                     this.flagFeatureKitPilotInstructionsShown = true;
                     this.setupFeatureKitPilotPhase();

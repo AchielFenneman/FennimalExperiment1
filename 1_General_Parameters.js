@@ -1771,6 +1771,16 @@ GENERALPARAM = function () {
             "We'll start with two practice rounds using simple shapes."
     };
 
+    this.FeatureKitComboPilot = {
+        nDuelReps: 2,
+        dayTitle: "Which heads look most alike?",
+        dayBody:
+            "You'll see three heads at a time. The one on top is made of pieces from the two below — sometimes more than one piece from each.<br><br>" +
+            "Go with your first impression: which of the lower heads looks more like the top one? Press <b>F</b> for the left head or <b>J</b> for the right (clicking a side head also works).<br><br>" +
+            "The green bars are a gentle pace cue (about 7 seconds). Even after they run out, please still choose — there is no right or wrong answer.<br><br>" +
+            "We'll start with two practice rounds using simple shapes."
+    };
+
 }
 
 

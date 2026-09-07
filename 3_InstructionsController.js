@@ -1865,6 +1865,10 @@ class InstructionsController {
         this.parentElem.style.display = "inherit";
 
         let copy = (typeof GenParam !== "undefined" && GenParam.FeatureKitPilot) || {};
+        if (this.expCont && this.expCont.currentPhaseType === "feature_kit_combo_pilot"
+            && typeof GenParam !== "undefined" && GenParam.FeatureKitComboPilot) {
+            copy = Object.assign({}, copy, GenParam.FeatureKitComboPilot);
+        }
         let title = dayTitle || copy.dayTitle || "Which heads look most alike?";
         document.getElementById("Instructions_Title").innerHTML = title;
 
