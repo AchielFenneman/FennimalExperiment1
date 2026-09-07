@@ -1,9 +1,11 @@
 /**
  * Feature-kit head composer.
  * Loads SVG/Heads features.svg, catalogs tokens, and assembles a Fennimal head
- * by placing shell / ears / eyes / lower-face / hair on the shell markers.
+ * by placing shell / ears / eyes / lower-face / hair / cheek-stamps on the shell markers.
  *
- * Used by feature_kit_lab.html and the feature_kit_pilot / feature_kit_combo_pilot experiments.
+ * Used by feature_kit_lab.html, the feature_kit_pilot / feature_kit_combo_pilot
+ * experiments, and opt-in training (`semantic_learning_kit`) which registers
+ * composed recipes as normal Fennimal_head_* templates under #All_Heads.
  */
 (function (global) {
     "use strict";
@@ -16,16 +18,17 @@
         { key: "ear", featureId: "feature_ear", groupClass: "ear_group", idPrefix: "ear_group_", required: true },
         { key: "eye", featureId: "feature_eye", groupClass: "eye_group", idPrefix: "eye_group_", required: true },
         { key: "lowerFace", featureId: "feature_lower_face", groupClass: "lower_face_group", idPrefix: "lower_face_group_", required: true },
-        { key: "hair", featureId: "feature_hair", groupClass: "hair_group", idPrefix: "hair_group_", required: false }
+        { key: "hair", featureId: "feature_hair", groupClass: "hair_group", idPrefix: "hair_group_", required: false },
+        { key: "stamp", featureId: "feature_stamp", groupClass: "stamp_group", idPrefix: "stamp_group_", required: false }
     ];
 
     const HAPPY_CLASSES = [
         "mouth_happy", "eyebrow_happy", "eyelid_happy", "cheek_happy",
-        "moustace_happy", "moustache_happy"
+        "moustace_happy", "moustache_happy", "whiskers_happy"
     ];
     const SAD_CLASSES = [
         "mouth_sad", "eyebrow_sad", "eyelid_sad", "cheek_sad",
-        "moustace_sad", "moustache_sad"
+        "moustace_sad", "moustache_sad", "whiskers_sad"
     ];
 
     function FeatureKit() {
@@ -39,6 +42,102 @@
     FeatureKit.SLOTS = SLOTS;
     FeatureKit.slotKeys = function () {
         return SLOTS.map((s) => s.key);
+    };
+    FeatureKit.noneableKeys = function () {
+        return SLOTS.filter((s) => !s.required).map((s) => s.key);
+    };
+    FeatureKit.defaultScales = function () {
+        return { ear: 1, eye: 1, lowerFace: 1, hair: 1, stamp: 1 };
+    };
+    FeatureKit.slotDef = function (key) {
+        for (let i = 0; i < SLOTS.length; i++) {
+            if (SLOTS[i].key === key) return SLOTS[i];
+        }
+        return null;
+    };
+    FeatureKit.sharedInstance = null;
+    FeatureKit.shared = function () {
+        if (!FeatureKit.sharedInstance) FeatureKit.sharedInstance = new FeatureKit();
+        return FeatureKit.sharedInstance;
+    };
+
+    // Slot jumble: polarity 0 takes set_a from recipeA / set_b from recipeB;
+    // polarity 1 swaps those coalitions. Unlisted slots stay on recipeA so the
+    // reverse is a clean chance control of the contested set only.
+    FeatureKit.mixRecipes = function (recipeA, recipeB, partition, polarity) {
+        let a = recipeA || {};
+        let b = recipeB || {};
+        partition = partition || {};
+        let pol = Number(polarity) ? 1 : 0;
+        let setA = Array.isArray(partition.set_a) ? partition.set_a : [];
+        let setB = Array.isArray(partition.set_b) ? partition.set_b : [];
+        let fromFenA = pol === 0 ? setA : setB;
+        let fromFenB = pol === 0 ? setB : setA;
+        let out = Object.assign({}, a);
+        out.scales = Object.assign(FeatureKit.defaultScales(), a.scales || {}, b.scales || {});
+        FeatureKit.slotKeys().forEach((key) => {
+            if (fromFenA.indexOf(key) >= 0) out[key] = a[key];
+            else if (fromFenB.indexOf(key) >= 0) out[key] = b[key];
+            else out[key] = a[key];
+        });
+        out.expression = a.expression === "sad" || b.expression === "sad" ? (a.expression || "happy") : (a.expression || "happy");
+        return out;
+    };
+
+    // Explicit C-vs-D jumble: each slot names the parent Fennimal id ("C" or "D").
+    FeatureKit.mixFromSlotMap = function (recipeByParentId, slotMap) {
+        let recipes = recipeByParentId || {};
+        let map = slotMap || {};
+        let out = {
+            expression: "happy",
+            scales: FeatureKit.defaultScales()
+        };
+        FeatureKit.slotKeys().forEach((key) => {
+            let parent = map[key];
+            let def = FeatureKit.slotDef(key);
+            if (parent == null || String(parent).trim() === "") {
+                if (def && !def.required) {
+                    out[key] = "none";
+                    return;
+                }
+                throw new Error('FeatureKit.mixFromSlotMap: jumble is missing slot "' + key + '".');
+            }
+            let rec = recipes[parent];
+            if (!rec) {
+                throw new Error(
+                    'FeatureKit.mixFromSlotMap: jumble.' + key + ' parent "' + parent + '" has no recipe.'
+                );
+            }
+            out[key] = rec[key];
+            if (rec.scales && rec.scales[key] != null) out.scales[key] = rec.scales[key];
+            if (rec.expression) out.expression = rec.expression;
+        });
+        return out;
+    };
+
+    FeatureKit.reverseSlotMap = function (slotMap) {
+        let out = {};
+        Object.keys(slotMap || {}).forEach((key) => {
+            let v = slotMap[key];
+            out[key] = v === "C" ? "D" : (v === "D" ? "C" : v);
+        });
+        return out;
+    };
+
+    FeatureKit.gistLinesForRecipe = function (recipe) {
+        recipe = recipe || {};
+        let shell = String(recipe.shell || "round").replace(/_/g, " ");
+        let ear = String(recipe.ear || "side").replace(/_/g, " ");
+        let eye = String(recipe.eye || "round").replace(/_/g, " ");
+        let mouth = String(recipe.lowerFace || "simple").replace(/_/g, " ");
+        let stamp = !recipe.stamp || recipe.stamp === "none"
+            ? "no cheek marks"
+            : String(recipe.stamp).replace(/_/g, " ") + " on the cheeks";
+        return [
+            "A " + shell + "-shaped head with " + ear + " ears and a " + mouth + " mouth",
+            "A face with " + eye + " eyes and " + stamp,
+            "A " + shell + " outline, " + ear + " ears, " + eye + " eyes, and " + mouth + " features"
+        ];
     };
     FeatureKit.unorderedPairs = function (arr) {
         let out = [];
@@ -77,6 +176,47 @@
         return this.catalog;
     };
 
+    FeatureKit.prototype.ensureLoaded = async function (path) {
+        if (this.catalog && this.sourceSvg) return this.catalog;
+        return this.load(path);
+    };
+
+    FeatureKit.prototype.injectGistStub = function (headId, recipe) {
+        if (typeof GenParam === "undefined" || !GenParam.gistDescriptions) return;
+        if (!GenParam.gistDescriptions.heads) GenParam.gistDescriptions.heads = {};
+        let id = String(headId || "").replace(/^Fennimal_head_/, "");
+        if (!id) return;
+        let existing = GenParam.gistDescriptions.heads[id];
+        if (Array.isArray(existing) && existing.length) return;
+        GenParam.gistDescriptions.heads[id] = FeatureKit.gistLinesForRecipe(recipe);
+    };
+
+    // Compose each recipe and register it as Fennimal_head_<id> under #All_Heads
+    // so map / polaroids / sorting / hat-binding keep using create_Fennimal_SVG_object*.
+    FeatureKit.prototype.registerRoster = function (recipesById) {
+        let layer = document.getElementById("All_Heads");
+        if (!layer) throw new Error("FeatureKit.registerRoster: missing #All_Heads");
+        if (!this.sourceSvg) throw new Error("FeatureKit.load() first.");
+        let ids = [];
+        Object.keys(recipesById || {}).forEach((rawId) => {
+            let id = String(rawId || "").replace(/^Fennimal_head_/, "");
+            if (!id) return;
+            let old = document.getElementById("Fennimal_head_" + id);
+            if (old && old.parentNode) old.parentNode.removeChild(old);
+            let result = this.compose(recipesById[rawId], { showMarkers: false });
+            let head = result.group;
+            head.setAttribute("id", "Fennimal_head_" + id);
+            head.classList.add("Fennimal_head", "kit_head");
+            if (typeof set_Fennimal_color_classes === "function") {
+                set_Fennimal_color_classes(head);
+            }
+            layer.appendChild(head);
+            this.injectGistStub(id, result.recipe);
+            ids.push(id);
+        });
+        return ids;
+    };
+
     FeatureKit.prototype._buildCatalog = function () {
         let catalog = {};
         SLOTS.forEach((slot) => {
@@ -110,9 +250,10 @@
             ear: firstToken(this, "ear", "elephant"),
             eye: firstToken(this, "eye", "round"),
             lowerFace: firstToken(this, "lowerFace", "smile"),
-            hair: firstToken(this, "hair", "horns"),
+            hair: firstToken(this, "hair", "horns") || "none",
+            stamp: firstToken(this, "stamp", "freckles") || "none",
             expression: "happy",
-            scales: { ear: 1, eye: 1, lowerFace: 1, hair: 1 }
+            scales: FeatureKit.defaultScales()
         };
     };
 
@@ -122,20 +263,21 @@
             ear: firstToken(this, "ear", "spikes"),
             eye: firstToken(this, "eye", "square"),
             lowerFace: firstToken(this, "lowerFace", "teeth"),
-            hair: firstToken(this, "hair", "spikes"),
+            hair: firstToken(this, "hair", "spikes") || "none",
+            stamp: firstToken(this, "stamp", "heart") || "none",
             expression: "happy",
-            scales: { ear: 1, eye: 1, lowerFace: 1, hair: 1 }
+            scales: FeatureKit.defaultScales()
         };
     };
 
     FeatureKit.prototype.randomRecipe = function (locks, base) {
         let recipe = Object.assign(this.defaultRecipe(), base || {});
-        recipe.scales = Object.assign({ ear: 1, eye: 1, lowerFace: 1, hair: 1 }, recipe.scales || {});
+        recipe.scales = Object.assign(FeatureKit.defaultScales(), recipe.scales || {});
         locks = locks || {};
-        ["shell", "ear", "eye", "lowerFace", "hair"].forEach((key) => {
+        FeatureKit.slotKeys().forEach((key) => {
             if (locks[key]) return;
             let tokens = this.listTokens(key).slice();
-            if (key === "hair") tokens.push("none");
+            if (FeatureKit.noneableKeys().indexOf(key) >= 0) tokens.push("none");
             if (!tokens.length) return;
             recipe[key] = tokens[Math.floor(Math.random() * tokens.length)];
         });
@@ -145,12 +287,14 @@
     FeatureKit.prototype.normalizeRecipe = function (recipe) {
         let defaults = this.defaultRecipe();
         let out = Object.assign({}, defaults, recipe || {});
-        out.scales = Object.assign({ ear: 1, eye: 1, lowerFace: 1, hair: 1 }, defaults.scales, (recipe && recipe.scales) || {});
+        out.scales = Object.assign(FeatureKit.defaultScales(), defaults.scales, (recipe && recipe.scales) || {});
         out.expression = out.expression === "sad" ? "sad" : "happy";
         ["shell", "ear", "eye", "lowerFace"].forEach((key) => {
             if (!tokenExists(this, key, out[key])) out[key] = defaults[key];
         });
-        if (out.hair !== "none" && !tokenExists(this, "hair", out.hair)) out.hair = defaults.hair;
+        FeatureKit.noneableKeys().forEach((key) => {
+            if (out[key] !== "none" && !tokenExists(this, key, out[key])) out[key] = "none";
+        });
         return out;
     };
 
@@ -166,17 +310,21 @@
             "data-kit-ear": recipe.ear,
             "data-kit-eye": recipe.eye,
             "data-kit-lower-face": recipe.lowerFace,
-            "data-kit-hair": recipe.hair || "none"
+            "data-kit-hair": recipe.hair || "none",
+            "data-kit-stamp": recipe.stamp || "none"
         });
 
         let earsLayer = createEl("g", { class: "kit_layer kit_ears" });
         let shellLayer = createEl("g", { class: "kit_layer kit_shell" });
         let lowerLayer = createEl("g", { class: "kit_layer kit_lower_face" });
+        let stampLayer = createEl("g", { class: "kit_layer kit_stamp" });
         let eyesLayer = createEl("g", { class: "kit_layer kit_eyes" });
         let hairLayer = createEl("g", { class: "kit_layer kit_hair" });
-        // Ears behind the shell; everything else in front, hair last.
+        // SVG source order does not matter. Paint order is hardcoded here:
+        // ears → shell → stamps → snout → eyes → hair.
         head.appendChild(earsLayer);
         head.appendChild(shellLayer);
+        head.appendChild(stampLayer);
         head.appendChild(lowerLayer);
         head.appendChild(eyesLayer);
         head.appendChild(hairLayer);
@@ -191,27 +339,29 @@
         let rightEyeAt = markerPoint(shellClone, [".eye_marker_right"]);
         let lowerAt = markerPoint(shellClone, [".lower_face_marker"]);
         let hairAt = markerPoint(shellClone, [".hair_marker"]);
+        let leftStampAt = markerPoint(shellClone, [".stamp_marker_left"]);
+        let rightStampAt = markerPoint(shellClone, [".stamp_marker_right"]);
 
         let earToken = this._findToken("ear", recipe.ear);
         if (earToken && leftEarAt) {
-            earsLayer.appendChild(this._placeClone(earToken.element, {
+            earsLayer.appendChild(wrapEarForWiggle(this._placeClone(earToken.element, {
                 dest: leftEarAt,
                 srcSelectors: [".ear_marker", ".placement_marker"],
                 scale: recipe.scales.ear,
                 mirror: false,
                 expression: recipe.expression,
                 role: "ear_left"
-            }));
+            }), recipe.ear));
         }
         if (earToken && rightEarAt) {
-            earsLayer.appendChild(this._placeClone(earToken.element, {
+            earsLayer.appendChild(wrapEarForWiggle(this._placeClone(earToken.element, {
                 dest: rightEarAt,
                 srcSelectors: [".ear_marker", ".placement_marker"],
                 scale: recipe.scales.ear,
                 mirror: true,
                 expression: recipe.expression,
                 role: "ear_right"
-            }));
+            }), recipe.ear));
         }
 
         let lowerToken = this._findToken("lowerFace", recipe.lowerFace);
@@ -243,14 +393,43 @@
             }));
         }
         if (eyeToken && rightEyeAt) {
-            eyesLayer.appendChild(this._placeClone(eyeToken.element, {
+            // Mirror the token so brows, lids, and decorations sit on the right,
+            // then un-flip .eye_gaze so pupil/iris/shine are not cross-eyed.
+            let rightEye = this._placeClone(eyeToken.element, {
                 dest: rightEyeAt,
                 srcSelectors: [".placement_marker_eye_center", ".eye_marker", ".placement_marker"],
                 scale: recipe.scales.eye,
                 mirror: true,
                 expression: recipe.expression,
                 role: "eye_right"
-            }));
+            });
+            unmirrorInnerEye(rightEye);
+            eyesLayer.appendChild(rightEye);
+        }
+
+        if (recipe.stamp && recipe.stamp !== "none") {
+            let stampToken = this._findToken("stamp", recipe.stamp);
+            let stampScale = (recipe.scales && recipe.scales.stamp) || 1;
+            if (stampToken && leftStampAt) {
+                stampLayer.appendChild(this._placeClone(stampToken.element, {
+                    dest: leftStampAt,
+                    srcSelectors: [".stamp_marker", ".placement_marker"],
+                    scale: stampScale,
+                    mirror: false,
+                    expression: recipe.expression,
+                    role: "stamp_left"
+                }));
+            }
+            if (stampToken && rightStampAt) {
+                stampLayer.appendChild(this._placeClone(stampToken.element, {
+                    dest: rightStampAt,
+                    srcSelectors: [".stamp_marker", ".placement_marker"],
+                    scale: stampScale,
+                    mirror: true,
+                    expression: recipe.expression,
+                    role: "stamp_right"
+                }));
+            }
         }
 
         if (recipe.hair && recipe.hair !== "none") {
@@ -279,7 +458,9 @@
                 eyeLeft: leftEyeAt,
                 eyeRight: rightEyeAt,
                 lowerFace: lowerAt,
-                hair: hairAt
+                hair: hairAt,
+                stampLeft: leftStampAt,
+                stampRight: rightStampAt
             }
         };
     };
@@ -336,23 +517,54 @@
         return clone;
     };
 
+    function unmirrorInnerEye(root) {
+        if (!root) return;
+        root.querySelectorAll(".eye_gaze").forEach((gaze) => {
+            let wrap = createEl("g", { "data-kit-unmirror-gaze": "1" });
+            wrap.setAttribute("transform", "scale(-1 1)");
+            while (gaze.firstChild) wrap.appendChild(gaze.firstChild);
+            gaze.appendChild(wrap);
+        });
+    }
+
+    function wrapEarForWiggle(clone, token) {
+        if (!clone) return clone;
+        clone.setAttribute("data-kit-token", token || "");
+        let inner = createEl("g", {
+            class: "kit_ear_wiggle kit_ear_wiggle_" + String(token || "ear")
+        });
+        while (clone.firstChild) inner.appendChild(clone.firstChild);
+        inner.appendChild(createEl("g", { class: "kit_ear_fx" }));
+        clone.appendChild(inner);
+        return clone;
+    }
+
     FeatureKit.prototype._stampMouthPoint = function (head, lowerLayer) {
         let existing = lowerLayer.querySelector(".Fennimal_head_mouth_point");
         let local = existing ? circleCenter(existing) : { x: 0, y: 0 };
         let placed = lowerLayer.querySelector("[data-kit-role='lower_face']");
         let world = transformPoint(placed, local);
-        if (existing) existing.setAttribute("display", "none");
+        if (!Number.isFinite(world.x) || !Number.isFinite(world.y)) {
+            world = { x: Number.isFinite(local.x) ? local.x : 0, y: Number.isFinite(local.y) ? local.y : 0 };
+        }
+        // Nested token markers can lack cx (SVG default 0) and still win querySelector.
+        // Toy animations then assign NaN to SVGPoint. Keep one stamped circle on the head.
+        lowerLayer.querySelectorAll(".Fennimal_head_mouth_point").forEach((el) => {
+            if (el.parentNode) el.parentNode.removeChild(el);
+        });
         let stamped = head.querySelector(":scope > .Fennimal_head_mouth_point");
         if (!stamped) {
             stamped = createEl("circle", {
                 class: "Fennimal_head_mouth_point invisible_element",
                 r: "9",
-                fill: "#2aff80"
+                fill: "#2aff80",
+                display: "inline"
             });
             head.appendChild(stamped);
         }
         stamped.setAttribute("cx", String(world.x));
         stamped.setAttribute("cy", String(world.y));
+        stamped.setAttribute("display", "inline");
     };
 
     FeatureKit.prototype._collectNotes = function () {
@@ -375,6 +587,16 @@
         let hairOnShell = this.sourceSvg.querySelector("#feature_shell .hair_marker.ear_marker");
         if (hairOnShell) {
             notes.push("Shell hair markers also have class ear_marker. The composer uses .hair_marker / .ear_marker_left specifically; dropping ear_marker from hair points would avoid future collisions.");
+        }
+        let shellsMissingStamp = [];
+        (this.catalog.shell || []).forEach((row) => {
+            if (!row.element) return;
+            if (!row.element.querySelector(".stamp_marker_left") || !row.element.querySelector(".stamp_marker_right")) {
+                shellsMissingStamp.push(row.token);
+            }
+        });
+        if (shellsMissingStamp.length) {
+            notes.push("Shell tokens missing stamp_marker_left/right: " + shellsMissingStamp.join(", ") + ".");
         }
         let human = this.sourceSvg.getElementById("ear_group_human");
         if (human && human.querySelector("path[display='none']")) {
@@ -514,6 +736,12 @@
 
     function hideConstruction(root) {
         root.querySelectorAll(".invisible_element, .placement_marker, .hair_bbox, .lower_face_bbox").forEach((el) => {
+            let cls = el.getAttribute("class") || "";
+            // Keep layout anchors visible to the SVG renderer so getScreenCTM()
+            // stays finite. CSS .invisible_element already hides them visually.
+            if (cls.indexOf("Fennimal_head_mouth_point") >= 0) return;
+            if (cls.indexOf("Fennimal_head_neck_point") >= 0) return;
+            if (cls.indexOf("Fennimal_head_hat_point") >= 0) return;
             el.setAttribute("display", "none");
         });
     }
@@ -556,4 +784,5 @@
     }
 
     global.FeatureKit = FeatureKit;
+    FeatureKit.applyExpression = applyExpression;
 })(window);

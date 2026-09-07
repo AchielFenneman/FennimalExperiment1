@@ -102,6 +102,7 @@ class DataController {
             // under phaseRandomizations for Layer 1 refresh restore).
             hatBindingAssignment: null,
             morphAssignment: null,
+            kitRoster: null,
             avatar: null,
             attentionData: null,
             experimentSeed: window.__EXPERIMENT_SEED__ || null,
@@ -130,6 +131,10 @@ class DataController {
 
         if (typeof this.stimuli.get_feature_map === "function") {
             this.experimentData.featureMap = this.stimuli.get_feature_map();
+        }
+
+        if (typeof this.stimuli.get_kit_roster === "function") {
+            this.experimentData.kitRoster = this.stimuli.get_kit_roster();
         }
     }
 
@@ -169,12 +174,16 @@ class DataController {
                 let ok = this.stimuli.hydrate_assignment(
                     earlySession.assignment.fennimals,
                     earlySession.assignment.featureMap,
-                    earlySession.assignment.colorAssignment
+                    earlySession.assignment.colorAssignment,
+                    earlySession.assignment.kitRoster
                 );
                 if (ok) {
                     this.experimentData.fennimals = this.stimuli.get_clean_Fennimal_templates();
                     this.experimentData.colorAssignment = this.stimuli.get_color_assignment_overview();
                     this.experimentData.featureMap = this.stimuli.get_feature_map();
+                    if (typeof this.stimuli.get_kit_roster === "function") {
+                        this.experimentData.kitRoster = this.stimuli.get_kit_roster();
+                    }
                     if (earlySession.assignment.phaseRandomizations
                         && typeof earlySession.assignment.phaseRandomizations === "object") {
                         this.experimentData.phaseRandomizations = JSON.parse(
@@ -252,6 +261,7 @@ class DataController {
                         fennimals: this.experimentData.fennimals,
                         featureMap: this.experimentData.featureMap,
                         colorAssignment: this.experimentData.colorAssignment,
+                        kitRoster: this.experimentData.kitRoster || null,
                         phaseRandomizations: this.experimentData.phaseRandomizations || {}
                     }
                 })
@@ -442,8 +452,9 @@ class DataController {
      * Between-subjects star arm pair for hat_binding_task.
      * Draws 2 arms from armIds (uniform over combinations) and restores on refresh.
      * Two-arm setups persist the only pair without sampling.
+     * allowedPairs, if set, restricts the draw (e.g. kit: ABC or ABD, never BCD).
      */
-    getOrCreateBindingArmPair(randomizationKey, armIds) {
+    getOrCreateBindingArmPair(randomizationKey, armIds, allowedPairs) {
         if (!this.experimentData.phaseRandomizations
             || typeof this.experimentData.phaseRandomizations !== "object") {
             this.experimentData.phaseRandomizations = {};
@@ -460,7 +471,16 @@ class DataController {
                 combos.push([arms[i], arms[j]]);
             }
         }
-        const comboKey = (pair) => pair.slice().sort().join("|");
+        const comboKey = (pair) => pair.slice().map(String).sort().join("|");
+        if (Array.isArray(allowedPairs) && allowedPairs.length) {
+            let allowedKeys = new Set(allowedPairs.map((pair) => comboKey(pair)));
+            combos = combos.filter((pair) => allowedKeys.has(comboKey(pair)));
+            if (!combos.length) {
+                throw new Error(
+                    "HatBindingTask: allowed_arm_pairs does not overlap the current arms pool."
+                );
+            }
+        }
         let comboKeys = new Set(combos.map(comboKey));
 
         let existing = this.experimentData.phaseRandomizations[randomizationKey];
@@ -469,15 +489,21 @@ class DataController {
             if (comboKeys.has(comboKey(restored))) {
                 return arms.filter((id) => restored.includes(id));
             }
+            if (!(Array.isArray(allowedPairs) && allowedPairs.length)) {
+                console.warn(
+                    `HatBindingTask: restored arm pair "${restored.join(",")}" for "${randomizationKey}" ` +
+                    `(not in current arms pool so refresh stays consistent).`
+                );
+                return restored;
+            }
             console.warn(
                 `HatBindingTask: restored arm pair "${restored.join(",")}" for "${randomizationKey}" ` +
-                `(not in current arms pool so refresh stays consistent).`
+                `is not in allowed_arm_pairs; drawing a new pair.`
             );
-            return restored;
         }
 
-        let picked = (arms.length === 2)
-            ? arms.slice()
+        let picked = (combos.length === 1)
+            ? combos[0].slice()
             : pickRandom(combos).slice();
         this.experimentData.phaseRandomizations[randomizationKey] = { arms: picked.slice() };
         this.storeAllData(false);
@@ -579,6 +605,24 @@ class DataController {
         this.storeAllData(false);
         this.writeSessionClaim(false);
         return picked;
+    }
+
+    /**
+     * Persist food-transfer layout (quiz sides, bag order) so a refresh does not re-roll.
+     */
+    getOrCreateFoodTransferLayout(randomizationKey, draft) {
+        if (!this.experimentData.phaseRandomizations
+            || typeof this.experimentData.phaseRandomizations !== "object") {
+            this.experimentData.phaseRandomizations = {};
+        }
+        let key = randomizationKey || "food_transfer_layout";
+        let existing = this.experimentData.phaseRandomizations[key];
+        if (existing && typeof existing === "object") return existing;
+        let stored = draft && typeof draft === "object" ? JSON.parse(JSON.stringify(draft)) : {};
+        this.experimentData.phaseRandomizations[key] = stored;
+        this.storeAllData(false);
+        this.writeSessionClaim(false);
+        return stored;
     }
 
     storeAllData(bool_experiment_completed) {
@@ -751,6 +795,8 @@ class TrialGenerator {
         orthogonalTrials = this.applyHideAndSeekFennimalPartnerDefault(orthogonalTrials, phaseData);
         mainTrials = this.applyHatLaundryHatsToTrials(mainTrials);
         orthogonalTrials = this.applyHatLaundryHatsToTrials(orthogonalTrials);
+        mainTrials = this.applyFoodTransferSettingsToTrials(mainTrials, phaseData);
+        orthogonalTrials = this.applyFoodTransferSettingsToTrials(orthogonalTrials, phaseData);
 
         mainTrials = this.applyPartnerBeliefInSituLureCycles(mainTrials, phaseData);
         orthogonalTrials = this.applyPartnerBeliefInSituLureCycles(orthogonalTrials, phaseData);
@@ -1227,6 +1273,32 @@ class TrialGenerator {
                         }
                     }
                 }
+                if (phase.allowed_arm_pairs !== undefined) {
+                    if (!Array.isArray(phase.allowed_arm_pairs) || !phase.allowed_arm_pairs.length) {
+                        errors.push(`${label} allowed_arm_pairs must be a non-empty array of [arm, arm] pairs when set.`);
+                    } else {
+                        let requiredArm = phase.always_include_arm != null
+                            ? String(phase.always_include_arm).trim()
+                            : "";
+                        phase.allowed_arm_pairs.forEach((pair, i) => {
+                            if (!Array.isArray(pair) || pair.length !== 2) {
+                                errors.push(`${label} allowed_arm_pairs[${i}] must be two Fennimal ids.`);
+                                return;
+                            }
+                            pair.forEach((id, j) => {
+                                let sid = id == null ? "" : String(id).trim();
+                                if (!sid || !knownIdSet.has(sid)) {
+                                    errors.push(`${label} allowed_arm_pairs[${i}][${j}] "${id}" is not a Fennimal id.`);
+                                }
+                            });
+                            if (requiredArm && pair.map(String).indexOf(requiredArm) < 0) {
+                                errors.push(
+                                    `${label} allowed_arm_pairs[${i}] must include always_include_arm "${requiredArm}".`
+                                );
+                            }
+                        });
+                    }
+                }
                 if (phase.hats !== undefined && !Array.isArray(phase.hats)) {
                     errors.push(`${label} hats must be an array of Fennimal ids when set.`);
                 }
@@ -1303,8 +1375,17 @@ class TrialGenerator {
                 }
                 let hasTrials = Array.isArray(phase.trials) && phase.trials.length > 0;
                 let builderFailed = false;
+                let kitJumble = phase.jumble_source === "feature_kit"
+                    || (typeof MorphTaskController !== "undefined"
+                        && typeof MorphTaskController.isKitJumblePhase === "function"
+                        && MorphTaskController.isKitJumblePhase(phase));
                 if (!hasTrials) {
                     try {
+                        if (kitJumble) {
+                            throw new Error(
+                                "kit morph_task needs an explicit trials list (fenA, fenB, target, mix, jumble, prime)."
+                            );
+                        }
                         if (typeof MorphTaskController === "undefined"
                             || typeof MorphTaskController.buildFactorialTrialBlocks !== "function") {
                             throw new Error("trials is empty and MorphTask trial builder is not loaded.");
@@ -1369,18 +1450,30 @@ class TrialGenerator {
                                 `${label} ${path} mix must be an integer percent from 1 to 99 (got "${trial.mix}").`
                             );
                         }
-                        if (trial.morph !== undefined && !["crossfade", "mesh", "silhouette"].includes(trial.morph)) {
-                            errors.push(`${label} ${path} morph must be "crossfade" | "mesh" | "silhouette" when set.`);
+                        if (trial.morph !== undefined && !["crossfade", "mesh", "silhouette", "kit"].includes(trial.morph)) {
+                            errors.push(`${label} ${path} morph must be "crossfade" | "mesh" | "silhouette" | "kit" when set.`);
                         }
                         if (trial.prime === undefined || trial.prime === null) {
-                            errors.push(`${label} ${path} requires prime: { head, hat, name }.`);
+                            errors.push(`${label} ${path} requires prime (a Fennimal id, "none", or { name }).`);
+                        } else if (typeof trial.prime === "string" || typeof trial.prime === "number") {
+                            if (!blank(trial.prime)) {
+                                let sid = String(trial.prime).trim();
+                                if (!knownIdSet.has(sid)) {
+                                    errors.push(
+                                        `${label} ${path} prime "${sid}" is not a Fennimal id ` +
+                                        `(known: ${[...knownIdSet].join(", ")}).`
+                                    );
+                                }
+                            }
                         } else if (typeof trial.prime !== "object" || Array.isArray(trial.prime)) {
-                            errors.push(`${label} ${path} prime must be an object.`);
+                            errors.push(`${label} ${path} prime must be a Fennimal id, "none", or { name }.`);
                         } else {
                             ["head", "hat", "name"].forEach((key) => {
                                 if (blank(trial.prime[key]) && key !== "name") return;
                                 if (blank(trial.prime[key]) && key === "name") {
-                                    errors.push(`${label} ${path} prime.name is required.`);
+                                    if (!kitJumble && trial.prime.empty !== true) {
+                                        errors.push(`${label} ${path} prime.name is required.`);
+                                    }
                                     return;
                                 }
                                 if (blank(trial.prime[key])) return;
@@ -1392,6 +1485,41 @@ class TrialGenerator {
                                     );
                                 }
                             });
+                        }
+                        if (kitJumble || trial.morph === "kit") {
+                            let jumble = trial.jumble;
+                            let slots = (typeof FeatureKit !== "undefined" && FeatureKit.SLOTS)
+                                ? FeatureKit.SLOTS
+                                : [
+                                    { key: "shell", required: true },
+                                    { key: "ear", required: true },
+                                    { key: "eye", required: true },
+                                    { key: "lowerFace", required: true },
+                                    { key: "hair", required: false },
+                                    { key: "stamp", required: false }
+                                ];
+                            if (!jumble || typeof jumble !== "object" || Array.isArray(jumble)) {
+                                if (!trial.kit_partition) {
+                                    errors.push(`${label} ${path} needs jumble: { shell, ear, eye, lowerFace } (hair/stamp optional).`);
+                                }
+                            } else {
+                                slots.forEach((slot) => {
+                                    let key = slot.key || slot;
+                                    let required = slot.required !== false;
+                                    let parent = jumble[key];
+                                    if (parent == null || String(parent).trim() === "") {
+                                        if (!required) return;
+                                        errors.push(`${label} ${path} jumble.${key} is missing.`);
+                                        return;
+                                    }
+                                    let sid = String(parent).trim();
+                                    if (trial.fenA && trial.fenB && sid !== trial.fenA && sid !== trial.fenB) {
+                                        errors.push(
+                                            `${label} ${path} jumble.${key} "${sid}" must be fenA or fenB.`
+                                        );
+                                    }
+                                });
+                            }
                         }
                     });
                 }
@@ -1563,6 +1691,8 @@ class TrialGenerator {
             "scan_box_in_situ",
             "check_box_contents",
             "feed_Fennimal",
+            "Fennimal_food",
+            "Fennimal_food_transfer",
             "joint_box_cleaning",
             "joint_box_decoration",
             "retrieve_lost_box",
@@ -1671,7 +1801,12 @@ class TrialGenerator {
                             add(trial.fenA, `${path}.fenA`);
                             add(trial.fenB, `${path}.fenB`);
                             add(trial.target, `${path}.target`);
-                            if (trial.prime && typeof trial.prime === "object" && !Array.isArray(trial.prime)) {
+                            if (typeof trial.prime === "string" || typeof trial.prime === "number") {
+                                let s = String(trial.prime).trim().toLowerCase();
+                                if (s && s !== "none" && s !== "null" && s !== "neutral") {
+                                    add(trial.prime, `${path}.prime`);
+                                }
+                            } else if (trial.prime && typeof trial.prime === "object" && !Array.isArray(trial.prime)) {
                                 ["head", "body", "hat", "toy", "name", "color_scheme"].forEach((key) => {
                                     let v = trial.prime[key];
                                     if (v === undefined || v === null) return;
@@ -1690,7 +1825,12 @@ class TrialGenerator {
                         add(entry.fenA, `${path}.fenA`);
                         add(entry.fenB, `${path}.fenB`);
                         add(entry.target, `${path}.target`);
-                        if (entry.prime && typeof entry.prime === "object" && !Array.isArray(entry.prime)) {
+                        if (typeof entry.prime === "string" || typeof entry.prime === "number") {
+                            let s = String(entry.prime).trim().toLowerCase();
+                            if (s && s !== "none" && s !== "null" && s !== "neutral") {
+                                add(entry.prime, `${path}.prime`);
+                            }
+                        } else if (entry.prime && typeof entry.prime === "object" && !Array.isArray(entry.prime)) {
                             ["head", "body", "hat", "toy", "name", "color_scheme"].forEach((key) => {
                                 let v = entry.prime[key];
                                 if (v === undefined || v === null) return;
@@ -2443,6 +2583,147 @@ class TrialGenerator {
         return trials;
     }
 
+    /**
+     * Stamp C/D food roles from the binding triad (ABC → C in / D out; ABD → D in / C out)
+     * plus persisted quiz/bag layouts. Fail loud if binding did not lock A into the triad.
+     */
+    applyFoodTransferSettingsToTrials(trials, phaseData) {
+        if (!trials || !trials.length) return trials;
+        let hasFood = trials.some((t) => t && (
+            t.interaction_type === "Fennimal_food"
+            || t.interaction_type === "Fennimal_food_transfer"
+        ));
+        if (!hasFood) return trials;
+
+        const fail = (message) => {
+            throw new Error("FoodTransfer: " + message);
+        };
+
+        let assignment = this.dataCont && this.dataCont.experimentData
+            ? this.dataCont.experimentData.hatBindingAssignment
+            : null;
+        if (!assignment || typeof assignment !== "object") {
+            fail("hatBindingAssignment is missing. The snack day must follow hat_binding_task.");
+        }
+
+        let arms = (Array.isArray(assignment.selected_arms) ? assignment.selected_arms : []).map(String);
+        if (!arms.includes("A")) {
+            fail(
+                "selected arms must include A (got [" + arms.join(", ") + "]). " +
+                "Lock allowed_arm_pairs to [A,C] / [A,D] on hat_binding_task."
+            );
+        }
+        let sourceIn = arms.find((id) => id === "C" || id === "D");
+        if (sourceIn !== "C" && sourceIn !== "D") {
+            fail("selected arms must pair A with C or D (got [" + arms.join(", ") + "]).");
+        }
+        let sourceOut = sourceIn === "C" ? "D" : "C";
+
+        let fenById = {};
+        (this.stimuli.get_all_Fennimals_objects_in_array() || []).forEach((fen) => {
+            if (fen && fen.id != null) fenById[String(fen.id)] = fen;
+        });
+        let fenC = fenById.C;
+        let fenD = fenById.D;
+        if (!fenC || !fenC.food_preference) fail("Fennimal C is missing a mapped food_preference.");
+        if (!fenD || !fenD.food_preference) fail("Fennimal D is missing a mapped food_preference.");
+        if (fenC.food_preference === fenD.food_preference) {
+            fail("C and D mapped to the same food flavor (" + fenC.food_preference + ").");
+        }
+
+        let flavorC = fenC.food_preference;
+        let flavorD = fenD.food_preference;
+        let flavorIn = sourceIn === "C" ? flavorC : flavorD;
+        let flavorOut = sourceOut === "C" ? flavorC : flavorD;
+        let triad = ["A", "B", sourceIn].slice().sort();
+
+        let draft = {
+            quiz_left_id: pickRandom(["C", "D"]),
+            quiz_food_order: shuffleArray([flavorC, flavorD]),
+            transfer_left_flavor: pickRandom([flavorC, flavorD]),
+            learning_bag_order_C: shuffleArray([flavorC, flavorD]),
+            learning_bag_order_D: shuffleArray([flavorC, flavorD])
+        };
+        draft.quiz_right_id = draft.quiz_left_id === "C" ? "D" : "C";
+        draft.transfer_right_flavor = draft.transfer_left_flavor === flavorC ? flavorD : flavorC;
+
+        let key = (phaseData && phaseData.randomization_id) || "food_transfer_layout";
+        let layout = this.dataCont && this.dataCont.getOrCreateFoodTransferLayout
+            ? this.dataCont.getOrCreateFoodTransferLayout(key, draft)
+            : draft;
+        if (!layout.quiz_left_id) layout.quiz_left_id = draft.quiz_left_id;
+        if (!layout.quiz_right_id) {
+            layout.quiz_right_id = layout.quiz_left_id === "C" ? "D" : "C";
+        }
+        if (!Array.isArray(layout.quiz_food_order) || layout.quiz_food_order.length !== 2) {
+            layout.quiz_food_order = draft.quiz_food_order;
+        }
+        if (!layout.transfer_left_flavor) layout.transfer_left_flavor = draft.transfer_left_flavor;
+        if (!layout.transfer_right_flavor) {
+            layout.transfer_right_flavor = layout.transfer_left_flavor === flavorC ? flavorD : flavorC;
+        }
+        if (!Array.isArray(layout.learning_bag_order_C)) layout.learning_bag_order_C = draft.learning_bag_order_C;
+        if (!Array.isArray(layout.learning_bag_order_D)) layout.learning_bag_order_D = draft.learning_bag_order_D;
+
+        let roster = {
+            C: JSON.parse(JSON.stringify(fenC)),
+            D: JSON.parse(JSON.stringify(fenD))
+        };
+        let shared = {
+            binding_triad: triad,
+            binding_selected_arms: arms.slice(),
+            source_in_id: sourceIn,
+            source_out_id: sourceOut,
+            target_id: "A",
+            flavor_in: flavorIn,
+            flavor_out: flavorOut,
+            flavor_C: flavorC,
+            flavor_D: flavorD,
+            quiz_left_id: layout.quiz_left_id,
+            quiz_right_id: layout.quiz_right_id,
+            quiz_food_order: layout.quiz_food_order.slice(),
+            transfer_left_flavor: layout.transfer_left_flavor,
+            transfer_right_flavor: layout.transfer_right_flavor
+        };
+
+        if (this.dataCont && this.dataCont.experimentData) {
+            this.dataCont.experimentData.foodTransferAssignment = Object.assign({}, shared);
+        }
+        if (phaseData) phaseData.food_transfer_assignment = Object.assign({}, shared);
+
+        trials.forEach((trial) => {
+            if (!trial) return;
+            if (trial.interaction_type !== "Fennimal_food"
+                && trial.interaction_type !== "Fennimal_food_transfer") {
+                return;
+            }
+            Object.assign(trial, shared);
+            if (String(trial.id) === "C") {
+                trial.food_role = sourceIn === "C" ? "source_in" : "source_out";
+                trial.food_choice_flavors = layout.learning_bag_order_C.slice();
+                trial.food_errors_made = [];
+            } else if (String(trial.id) === "D") {
+                trial.food_role = sourceIn === "D" ? "source_in" : "source_out";
+                trial.food_choice_flavors = layout.learning_bag_order_D.slice();
+                trial.food_errors_made = [];
+            } else if (String(trial.id) === "A" || trial.interaction_type === "Fennimal_food_transfer") {
+                trial.food_role = "target";
+                trial.food_choice_flavors = [
+                    layout.transfer_left_flavor,
+                    layout.transfer_right_flavor
+                ];
+                trial.quiz_left_fen = roster[layout.quiz_left_id];
+                trial.quiz_right_fen = roster[layout.quiz_right_id];
+                trial.quiz_errors = [];
+                trial.bonus_stars_earnable = (typeof phaseData.bonus_stars_per_correct_answer === "number")
+                    ? phaseData.bonus_stars_per_correct_answer
+                    : 2;
+            }
+        });
+
+        return trials;
+    }
+
     applyAskBoxSettingsToTrials(trials, phaseData) {
         if (!phaseData.ask_box || !trials || trials.length === 0) return trials;
 
@@ -2867,6 +3148,10 @@ class ExperimentController {
             );
         }
 
+        if (this.stimuli && typeof this.stimuli.ensureKitHeadsRegistered === "function") {
+            await this.stimuli.ensureKitHeadsRegistered();
+        }
+
         // Prune unused SVG assets only after the final Fennimal assignment is known.
         this.svgReducer = new SVGREDUCER(this.stimuli);
 
@@ -3017,7 +3302,7 @@ class ExperimentController {
                     this.startNextTrialInPhoneRoomPhase();
                 } else {
                     this.flagPhoneRoomInstructionsShown = false;
-                    this.instrCont.initializePhoneRoomPhaseGeneralInstructions(this.currentDayNum);
+                    this.instrCont.initializePhoneRoomPhaseGeneralInstructions(this.currentDayNum, this.currentPhaseData);
                 }
                 break;
             case "name_recall_task":
@@ -3526,7 +3811,7 @@ class ExperimentController {
         // Legacy star logic for trial-based phases
         let totalBonusStarsEarned = 0, maxBonusStars = 0;
         if (this.currentPhaseData.bonus_stars_per_correct_answer) {
-            if (["jump_to_trial", "hint_and_search", "free_exploration", "retrieve_lost_box"].includes(this.currentPhaseData.type)) {
+            if (["jump_to_trial", "hint_and_search", "free_exploration", "retrieve_lost_box", "phone_room"].includes(this.currentPhaseData.type)) {
                 for (let trialNum = 0; trialNum < this.currentPhaseData.Data.length; trialNum++) {
                     if (this.currentPhaseData.Data[trialNum].bonus_stars_earned !== undefined) {
                         totalBonusStarsEarned += this.currentPhaseData.Data[trialNum].bonus_stars_earned === true ? 1 : this.currentPhaseData.Data[trialNum].bonus_stars_earned;

@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="morph_lab.css">
-    <link rel="stylesheet" href="feature_kit_lab.css">
+    <link rel="stylesheet" href="feature_kit_lab.css?v=stamp-3">
 </head>
 <body>
     <header class="lab-header">
@@ -16,7 +16,8 @@
         <p class="lab-sub">
             Mix-and-match test for the new modular heads
             (<code>SVG/Heads features.svg</code>).
-            Ears sit behind the shell; eyes, lower face, and hair sit in front.
+            Stamp review: freckles, heart, smiley, chevrons.
+            Ears sit behind the shell; stamps sit on the cheeks (above the shell, under the snout and eyes); hair sits last.
             Right ear and right eye are mirrored copies of the left-side templates.
         </p>
     </header>
@@ -32,6 +33,7 @@
                     <label><input id="exprHappy" type="radio" name="expression" value="happy" checked> Happy</label>
                     <label><input id="exprSad" type="radio" name="expression" value="sad"> Sad</label>
                     <label><input id="markersInput" type="checkbox"> Show placement markers</label>
+                    <label><input id="grayInput" type="checkbox" checked> Grayscale (pilot)</label>
                 </div>
                 <div class="actions">
                     <button id="randomBtn" type="button">Randomize unlocked</button>
@@ -40,7 +42,7 @@
                 </div>
             </section>
 
-            <details class="kit-card" open>
+            <details class="kit-card">
                 <summary>SVG notes</summary>
                 <ul id="notesList" class="notes-list"></ul>
             </details>
@@ -54,9 +56,15 @@
 
             <section class="kit-card" style="margin-top:18px">
                 <h2>Vary one slot</h2>
-                <p class="lab-note" style="margin-top:0">Hold the current recipe fixed and swap only this part.</p>
+                <p class="lab-note" style="margin-top:0">Hold the current recipe fixed and swap only this part. Opens on stamps.</p>
                 <div id="varySlotButtons" class="actions"></div>
-                <div id="variantRow" class="variant-row"></div>
+                <div id="variantRow" class="variant-row stamp-lineup"></div>
+            </section>
+
+            <section class="kit-card" style="margin-top:18px">
+                <h2>Same stamp, each shell</h2>
+                <p class="lab-note" style="margin-top:0">Placement check on pear / wide / tall / point.</p>
+                <div id="shellRow" class="variant-row stamp-lineup"></div>
             </section>
 
             <section class="kit-card" style="margin-top:18px">
@@ -71,7 +79,7 @@
         </div>
     </div>
 
-    <script src="FeatureKit.js?v=feature-kit-lab-1"></script>
-    <script src="FeatureKitLab.js?v=feature-kit-lab-1"></script>
+    <script src="FeatureKit.js?v=kit-whisker-1"></script>
+    <script src="FeatureKitLab.js?v=feature-kit-lab-4"></script>
 </body>
 </html>

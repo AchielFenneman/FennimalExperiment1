@@ -236,7 +236,9 @@ class BasicElementsModule {
             this.Fennimal.style.opacity = 1;
 
             this.TargetPoints.Fennimal_body_center = this.Fennimal.getElementsByClassName("Fennimal_body_center_point")[0];
-            this.TargetPoints.Fennimal_mouth = this.Fennimal.getElementsByClassName("Fennimal_head_mouth_point")[0];
+            this.TargetPoints.Fennimal_mouth = (typeof pick_fennimal_layout_point === "function")
+                ? pick_fennimal_layout_point(this.Fennimal, "Fennimal_head_mouth_point")
+                : this.Fennimal.getElementsByClassName("Fennimal_head_mouth_point")[0];
 
             // ----------------------------------------------------
             // NEW: Grab the paper-doll layers and set their origins
@@ -344,6 +346,8 @@ class BasicElementsModule {
 
         window.addEventListener('pointermove', this.gaze_tracker);
 
+        if (typeof apply_kit_ear_wiggle === "function") apply_kit_ear_wiggle(this.Fennimal);
+
         this.animation_start_time = performance.now();
         this.animation_frame_id = requestAnimationFrame((t) => this.render_character_frame(t));
     }
@@ -429,9 +433,18 @@ class BasicElementsModule {
         // 3. The head and eyes gaze and bob (and are safely carried by the sway!)
         this.FennimalHead.style.transform = `translate(${this.currentGazeX + shiverX}px, ${this.currentGazeY + headBobY}px) rotate(${headRot}deg)`;
 
-        this.FennimalEyes.forEach(eye => {
-            eye.style.transform = `translate(${(this.currentGazeX * 1.2) + shiverX}px, ${(this.currentGazeY * 1.2)}px) scale(${this.currentEyeScale})`;
-        });
+        if (typeof apply_fennimal_eye_gaze === "function") {
+            apply_fennimal_eye_gaze(
+                this.FennimalEyes,
+                (this.currentGazeX * 1.2) + shiverX,
+                this.currentGazeY * 1.2,
+                this.currentEyeScale
+            );
+        } else {
+            this.FennimalEyes.forEach(eye => {
+                eye.style.transform = `translate(${(this.currentGazeX * 1.2) + shiverX}px, ${(this.currentGazeY * 1.2)}px) scale(${this.currentEyeScale})`;
+            });
+        }
 
         if (this.character_animation_frozen) return;
         this.animation_frame_id = requestAnimationFrame((t) => this.render_character_frame(t));
@@ -2129,9 +2142,12 @@ class BaseToyModule {
 
         if (mouthPoint && pivotPoint) {
             let pt = GenParam.SVGObject.createSVGPoint();
-            pt.x = parseFloat(mouthPoint.getAttribute("cx"));
-            pt.y = parseFloat(mouthPoint.getAttribute("cy"));
-            let screenMouth = pt.matrixTransform(mouthPoint.getScreenCTM());
+            let screenMouth = (typeof svg_screen_point_from_element === "function")
+                ? svg_screen_point_from_element(mouthPoint)
+                : null;
+            if (!screenMouth) {
+                return;
+            }
 
             let raw_cx = parseFloat(pivotPoint.getAttribute("cx"));
             let raw_cy = parseFloat(pivotPoint.getAttribute("cy"));
@@ -2264,32 +2280,35 @@ class BaseToyModule {
             let pt = GenParam.SVGObject.createSVGPoint();
 
             // Get screen coords of the mouth
-            pt.x = parseFloat(mouthPoint.getAttribute("cx"));
-            pt.y = parseFloat(mouthPoint.getAttribute("cy"));
-            let screenMouth = pt.matrixTransform(mouthPoint.getScreenCTM());
+            let screenMouth = (typeof svg_screen_point_from_element === "function")
+                ? svg_screen_point_from_element(mouthPoint)
+                : null;
+            if (screenMouth) {
+                // Get screen coords of the globe's core
+                let pBox = central_pivot.getBBox();
+                pt.x = pBox.x + pBox.width / 2;
+                pt.y = pBox.y + pBox.height / 2;
+                let screenPivot = pt.matrixTransform(central_pivot.getScreenCTM());
 
-            // Get screen coords of the globe's core
-            let pBox = central_pivot.getBBox();
-            pt.x = pBox.x + pBox.width / 2;
-            pt.y = pBox.y + pBox.height / 2;
-            let screenPivot = pt.matrixTransform(central_pivot.getScreenCTM());
+                // Project to local space
+                let ToyParentCTM = parent.getScreenCTM().inverse();
+                pt.x = screenMouth.x; pt.y = screenMouth.y;
+                let localTargetMouth = pt.matrixTransform(ToyParentCTM);
 
-            // Project to local space
-            let ToyParentCTM = parent.getScreenCTM().inverse();
-            pt.x = screenMouth.x; pt.y = screenMouth.y;
-            let localTargetMouth = pt.matrixTransform(ToyParentCTM);
+                pt.x = screenPivot.x; pt.y = screenPivot.y;
+                let localCurrentPivot = pt.matrixTransform(ToyParentCTM);
 
-            pt.x = screenPivot.x; pt.y = screenPivot.y;
-            let localCurrentPivot = pt.matrixTransform(ToyParentCTM);
+                // Calculate distance, pushing it 80px DOWN so it sits on the chest/hands!
+                let dx = localTargetMouth.x - localCurrentPivot.x;
+                let dy = (localTargetMouth.y - localCurrentPivot.y) + 80;
 
-            // Calculate distance, pushing it 80px DOWN so it sits on the chest/hands!
-            let dx = localTargetMouth.x - localCurrentPivot.x;
-            let dy = (localTargetMouth.y - localCurrentPivot.y) + 80;
-
-            transGroup.style.transform = "translate(0px, 0px)";
-            window.getComputedStyle(transGroup).transform;
-            transGroup.style.transition = "transform 400ms ease-in-out";
-            transGroup.style.transform = `translate(${dx}px, ${dy}px)`;
+                transGroup.style.transform = "translate(0px, 0px)";
+                window.getComputedStyle(transGroup).transform;
+                transGroup.style.transition = "transform 400ms ease-in-out";
+                transGroup.style.transform = `translate(${dx}px, ${dy}px)`;
+            } else {
+                transGroup.classList.add("translation_" + this.FenObj.toy);
+            }
         } else {
             // Fallback if no mouth is found
             transGroup.classList.add("translation_" + this.FenObj.toy);
@@ -2336,41 +2355,44 @@ class BaseToyModule {
             let pt = GenParam.SVGObject.createSVGPoint();
 
             // Calculate Screen Position of the Mouth
-            pt.x = parseFloat(mouthPoint.getAttribute("cx"));
-            pt.y = parseFloat(mouthPoint.getAttribute("cy"));
-            let screenMouth = pt.matrixTransform(mouthPoint.getScreenCTM());
+            let screenMouth = (typeof svg_screen_point_from_element === "function")
+                ? svg_screen_point_from_element(mouthPoint)
+                : null;
 
             // Calculate Screen Position of the Neck
             let screenNeck = screenMouth;
-            if (neckPoint) {
-                pt.x = parseFloat(neckPoint.getAttribute("cx"));
-                pt.y = parseFloat(neckPoint.getAttribute("cy"));
-                screenNeck = pt.matrixTransform(neckPoint.getScreenCTM());
+            if (screenMouth && neckPoint) {
+                let neckScreen = (typeof svg_screen_point_from_element === "function")
+                    ? svg_screen_point_from_element(neckPoint)
+                    : null;
+                if (neckScreen) screenNeck = neckScreen;
             }
 
-            // THE SKELETAL CHECK: If mouth is > 15px to the right of the neck, it is facing right!
-            let is_facing_right = (screenMouth.x - screenNeck.x) > 15;
+            if (screenMouth) {
+                // THE SKELETAL CHECK: If mouth is > 15px to the right of the neck, it is facing right!
+                let is_facing_right = (screenMouth.x - screenNeck.x) > 15;
 
-            // Offset (Note: Because we are now inside the toy's coordinate space, this number
-            // represents SVG internal pixels. You may need to tweak this to 80 or 120!)
-            let x_offset = is_facing_right ? -30 : 30;
+                // Offset (Note: Because we are now inside the toy's coordinate space, this number
+                // represents SVG internal pixels. You may need to tweak this to 80 or 120!)
+                let x_offset = is_facing_right ? -30 : 30;
 
-            // THE FIX: Project into the wand's IMMEDIATE parent space, not the global space!
-            let WandParentCTM = wand_assembly.parentNode.getScreenCTM().inverse();
+                // THE FIX: Project into the wand's IMMEDIATE parent space, not the global space!
+                let WandParentCTM = wand_assembly.parentNode.getScreenCTM().inverse();
 
-            pt.x = screenMouth.x; pt.y = screenMouth.y;
-            let localTargetMouth = pt.matrixTransform(WandParentCTM);
+                pt.x = screenMouth.x; pt.y = screenMouth.y;
+                let localTargetMouth = pt.matrixTransform(WandParentCTM);
 
-            let pBox = wand_center.getBBox();
-            pt.x = pBox.x + pBox.width / 2;
-            pt.y = pBox.y + pBox.height / 2;
-            let screenPivot = pt.matrixTransform(wand_center.getScreenCTM());
-            pt.x = screenPivot.x; pt.y = screenPivot.y;
-            let localCurrentPivot = pt.matrixTransform(WandParentCTM);
+                let pBox = wand_center.getBBox();
+                pt.x = pBox.x + pBox.width / 2;
+                pt.y = pBox.y + pBox.height / 2;
+                let screenPivot = pt.matrixTransform(wand_center.getScreenCTM());
+                pt.x = screenPivot.x; pt.y = screenPivot.y;
+                let localCurrentPivot = pt.matrixTransform(WandParentCTM);
 
-            // Calculate exact localized distance!
-            dx = (localTargetMouth.x - localCurrentPivot.x) + x_offset;
-            dy = (localTargetMouth.y - localCurrentPivot.y);
+                // Calculate exact localized distance!
+                dx = (localTargetMouth.x - localCurrentPivot.x) + x_offset;
+                dy = (localTargetMouth.y - localCurrentPivot.y);
+            }
 
             // Safely set the rotational pivot to the handle
             let handle_pivot = wand_assembly.querySelector(".toy_pivot_point");
@@ -2488,34 +2510,37 @@ class BaseToyModule {
 
         // 2. Move the Toy to the floor (Using pure, scalable SVG Math!)
         let dx = 0, dy = 0;
-        let mouthPoint = activeFennimal ? activeFennimal.querySelector(".Fennimal_head_mouth_point") : null;
+        let mouthPoint = activeFennimal
+            ? ((typeof pick_fennimal_layout_point === "function")
+                ? pick_fennimal_layout_point(activeFennimal, "Fennimal_head_mouth_point")
+                : activeFennimal.querySelector(".Fennimal_head_mouth_point"))
+            : null;
 
         if (mouthPoint && pivot) {
-            let pt = GenParam.SVGObject.createSVGPoint();
+            let screenMouth = (typeof svg_screen_point_from_element === "function")
+                ? svg_screen_point_from_element(mouthPoint)
+                : null;
+            let pivotCtm = pivot.getScreenCTM && pivot.getScreenCTM();
+            let parentCtm = parent && parent.getScreenCTM && parent.getScreenCTM();
+            if (screenMouth && pivotCtm && parentCtm) {
+                let pt = GenParam.SVGObject.createSVGPoint();
+                let pBox = pivot.getBBox();
+                pt.x = pBox.x + pBox.width / 2;
+                pt.y = pBox.y + pBox.height;
+                if (isFinite(pt.x) && isFinite(pt.y)) {
+                    let screenPivot = pt.matrixTransform(pivotCtm);
+                    let ToyParentCTM = parentCtm.inverse();
+                    pt.x = screenMouth.x; pt.y = screenMouth.y;
+                    let localMouth = pt.matrixTransform(ToyParentCTM);
 
-            // Get screen coords of the Fennimal's mouth
-            pt.x = parseFloat(mouthPoint.getAttribute("cx"));
-            pt.y = parseFloat(mouthPoint.getAttribute("cy"));
-            let screenMouth = pt.matrixTransform(mouthPoint.getScreenCTM());
+                    pt.x = screenPivot.x; pt.y = screenPivot.y;
+                    let localPivot = pt.matrixTransform(ToyParentCTM);
 
-            // Get screen coords of the Jack's base (using the pivot we already found!)
-            let pBox = pivot.getBBox();
-            pt.x = pBox.x + pBox.width / 2;
-            pt.y = pBox.y + pBox.height;
-            let screenPivot = pt.matrixTransform(pivot.getScreenCTM());
-
-            // Project both into the parent animation layer's internal space
-            let ToyParentCTM = parent.getScreenCTM().inverse();
-            pt.x = screenMouth.x; pt.y = screenMouth.y;
-            let localMouth = pt.matrixTransform(ToyParentCTM);
-
-            pt.x = screenPivot.x; pt.y = screenPivot.y;
-            let localPivot = pt.matrixTransform(ToyParentCTM);
-
-            // Calculate distance: Offset slightly to the right (+120x) and down to the floor (+250y)
-            // You can safely tweak these SVG units to get the exact visual layout you want!
-            dx = (localMouth.x - localPivot.x) + 120;
-            dy = (localMouth.y - localPivot.y) + 250;
+                    // Offset slightly to the right (+120x) and down to the floor (+250y)
+                    dx = (localMouth.x - localPivot.x) + 120;
+                    dy = (localMouth.y - localPivot.y) + 250;
+                }
+            }
         }
 
         transGroup.style.transition = "transform 600ms ease-in-out";
@@ -12056,6 +12081,17 @@ class TrialFactory {
                     return TrialFactory.missingArchived(interaction_type, "FeedFennimalTrialController");
                 }
                 return new FeedFennimalTrialController(FenObj, partner_is_present, returnfunc);
+
+            case "Fennimal_food":
+            case "Fennimal_food_transfer":
+                if (typeof FennimalFoodTrialController === "undefined") {
+                    console.error(
+                        '[TrialFactory] Interaction type "' + interaction_type +
+                        '" needs 4_FennimalFoodTask.js loaded after 3_InteractiveFennimalController.js.'
+                    );
+                    return null;
+                }
+                return new FennimalFoodTrialController(FenObj, partner_is_present, returnfunc);
 
             case "joint_box_cleaning":
                 return new JointBoxCleaningTrialController(FenObj, partner_is_present, returnfunc);

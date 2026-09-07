@@ -1,16 +1,22 @@
 /**
  * Morph task DV (extra-wide two-spot polaroid): one code-drawn polaroid with a
  * shared photo well. Prime (smaller, back-left) starts under a black [?];
- * jumble (larger, front-right) starts under a light-gray [?]. The prime hat
- * is already visible (head still [?]); a radial name quiz (F/J move,
- * Space confirm; keyboard only) identifies prime.name. Correct → head [?]
- * snaps off: the head if show_head_on_prime, else empty space (hat only).
- * Pause primeRevealHoldMs, then the jumble [?] fades out over
- * jumbleFadeMs. Identity 2AFC: F/J keycaps show the two jumble
- * parents (prime excluded). phase.response_key_icons selects the
- * property on those keys: "hats" (default), "heads" (grayscale,
- * as in the archived morph_head_pilot), or "names". Polaroid flies to the chosen side.
- * No resolve / no trial-by-trial identity feedback. Caption stays ????.
+ * jumble (larger, front-right) starts under a light-gray [?].
+ *
+ * Star / default paid prime: the hat is already visible (head still [?]); a
+ * radial name quiz (F/J move, Space confirm) identifies prime.name. Correct →
+ * head [?] snaps off: the head if show_head_on_prime, else empty space (hat only).
+ *
+ * Kit inverse prime (prime_quiz: "hat_from_name"): name in a partner speech
+ * bubble, radial hat quiz, then the correct hat is stamped on the polaroid
+ * (no head). prime: "none" skips the quiz and leaves the prime slot empty.
+ * Kit C/D primes may be jumble parents (pattern-breakers).
+ *
+ * Pause primeRevealHoldMs, then the jumble [?] fades out over jumbleFadeMs.
+ * Identity 2AFC: F/J keycaps show the two jumble parents. phase.response_key_icons
+ * selects the property on those keys: "hats" (default), "heads" (grayscale),
+ * or "names". Polaroid flies to the chosen side. No resolve / no trial-by-trial
+ * identity feedback. Caption stays ????.
  *
  * mix: integer percent target in the jumble (1–99). 50 is the unbiased
  * special case (either identity answer is scored correct).
@@ -206,7 +212,7 @@ class MorphTaskController {
     }
 
     static morphKinds() {
-        return ["crossfade", "mesh", "silhouette"];
+        return ["crossfade", "mesh", "silhouette", "kit"];
     }
 
     // Z-order for compositional head morphing (shell → features → crown).
@@ -239,31 +245,48 @@ class MorphTaskController {
         return Number.isFinite(n) && n === Math.round(n) && n >= 1 && n <= 99;
     }
 
+    static isKitJumblePhase(phase) {
+        return !!(phase && phase.jumble_source === "feature_kit");
+    }
+
     // Max stars a subject can earn. morphs[] is between-subjects, so do not
-    // multiply by the number of morph methods.
+    // multiply by the number of morph methods. Explicit trials[] win over
+    // factorial builders (kit lists 28 paid rows).
     static countMaxEarnableStars(phase) {
         phase = phase || {};
+        const paidCount = (list) => (list || []).filter((t) => t && t.is_practice !== true).length;
+        let trials = phase.trials;
+        if (Array.isArray(trials) && trials.length) {
+            if (Array.isArray(trials[0])) {
+                let sizes = trials.map((block) => paidCount(block));
+                return sizes.length ? Math.max.apply(null, sizes) : 0;
+            }
+            let byMorph = {};
+            trials.forEach((t) => {
+                if (!t || t.is_practice) return;
+                let m = t.morph != null ? String(t.morph) : "_none";
+                byMorph[m] = (byMorph[m] || 0) + 1;
+            });
+            let keys = Object.keys(byMorph);
+            if (!keys.length) return paidCount(trials);
+            return Math.max.apply(null, keys.map((k) => byMorph[k]));
+        }
+        if (MorphTaskController.isKitJumblePhase(phase)) {
+            let partitions = Array.isArray(phase.kit_partitions) ? phase.kit_partitions : [];
+            let polarities = Array.isArray(phase.kit_polarities) && phase.kit_polarities.length
+                ? phase.kit_polarities
+                : [0, 1];
+            let pairs = Array.isArray(phase.pairs) ? phase.pairs : [];
+            if (partitions.length && pairs.length) {
+                return partitions.length * polarities.length * pairs.length * 2;
+            }
+        }
         let mixes = Array.isArray(phase.mixes) ? phase.mixes : [];
         let pairs = Array.isArray(phase.pairs) ? phase.pairs : [];
         if (mixes.length && pairs.length) {
             return mixes.length * pairs.length * 2;
         }
-        const paidCount = (list) => (list || []).filter((t) => t && t.is_practice !== true).length;
-        let trials = phase.trials;
-        if (!Array.isArray(trials) || !trials.length) return 0;
-        if (Array.isArray(trials[0])) {
-            let sizes = trials.map((block) => paidCount(block));
-            return sizes.length ? Math.max.apply(null, sizes) : 0;
-        }
-        let byMorph = {};
-        trials.forEach((t) => {
-            if (!t || t.is_practice) return;
-            let m = t.morph != null ? String(t.morph) : "_none";
-            byMorph[m] = (byMorph[m] || 0) + 1;
-        });
-        let keys = Object.keys(byMorph);
-        if (!keys.length) return 0;
-        return Math.max.apply(null, keys.map((k) => byMorph[k]));
+        return 0;
     }
 
     _indexFennimals(stimuli) {
@@ -339,11 +362,21 @@ class MorphTaskController {
         return blocked ? raw : [raw];
     }
 
+    static buildKitTrialBlocks(phase) {
+        throw new Error(
+            "morph_task jumble_source feature_kit needs an explicit trials list " +
+            "(each row: fenA, fenB, target, mix, jumble slot map, prime)."
+        );
+    }
+
     // Expand morphs × mixes × pairs × both targets into blocked trial lists.
     // Stimulus blocks define those constants; MorphTask then keeps only the
     // one morph assigned to this subject (between-subjects).
     static buildFactorialTrialBlocks(phase) {
         phase = phase || {};
+        if (MorphTaskController.isKitJumblePhase(phase)) {
+            return MorphTaskController.buildKitTrialBlocks(phase);
+        }
         let morphs = phase.morphs;
         let mixes = phase.mixes;
         let pairs = phase.pairs;
@@ -406,13 +439,14 @@ class MorphTaskController {
     }
 
     _morphPool() {
+        if (MorphTaskController.isKitJumblePhase(this.phaseData)) return ["kit"];
         let allowed = MorphTaskController.morphKinds();
         let listed = this.phaseData.morphs;
         if (Array.isArray(listed) && listed.length) {
             let pool = listed.map((m) => String(m).trim()).filter((m) => allowed.indexOf(m) >= 0);
             pool = pool.filter((m, i) => pool.indexOf(m) === i);
             if (!pool.length) {
-                this._fail('morphs must list "crossfade", "mesh", and/or "silhouette".');
+                this._fail('morphs must list "crossfade", "mesh", "silhouette", and/or "kit".');
             }
             return pool;
         }
@@ -560,10 +594,15 @@ class MorphTaskController {
         }
         let morph = spec.morph || "crossfade";
         if (MorphTaskController.morphKinds().indexOf(morph) < 0) {
-            this._fail(`trial "${spec.id}" morph must be "crossfade" | "mesh" | "silhouette" (got "${morph}").`);
+            this._fail(`trial "${spec.id}" morph must be "crossfade" | "mesh" | "silhouette" | "kit" (got "${morph}").`);
         }
         if (fenA.head === fenB.head) {
             this._fail(`trial "${spec.id}" morph "${morph}" requires fenA and fenB to have different heads (both are "${fenA.head}").`);
+        }
+        if (morph === "kit") {
+            if (!fenA.kit_recipe || !fenB.kit_recipe) {
+                this._fail(`trial "${spec.id}" kit jumble needs kit_recipe on both fenA and fenB.`);
+            }
         }
         (["A", "B"]).forEach((side) => {
             let fen = side === "A" ? fenA : fenB;
@@ -571,13 +610,32 @@ class MorphTaskController {
             if (!fen.hat) this._fail(`trial "${spec.id}" fen${side} "${fen.id}" is missing a hat.`);
         });
         if (spec.prime === undefined || spec.prime === null) {
-            this._fail(`trial "${spec.id}" requires a prime object with name (paid trials).`);
+            this._fail(`trial "${spec.id}" requires a prime (Fennimal id, "none", or { name }).`);
         }
         let prime = this._expandPrimeSpec(spec.prime, spec.id);
-        if (prime.nameFen && (prime.nameFen.id === fenA.id || prime.nameFen.id === fenB.id)) {
+        if (prime.nameFen && (prime.nameFen.id === fenA.id || prime.nameFen.id === fenB.id)
+            && !this._allowsPrimeAsParent()) {
             this._fail(`trial "${spec.id}" prime.name "${prime.nameFen.id}" must not be fenA or fenB (prime hat is excluded from the 2AFC).`);
         }
+        let kitJumble = this._expandKitJumble(spec, fenA, fenB);
         let otherFen = target.id === fenA.id ? fenB : fenA;
+        let kitPartition = spec.kit_partition
+            ? JSON.parse(JSON.stringify(spec.kit_partition))
+            : null;
+        let kitPolarity = spec.kit_polarity != null ? (Number(spec.kit_polarity) ? 1 : 0) : null;
+        let setFromFenA = null;
+        let setFromFenB = null;
+        if (kitJumble) {
+            setFromFenA = [];
+            setFromFenB = [];
+            Object.keys(kitJumble).forEach((slot) => {
+                if (kitJumble[slot] === fenA.id) setFromFenA.push(slot);
+                else if (kitJumble[slot] === fenB.id) setFromFenB.push(slot);
+            });
+        } else if (kitPartition) {
+            setFromFenA = kitPolarity === 1 ? (kitPartition.set_b || []).slice() : (kitPartition.set_a || []).slice();
+            setFromFenB = kitPolarity === 1 ? (kitPartition.set_a || []).slice() : (kitPartition.set_b || []).slice();
+        }
         return {
             id: spec.id,
             role: spec.role || spec.id,
@@ -593,13 +651,81 @@ class MorphTaskController {
             morph,
             view: "closeup",
             grayscale: true,
+            jumble_source: spec.jumble_source || (morph === "kit" ? "feature_kit" : null),
+            kit_mix_id: spec.kit_mix_id || null,
+            kit_jumble: kitJumble,
+            kit_partition: kitPartition,
+            kit_polarity: kitPolarity,
+            p_design: spec.p_design || (kitPartition && (kitPartition.p_design || kitPartition.family)) || null,
+            set_from_fenA: setFromFenA,
+            set_from_fenB: setFromFenB,
+            kit_recipe_fenA: fenA.kit_recipe ? JSON.parse(JSON.stringify(fenA.kit_recipe)) : null,
+            kit_recipe_fenB: fenB.kit_recipe ? JSON.parse(JSON.stringify(fenB.kit_recipe)) : null,
+            kit_probe_recipe: null,
             prime,
+            prime_kind: prime.empty ? "none" : (prime.nameFen ? prime.nameFen.id : null),
             question: this._identityPrompt({ is_practice: false }),
             options: [
                 { id: fenA.id, label: fenA.name, hat: fenA.hat, head: fenA.head, fen: fenA },
                 { id: fenB.id, label: fenB.name, hat: fenB.hat, head: fenB.head, fen: fenB }
             ]
         };
+    }
+
+    _allowsPrimeAsParent() {
+        if (this.phaseData && this.phaseData.allow_prime_as_parent === true) return true;
+        return MorphTaskController.isKitJumblePhase(this.phaseData);
+    }
+
+    _usesInverseHatQuizPhase() {
+        if (this.phaseData && this.phaseData.prime_quiz === "hat_from_name") return true;
+        return MorphTaskController.isKitJumblePhase(this.phaseData);
+    }
+
+    _usesInverseHatQuiz(trial) {
+        if (!trial || trial.is_practice) return false;
+        if (!trial.prime || trial.prime.empty) return false;
+        return !!(trial.prime.needsHatQuiz || this._usesInverseHatQuizPhase());
+    }
+
+    _isEmptyPrime(trial) {
+        return !!(trial && trial.prime && trial.prime.empty);
+    }
+
+    _expandKitJumble(spec, fenA, fenB) {
+        let raw = spec && spec.jumble;
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+            if (spec && spec.morph === "kit" && !spec.kit_partition) {
+                this._fail(`trial "${spec.id}" kit jumble needs a jumble slot map ({ shell, ear, eye, lowerFace }; hair/stamp optional).`);
+            }
+            return raw ? JSON.parse(JSON.stringify(raw)) : null;
+        }
+        let slots = (typeof FeatureKit !== "undefined" && FeatureKit.SLOTS)
+            ? FeatureKit.SLOTS
+            : [
+                { key: "shell", required: true },
+                { key: "ear", required: true },
+                { key: "eye", required: true },
+                { key: "lowerFace", required: true },
+                { key: "hair", required: false },
+                { key: "stamp", required: false }
+            ];
+        let jumble = {};
+        slots.forEach((slot) => {
+            let key = slot.key || slot;
+            let required = slot.required !== false;
+            let parent = raw[key];
+            if (parent == null || String(parent).trim() === "") {
+                if (!required) return;
+                this._fail(`trial "${spec.id}" jumble.${key} is missing.`);
+            }
+            let id = String(parent).trim();
+            if (id !== fenA.id && id !== fenB.id) {
+                this._fail(`trial "${spec.id}" jumble.${key} "${id}" must be fenA ("${fenA.id}") or fenB ("${fenB.id}").`);
+            }
+            jumble[key] = id;
+        });
+        return jumble;
     }
 
     _isBlankPrimeToken(token) {
@@ -614,12 +740,49 @@ class MorphTaskController {
         return s === "gray" || s === "grey" || s === "grayscale" || s === "greyscale";
     }
 
+    _emptyPrimeSpec() {
+        return {
+            headFen: null,
+            hatFen: null,
+            nameFen: null,
+            hasHead: false,
+            hasHat: false,
+            hasBody: false,
+            hasToy: false,
+            empty: true,
+            schemeMode: "grayscale",
+            schemeFen: null,
+            needsNameQuiz: false,
+            needsHatQuiz: false,
+            trueCaption: "",
+            caption: "????",
+            log: {
+                head: null,
+                hat: null,
+                name: "none",
+                caption: "????",
+                empty: true,
+                needs_name_quiz: false,
+                needs_hat_quiz: false,
+                prime_quiz: null,
+                show_head_on_prime: false
+            }
+        };
+    }
+
     _expandPrimeSpec(raw, trialId) {
-        if (typeof raw !== "object" || Array.isArray(raw)) {
-            this._fail(`trial "${trialId}" prime must be an object.`);
+        if (typeof raw === "string" || typeof raw === "number") {
+            raw = this._isBlankPrimeToken(raw)
+                ? { name: "none", empty: true }
+                : { name: String(raw).trim(), head: String(raw).trim(), hat: String(raw).trim() };
         }
-        let nameId = this._isBlankPrimeToken(raw.name) ? null : String(raw.name).trim();
-        if (!nameId) this._fail(`trial "${trialId}" prime.name is required.`);
+        if (typeof raw !== "object" || Array.isArray(raw)) {
+            this._fail(`trial "${trialId}" prime must be a Fennimal id, "none", or { name }.`);
+        }
+        if (raw.empty || this._isBlankPrimeToken(raw.name)) {
+            return this._emptyPrimeSpec();
+        }
+        let nameId = String(raw.name).trim();
         let nameFen = this._getFen(nameId, `trial "${trialId}" prime.name`);
         let headId = this._isBlankPrimeToken(raw.head) ? nameId : String(raw.head).trim();
         let hatId = this._isBlankPrimeToken(raw.hat) ? nameId : String(raw.hat).trim();
@@ -628,6 +791,7 @@ class MorphTaskController {
         if (!headFen.head) this._fail(`trial "${trialId}" prime.head "${headId}" has no head SVG assigned.`);
         if (!hatFen.hat) this._fail(`trial "${trialId}" prime.hat "${hatId}" has no hat assigned.`);
         if (!nameFen.name) this._fail(`trial "${trialId}" prime.name "${nameId}" is missing a name.`);
+        let inverse = this._usesInverseHatQuizPhase();
         return {
             headFen,
             hatFen,
@@ -639,7 +803,8 @@ class MorphTaskController {
             empty: false,
             schemeMode: "grayscale",
             schemeFen: null,
-            needsNameQuiz: true,
+            needsNameQuiz: !inverse,
+            needsHatQuiz: inverse,
             trueCaption: String(nameFen.name),
             caption: "????",
             log: {
@@ -647,7 +812,10 @@ class MorphTaskController {
                 hat: hatId,
                 name: nameId,
                 caption: "????",
-                needs_name_quiz: true,
+                empty: false,
+                needs_name_quiz: !inverse,
+                needs_hat_quiz: inverse,
+                prime_quiz: inverse ? "hat_from_name" : "name_from_hat",
                 show_head_on_prime: this.showHeadOnPrime !== false
             }
         };
@@ -657,8 +825,12 @@ class MorphTaskController {
         return !!(trial && trial.prime && trial.prime.needsNameQuiz && trial.prime.nameFen);
     }
 
+    _primeNeedsHatQuiz(trial) {
+        return !!(trial && trial.prime && trial.prime.needsHatQuiz && trial.prime.nameFen);
+    }
+
     _buildNameRoster() {
-        let needsAny = (this.trialSpecs || []).some((t) => this._primeNeedsNameQuiz(t));
+        let needsAny = (this.trialSpecs || []).some((t) => this._primeNeedsNameQuiz(t) || this._primeNeedsHatQuiz(t));
         if (!needsAny) return [];
 
         let declared = this.phaseData.names_options;
@@ -892,7 +1064,7 @@ class MorphTaskController {
             }
         }
 
-        let shuffledBlocks = blocks.map((block) => shuffleArray(block.slice()));
+        let shuffledBlocks = blocks.map((block) => this._shufflePaidBlock(block));
         let paid = shuffledBlocks.reduce((acc, block) => acc.concat(block), []);
         let queue = practice.concat(paid);
         this._markFirstPaidTutorial(queue);
@@ -901,6 +1073,33 @@ class MorphTaskController {
             block_sizes: shuffledBlocks.map((block) => block.length)
         });
         return queue;
+    }
+
+    _shufflePaidBlock(block) {
+        let shuffled = shuffleArray((block || []).slice());
+        if (!MorphTaskController.isKitJumblePhase(this.phaseData)) return shuffled;
+        const keyOf = (t) => String(t.kit_mix_id || "") + "|" + String(t.prime_kind || "");
+        for (let pass = 0; pass < 80; pass++) {
+            let moved = false;
+            for (let i = 1; i < shuffled.length; i++) {
+                if (keyOf(shuffled[i]) !== keyOf(shuffled[i - 1])) continue;
+                let swapAt = -1;
+                for (let j = i + 1; j < shuffled.length; j++) {
+                    if (keyOf(shuffled[j]) === keyOf(shuffled[i])) continue;
+                    if (keyOf(shuffled[j]) === keyOf(shuffled[i - 1])) continue;
+                    if (j + 1 < shuffled.length && keyOf(shuffled[j]) === keyOf(shuffled[j + 1])) continue;
+                    swapAt = j;
+                    break;
+                }
+                if (swapAt < 0) continue;
+                let tmp = shuffled[i];
+                shuffled[i] = shuffled[swapAt];
+                shuffled[swapAt] = tmp;
+                moved = true;
+            }
+            if (!moved) break;
+        }
+        return shuffled;
     }
 
     _markFirstPaidTutorial(queue) {
@@ -2205,7 +2404,11 @@ class MorphTaskController {
             "[class*='mushroom_cap_']",
             "[class*='icy_']",
             "[class*='tail-']",
-            "[class*='scarf-']"
+            "[class*='scarf-']",
+            ".kit_ear_wiggle",
+            ".kit_ear_particle",
+            ".kit_ear_motion_scale",
+            ".kit_ear_fx"
         ].join(", ");
         icon.querySelectorAll(animatedSelectors).forEach((el) => {
             el.style.animation = "none";
@@ -2547,7 +2750,8 @@ class MorphTaskController {
         return this._buildPrimeIcon(trial.prime);
     }
 
-    _placeHiddenPrime(trial) {
+    _placeHiddenPrime(trial, opts) {
+        opts = opts || {};
         let built = this._preparePrimeNode(trial);
         if (!built || !built.node) return;
         let slot = this._slotBox("prime");
@@ -2555,7 +2759,7 @@ class MorphTaskController {
             this.polaroidMount.photoHost.appendChild(built.node);
         }
         this._fitNodeInBox(built.node, slot, built.widthFrac || 0.92, built.heightFrac || 0.92);
-        this._installPrimeHeadOccluder(built.node, trial);
+        if (!opts.revealedHat) this._installPrimeHeadOccluder(built.node, trial);
         if (this._shouldHidePrimeHead(trial)) this._hidePrimeHead(built.node);
         this.primeGroup = built.node;
     }
@@ -6376,6 +6580,10 @@ class MorphTaskController {
             this._placePracticeJumble(trial, opts);
             return;
         }
+        if (this._isKitJumble(trial)) {
+            this._placeKitJumble(trial, opts);
+            return;
+        }
         let mix = this._mixWeight(trial);
         let ready = await this._placeRasterMorph(trial, opts);
         if (!ready) {
@@ -6384,6 +6592,59 @@ class MorphTaskController {
         }
         this._currentMorphLevel = mix;
         if (this.morphGroup) this.morphGroup.style.opacity = "1";
+    }
+
+    _isKitJumble(trial) {
+        if (trial && trial.is_practice) return false;
+        if (MorphTaskController.isKitJumblePhase(this.phaseData)) return true;
+        return !!(trial && (trial.morph === "kit" || trial.jumble_source === "feature_kit"));
+    }
+
+    _placeKitJumble(trial, opts) {
+        let slot = this._slotBox("jumble") || this._photoWellBox();
+        if (!slot || !trial || !trial.fenA || !trial.fenB) return false;
+        if (typeof FeatureKit === "undefined") {
+            this._fail("kit jumble needs FeatureKit.js loaded.");
+        }
+        let kit = FeatureKit.shared();
+        if (!kit.catalog) {
+            this._fail("kit jumble needs FeatureKit.load() before morph_task.");
+        }
+        let mixed;
+        if (trial.kit_jumble) {
+            let recipes = {};
+            recipes[trial.fenA.id] = trial.fenA.kit_recipe;
+            recipes[trial.fenB.id] = trial.fenB.kit_recipe;
+            mixed = FeatureKit.mixFromSlotMap(recipes, trial.kit_jumble);
+        } else {
+            let partition = trial.kit_partition || {};
+            let polarity = trial.kit_polarity != null ? trial.kit_polarity : 0;
+            mixed = FeatureKit.mixRecipes(
+                trial.fenA.kit_recipe,
+                trial.fenB.kit_recipe,
+                partition,
+                polarity
+            );
+            trial.set_from_fenA = polarity === 1
+                ? (partition.set_b || []).slice()
+                : (partition.set_a || []).slice();
+            trial.set_from_fenB = polarity === 1
+                ? (partition.set_a || []).slice()
+                : (partition.set_b || []).slice();
+        }
+        trial.kit_probe_recipe = mixed;
+        let composed = kit.compose(mixed, { showMarkers: false });
+        let group = create_SVG_group(0, 0, "morph_stimulus");
+        group.style.pointerEvents = "none";
+        group.appendChild(composed.group);
+        this._applyJumbleComponentGrayscale(group);
+        this.morphGroup = group;
+        this.activeRenderer = "kit";
+        this._insertInPhotoWell(group, opts && opts.before ? opts.before : this.jumbleOccluder);
+        this._fitNodeInBox(group, slot, 0.86, 0.86, "right");
+        group.style.opacity = "1";
+        this._currentMorphLevel = 0.5;
+        return true;
     }
 
     _placePracticeJumble(trial, opts) {
@@ -6410,6 +6671,10 @@ class MorphTaskController {
         m = Math.max(0, Math.min(1, m));
         this._currentMorphLevel = m;
         let kind = this.activeRenderer || "crossfade";
+        if (kind === "kit") {
+            if (this.filmRect) this.filmRect.style.opacity = "0";
+            return;
+        }
         let renderM = m;
         if ((kind === "mesh_shell" || kind === "feature_anchored_mesh") && this.morphRenderTrial) {
             renderM = this._displayMixWeight(this.morphRenderTrial, m);
@@ -6668,6 +6933,10 @@ class MorphTaskController {
     }
 
     _placeNameQuizKeys(trial) {
+        if (this._usesInverseHatQuiz(trial)) {
+            this._placeHatQuizKeys(trial);
+            return;
+        }
         this._clearNameQuizUi();
         let options = trial.is_practice
             ? this._nameOptionsForTrial(trial)
@@ -6703,6 +6972,86 @@ class MorphTaskController {
                 chip: true
             });
             group.appendChild(key);
+            this.nameQuizLayout.push({
+                option_id: opt.id,
+                label: opt.label,
+                x: Math.round(x),
+                y: Math.round(y),
+                ring: layout.mode,
+                clock_hour: this._clockHour(x, y, cx, cy)
+            });
+            this.nameQuizKeys.push({ id: opt.id, label: opt.label, el: key, x, y });
+        });
+        this._nameQuizHighlight = 0;
+        this._updateNameQuizHighlight();
+        this._placeNameQuizHint();
+    }
+
+    _hatQuizOptions() {
+        let declared = this.phaseData.names_options;
+        let ids = (Array.isArray(declared) && declared.length)
+            ? declared
+            : Object.keys(this.fensById || {});
+        let options = [];
+        let seen = {};
+        ids.forEach((raw) => {
+            if (this._isBlankPrimeToken(raw)) return;
+            let fen = this._getFen(String(raw).trim(), "hat quiz option");
+            if (seen[fen.id] || !fen.hat) return;
+            seen[fen.id] = true;
+            options.push({ id: fen.id, label: fen.name, fen: fen });
+        });
+        if (!options.length) this._fail("hat quiz has no hat options.");
+        return options;
+    }
+
+    _placeHatQuizKeys(trial) {
+        this._clearNameQuizUi();
+        let options = this._sortByButtonOrder(this._hatQuizOptions());
+        if (!options.length) this._fail(`trial "${trial.id}" hat quiz has no options.`);
+
+        let n = options.length;
+        let btnW = this._num("hatQuizKeyW", 168);
+        let btnH = this._num("hatQuizKeyH", 148);
+        let slotW = this._num("hatQuizSlotW", 132);
+        let slotH = this._num("hatQuizSlotH", 108);
+        let radius = n <= 2 ? 200 : this._num("radialRadius", this._num("primeNameRadialRadius", 250));
+        let primeCenter = this._slotCenterSvg("prime");
+        let cx = primeCenter.x;
+        let cy = primeCenter.y;
+        let minX = 16 + btnW / 2;
+        let maxX = this.W - 16 - btnW / 2;
+        let minY = 110 + btnH / 2;
+        let maxY = this.H - 18 - btnH / 2;
+        let spin = n > 2 ? (this.buttonRingSpin != null ? this.buttonRingSpin : -Math.PI / 2) : 0;
+        let layout = this._fitAnswerRing(n, cx, cy, radius, false, minX, maxX, minY, maxY, spin);
+
+        let group = create_SVG_group(0, 0, "morph_name_quiz_keys");
+        this.layers.Plus1.appendChild(group);
+        this.nameQuizGroup = group;
+        this.nameQuizKeys = [];
+        this.nameQuizLayout = [];
+
+        let sizes = options.map((opt) => this._identityHatNativeSize(opt.fen));
+        let maxW = Math.max.apply(null, sizes.map((s) => s.width).concat([1]));
+        let maxH = Math.max.apply(null, sizes.map((s) => s.height).concat([1]));
+        let hatScale = Math.min(slotW / maxW, slotH / maxH);
+        if (!Number.isFinite(hatScale) || hatScale <= 0) hatScale = 1;
+
+        options.forEach((opt, i) => {
+            let x = layout.points[i].x;
+            let y = layout.points[i].y;
+            let key = create_SVG_group(0, 0, "morph_hat_quiz_chip");
+            key.style.pointerEvents = "none";
+            group.appendChild(key);
+            this._drawNameChip(key, x, y, btnW, btnH);
+            let hatBox = {
+                x: x - slotW / 2,
+                y: y - slotH / 2,
+                width: slotW,
+                height: slotH
+            };
+            this._placeHatOnKey(key, opt.fen, hatBox, hatScale);
             this.nameQuizLayout.push({
                 option_id: opt.id,
                 label: opt.label,
@@ -6766,8 +7115,10 @@ class MorphTaskController {
         let moveBubbleDone = this._showBubble(
             wrongEl,
             (this.currentTrial && this.currentTrial.is_practice)
-                ? "Each polaroid has two pictures. Name the shape on the left — use F and J to move the highlighted name."
-                : "Use F and J to move the highlighted name.",
+            ? "Each polaroid has two pictures. Name the shape on the left — use F and J to move the highlighted name."
+            : (this._usesInverseHatQuiz(this.currentTrial)
+                ? "Use F and J to move the highlighted hat."
+                : "Use F and J to move the highlighted name."),
             { hideButton: true, preferredSide: "up" }
         );
         await new Promise((resolve) => {
@@ -6889,6 +7240,7 @@ class MorphTaskController {
         });
         await this._coachNameQuizFjIfNeeded();
         if (this.destroyed) return null;
+        if (this._usesInverseHatQuiz(trial)) this._showPrimeNameCue(trial);
         if (this._primeNameQuizResult) {
             this._primeNameQuizResult.start_perf = performance.now();
         }
@@ -7794,15 +8146,74 @@ class MorphTaskController {
         );
     }
 
+    _primeNameCueText(trial) {
+        let name = trial && trial.prime && trial.prime.nameFen && trial.prime.nameFen.name;
+        if (!name) return "Which hat does this Fennimal wear?";
+        return "Which hat does <b>" + name + "</b> wear?";
+    }
+
+    _showPrimeNameCue(trial) {
+        if (!Interface || !Interface.PartnerSpeechBubble) return;
+        let target = this.questionEl || (this.polaroidMount && this.polaroidMount.frame) || this.stimulusGroup;
+        Interface.PartnerSpeechBubble.show({
+            target: target,
+            text: this._primeNameCueText(trial),
+            context: "map",
+            dimOpacity: 0,
+            hideButton: true,
+            preferredSide: "up"
+        });
+    }
+
+    _hidePrimeNameCue() {
+        if (typeof Interface !== "undefined" && Interface.PartnerSpeechBubble) {
+            Interface.PartnerSpeechBubble.hide(true);
+            Interface.PartnerSpeechBubble.confirm();
+        }
+    }
+
+    _stampPrimeHat(trial) {
+        this._placeHiddenPrime(trial, { revealedHat: true });
+    }
+
+    async _runPrimeThenJumble(trial) {
+        if (this._isEmptyPrime(trial)) {
+            await this._revealJumble(trial);
+            return;
+        }
+        if (this._usesInverseHatQuiz(trial)) {
+            await this._runNameQuiz(trial);
+            this._hidePrimeNameCue();
+            this._stampPrimeHat(trial);
+            await this._waitForPaint();
+            await this._revealJumble(trial);
+            return;
+        }
+        await this._beginTrialReveal();
+        await this._runNameQuiz(trial);
+        await this._revealJumble(trial);
+    }
+
     async _runPaidTutorial() {
         this.inputLocked = true;
-        await this._showBubble(
-            this.questionEl,
-            "Same two steps, now with Fennimals you know. Name who is wearing the hat, then decide which of the two the mix looks like."
-        );
-        await this._beginTrialReveal();
-        await this._runNameQuiz(this.currentTrial);
-        await this._revealJumble(this.currentTrial);
+        let trial = this.currentTrial;
+        if (this._isEmptyPrime(trial)) {
+            await this._showBubble(
+                this.questionEl,
+                "Sometimes the small picture is empty. Just decide which of the two names the mix looks like."
+            );
+        } else if (this._usesInverseHatQuiz(trial)) {
+            await this._showBubble(
+                this.questionEl,
+                "You'll see a name. Pick the hat that Fennimal wears. Then decide which of the two names the mix looks like."
+            );
+        } else {
+            await this._showBubble(
+                this.questionEl,
+                "Same two steps, now with Fennimals you know. Name who is wearing the hat, then decide which of the two the mix looks like."
+            );
+        }
+        await this._runPrimeThenJumble(trial);
     }
 
     _paidIdentityCoachText() {
@@ -7827,9 +8238,7 @@ class MorphTaskController {
     }
 
     async _runStandardTrialFlow() {
-        await this._beginTrialReveal();
-        await this._runNameQuiz(this.currentTrial);
-        await this._revealJumble(this.currentTrial);
+        await this._runPrimeThenJumble(this.currentTrial);
     }
 
     async _runTrial(trial) {
@@ -7847,7 +8256,9 @@ class MorphTaskController {
         this._placeProgressHud();
         this._placeTimeBars();
         this._placeOccluder();
-        this._placeHiddenPrime(trial);
+        if (!this._isEmptyPrime(trial) && !this._usesInverseHatQuiz(trial)) {
+            this._placeHiddenPrime(trial);
+        }
         await this._waitForPaint();
         try {
             await this._placeMorphStimulus(trial, { before: this.jumbleOccluder });
@@ -7936,11 +8347,32 @@ class MorphTaskController {
             assigned_morph: this.assignedMorph || null,
             morph_mode: trial.morph || null,
             morph_renderer: this.activeRenderer,
+            jumble_source: trial.jumble_source || this.phaseData.jumble_source || null,
+            kit_mix_id: trial.kit_mix_id || null,
+            kit_jumble: trial.kit_jumble ? JSON.parse(JSON.stringify(trial.kit_jumble)) : null,
+            kit_partition_id: trial.kit_partition ? trial.kit_partition.id : null,
+            kit_partition: trial.kit_partition
+                ? JSON.parse(JSON.stringify(trial.kit_partition))
+                : null,
+            kit_polarity: trial.kit_polarity != null ? trial.kit_polarity : null,
+            p_design: trial.p_design || null,
+            set_from_fenA: trial.set_from_fenA || null,
+            set_from_fenB: trial.set_from_fenB || null,
+            kit_recipe_fenA: trial.kit_recipe_fenA || (trial.fenA && trial.fenA.kit_recipe) || null,
+            kit_recipe_fenB: trial.kit_recipe_fenB || (trial.fenB && trial.fenB.kit_recipe) || null,
+            kit_probe_recipe: trial.kit_probe_recipe || null,
+            chose_fenA: choice.selected_id === (trial.fenA && trial.fenA.id),
+            chose_C: choice.selected_id === "C",
+            chose_D: choice.selected_id === "D",
             mesh_fallback_reason: this.meshFallbackReason,
             mesh_target_diagnostics: this.meshData ? this.meshData.target.diagnostics : null,
             mesh_other_diagnostics: this.meshData ? this.meshData.other.diagnostics : null,
             mesh_triangle_count: (this.meshData && this.meshData.triangles) ? this.meshData.triangles.length : null,
             prime: (trial.prime && trial.prime.log) ? Object.assign({}, trial.prime.log) : null,
+            prime_kind: trial.prime_kind || (trial.prime && trial.prime.empty ? "none" : (trial.prime && trial.prime.nameFen && trial.prime.nameFen.id)) || null,
+            prime_quiz_kind: trial.prime && trial.prime.needsHatQuiz
+                ? "hat_from_name"
+                : (trial.prime && trial.prime.needsNameQuiz ? "name_from_hat" : null),
             prime_name_quiz: this._primeNameQuizResult ? {
                 correct_id: this._primeNameQuizResult.correct_id,
                 selected_id: this._primeNameQuizResult.selected_id || null,

@@ -115,6 +115,11 @@ SVGREDUCER = function (Stimuli) {
             ? (Stimuli.get_forced_heads() || [])
             : []
         let keepHeads = new Set([...(Heads_in_exp || []), ...forcedHeads].filter(Boolean))
+        AllHeadsInSVG.forEach((el) => {
+            if (!el || !el.classList || !el.classList.contains("kit_head")) return
+            let id = (el.id || "").replace(/^Fennimal_head_/, "")
+            if (id) keepHeads.add(id)
+        })
         // Keep assigned Fennimal heads AND leftover forced_heads (unused pool
         // members that later tasks may still clone from the SVG templates).
         let Unused_heads = ALl_head_Ids.filter(x => x && !keepHeads.has(x))

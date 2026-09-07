@@ -9,9 +9,17 @@
         ear: "Ears",
         eye: "Eyes",
         lowerFace: "Lower",
-        hair: "Hair"
+        hair: "Hair",
+        stamp: "Stamps"
     };
-    const SLOT_KEYS = ["shell", "ear", "eye", "lowerFace", "hair"];
+
+    function slotKeys() {
+        return FeatureKit.slotKeys();
+    }
+
+    function noneable(key) {
+        return FeatureKit.noneableKeys().indexOf(key) >= 0;
+    }
 
     let kit = new FeatureKit();
     let recipe = null;
@@ -21,9 +29,10 @@
         ear: "A",
         eye: "B",
         lowerFace: "B",
-        hair: "A"
+        hair: "A",
+        stamp: "B"
     };
-    let varySlot = "ear";
+    let varySlot = "stamp";
     let locks = {};
 
     function $(id) {
@@ -41,6 +50,7 @@
             "eye:" + r.eye,
             "lower:" + r.lowerFace,
             "hair:" + (r.hair || "none"),
+            "stamp:" + (r.stamp || "none"),
             r.expression
         ].join("  ·  ");
     }
@@ -54,9 +64,26 @@
         return !!($("markersInput") && $("markersInput").checked);
     }
 
+    function showGray() {
+        return !!($("grayInput") && $("grayInput").checked);
+    }
+
+    function applyGray() {
+        ["mainStage", "variantRow", "chimeraRow", "shellRow"].forEach((id) => {
+            let el = $(id);
+            if (el) el.classList.toggle("kit-gray", showGray());
+        });
+    }
+
+    function pickToken(key, preferred) {
+        let tokens = kit.listTokens(key);
+        if (preferred && tokens.indexOf(preferred) >= 0) return preferred;
+        return tokens[0] || (noneable(key) ? "none" : "");
+    }
+
     function readControlsIntoRecipe() {
         recipe.expression = currentExpression();
-        SLOT_KEYS.forEach((key) => {
+        slotKeys().forEach((key) => {
             let sel = $("slot_" + key);
             if (sel) recipe[key] = sel.value;
             let scale = $("scale_" + key);
@@ -79,7 +106,7 @@
     function buildSlotControls() {
         let host = $("slotControls");
         host.innerHTML = "";
-        SLOT_KEYS.forEach((key) => {
+        slotKeys().forEach((key) => {
             let row = document.createElement("div");
             row.className = "slot-row";
 
@@ -90,7 +117,7 @@
             let mid = document.createElement("div");
             let sel = document.createElement("select");
             sel.id = "slot_" + key;
-            fillSelect(sel, kit.listTokens(key), key === "hair");
+            fillSelect(sel, kit.listTokens(key), noneable(key));
             sel.value = recipe[key];
             sel.addEventListener("change", onControlChange);
 
@@ -115,8 +142,8 @@
                 let range = document.createElement("input");
                 range.type = "range";
                 range.id = "scale_" + key;
-                range.min = "0.6";
-                range.max = "1.4";
+                range.min = key === "stamp" ? "0.45" : "0.6";
+                range.max = key === "stamp" ? "1.8" : "1.4";
                 range.step = "0.05";
                 range.value = String((recipe.scales && recipe.scales[key]) || 1);
                 let readout = document.createElement("span");
@@ -166,13 +193,16 @@
         let composed = kit.composeSvg(recipe, { showMarkers: showMarkers() });
         mountSvg(stage, composed);
         $("recipeLine").textContent = recipeLabel(composed.recipe);
+        applyGray();
+        drawShellStrip();
     }
 
     function drawVariants() {
         let host = $("variantRow");
         host.innerHTML = "";
+        host.classList.toggle("stamp-lineup", varySlot === "stamp");
         let tokens = kit.listTokens(varySlot).slice();
-        if (varySlot === "hair") tokens.push("none");
+        if (noneable(varySlot)) tokens.push("none");
         tokens.forEach((token) => {
             let next = Object.assign({}, recipe, { scales: Object.assign({}, recipe.scales) });
             next[varySlot] = token;
@@ -192,12 +222,13 @@
             });
             host.appendChild(btn);
         });
+        applyGray();
     }
 
     function buildVaryButtons() {
         let host = $("varySlotButtons");
         host.innerHTML = "";
-        SLOT_KEYS.forEach((key) => {
+        slotKeys().forEach((key) => {
             let btn = document.createElement("button");
             btn.type = "button";
             btn.className = varySlot === key ? "" : "secondary";
@@ -218,7 +249,7 @@
             expression: a.expression,
             scales: Object.assign({}, a.scales)
         };
-        SLOT_KEYS.forEach((key) => {
+        slotKeys().forEach((key) => {
             out[key] = mixFrom[key] === "B" ? b[key] : a[key];
             if (key !== "shell") {
                 let src = mixFrom[key] === "B" ? b : a;
@@ -246,12 +277,32 @@
             box.appendChild(cap);
             host.appendChild(box);
         });
+        applyGray();
+    }
+
+    function drawShellStrip() {
+        let host = $("shellRow");
+        if (!host) return;
+        host.innerHTML = "";
+        kit.listTokens("shell").forEach((shell) => {
+            let next = Object.assign({}, recipe, { scales: Object.assign({}, recipe.scales) });
+            next.shell = shell;
+            let composed = kit.composeSvg(next, { showMarkers: false });
+            let box = document.createElement("div");
+            box.className = "mini-head preview-only" + (recipe.shell === shell ? " is-active" : "");
+            box.appendChild(composed.svg);
+            let cap = document.createElement("span");
+            cap.textContent = shell;
+            box.appendChild(cap);
+            host.appendChild(box);
+        });
+        applyGray();
     }
 
     function buildMixToggles() {
         let host = $("mixToggles");
         host.innerHTML = "";
-        SLOT_KEYS.forEach((key) => {
+        slotKeys().forEach((key) => {
             let wrap = document.createElement("label");
             wrap.appendChild(document.createTextNode(SLOT_LABELS[key] + " "));
             let sel = document.createElement("select");
@@ -300,9 +351,30 @@
     async function boot() {
         try {
             await kit.load();
-            recipe = kit.defaultRecipe();
-            parentB = kit.altRecipe();
+            recipe = kit.normalizeRecipe({
+                shell: pickToken("shell", "pear"),
+                ear: pickToken("ear", "bat"),
+                eye: pickToken("eye", "round"),
+                lowerFace: pickToken("lowerFace", "elephant"),
+                hair: "none",
+                stamp: pickToken("stamp", "freckles"),
+                expression: "happy",
+                scales: FeatureKit.defaultScales()
+            });
+            parentB = kit.normalizeRecipe({
+                shell: pickToken("shell", "point"),
+                ear: pickToken("ear", "seashell"),
+                eye: pickToken("eye", "square"),
+                lowerFace: pickToken("lowerFace", "pig"),
+                hair: "none",
+                stamp: pickToken("stamp", "heart"),
+                expression: "happy",
+                scales: FeatureKit.defaultScales()
+            });
+            locks.hair = true;
             buildSlotControls();
+            let hairLock = $("lock_hair");
+            if (hairLock) hairLock.checked = true;
             buildVaryButtons();
             buildMixToggles();
             writeNotes();
@@ -310,9 +382,10 @@
                 let el = $(id);
                 if (el) el.addEventListener("change", renderAll);
             });
+            if ($("grayInput")) $("grayInput").addEventListener("change", applyGray);
             $("randomBtn").addEventListener("click", () => {
                 recipe = kit.randomRecipe(locks, recipe);
-                SLOT_KEYS.forEach((key) => {
+                slotKeys().forEach((key) => {
                     let sel = $("slot_" + key);
                     if (sel) sel.value = recipe[key];
                     let scale = $("scale_" + key);
@@ -325,8 +398,8 @@
                 renderAll();
             });
             $("resetScaleBtn").addEventListener("click", () => {
-                recipe.scales = { ear: 1, eye: 1, lowerFace: 1, hair: 1 };
-                SLOT_KEYS.forEach((key) => {
+                recipe.scales = FeatureKit.defaultScales();
+                slotKeys().forEach((key) => {
                     let scale = $("scale_" + key);
                     if (scale) {
                         scale.value = "1";
@@ -342,7 +415,7 @@
                 setStatus("Parent B snapshot saved: " + recipeLabel(parentB));
             });
             renderAll();
-            let n = SLOT_KEYS.map((k) => k + "=" + kit.listTokens(k).length).join(", ");
+            let n = slotKeys().map((k) => k + "=" + kit.listTokens(k).length).join(", ");
             setStatus("Kit loaded (" + n + ").");
         } catch (err) {
             console.error(err);

@@ -940,6 +940,33 @@ GENERALPARAM = function () {
         partnerHandoffLift: -50
     }
 
+    // Two-bag snack encounters (learning + food-transfer test).
+    this.FennimalFood = {
+        fennimalX: 0.38,
+        fennimalY: 0.82,
+        fennimalScale: 1.75,
+        transferFennimalX: 0.50,
+        transferFennimalY: 0.82,
+        bagScale: 3.2,
+        bagY: 0.72,
+        bagLeftX: 0.68,
+        bagRightX: 0.86,
+        transferBagLeftX: 0.28,
+        transferBagRightX: 0.72,
+        transferBagY: 0.74,
+        dropPad: 48,
+        bagMoveTime: 280,
+        eatMoveTime: 420,
+        quizLeftX: 0.18,
+        quizRightX: 0.82,
+        quizFenY: 0.70,
+        quizFenScale: 1.35,
+        quizFoodX: 0.50,
+        quizFoodTopY: 0.38,
+        quizFoodBottomY: 0.58,
+        quizNameY: 0.82
+    }
+
     // Match a hatless Fennimal with their hat from a laundry basket of phase hats.
     this.HatLaundry = {
         fennimalX: 0.68,
@@ -1130,6 +1157,34 @@ GENERALPARAM = function () {
     // Heads are a starter set — add the rest of the SVG pool later.
     // Do not use sorting labels, official region names, or head-derived character names.
     // Missing keys fail loud in HatBindingTask — every roster head/region/toy/hat needs a line.
+    // Short kit-head gist options (hat_binding mouth / ear rotation).
+    this.kitSlotGists = {
+        lowerFace: {
+            elephant: "elephant trunk",
+            cat: "cat whiskers",
+            pig: "pig snout",
+            shark: "shark teeth"
+        },
+        ear: {
+            bat: "bat wings",
+            seashell: "seashells",
+            mechanical: "robot ears",
+            mushroom: "mushroom caps"
+        },
+        hair: {
+            feathers: "feathers",
+            flowers: "flowers",
+            tuft: "tuft",
+            antlers: "antlers"
+        },
+        stamp: {
+            freckles: "freckles",
+            heart: "heart cheeks",
+            smiley: "smile marks",
+            chevrons: "V-marks"
+        }
+    };
+
     this.gistDescriptions = {
         hats: {
             partyhat: [
@@ -1745,6 +1800,7 @@ GENERALPARAM = function () {
         nDuelReps: 3,
         nCatch: 3,
         adaptive: true,
+        excludeSlots: ["hair"],
         itiMs: 280,
         prompt: "Which one looks more like the top head?",
         practicePrompt: "Which one looks more like the top head?",
@@ -1766,17 +1822,20 @@ GENERALPARAM = function () {
         dayTitle: "Which heads look most alike?",
         dayBody:
             "You'll see three heads at a time. The one on top is made of pieces from the two below.<br><br>" +
-            "Go with your first impression: which of the lower heads looks more like the top one? Press <b>F</b> for the left head or <b>J</b> for the right (clicking a side head also works).<br><br>" +
+            "Which of the lower heads looks more like the top one? Press <b>F</b> for the left head or <b>J</b> for the right (clicking a side head also works).<br><br>" +
             "The green bars are a gentle pace cue (about 7 seconds). Even after they run out, please still choose — there is no right or wrong answer.<br><br>" +
             "We'll start with two practice rounds using simple shapes."
     };
 
     this.FeatureKitComboPilot = {
+        nTokensSampled: 4,
         nDuelReps: 2,
+        nAdaptiveDuels: 16,
+        excludeSlots: ["hair"],
         dayTitle: "Which heads look most alike?",
         dayBody:
-            "You'll see three heads at a time. The one on top is made of pieces from the two below — sometimes more than one piece from each.<br><br>" +
-            "Go with your first impression: which of the lower heads looks more like the top one? Press <b>F</b> for the left head or <b>J</b> for the right (clicking a side head also works).<br><br>" +
+            "You'll see three heads at a time. The one on top is made of pieces from the two below.<br><br>" +
+            "Which of the lower heads looks more like the top one? Press <b>F</b> for the left head or <b>J</b> for the right (clicking a side head also works).<br><br>" +
             "The green bars are a gentle pace cue (about 7 seconds). Even after they run out, please still choose — there is no right or wrong answer.<br><br>" +
             "We'll start with two practice rounds using simple shapes."
     };

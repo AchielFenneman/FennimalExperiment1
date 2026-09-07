@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kit Ear Animation Lab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="morph_lab.css">
+    <style>
+        .ear-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            margin: 0 0 18px;
+        }
+        .stamp-panel {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px 22px;
+            align-items: center;
+            padding: 12px 14px;
+            margin: 0 0 18px;
+            background: #fff;
+            border: 1px solid #d7d2c8;
+        }
+        .stamp-panel h2 {
+            margin: 0;
+            font-size: 13px;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #4a5560;
+        }
+        .stamp-panel label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+        }
+        .ear-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 16px;
+        }
+        .ear-card {
+            background: #fff;
+            border: 1px solid #d7d2c8;
+            padding: 10px 12px 12px;
+        }
+        .ear-card.is-live {
+            cursor: pointer;
+        }
+        .ear-card h3 {
+            margin: 0 0 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #4a5560;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+        .ear-card .sub {
+            margin: 6px 0 0;
+            font-size: 12px;
+            color: #6b7280;
+        }
+        .ear-card svg {
+            width: 100%;
+            height: auto;
+            display: block;
+            background: #faf8f4;
+            overflow: visible;
+        }
+        .ear-card.is-frozen {
+            opacity: 0.96;
+            cursor: default;
+        }
+        .invisible_element {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .kit_ear_fx,
+        .kit_ear_particle {
+            pointer-events: none;
+        }
+        .kit_ear_spore {
+            filter: drop-shadow(0px 0px 6px #FF3300);
+        }
+        .kit_ear_droplet {
+            filter: drop-shadow(0px 0px 3px #7ec8e3);
+        }
+        .kit_stamp_expr {
+            transform-origin: center;
+            transform-box: fill-box;
+            transition: transform 0.45s ease, filter 0.45s ease;
+        }
+        .kit_stamp_shadow_blob {
+            pointer-events: none;
+            filter: blur(2.2px);
+        }
+        .kit_stamp_mood_happy .kit_stamp_expr {
+            transform: scale(1.16);
+            filter: brightness(1.28) saturate(1.55) contrast(1.08);
+        }
+        .kit_stamp_mood_sad .kit_stamp_expr {
+            transform: scale(0.82);
+            filter: brightness(0.58) saturate(0.42) contrast(0.92);
+        }
+        .fennimal_pose_frozen .kit_stamp_motion {
+            animation: none !important;
+            filter: none;
+        }
+        .status {
+            margin: 0 0 16px;
+        }
+    </style>
+</head>
+<body>
+    <header class="lab-header">
+        <h1>Kit Ear Animation Lab</h1>
+        <p class="lab-sub">
+            Live heads: ear motion, cursor gaze, and stamp salience trials.
+            Click a live head to fire the stamp press. Frozen cards stay still.
+        </p>
+    </header>
+
+    <p id="statusLine" class="status" aria-live="polite">Loading kit…</p>
+
+    <div class="ear-toolbar">
+        <button id="regenBtn" type="button">Regenerate heads</button>
+        <button id="freezeLiveBtn" type="button" class="secondary">Freeze live row</button>
+        <button id="reviveBtn" type="button" class="secondary">Restart live row</button>
+        <button id="exprHappyBtn" type="button">Happy</button>
+        <button id="exprSadBtn" type="button" class="secondary">Sad</button>
+    </div>
+
+    <div class="stamp-panel">
+        <h2>Stamp trials</h2>
+        <label><input id="stampPressInput" type="checkbox" checked> Click press</label>
+        <label><input id="stampExprInput" type="checkbox" checked> Expression scale / warmth</label>
+        <label><input id="stampLightInput" type="checkbox" checked> Drop-shadow pulse</label>
+    </div>
+
+    <section>
+        <h2>Live</h2>
+        <div id="liveGrid" class="ear-grid"></div>
+    </section>
+
+    <section style="margin-top:28px">
+        <h2>Frozen (polaroid-style)</h2>
+        <p class="lab-note">Composed and frozen. No ear or stamp motion.</p>
+        <div id="frozenGrid" class="ear-grid"></div>
+    </section>
+
+    <section style="margin-top:28px">
+        <h2>Apply, then freeze</h2>
+        <p class="lab-note">Starts live, then freeze must kill SMIL, spores, droplets, and stamp pulse.</p>
+        <div id="stoppedGrid" class="ear-grid"></div>
+    </section>
+
+    <script src="FeatureKit.js?v=kit-stamp-salience-2"></script>
+    <script src="1_General_functions.js?v=kit-stamp-salience-2"></script>
+    <script src="KitEarAnimLab.js?v=kit-stamp-salience-2"></script>
+</body>
+</html>

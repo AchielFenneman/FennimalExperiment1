@@ -1802,6 +1802,41 @@ html, body {
     animation-play-state: paused !important;
 }
 
+.kit_ear_fx,
+.kit_ear_particle {
+    pointer-events: none;
+}
+
+.kit_ear_spore {
+    filter: drop-shadow(0px 0px 6px #FF3300);
+    stroke: #111;
+}
+
+.kit_ear_droplet {
+    filter: drop-shadow(0px 0px 3px #7ec8e3);
+}
+
+.kit_stamp_expr {
+    transform-origin: center;
+    transform-box: fill-box;
+    transition: transform 0.45s ease, filter 0.45s ease;
+}
+
+.kit_stamp_shadow_blob {
+    pointer-events: none;
+    filter: blur(2.2px);
+}
+
+.kit_stamp_mood_happy .kit_stamp_expr {
+    transform: scale(1.16);
+    filter: brightness(1.28) saturate(1.55) contrast(1.08);
+}
+
+.kit_stamp_mood_sad .kit_stamp_expr {
+    transform: scale(0.82);
+    filter: brightness(0.58) saturate(0.42) contrast(0.92);
+}
+
 
 
 /* --- PHONE BOOTH ANTENNA SCANNING --- */

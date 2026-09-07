@@ -7,7 +7,7 @@
 // cannot desync the stimulus stream.
 //
 // URL: ?SEED=slides01   (reload → same world)
-//      ?EXP=feature_kit_combo_pilot   (optional experiment-code override)
+//      ?EXP=semantic_learning_kit   (opt-in kit training; default is the live code in 2_Stimulus_data.js)
 //      ?SKIP_INTRO=1    (skip consent / character-creation / overview pages)
 // ----------------------------------------------------
 let _experimentRandomFn = Math.random.bind(Math);
@@ -904,6 +904,26 @@ function apply_Fennimal_animation_pivots(FennimalSVG) {
     });
 }
 
+// Kit right eyes are placed with scale(-1 1). A shared +X gaze offset then
+// slides that pupil toward the nose. Flip only the tracking X; leave the
+// mirrored artwork and left-of-center shine alone.
+function fennimal_eye_gaze_x_sign(eye) {
+    if (!eye || typeof eye.closest !== "function") return 1;
+    return eye.closest("[data-kit-role='eye_right']") ? -1 : 1;
+}
+
+function apply_fennimal_eye_gaze(eyes, gazeX, gazeY, scale) {
+    let gx = Number(gazeX) || 0;
+    let gy = Number(gazeY) || 0;
+    let s = Number(scale);
+    if (!Number.isFinite(s) || s <= 0) s = 1.15;
+    Array.from(eyes || []).forEach((eye) => {
+        eye.style.transformOrigin = "center";
+        eye.style.transformBox = "fill-box";
+        eye.style.transform = "translate(" + (gx * fennimal_eye_gaze_x_sign(eye)) + "px, " + gy + "px) scale(" + s + ")";
+    });
+}
+
 /**
  * Freeze all decorative CSS body/head flair on a Fennimal SVG
  * (snowflakes, spores, heat waves, tails, curious tilt, climber arms, …).
@@ -911,10 +931,560 @@ function apply_Fennimal_animation_pivots(FennimalSVG) {
 function freeze_fennimal_decorative_animations(FennimalSVG) {
     if (!FennimalSVG) return;
     FennimalSVG.classList.add("fennimal_pose_frozen");
+    FennimalSVG.classList.remove("kit_ear_live", "kit_stamp_live", "kit_stamp_lighting", "kit_stamp_mood_happy", "kit_stamp_mood_sad");
+    kit_ear_stop_timers(FennimalSVG);
+    kit_ear_strip_motion(FennimalSVG);
+    kit_stamp_strip(FennimalSVG);
     // Inline fallback so mid-keyframe transforms also settle even if class CSS lags.
     FennimalSVG.querySelectorAll("*").forEach((el) => {
         el.style.animation = "none";
         el.style.animationPlayState = "paused";
+        el.style.rotate = "0deg";
+    });
+}
+
+const KIT_EAR_NS = "http://www.w3.org/2000/svg";
+const KIT_EAR_SPORE_FILLS = ["#FFEA00", "#FF9900", "#FFCC44", "#FF6600"];
+const KIT_EAR_DROP_FILLS = ["#7EB8D4", "#A8D8EA", "#5B9BB8", "#E0F4FF"];
+
+function kit_ear_is_live(root) {
+    return !!(root
+        && root.isConnected
+        && root.classList
+        && root.classList.contains("kit_ear_live")
+        && !root.classList.contains("fennimal_pose_frozen"));
+}
+
+function kit_ear_stop_timers(root) {
+    let bag = root && root._kitEarAnim;
+    if (!bag || !bag.timeouts) return;
+    bag.timeouts.forEach((id) => clearTimeout(id));
+    bag.timeouts.length = 0;
+}
+
+function kit_ear_schedule(root, delay, fn) {
+    if (!root) return 0;
+    if (!root._kitEarAnim) root._kitEarAnim = { timeouts: [] };
+    let id = setTimeout(() => {
+        let bag = root._kitEarAnim;
+        if (bag && bag.timeouts) {
+            let i = bag.timeouts.indexOf(id);
+            if (i >= 0) bag.timeouts.splice(i, 1);
+        }
+        if (!kit_ear_is_live(root)) return;
+        fn();
+    }, delay);
+    root._kitEarAnim.timeouts.push(id);
+    return id;
+}
+
+function kit_ear_strip_motion(root) {
+    if (!root) return;
+    root.querySelectorAll("animateTransform.kit_ear_wiggle_anim, animateTransform.kit_ear_anim").forEach((el) => {
+        try { if (typeof el.endElement === "function") el.endElement(); } catch (err) {}
+        if (el.parentNode) el.parentNode.removeChild(el);
+    });
+    root.querySelectorAll(".kit_ear_particle").forEach((el) => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+    });
+    root.querySelectorAll(".kit_ear_motion_scale").forEach((el) => {
+        el.removeAttribute("transform");
+        el.style.transform = "";
+    });
+    root.querySelectorAll(".sprocket.sprocket_upper, .sprocket.sprocket_middle, .sprocket.sprocket_lower").forEach((el) => {
+        el.removeAttribute("transform");
+        el.style.transform = "";
+    });
+}
+
+function kit_ear_el(name, attrs) {
+    let el = document.createElementNS(KIT_EAR_NS, name);
+    Object.keys(attrs || {}).forEach((key) => {
+        if (attrs[key] == null) return;
+        el.setAttribute(key, attrs[key]);
+    });
+    return el;
+}
+
+function kit_ear_point(root, selector) {
+    let el = root && root.querySelector(selector);
+    if (!el) return { x: 0, y: 0 };
+    return {
+        x: parseFloat(el.getAttribute("cx") || "0") || 0,
+        y: parseFloat(el.getAttribute("cy") || "0") || 0
+    };
+}
+
+function kit_ear_token_name(el) {
+    let cls = (el && el.getAttribute("class")) || "";
+    let names = ["mechanical", "mushroom", "seashell", "bat"];
+    for (let i = 0; i < names.length; i++) {
+        if (cls.indexOf("kit_ear_wiggle_" + names[i]) >= 0) return names[i];
+    }
+    return "";
+}
+
+function kit_ear_ensure_fx(earInner) {
+    let fx = earInner.querySelector(":scope > .kit_ear_fx");
+    if (!fx) {
+        fx = kit_ear_el("g", { class: "kit_ear_fx" });
+        earInner.appendChild(fx);
+    }
+    return fx;
+}
+
+function kit_ear_wrap_element_for_scale(el, cx, cy, scaleClass) {
+    let parent = el && el.parentNode;
+    if (!parent) return null;
+    if (parent.getAttribute && parent.getAttribute("data-kit-unpivot") === "1") {
+        let scaleG = parent.parentNode;
+        if (scaleG && scaleG.classList && scaleG.classList.contains("kit_ear_motion_scale")) return scaleG;
+    }
+    let pivot = kit_ear_el("g", {
+        class: "kit_ear_pivot",
+        transform: "translate(" + cx + " " + cy + ")"
+    });
+    let scaleG = kit_ear_el("g", { class: "kit_ear_motion_scale " + scaleClass });
+    let unpivot = kit_ear_el("g", {
+        "data-kit-unpivot": "1",
+        transform: "translate(" + (-cx) + " " + (-cy) + ")"
+    });
+    parent.insertBefore(pivot, el);
+    pivot.appendChild(scaleG);
+    scaleG.appendChild(unpivot);
+    unpivot.appendChild(el);
+    return scaleG;
+}
+
+function kit_ear_wrap_children_for_scale(earInner, cx, cy, scaleClass) {
+    let existing = earInner.querySelector(":scope > .kit_ear_pivot");
+    if (existing) {
+        let scaleG = existing.querySelector(".kit_ear_motion_scale");
+        if (scaleG) return scaleG;
+    }
+    let fx = kit_ear_ensure_fx(earInner);
+    let pivot = kit_ear_el("g", {
+        class: "kit_ear_pivot",
+        transform: "translate(" + cx + " " + cy + ")"
+    });
+    let scaleG = kit_ear_el("g", { class: "kit_ear_motion_scale " + scaleClass });
+    let unpivot = kit_ear_el("g", {
+        "data-kit-unpivot": "1",
+        transform: "translate(" + (-cx) + " " + (-cy) + ")"
+    });
+    Array.from(earInner.children).forEach((ch) => {
+        if (ch !== fx) unpivot.appendChild(ch);
+    });
+    scaleG.appendChild(unpivot);
+    pivot.appendChild(scaleG);
+    earInner.insertBefore(pivot, fx);
+    return scaleG;
+}
+
+function kit_ear_add_smil(el, attrs) {
+    let anim = kit_ear_el("animateTransform", Object.assign({
+        class: "kit_ear_anim kit_ear_wiggle_anim",
+        attributeName: "transform",
+        attributeType: "XML"
+    }, attrs));
+    el.appendChild(anim);
+    return anim;
+}
+
+function kit_ear_rotate_values(angles, cx, cy) {
+    return angles.map((a) => a + " " + cx + " " + cy).join("; ");
+}
+
+function kit_ear_clock_steps(stepDeg, nSteps) {
+    let angles = [];
+    for (let i = 0; i <= nSteps; i++) angles.push(i * stepDeg);
+    return angles;
+}
+
+function apply_kit_ear_mechanical(earInner, earIndex) {
+    let specs = [
+        { sel: ".sprocket_upper", step: 20, ticks: 18, dur: 7.4, extraBegin: 0 },
+        { sel: ".sprocket_lower", step: 30, ticks: 12, dur: 5.1, extraBegin: 0.24 },
+        {
+            sel: ".sprocket_middle",
+            angles: [0, 12, 25, 12, 0, -12, -25, -12, 0],
+            dur: 4.6,
+            extraBegin: 0.12
+        }
+    ];
+    specs.forEach((spec) => {
+        let sprocket = earInner.querySelector(spec.sel);
+        if (!sprocket) return;
+        if (sprocket.querySelector("animateTransform.kit_ear_anim")) return;
+        let pt = kit_ear_point(sprocket, ".sprocket_rotation_point");
+        let angles = spec.angles || kit_ear_clock_steps(spec.step, spec.ticks);
+        kit_ear_add_smil(sprocket, {
+            type: "rotate",
+            values: kit_ear_rotate_values(angles, pt.x, pt.y),
+            calcMode: "discrete",
+            dur: spec.dur + "s",
+            repeatCount: "indefinite",
+            begin: (earIndex * 0.2 + spec.extraBegin) + "s"
+        });
+    });
+}
+
+function apply_kit_ear_bat(earInner, earIndex) {
+    let attach = kit_ear_point(earInner, ".ear_marker");
+    let scaleG = kit_ear_wrap_children_for_scale(earInner, attach.x, attach.y, "kit_ear_bat_flutter");
+    if (!scaleG || scaleG.querySelector("animateTransform.kit_ear_anim")) return;
+    kit_ear_add_smil(scaleG, {
+        type: "scale",
+        values: "1 1; 1.11 0.9; 0.9 1.1; 1.08 0.93; 0.96 1.05; 1 1; 1 1",
+        keyTimes: "0; 0.019; 0.041; 0.063; 0.085; 0.102; 1",
+        calcMode: "spline",
+        keySplines: "0.37 0 0.63 1; 0.37 0 0.63 1; 0.37 0 0.63 1; 0.37 0 0.63 1; 0.37 0 0.63 1; 0 0 1 1",
+        dur: "11.3s",
+        repeatCount: "indefinite",
+        begin: (earIndex * 0.18) + "s"
+    });
+}
+
+function apply_kit_ear_mushroom(earInner, root, earIndex) {
+    let cap = earInner.querySelector(".cap");
+    if (!cap) return;
+    let attach = kit_ear_point(cap, ".cap_attachment_point");
+    let scaleG = kit_ear_wrap_element_for_scale(cap, attach.x, attach.y, "kit_ear_cap_squash");
+    if (!scaleG) return;
+    let anim = scaleG.querySelector("animateTransform.kit_ear_anim");
+    if (!anim) {
+        anim = kit_ear_add_smil(scaleG, {
+            type: "scale",
+            values: "1 1; 1.16 0.78; 1.05 0.94; 1 1",
+            keyTimes: "0; 0.38; 0.7; 1",
+            dur: "0.72s",
+            begin: "indefinite",
+            fill: "freeze",
+            restart: "always"
+        });
+    }
+    let fx = kit_ear_ensure_fx(earInner);
+    let points = Array.from(earInner.querySelectorAll(".spore_release_point")).map((el) => ({
+        x: parseFloat(el.getAttribute("cx") || "0") || 0,
+        y: parseFloat(el.getAttribute("cy") || "0") || 0
+    }));
+    let beat = () => {
+        if (!kit_ear_is_live(root)) return;
+        try { if (typeof anim.beginElement === "function") anim.beginElement(); } catch (err) {}
+        points.forEach((pt, i) => {
+            let n = 1 + Math.floor(Math.random() * 2);
+            for (let s = 0; s < n; s++) {
+                kit_ear_schedule(root, i * 40 + s * 55, () => kit_ear_spawn_spore(fx, pt.x, pt.y, root));
+            }
+        });
+        kit_ear_schedule(root, 9600 + Math.random() * 4400, beat);
+    };
+    kit_ear_schedule(root, 420 + earIndex * 900, beat);
+}
+
+function apply_kit_ear_seashell(earInner, root, earIndex) {
+    let attach = kit_ear_point(earInner, ".ear_marker");
+    let scaleG = kit_ear_wrap_children_for_scale(earInner, attach.x, attach.y, "kit_ear_shell_squeeze");
+    if (!scaleG) return;
+    let anim = scaleG.querySelector("animateTransform.kit_ear_anim");
+    if (!anim) {
+        anim = kit_ear_add_smil(scaleG, {
+            type: "scale",
+            values: "1 1; 0.93 1.07; 1.04 0.97; 1 1",
+            keyTimes: "0; 0.32; 0.62; 1",
+            dur: "0.48s",
+            begin: "indefinite",
+            fill: "freeze",
+            restart: "always"
+        });
+    }
+    let fx = kit_ear_ensure_fx(earInner);
+    let sprout = kit_ear_point(earInner, ".water_sprout");
+    let beat = () => {
+        if (!kit_ear_is_live(root)) return;
+        try { if (typeof anim.beginElement === "function") anim.beginElement(); } catch (err) {}
+        kit_ear_schedule(root, 160, () => kit_ear_spawn_water(fx, sprout.x, sprout.y, root));
+        kit_ear_schedule(root, 12400 + Math.random() * 4400, beat);
+    };
+    kit_ear_schedule(root, 700 + earIndex * 1100, beat);
+}
+
+function kit_ear_spawn_spore(fx, x, y, root) {
+    if (!fx || !kit_ear_is_live(root)) return;
+    let r = 3.4 + Math.random() * 3.2;
+    let spore = kit_ear_el("circle", {
+        class: "kit_ear_particle kit_ear_spore",
+        cx: String(x + (Math.random() - 0.5) * 8),
+        cy: String(y + (Math.random() - 0.5) * 6),
+        r: String(r),
+        fill: KIT_EAR_SPORE_FILLS[Math.floor(Math.random() * KIT_EAR_SPORE_FILLS.length)],
+        stroke: "#111",
+        "stroke-width": "1.7"
+    });
+    spore.style.pointerEvents = "none";
+    spore.style.opacity = "0.95";
+    spore.style.transform = "translate(0px, 0px)";
+    fx.appendChild(spore);
+    let drift = (Math.random() - 0.5) * 46;
+    requestAnimationFrame(() => {
+        if (!kit_ear_is_live(root) || !spore.parentNode) {
+            if (spore.parentNode) spore.parentNode.removeChild(spore);
+            return;
+        }
+        spore.style.transition = "transform 1.15s cubic-bezier(0.4, 0, 1, 1)";
+        spore.style.transform = "translate(" + drift + "px, 200px)";
+        kit_ear_schedule(root, 1150, () => {
+            if (!spore.parentNode) return;
+            spore.style.transition = "opacity 1s ease-in";
+            spore.style.opacity = "0";
+            kit_ear_schedule(root, 1050, () => {
+                if (spore.parentNode) spore.parentNode.removeChild(spore);
+            });
+        });
+    });
+}
+
+function kit_ear_spawn_water(fx, x, y, root) {
+    if (!fx || !kit_ear_is_live(root)) return;
+    let count = 5 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < count; i++) {
+        kit_ear_schedule(root, i * 28, () => {
+            if (!kit_ear_is_live(root)) return;
+            let drop = kit_ear_el("g", { class: "kit_ear_particle kit_ear_droplet" });
+            let rx = 6.2 + Math.random() * 4.4;
+            let body = kit_ear_el("ellipse", {
+                rx: String(rx),
+                ry: String(rx * 1.35),
+                fill: KIT_EAR_DROP_FILLS[Math.floor(Math.random() * KIT_EAR_DROP_FILLS.length)],
+                stroke: "#111",
+                "stroke-width": "1.7"
+            });
+            let shine = kit_ear_el("ellipse", {
+                rx: String(rx * 0.35),
+                ry: String(rx * 0.42),
+                cy: String(-rx * 0.35),
+                fill: "#fff",
+                opacity: "0.45"
+            });
+            drop.appendChild(body);
+            drop.appendChild(shine);
+            drop.style.pointerEvents = "none";
+            drop.style.opacity = "0.95";
+            drop.style.transform = "translate(" + x + "px, " + y + "px)";
+            fx.appendChild(drop);
+            let dx = (Math.random() - 0.5) * 36;
+            let up = 42 + Math.random() * 38;
+            requestAnimationFrame(() => {
+                if (!kit_ear_is_live(root) || !drop.parentNode) {
+                    if (drop.parentNode) drop.parentNode.removeChild(drop);
+                    return;
+                }
+                drop.style.transition = "transform 0.28s cubic-bezier(0.15, 0.75, 0.25, 1)";
+                drop.style.transform = "translate(" + (x + dx) + "px, " + (y - up) + "px)";
+                kit_ear_schedule(root, 280, () => {
+                    if (!drop.parentNode) return;
+                    drop.style.transition = "transform 0.9s cubic-bezier(0.4, 0, 1, 1), opacity 0.7s ease-in";
+                    drop.style.transform = "translate(" + (x + dx * 1.15) + "px, " + (y + 170) + "px)";
+                    kit_ear_schedule(root, 280, () => { drop.style.opacity = "0"; });
+                    kit_ear_schedule(root, 950, () => {
+                        if (drop.parentNode) drop.parentNode.removeChild(drop);
+                    });
+                });
+            });
+        });
+    }
+}
+
+function apply_kit_ear_wiggle(root) {
+    if (!root) return;
+    kit_ear_stop_timers(root);
+    kit_ear_strip_motion(root);
+    root.classList.remove("fennimal_pose_frozen");
+    root.classList.add("kit_ear_live");
+    let ears = Array.from(root.querySelectorAll(".kit_ear_wiggle"));
+    ears.forEach((el, i) => {
+        let token = kit_ear_token_name(el);
+        kit_ear_ensure_fx(el);
+        if (token === "mechanical") apply_kit_ear_mechanical(el, i);
+        else if (token === "bat") apply_kit_ear_bat(el, i);
+        else if (token === "mushroom") apply_kit_ear_mushroom(el, root, i);
+        else if (token === "seashell") apply_kit_ear_seashell(el, root, i);
+    });
+}
+
+function kit_stamp_nodes(root) {
+    if (!root) return [];
+    return Array.from(root.querySelectorAll("[data-kit-role='stamp_left'], [data-kit-role='stamp_right']"));
+}
+
+function kit_stamp_strip(root) {
+    if (!root) return;
+    root.classList.remove("kit_stamp_lighting");
+    root.querySelectorAll("animate.kit_stamp_anim, animateTransform.kit_stamp_anim").forEach((el) => {
+        try { if (typeof el.endElement === "function") el.endElement(); } catch (err) {}
+        if (el.parentNode) el.parentNode.removeChild(el);
+    });
+    root.querySelectorAll(".kit_stamp_spec, .kit_stamp_shadow_filter, .kit_stamp_shadow_blob").forEach((el) => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+    });
+    root.querySelectorAll(".kit_stamp_press, .kit_stamp_expr, .kit_stamp_motion").forEach((el) => {
+        el.removeAttribute("transform");
+        el.removeAttribute("filter");
+        el.style.transform = "";
+        el.style.filter = "";
+        el.style.animation = "";
+    });
+}
+
+function kit_stamp_ensure_motion(stamp) {
+    if (!stamp) return null;
+    let existing = stamp.querySelector(":scope > .kit_stamp_motion");
+    if (existing) {
+        let press = existing.querySelector(".kit_stamp_press");
+        if (press) {
+            press.querySelectorAll(":scope > animateTransform.kit_stamp_anim").forEach((el) => {
+                if (el.parentNode) el.parentNode.removeChild(el);
+            });
+            press.appendChild(kit_stamp_press_anim());
+        }
+        return existing;
+    }
+    let pt = kit_ear_point(stamp, ".stamp_marker");
+    let motion = kit_ear_el("g", { class: "kit_stamp_motion" });
+    let expr = kit_ear_el("g", { class: "kit_stamp_expr" });
+    let pivot = kit_ear_el("g", {
+        class: "kit_stamp_pivot",
+        transform: "translate(" + pt.x + " " + pt.y + ")"
+    });
+    let press = kit_ear_el("g", { class: "kit_stamp_press" });
+    let unpivot = kit_ear_el("g", {
+        transform: "translate(" + (-pt.x) + " " + (-pt.y) + ")"
+    });
+    while (stamp.firstChild) unpivot.appendChild(stamp.firstChild);
+    press.appendChild(unpivot);
+    press.appendChild(kit_stamp_press_anim());
+    pivot.appendChild(press);
+    expr.appendChild(pivot);
+    motion.appendChild(expr);
+    stamp.appendChild(motion);
+    return motion;
+}
+
+function kit_stamp_press_anim() {
+    return kit_ear_el("animateTransform", {
+        class: "kit_stamp_anim",
+        attributeName: "transform",
+        attributeType: "XML",
+        type: "scale",
+        values: "1.32 1.32; 1.26 1.26; 0.9 0.9; 1.04 1.04; 1 1",
+        keyTimes: "0; 0.16; 0.42; 0.7; 1",
+        dur: "0.72s",
+        begin: "indefinite",
+        fill: "freeze",
+        restart: "always",
+        calcMode: "spline",
+        keySplines: "0.2 0.7 0.3 1; 0.3 0 0.5 1; 0.2 0.7 0.3 1; 0.2 0.6 0.3 1"
+    });
+}
+
+function kit_stamp_clear_shadow(motion) {
+    if (!motion) return;
+    motion.removeAttribute("filter");
+    motion.style.filter = "";
+    motion.style.animation = "";
+    let host = motion.parentNode || motion;
+    host.querySelectorAll(":scope > .kit_stamp_shadow_filter, :scope > defs.kit_stamp_shadow_filter").forEach((el) => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+    });
+    motion.querySelectorAll(".kit_stamp_shadow_filter, .kit_stamp_shadow_blob, .kit_stamp_spec").forEach((el) => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+    });
+}
+
+function kit_stamp_add_shadow(motion, index) {
+    if (!motion) return;
+    kit_stamp_clear_shadow(motion);
+    let stamp = motion.parentNode;
+    let pt = kit_ear_point(stamp, ".stamp_marker");
+    let begin = (index * 0.85) + "s";
+    let blob = kit_ear_el("g", {
+        class: "kit_stamp_shadow_blob",
+        transform: "translate(" + pt.x + " " + (pt.y + 12) + ")",
+        "pointer-events": "none"
+    });
+    let oval = kit_ear_el("ellipse", {
+        cx: "0",
+        cy: "0",
+        rx: "30",
+        ry: "16",
+        fill: "#1a120c",
+        "fill-opacity": "0.28"
+    });
+    oval.appendChild(kit_ear_el("animate", {
+        class: "kit_stamp_anim",
+        attributeName: "fill-opacity",
+        values: "0.18; 0.72; 0.18",
+        dur: "2.6s",
+        repeatCount: "indefinite",
+        begin: begin
+    }));
+    oval.appendChild(kit_ear_el("animate", {
+        class: "kit_stamp_anim",
+        attributeName: "rx",
+        values: "22; 38; 22",
+        dur: "2.6s",
+        repeatCount: "indefinite",
+        begin: begin
+    }));
+    oval.appendChild(kit_ear_el("animate", {
+        class: "kit_stamp_anim",
+        attributeName: "ry",
+        values: "11; 22; 11",
+        dur: "2.6s",
+        repeatCount: "indefinite",
+        begin: begin
+    }));
+    blob.appendChild(oval);
+    motion.insertBefore(blob, motion.firstChild);
+}
+
+function set_kit_stamp_expression(root, expression) {
+    if (!root || !root.classList) return;
+    root.classList.remove("kit_stamp_mood_happy", "kit_stamp_mood_sad");
+    if (expression === "happy") root.classList.add("kit_stamp_mood_happy");
+    else if (expression === "sad") root.classList.add("kit_stamp_mood_sad");
+}
+
+function apply_kit_stamp_salience(root, options) {
+    if (!root) return;
+    options = options || {};
+    kit_stamp_nodes(root).forEach((stamp, i) => {
+        let motion = kit_stamp_ensure_motion(stamp);
+        kit_stamp_clear_shadow(motion);
+        if (options.lighting) kit_stamp_add_shadow(motion, i);
+    });
+    root.classList.toggle("kit_stamp_lighting", !!options.lighting);
+    set_kit_stamp_expression(root, options.expression || null);
+    if (options.lighting || options.expression || options.press) {
+        root.classList.add("kit_stamp_live");
+        root.classList.remove("fennimal_pose_frozen");
+    } else {
+        root.classList.remove("kit_stamp_live", "kit_stamp_lighting");
+    }
+}
+
+function play_kit_stamp_press(root) {
+    if (!root) return;
+    kit_stamp_nodes(root).forEach((stamp, i) => {
+        kit_stamp_ensure_motion(stamp);
+        let anim = stamp.querySelector(".kit_stamp_press > animateTransform.kit_stamp_anim");
+        if (!anim) return;
+        let fire = function () {
+            try { if (typeof anim.beginElement === "function") anim.beginElement(); } catch (err) {}
+        };
+        if (i === 0) fire();
+        else if (root.classList.contains("kit_ear_live")) kit_ear_schedule(root, i * 45, fire);
+        else setTimeout(fire, i * 45);
     });
 }
 
@@ -1148,6 +1718,28 @@ function _circle_center(el) {
     return { x: cx, y: cy };
 }
 
+function pick_fennimal_layout_point(root, className) {
+    if (!root) return null;
+    let nodes = root.getElementsByClassName(className);
+    let fallback = nodes[0] || null;
+    for (let i = 0; i < nodes.length; i++) {
+        if (_circle_center(nodes[i])) return nodes[i];
+    }
+    return fallback;
+}
+
+function svg_screen_point_from_element(el) {
+    if (!el || !GenParam || !GenParam.SVGObject) return null;
+    let local = _circle_center(el) || _local_bbox_center(el);
+    if (!local) return null;
+    let ctm = typeof el.getScreenCTM === "function" ? el.getScreenCTM() : null;
+    if (!ctm) return null;
+    let pt = GenParam.SVGObject.createSVGPoint();
+    pt.x = local.x;
+    pt.y = local.y;
+    return pt.matrixTransform(ctm);
+}
+
 function _local_bbox_center(el) {
     if (!el) return null;
     try {
@@ -1244,6 +1836,7 @@ function create_Fennimal_SVG_object_head_only(FenObj, outline_only, include_hat)
     let HeadSVG = HeadTemplate.cloneNode(true)
     HeadSVG.removeAttribute("id") // avoid duplicate ids with the template in #All_Heads
     HeadSVG.style.display = "inherit"
+    set_Fennimal_color_classes(HeadSVG)
     HeadScaleGroup.appendChild(HeadSVG)
 
     if (include_hat) {

@@ -1,12 +1,36 @@
 let StimulusSettings = function () {
 
     this.Experiment_Code = ["feature_kit_combo_pilot"];
-    // Live default: feature_kit_combo_pilot. Other codes: feature_kit_pilot | semantic_learning_star | mentalizing_between_subjects
-    // Override (no file edit): ?EXP=semantic_learning_star&SEED=slides01&SKIP_INTRO=1
+    // Live default: feature_kit_combo_pilot. Other codes: feature_kit_pilot |
+    // semantic_learning_kit | semantic_learning_star | mentalizing_between_subjects.
+    // Override (no file edit): ?EXP=semantic_learning_kit&SEED=kitlive09&SKIP_INTRO=1
     // Archived recipes: archive/experiments/ (see archive/MANIFEST.md)
 
+    // Independent of Heads.svg token ids so kit Fennimals are not named "the elephant one".
+    const KIT_NAME_POOL = ["Pip", "Loma", "Nedd", "Sora", "Vell", "Kiri", "Tams", "Orin"];
+
+    // Three disjoint recipes shuffled onto head codes {B, C, D}. A clones B's
+    // recipe (shared head). Bald re-pilot: hair is "none" on every face so hats
+    // cannot hide a jumble slot. Unused tokens: tall, mushroom, slanted, shark,
+    // and all hair (tuft, feathers, flowers, antlers).
+    const KIT_RECIPES = [
+        { id: "R1", shell: "pear", ear: "bat", eye: "round", lowerFace: "elephant", hair: "none", stamp: "none", expression: "happy" },
+        { id: "R2", shell: "point", ear: "seashell", eye: "square", lowerFace: "pig", hair: "none", stamp: "none", expression: "happy" },
+        { id: "R3", shell: "wide", ear: "mechanical", eye: "egg", lowerFace: "cat", hair: "none", stamp: "none", expression: "happy" }
+    ];
+
+    // C-vs-D jumbles. Hair is pinned (all faces bald) and does not contest.
+    // Remaining four slots are three complementary 2-vs-2 coalitions; reverse
+    // = C↔D on every slot, so direction of effect is still a chance control.
+    const KIT_JUMBLES = {
+        X: { shell: "C", ear: "C", eye: "D", lowerFace: "D", hair: "C", stamp: "C" }, // shell+ear vs eye+mouth
+        Y: { shell: "C", ear: "D", eye: "C", lowerFace: "D", hair: "C", stamp: "C" }, // shell+eye vs ear+mouth
+        Z: { shell: "C", ear: "D", eye: "D", lowerFace: "C", hair: "C", stamp: "C" }  // shell+mouth vs ear+eye
+    };
+
     const All_Instructions_At_Start = {
-        semantic_learning_star: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview"],
+        semantic_learning_star: [], //"browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview"
+        semantic_learning_kit: [], // ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview"],
         mentalizing_between_subjects: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
         feature_kit_pilot: ["browser_check_and_full_screen_prompt", "consent", "single_sitting"],
         feature_kit_combo_pilot: ["browser_check_and_full_screen_prompt", "consent", "single_sitting"],
@@ -28,8 +52,16 @@ let StimulusSettings = function () {
         semantic_learning_star: {
             "A": { head: "B", region: "A", toy: "A", hat: "A" },
             "B": { head: "B", region: "B", toy: "B", hat: "B" },
-            "C": { head: "C", region: "B", toy: "C", hat: "C" },
+            "C": { head: "C", region: "B", toy: "C", hat: "C"},
             "D": { head: "D", region: "D", toy: "B", hat: "D" },
+        },
+
+        // Same star graph as semantic_learning_star: A and B share head B.
+        semantic_learning_kit: {
+            "A": { head: "B", region: "A", toy: "A", hat: "A" },
+            "B": { head: "B", region: "B", toy: "B", hat: "B" },
+            "C": { head: "C", region: "B", toy: "C", hat: "C" , food_preference: "C" },
+            "D": { head: "D", region: "D", toy: "B", hat: "D" , food_preference: "D"},
         },
 
         mentalizing_between_subjects: {
@@ -317,7 +349,8 @@ let StimulusSettings = function () {
                 n_tokens_sampled: 3,
                 n_duel_reps: 3,
                 n_catch: 3,
-                adaptive: true
+                adaptive: true,
+                exclude_slots: ["hair"]
             }
         ],
         feature_kit_combo_pilot: [
@@ -328,16 +361,130 @@ let StimulusSettings = function () {
                 skip_practice: false,
                 partner_behavior: "absent",
                 trial_speed: 7500,
-                n_tokens_sampled: 3,
+                n_tokens_sampled: 4,
                 n_duel_reps: 2,
                 n_catch: 3,
-                adaptive: true
+                n_adaptive_duels: 16,
+                adaptive: true,
+                exclude_slots: ["hair"]
             }
         ],
     };
 
+    All_Experiment_Structures.semantic_learning_kit = JSON.parse(
+        JSON.stringify(All_Experiment_Structures.semantic_learning_star)
+    );
+    (function patchKitTraining() {
+        let phases = All_Experiment_Structures.semantic_learning_kit || [];
+        let binding = phases.find((p) => p && p.type === "hat_binding_task");
+        if (binding) {
+            // Always include hub-arm A so the triad is ABC (head+region) or ABD (head+toy).
+            binding.allowed_arm_pairs = [["A", "C"], ["A", "D"]];
+            binding.always_include_arm = "A";
+        }
+
+        let recallIdx = phases.findIndex((p) => p && p.type === "name_recall_task");
+        if (recallIdx >= 0) {
+            phases[recallIdx] = {
+                type: "phone_room",
+                skip_instructions: false,
+                partner_behavior: "absent",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: true,
+                randomization_id: "food_transfer_layout",
+                bonus_stars_per_correct_answer: 2,
+                day_title: "snack time",
+                day_body:
+                    "The Fennimals are getting hungry. The phone will ring when someone wants a snack. " +
+                    "Answer the phone, travel there, and give them the food they like.",
+                trial_subblocks: [
+                    {
+                        Fennimals_encountered: ["C", "D"],
+                        interaction_type: "Fennimal_food"
+                    },
+                    {
+                        trials: [
+                            { Fennimal: "A", interaction_type: "Fennimal_food_transfer" }
+                        ]
+                    }
+                ]
+            };
+        }
+
+        let morph = phases.find((p) => p && p.type === "morph_task");
+        if (!morph) return;
+        morph.jumble_source = "feature_kit";
+        morph.morphs = ["kit"];
+        morph.trial_speed = 7500;
+        morph.prime_quiz = "hat_from_name";
+        morph.allow_prime_as_parent = true;
+        morph.show_head_on_prime = false;
+        morph.response_key_icons = "names";
+        delete morph.mixes;
+        delete morph.pairs;
+        delete morph.kit_polarities;
+        delete morph.kit_partitions;
+        morph.day_body =
+            "The camera glitched this morning. Each polaroid has two shots: a small picture on the left, and a mixed picture on the right.<br><br>" +
+            "When a name appears, pick the hat that Fennimal wears (F / J to move, Space to confirm). The correct hat is then stamped on the polaroid. Sometimes the small picture stays empty — there is no one to name, just the mix.<br><br>" +
+            "Then the mix is uncovered — two Fennimals in one frame. Use F and J to pick which name the mix looks like, as quickly as you can. Faster answers leave more points (100 points = 1 bonus star). An incorrect answer quietly costs points — there is no trial-by-trial feedback.<br><br>" +
+            "We will start with two practice rounds using simple shapes.";
+
+        const reverseJumble = (jumble) => {
+            let out = {};
+            Object.keys(jumble || {}).forEach((slot) => {
+                let v = jumble[slot];
+                out[slot] = v === "C" ? "D" : (v === "D" ? "C" : v);
+            });
+            return out;
+        };
+        const kitTrial = (id, mixId, polarity, jumble, prime, extra) => Object.assign({
+            id: id,
+            fenA: "C",
+            fenB: "D",
+            target: "C",
+            mix: 50,
+            morph: "kit",
+            jumble_source: "feature_kit",
+            kit_mix_id: mixId,
+            kit_polarity: polarity,
+            jumble: JSON.parse(JSON.stringify(jumble)),
+            prime: prime
+        }, extra || {});
+
+        // 6 pictures (X,Y,Z and reverses) × (2 A-prime + 2 none-prime) = 24,
+        // plus 4 C/D-prime pattern-breakers (X→C, X′→D, Y→D, Y′→C) = 28 paid.
+        let trials = [];
+        let breakers = { X: "C", Xp: "D", Y: "D", Yp: "C" };
+        ["X", "Y", "Z"].forEach((base) => {
+            let fwd = KIT_JUMBLES[base];
+            [
+                { id: base, jumble: fwd, pol: 0 },
+                { id: base + "p", jumble: reverseJumble(fwd), pol: 1 }
+            ].forEach((mix) => {
+                trials.push(kitTrial("kit_" + mix.id + "_A_1", mix.id, mix.pol, mix.jumble, "A"));
+                trials.push(kitTrial("kit_" + mix.id + "_A_2", mix.id, mix.pol, mix.jumble, "A"));
+                trials.push(kitTrial("kit_" + mix.id + "_none_1", mix.id, mix.pol, mix.jumble, "none"));
+                trials.push(kitTrial("kit_" + mix.id + "_none_2", mix.id, mix.pol, mix.jumble, "none"));
+                let br = breakers[mix.id];
+                if (br) {
+                    trials.push(kitTrial(
+                        "kit_" + mix.id + "_" + br,
+                        mix.id,
+                        mix.pol,
+                        mix.jumble,
+                        br,
+                        { kind: "pattern_breaker", role: "pattern_breaker" }
+                    ));
+                }
+            });
+        });
+        morph.trials = trials;
+    })();
+
     const All_Questionnaire_Page_sets = {
         semantic_learning_star: ["demographics_questionnaire"],
+        semantic_learning_kit: ["demographics_questionnaire"],
         mentalizing_between_subjects: ["demographics_questionnaire"],
         feature_kit_pilot: [],
         feature_kit_combo_pilot: [],
@@ -347,6 +494,7 @@ let StimulusSettings = function () {
     const All_Banned_Head_Lists = {};
     const All_Forced_Head_Lists = {
         semantic_learning_star: ["bell", "pig", "bun"],
+        semantic_learning_kit: ["bell"],
         mentalizing_between_subjects: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
         feature_kit_pilot: ["bell"],
         feature_kit_combo_pilot: ["bell"],
@@ -373,7 +521,7 @@ let StimulusSettings = function () {
     if (!this.Experiment_Structure || !this.Fennimal_Dictionary) {
         throw new Error(
             'Unknown experiment code "' + this.Experiment_Code + '". ' +
-            'Live codes: semantic_learning_star, mentalizing_between_subjects, feature_kit_pilot, feature_kit_combo_pilot. ' +
+            'Live codes: semantic_learning_star, semantic_learning_kit, mentalizing_between_subjects, feature_kit_pilot, feature_kit_combo_pilot. ' +
             'Archived recipes are in archive/experiments/ (see archive/MANIFEST.md).'
         );
     }
@@ -386,6 +534,10 @@ let StimulusSettings = function () {
     this.forced_heads = All_Forced_Head_Lists[this.Experiment_Code] || false;
     this.allowed_head_groups = All_Allowed_Head_Groups_List[this.Experiment_Code] || false;
     this.banned_head_groups = All_Banned_Head_Groups_List[this.Experiment_Code] || false;
+
+    this.head_source = this.Experiment_Code === "semantic_learning_kit" ? "feature_kit" : "svg";
+    this.kit_recipes = this.head_source === "feature_kit" ? KIT_RECIPES : null;
+    this.kit_name_pool = KIT_NAME_POOL.slice();
 
     this.use_region_preferred_body_types = true;
     this.preferred_region_sample_order = [["Jungle", "Village", "North", "Desert"], ["Beach", "Mountains", "Flowerfields", "Swamp"]]; // [["Jungle", "Village", "North", "Desert","Beach", "Mountains", "Flowerfields", "Swamp"]] // [["Jungle", "Village", "North", "Desert"], ["Beach", "Mountains", "Flowerfields", "Swamp"]];
@@ -782,7 +934,18 @@ let StimulusTransformer = function (StimTemplate) {
             let Map = {};
             let UnMappedItems = {};
 
-            if (Variable_Features.head) Map.head = match_head_codes_to_head_names();
+            if (StimTemplate.head_source === "feature_kit") {
+                Map.head = {};
+                let seen = {};
+                Object.keys(StimTemplate.Fennimal_Dictionary || {}).forEach((fenId) => {
+                    let code = StimTemplate.Fennimal_Dictionary[fenId].head || fenId;
+                    if (seen[code]) return;
+                    seen[code] = true;
+                    Map.head[code] = "kit" + code;
+                });
+            } else if (Variable_Features.head) {
+                Map.head = match_head_codes_to_head_names();
+            }
 
             if (Variable_Features.region) {
                 Map.region = {};
@@ -833,8 +996,58 @@ let StimulusTransformer = function (StimTemplate) {
     // ----------------------------------------------------
     // CREATING FINAL STIMULI
     // ----------------------------------------------------
+    function assertDisjointKitRecipes(recipes) {
+        let slots = ["shell", "ear", "eye", "lowerFace", "hair", "stamp"];
+        slots.forEach((slot) => {
+            let tokens = recipes.map((r) => r && r[slot]);
+            let meaningful = tokens.filter((t) => t != null && t !== "" && t !== "none");
+            if (meaningful.length === 0) return;
+            let unique = new Set(tokens.filter((t) => t != null && t !== ""));
+            if (unique.size !== recipes.length) {
+                throw new Error(
+                    'semantic_learning_kit recipes must be disjoint on "' + slot + '" (got [' +
+                    tokens.join(", ") + "])."
+                );
+            }
+        });
+    }
+
+    function assignKitRecipesToHeadCodes(Dict) {
+        let recipes = (StimTemplate.kit_recipes || []).slice();
+        if (!Array.isArray(recipes) || recipes.length < 3) {
+            throw new Error("semantic_learning_kit needs at least 3 kit_recipes to shuffle onto head codes B, C, D.");
+        }
+        assertDisjointKitRecipes(recipes);
+        let headCodes = [];
+        let seen = {};
+        Object.keys(Dict || {}).forEach((fenId) => {
+            let code = Dict[fenId].head || fenId;
+            if (seen[code]) return;
+            seen[code] = true;
+            headCodes.push(code);
+        });
+        if (recipes.length < headCodes.length) {
+            throw new Error(
+                "semantic_learning_kit has " + headCodes.length + " head codes but only " +
+                recipes.length + " recipes."
+            );
+        }
+        let shuffled = shuffleArray(recipes.slice());
+        let byCode = {};
+        headCodes.forEach((code, i) => {
+            byCode[code] = JSON.parse(JSON.stringify(shuffled[i]));
+        });
+        return byCode;
+    }
+
     function create_Fennimals_from_stimulus_template(Dict, Map) {
         let Arr = [];
+        let kitNames = StimTemplate.head_source === "feature_kit"
+            ? shuffleArray((StimTemplate.kit_name_pool || []).slice())
+            : [];
+        let kitRecipeByHeadCode = StimTemplate.head_source === "feature_kit"
+            ? assignKitRecipesToHeadCodes(Dict)
+            : null;
 
         let Region_in_map = Object.values(Map.region || {}).map(r => r.region);
         let Unmapped_regions = StimTemplate.preferred_region_sample_order.flat().filter(x => !Region_in_map.includes(x));
@@ -871,20 +1084,34 @@ let StimulusTransformer = function (StimTemplate) {
             }
 
             // Head & Name
-            FenObj.head = Map.head[req.head];
-            if (!FenObj.head) {
-                throw new Error(
-                    `Fennimal "${fenID}" head code "${req.head}" did not resolve to an SVG head id. ` +
-                    `Check head_group / head_cluster (matcher maps groups by size onto SVG categories).`
-                );
-            }
+            if (StimTemplate.head_source === "feature_kit") {
+                let headCode = req.head || fenID;
+                FenObj.head = Map.head[headCode];
+                if (!FenObj.head) {
+                    throw new Error('Fennimal "' + fenID + '" head code "' + headCode + '" did not map to a kit template.');
+                }
+                let recipe = kitRecipeByHeadCode && kitRecipeByHeadCode[headCode];
+                if (!recipe) {
+                    throw new Error('Fennimal "' + fenID + '" is missing a kit recipe for head code "' + headCode + '".');
+                }
+                FenObj.kit_recipe = JSON.parse(JSON.stringify(recipe));
+                FenObj.name = kitNames.shift() || ("Fen " + fenID);
+            } else {
+                FenObj.head = Map.head[req.head];
+                if (!FenObj.head) {
+                    throw new Error(
+                        `Fennimal "${fenID}" head code "${req.head}" did not resolve to an SVG head id. ` +
+                        `Check head_group / head_cluster (matcher maps groups by size onto SVG categories).`
+                    );
+                }
 
-            if (StimTemplate.name_is_determined_as === "head") {
-                if (All_Names[FenObj.head] && All_Names[FenObj.head].length > 0) {
-                    FenObj.name = All_Names[FenObj.head].shift();
-                } else {
-                    FenObj.name = capitalize_first_letter_in_string(FenObj.head);
-                    console.warn(`No custom names left for ${FenObj.head}. Using default.`);
+                if (StimTemplate.name_is_determined_as === "head") {
+                    if (All_Names[FenObj.head] && All_Names[FenObj.head].length > 0) {
+                        FenObj.name = All_Names[FenObj.head].shift();
+                    } else {
+                        FenObj.name = capitalize_first_letter_in_string(FenObj.head);
+                        console.warn(`No custom names left for ${FenObj.head}. Using default.`);
+                    }
                 }
             }
 
@@ -928,6 +1155,27 @@ let StimulusTransformer = function (StimTemplate) {
     }
 
     const FennimalObjArr = create_Fennimals_from_stimulus_template(StimTemplate.Fennimal_Dictionary, FeatureMap);
+    let kitRoster = null;
+
+    function rebuildKitRosterFromFennimals() {
+        if (StimTemplate.head_source !== "feature_kit") {
+            kitRoster = null;
+            return;
+        }
+        kitRoster = { recipes: {}, names: {}, headIds: {}, recipesByHeadId: {} };
+        FennimalObjArr.forEach((fen) => {
+            if (!fen || !fen.id) return;
+            kitRoster.headIds[fen.id] = fen.head;
+            kitRoster.names[fen.id] = fen.name;
+            kitRoster.recipes[fen.id] = fen.kit_recipe
+                ? JSON.parse(JSON.stringify(fen.kit_recipe))
+                : null;
+            if (fen.head && fen.kit_recipe && !kitRoster.recipesByHeadId[fen.head]) {
+                kitRoster.recipesByHeadId[fen.head] = JSON.parse(JSON.stringify(fen.kit_recipe));
+            }
+        });
+    }
+    rebuildKitRosterFromFennimals();
 
     // ----------------------------------------------------
     // ITEM COLOR ASSIGNMENT (toys + boxes)
@@ -970,11 +1218,36 @@ let StimulusTransformer = function (StimTemplate) {
 
     this.get_feature_map = () => JSON.parse(JSON.stringify(FeatureMapConstant));
 
+    this.get_kit_roster = function () {
+        return kitRoster ? JSON.parse(JSON.stringify(kitRoster)) : null;
+    };
+
+    this.get_head_source = function () {
+        return StimTemplate.head_source === "feature_kit" ? "feature_kit" : "svg";
+    };
+
+    this.ensureKitHeadsRegistered = async function () {
+        if (StimTemplate.head_source !== "feature_kit") return [];
+        if (typeof FeatureKit === "undefined") {
+            throw new Error("semantic_learning_kit needs FeatureKit.js loaded before StimulusTransformer.");
+        }
+        let kit = FeatureKit.shared();
+        await kit.ensureLoaded();
+        let recipesByHeadId = {};
+        FennimalObjArr.forEach((fen) => {
+            if (!fen || !fen.head || !fen.kit_recipe) return;
+            recipesByHeadId[fen.head] = fen.kit_recipe;
+        });
+        let ids = kit.registerRoster(recipesByHeadId);
+        console.log("%c FeatureKit roster registered: " + ids.join(", "), "color:teal");
+        return ids;
+    };
+
     /**
      * Layer 1: replace the freshly randomized world with a saved assignment.
      * Returns false if the payload looks unusable (caller keeps the fresh randomization).
      */
-    this.hydrate_assignment = function (savedFennimals, savedFeatureMap, savedColorOverview) {
+    this.hydrate_assignment = function (savedFennimals, savedFeatureMap, savedColorOverview, savedKitRoster) {
         if (!Array.isArray(savedFennimals) || savedFennimals.length === 0) {
             console.warn("hydrate_assignment: missing fennimals");
             return false;
@@ -1001,6 +1274,12 @@ let StimulusTransformer = function (StimTemplate) {
             paint_all_box_color_templates();
             paint_all_toy_color_templates();
             colorAssignmentOverview = JSON.parse(JSON.stringify(savedColorOverview));
+        }
+
+        if (savedKitRoster && typeof savedKitRoster === "object") {
+            kitRoster = JSON.parse(JSON.stringify(savedKitRoster));
+        } else {
+            rebuildKitRosterFromFennimals();
         }
 
         console.log("%c Restored saved stimulus assignment for this session", "color:teal");
@@ -1237,6 +1516,21 @@ let StimulusTransformer = function (StimTemplate) {
                     ? this.get_all_Fennimals_objects_in_array().length
                     : 0;
                 max_stars += block.bonus_stars_per_correct_answer * nFens;
+            }
+
+            if (block.type === "phone_room" && typeof block.bonus_stars_per_correct_answer === "number") {
+                let hasTransfer = false;
+                const noteType = (value) => {
+                    if (value === "Fennimal_food_transfer") hasTransfer = true;
+                    if (Array.isArray(value) && value.indexOf("Fennimal_food_transfer") >= 0) hasTransfer = true;
+                };
+                noteType(block.interaction_type);
+                (block.trial_subblocks || []).forEach((sb) => {
+                    if (!sb) return;
+                    noteType(sb.interaction_type);
+                    (sb.trials || []).forEach((t) => { if (t) noteType(t.interaction_type); });
+                });
+                if (hasTransfer) max_stars += block.bonus_stars_per_correct_answer;
             }
 
             if (block.type === "morph_task") {

@@ -89,6 +89,20 @@
     display: block;
 }
 
+.kit-stage.kit-gray,
+.kit-gray svg {
+    filter: grayscale(100%);
+}
+
+.stamp-lineup .mini-head {
+    width: 156px;
+}
+
+.stamp-lineup .mini-head svg {
+    width: 148px;
+    height: 148px;
+}
+
 .kit-stage.kit-show-markers .invisible_element,
 .kit-stage.kit-show-markers .placement_marker,
 .kit-stage.kit-show-markers .Fennimal_head_hat_point,

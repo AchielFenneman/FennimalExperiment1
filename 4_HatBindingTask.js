@@ -213,14 +213,23 @@ class HatBindingTaskController {
 
     _resolveSelectedArms(armIds) {
         let key = this.phaseData.arm_randomization_id || "binding_star_arms";
+        let allowed = this.phaseData.allowed_arm_pairs;
         if (this.expCont && this.expCont.dataCont && this.expCont.dataCont.getOrCreateBindingArmPair) {
-            return this.expCont.dataCont.getOrCreateBindingArmPair(key, armIds);
+            return this.expCont.dataCont.getOrCreateBindingArmPair(key, armIds, allowed);
         }
         if (armIds.length === 2) return armIds.slice();
         let combos = [];
         for (let i = 0; i < armIds.length; i++) {
             for (let j = i + 1; j < armIds.length; j++) {
                 combos.push([armIds[i], armIds[j]]);
+            }
+        }
+        if (Array.isArray(allowed) && allowed.length) {
+            const comboKey = (pair) => pair.slice().map(String).sort().join("|");
+            let allowedKeys = new Set(allowed.map((pair) => comboKey(pair)));
+            combos = combos.filter((pair) => allowedKeys.has(comboKey(pair)));
+            if (!combos.length) {
+                this._fail("allowed_arm_pairs does not overlap the current arms.");
             }
         }
         return pickRandom(combos).slice();
@@ -885,24 +894,114 @@ class HatBindingTaskController {
         return Array.isArray(lines) && lines.length > 0;
     }
 
+    _hasKitHeads() {
+        return this._rosterFens().some((fen) => fen && fen.kit_recipe);
+    }
+
+    _kitSlotLabel(slot, token) {
+        let dict = (typeof GenParam !== "undefined" && GenParam.kitSlotGists)
+            ? GenParam.kitSlotGists[slot]
+            : null;
+        let label = dict && dict[token];
+        if (!label) {
+            this._fail('missing kitSlotGists.' + slot + '["' + token + '"].');
+        }
+        return String(label);
+    }
+
+    _uniqueKitSlotTokens(slot) {
+        let seen = new Set();
+        let tokens = [];
+        this._rosterFens().forEach((fen) => {
+            let token = fen && fen.kit_recipe && fen.kit_recipe[slot];
+            if (!token || token === "none" || seen.has(token)) return;
+            seen.add(token);
+            tokens.push(token);
+        });
+        if (!tokens.length) this._fail('no unique kit "' + slot + '" tokens for gist options.');
+        return tokens;
+    }
+
+    _nextKitHeadGistSlot() {
+        let slots = ["lowerFace", "ear"];
+        let dataCont = this.expCont && this.expCont.dataCont;
+        if (!dataCont || !dataCont.experimentData) {
+            return slots[0];
+        }
+        if (!dataCont.experimentData.phaseRandomizations
+            || typeof dataCont.experimentData.phaseRandomizations !== "object") {
+            dataCont.experimentData.phaseRandomizations = {};
+        }
+        let rec = dataCont.experimentData.phaseRandomizations.kit_head_gist_slots;
+        if (!rec || !Array.isArray(rec.sequence) || !rec.sequence.length
+            || rec.sequence.some((s) => slots.indexOf(s) < 0)) {
+            rec = { i: 0, sequence: slots.slice() };
+        }
+        let slot = rec.sequence[rec.i % rec.sequence.length];
+        rec.i = rec.i + 1;
+        dataCont.experimentData.phaseRandomizations.kit_head_gist_slots = rec;
+        if (typeof dataCont.storeAllData === "function") dataCont.storeAllData(false);
+        return slot;
+    }
+
+    _makeKitHeadGistQuestion(fen, subject) {
+        let slot = this._nextKitHeadGistSlot();
+        let token = fen && fen.kit_recipe && fen.kit_recipe[slot];
+        if (!token) this._fail('Fennimal "' + (fen && fen.id) + '" has no kit_recipe.' + slot + ".");
+        let optionIds = this._uniqueKitSlotTokens(slot);
+        if (optionIds.indexOf(token) < 0) optionIds.push(token);
+        shuffleArray(optionIds);
+        let options = optionIds.map((id) => ({
+            value: id,
+            text: this._kitSlotLabel(slot, id)
+        }));
+        let correctOpt = options.filter((o) => o.value === token)[0];
+        let kind = slot === "ear" ? "ears" : (slot === "hair" ? "hair" : "mouth");
+        let stem = "What kind of " + kind + "?";
+        if (subject && subject !== "this Fennimal") {
+            stem = "What kind of " + kind + " does " + subject + " have?";
+        }
+        return {
+            feature: "head",
+            kit_slot: slot,
+            used_gist: false,
+            used_kit_slot: true,
+            stem: stem,
+            correct_value: token,
+            correct_text: correctOpt.text,
+            options: options
+        };
+    }
+
     _validateGistCoverage() {
         if (!this._usesGistQuestions()) return;
         let missing = [];
         const collect = (kind, fens) => {
             this._uniqueFeatureIds(kind, fens).forEach((id) => {
                 if (!this._hasGist(kind, id)) {
-                    missing.push(this._gistBucket(kind) + '["' + id + '"]');
+                    missing.push("gistDescriptions." + this._gistBucket(kind) + '["' + id + '"]');
                 }
             });
         };
         collect("hat", this.hatFens);
         if (this.condition === "group_based") {
             (this.graph.joiningFeatureKinds || []).forEach((kind) => {
+                if (kind === "head" && this._hasKitHeads()) {
+                    ["lowerFace", "ear"].forEach((slot) => {
+                        this._uniqueKitSlotTokens(slot).forEach((token) => {
+                            let dict = (typeof GenParam !== "undefined" && GenParam.kitSlotGists)
+                                ? GenParam.kitSlotGists[slot]
+                                : null;
+                            if (!dict || !dict[token]) missing.push('kitSlotGists.' + slot + '["' + token + '"]');
+                        });
+                    });
+                    return;
+                }
                 if (this._usesGistDescription(kind)) collect(kind, this._rosterFens());
             });
         }
         if (missing.length) {
-            this._fail("missing gistDescriptions." + missing.join(", gistDescriptions.") + ".");
+            this._fail("missing " + missing.join(", ") + ".");
         }
     }
 
@@ -1019,6 +1118,9 @@ class HatBindingTaskController {
     }
 
     _makeGistQuestion(fen, kind, subject) {
+        if (kind === "head" && fen && fen.kit_recipe) {
+            return this._makeKitHeadGistQuestion(fen, subject);
+        }
         let poolFens = (kind === "hat") ? this.hatFens.slice() : this._rosterFens();
         let correctId = this._normalizeFeatureId(kind, this._fenFeatureId(fen, kind));
         if (!correctId) this._fail(`Fennimal "${fen.id}" has no ${kind} for gist.`);
@@ -1300,7 +1402,9 @@ class HatBindingTaskController {
                 nErrors += row.n_errors;
                 return {
                     feature: row.question.feature,
+                    kit_slot: row.question.kit_slot || null,
                     used_gist: !!row.question.used_gist,
+                    used_kit_slot: !!row.question.used_kit_slot,
                     stem: row.question.stem,
                     correct_value: row.question.correct_value,
                     correct_text: row.question.correct_text,

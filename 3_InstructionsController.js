@@ -1582,7 +1582,7 @@ class InstructionsController {
         this.addClosingButtonToParent("bottom-center", false, undefined, 500);
     }
 
-    initializePhoneRoomPhaseGeneralInstructions(currentBlockNum) {
+    initializePhoneRoomPhaseGeneralInstructions(currentBlockNum, phaseData) {
         this.currentInstructionType = "phone_room";
 
         this.clearInstructions();
@@ -1590,7 +1590,11 @@ class InstructionsController {
         this.parentElem.appendChild(this.currentInstructionsSVG);
         this.parentElem.style.display = "inherit";
 
-        document.getElementById("Instructions_Title").innerHTML = `Day ${currentBlockNum}: staffing the phone room`;
+        let customTitle = phaseData && phaseData.day_title;
+        let customBody = phaseData && phaseData.day_body;
+        document.getElementById("Instructions_Title").innerHTML = customTitle
+            ? `Day ${currentBlockNum}: ${customTitle}`
+            : `Day ${currentBlockNum}: staffing the phone room`;
         this.updateProgressNewDay(currentBlockNum);
         this.updateProgressWithinDay(false);
 
@@ -1598,19 +1602,21 @@ class InstructionsController {
         let partnerPresent = partnerRole && partnerRole !== "absent";
         let partnerName = this.worldState.get_partner_icon_settings().name;
 
-        let instructionText;
-        if (partnerPresent) {
-            instructionText =
-                `You and ${partnerName} will be staffing the island’s phone room today!<br><br>` +
-                `Whenever someone on the island needs assistance, the phone will ring. Click the phone to answer it and receive instructions about the task and where you need to go.<br><br>` +
-                `Today ${partnerName} will take the lead and will guide you along the island - so you do not need to navigate the map yourself.<br><br>` +
-                `After each task, you will automatically return to the phone room. Wait there until the phone rings again.`;
-        } else {
-            instructionText =
-                `Today, you will be staffing the island’s phone room.<br><br>` +
-                `Whenever someone on the island needs assistance, the phone will ring. Click the phone to answer it and receive instructions about the task and where you need to go.<br><br>` +
-                `During this part of your stay on the island, your route will be arranged for you. You will travel automatically to each destination, so you do not need to navigate the map yourself.<br><br>` +
-                `After each task, you will automatically return to the phone room. Wait there until the phone rings again.`;
+        let instructionText = customBody;
+        if (!instructionText) {
+            if (partnerPresent) {
+                instructionText =
+                    `You and ${partnerName} will be staffing the island’s phone room today!<br><br>` +
+                    `Whenever someone on the island needs assistance, the phone will ring. Click the phone to answer it and receive instructions about the task and where you need to go.<br><br>` +
+                    `Today ${partnerName} will take the lead and will guide you along the island - so you do not need to navigate the map yourself.<br><br>` +
+                    `After each task, you will automatically return to the phone room. Wait there until the phone rings again.`;
+            } else {
+                instructionText =
+                    `Today, you will be staffing the island’s phone room.<br><br>` +
+                    `Whenever someone on the island needs assistance, the phone will ring. Click the phone to answer it and receive instructions about the task and where you need to go.<br><br>` +
+                    `During this part of your stay on the island, your route will be arranged for you. You will travel automatically to each destination, so you do not need to navigate the map yourself.<br><br>` +
+                    `After each task, you will automatically return to the phone room. Wait there until the phone rings again.`;
+            }
         }
 
         let iconBox = create_SVG_rect(0.08 * GenParam.SVG_width, 0.25 * GenParam.SVG_height, 400, 475, undefined, undefined);
@@ -1873,7 +1879,7 @@ class InstructionsController {
         document.getElementById("Instructions_Title").innerHTML = title;
 
         let body = dayBody || copy.dayBody ||
-            "You'll see three heads. Go with your first impression: which lower head looks more like the top one? Press F for the left head, J for the right.";
+            "You'll see three heads. Which lower head looks more like the top one? Press F for the left head, J for the right.";
         this.textElemMainInstructions = create_SVG_text_in_foreign_element(
             body,
             0.12 * GenParam.SVG_width, 160,
@@ -2229,6 +2235,22 @@ class InstructionsController {
                     type: "fennimal",
                     slumped: true,
                     mainText: `${displayName} is hungry.`
+                };
+
+            case "Fennimal_food":
+                return {
+                    ...baseConfig,
+                    type: "fennimal",
+                    slumped: true,
+                    mainText: `${displayName} is hungry.`
+                };
+
+            case "Fennimal_food_transfer":
+                return {
+                    ...baseConfig,
+                    type: "fennimal",
+                    slumped: false,
+                    mainText: `Check in on ${displayName}. They might want a snack.`
                 };
 
             case "joint_box_cleaning":

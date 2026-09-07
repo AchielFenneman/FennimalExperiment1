@@ -2,10 +2,13 @@
  * Feature-kit stimulus pilot: slot-duel 2AFC.
  *
  * Default: 1-vs-1 slot duels (share three, differ on two).
- * Combo mode (`combo: true` / `feature_kit_combo_pilot`): coalition duels
- * (2v2, 2v3, 1v2) to find non-additive ~50/50 mixes.
- *
- * Between-subjects: 3 tokens sampled per slot from the live SVG.
+ * Combo mode (`combo: true` / `feature_kit_combo_pilot`): pick three disjoint
+ * ensemble heads whose 3-vs-2 mixes can sit near 50/50. Coverage is every
+ * morph-complete 3v2 split, twice (new token pairs each time). Adaptive
+ * resamples splits near 50 and slots whose token pairs are still thin.
+ * Shared-slot 1v2 / 2v2 families are out — those are not mixes of two
+ * non-overlapping heads. Hair is excluded; stamps contest. All four SVG
+ * tokens per slot are on stage (no between-subjects subsample). Scales stay 1.
  * No morphing, names, hats, map, or bonus stars.
  */
 class FeatureKitPilotController {
@@ -24,9 +27,10 @@ class FeatureKitPilotController {
         this.W = GenParam.SVG_width;
         this.H = GenParam.SVG_height;
         this.trialSpeedMs = this._num("trialSpeedMs", this.phaseData.trial_speed || 7500);
-        this.nTokensSampled = this._int("nTokensSampled", this.phaseData.n_tokens_sampled, 3);
+        this.nTokensSampled = this._int("nTokensSampled", this.phaseData.n_tokens_sampled, this.combo ? 4 : 3);
         this.nDuelReps = this._int("nDuelReps", this.phaseData.n_duel_reps, 3);
         this.nCatch = this._int("nCatch", this.phaseData.n_catch, 3);
+        this.nAdaptiveDuels = this._int("nAdaptiveDuels", this.phaseData.n_adaptive_duels, 16);
         this.skipPractice = this.phaseData.skip_practice === true;
         this.minChoiceMs = this._num("minChoiceMs", 750);
         this.adaptive = this.phaseData.adaptive !== false && this.params.adaptive !== false;
@@ -167,14 +171,21 @@ class FeatureKitPilotController {
         this.phaseData.n_tokens_sampled = this.nTokensSampled;
         this.phaseData.n_duel_reps = this.nDuelReps;
         this.phaseData.n_catch = this.nCatch;
+        this.phaseData.n_adaptive_duels = this.nAdaptiveDuels;
+        this.phaseData.queue_version = this._queueVersion();
         this.phaseData.slot_keys = (this.slotKeys || []).slice();
         this.phaseData.combo = !!this.combo;
-        if (this.combo) this.phaseData.combo_partitions = this._comboPartitions().map((p) => p.id);
+        if (this.combo) this.phaseData.combo_partitions = this._coveragePartitions().map((p) => p.id);
+        if (this.combo) this.phaseData.fish_partitions = this._fishPartitions().map((p) => p.id);
         if (typeof this.returnfunc === "function") this.returnfunc();
     }
 
     _sampleTokens() {
-        let slotKeys = FeatureKit.slotKeys().filter((key) => this.kit.tokensForPilot(key).length >= 2);
+        let exclude = this._excludeSlots();
+        let slotKeys = FeatureKit.slotKeys().filter((key) => {
+            if (exclude.indexOf(key) >= 0) return false;
+            return this.kit.tokensForPilot(key).length >= 2;
+        });
         if (slotKeys.length < 2) {
             this._fail("need at least two feature groups with 2+ tokens in Heads features.svg.");
         }
@@ -198,13 +209,16 @@ class FeatureKitPilotController {
                     if (pool.indexOf(token) >= 0 && keep.indexOf(token) < 0) keep.push(token);
                 });
             }
-            if (keep.length >= 2) {
-                sampled[key] = keep.slice(0, Math.max(2, Math.min(this.nTokensSampled, pool.length)));
+            let want = Math.max(2, Math.min(this.nTokensSampled, pool.length));
+            if (keep.length >= want) {
+                sampled[key] = keep.slice(0, want);
                 return;
             }
-            let shuffled = shuffleArray(pool.slice());
-            let n = Math.max(2, Math.min(this.nTokensSampled, shuffled.length));
-            sampled[key] = shuffled.slice(0, n);
+            if (want >= pool.length) {
+                sampled[key] = pool.slice();
+                return;
+            }
+            sampled[key] = shuffleArray(pool.slice()).slice(0, want);
         });
         this.sampledTokens = sampled;
         this._persist(this._storeKey("tokens"), {
@@ -213,7 +227,8 @@ class FeatureKitPilotController {
             n_tokens_sampled: this.nTokensSampled,
             n_duel_reps: this.nDuelReps,
             n_catch: this.nCatch,
-            slot_keys: slotKeys.slice()
+            slot_keys: slotKeys.slice(),
+            exclude_slots: exclude.slice()
         });
         this.phaseData.sampled_tokens = sampled;
         this.phaseData.catalog_tokens = this.catalogTokens;
@@ -226,7 +241,9 @@ class FeatureKitPilotController {
     _blankRecipe() {
         return {
             expression: "happy",
-            scales: { ear: 1, eye: 1, lowerFace: 1, hair: 1 }
+            scales: (typeof FeatureKit !== "undefined" && FeatureKit.defaultScales)
+                ? FeatureKit.defaultScales()
+                : { ear: 1, eye: 1, lowerFace: 1, hair: 1, stamp: 1 }
         };
     }
 
@@ -235,7 +252,16 @@ class FeatureKitPilotController {
         this.slotKeys.forEach((key) => {
             if (!rec[key]) rec[key] = this.sampledTokens[key][0];
         });
-        return this.kit.normalizeRecipe(rec);
+        rec = this.kit.normalizeRecipe(rec);
+        rec.scales = Object.assign(
+            (typeof FeatureKit !== "undefined" && FeatureKit.defaultScales)
+                ? FeatureKit.defaultScales()
+                : { ear: 1, eye: 1, lowerFace: 1, hair: 1, stamp: 1 },
+            rec.scales || {}
+        );
+        Object.keys(rec.scales).forEach((key) => { rec.scales[key] = 1; });
+        this._excludeSlots().forEach((key) => { rec[key] = "none"; });
+        return rec;
     }
 
     _randomFullRecipe(avoid) {
@@ -256,6 +282,14 @@ class FeatureKitPilotController {
         return prefix + kind;
     }
 
+    _excludeSlots() {
+        let fromPhase = this.phaseData.exclude_slots;
+        let fromParams = this.params.excludeSlots;
+        if (Array.isArray(fromPhase)) return fromPhase.slice();
+        if (Array.isArray(fromParams)) return fromParams.slice();
+        return ["hair"];
+    }
+
     _canonSet(arr) {
         return (arr || []).slice().sort().join("+");
     }
@@ -269,62 +303,192 @@ class FeatureKitPilotController {
         return left + " vs " + right + (sh ? " | " + sh : "");
     }
 
+    _queueVersion() {
+        return this.combo ? 6 : 3;
+    }
+
+    _coverageReps() {
+        if (this.combo) return Math.max(1, this.nDuelReps);
+        return this.adaptive ? 1 : this.nDuelReps;
+    }
+
     _comboPartitions() {
-        if (this._comboPartCache) return this._comboPartCache;
-        let keys = this.slotKeys || [];
-        let strong = ["shell", "lowerFace"].filter((s) => keys.indexOf(s) >= 0);
-        let weak = ["ear", "eye", "hair"].filter((s) => keys.indexOf(s) >= 0);
-        if (strong.length < 2 || weak.length < 3) {
-            this._fail("combo mode needs shell, lowerFace, and ear/eye/hair in the SVG catalog.");
-        }
-        let parts = [];
-        let push = (family, setA, setB, shared) => {
-            parts.push({
-                family: family,
-                set_a: setA.slice(),
-                set_b: setB.slice(),
-                shared: (shared || []).slice(),
-                id: this._partitionId(setA, setB, shared)
-            });
+        return this._coveragePartitions();
+    }
+
+    _kSubsets(arr, k) {
+        let out = [];
+        let rec = (start, acc) => {
+            if (acc.length === k) {
+                out.push(acc.slice());
+                return;
+            }
+            for (let i = start; i < arr.length; i++) {
+                acc.push(arr[i]);
+                rec(i + 1, acc);
+                acc.pop();
+            }
         };
-        for (let s = 0; s < weak.length; s++) {
-            let shared = [weak[s]];
-            let rest = weak.filter((_, i) => i !== s);
-            push("balanced_2v2", [strong[0], rest[0]], [strong[1], rest[1]], shared);
-            push("balanced_2v2", [strong[0], rest[1]], [strong[1], rest[0]], shared);
-        }
-        for (let i = 0; i < weak.length; i++) {
-            for (let j = i + 1; j < weak.length; j++) {
-                let pair = [weak[i], weak[j]];
-                let leftover = weak.filter((w) => pair.indexOf(w) < 0);
-                push("strong2_vs_weak2", strong.slice(), pair, leftover);
-            }
-        }
-        push("strong2_vs_weak3", strong.slice(), weak.slice(), []);
-        strong.forEach((one) => {
-            let otherStrong = strong.filter((s) => s !== one);
-            for (let i = 0; i < weak.length; i++) {
-                for (let j = i + 1; j < weak.length; j++) {
-                    let pair = [weak[i], weak[j]];
-                    let leftoverWeak = weak.filter((w) => pair.indexOf(w) < 0);
-                    push("strong1_vs_weak2", [one], pair, otherStrong.concat(leftoverWeak));
-                }
-            }
+        rec(0, []);
+        return out;
+    }
+
+    _pushPart(parts, family, setA, setB, shared) {
+        parts.push({
+            family: family,
+            set_a: setA.slice(),
+            set_b: setB.slice(),
+            shared: (shared || []).slice(),
+            id: this._partitionId(setA, setB, shared)
         });
-        this._comboPartCache = parts;
         return parts;
     }
 
+    _morphCompletePartitions(keys) {
+        let n = keys.length;
+        let parts = [];
+        if (n < 2) return parts;
+        let nA = Math.ceil(n / 2);
+        let nB = n - nA;
+        this._kSubsets(keys, nA).forEach((setA) => {
+            let setB = keys.filter((k) => setA.indexOf(k) < 0);
+            if (setB.length !== nB) return;
+            if (nA === nB && this._canonSet(setA) > this._canonSet(setB)) return;
+            this._pushPart(parts, "morph_complete", setA, setB, []);
+        });
+        return parts;
+    }
+
+    _oneVsTwoPartitions(keys) {
+        let parts = [];
+        keys.forEach((one) => {
+            let rest = keys.filter((k) => k !== one);
+            this._kSubsets(rest, 2).forEach((pair) => {
+                let shared = rest.filter((k) => pair.indexOf(k) < 0);
+                this._pushPart(parts, "hunt_1v2", [one], pair, shared);
+            });
+        });
+        return parts;
+    }
+
+    _twoVsTwoSharedPartitions(keys) {
+        let parts = [];
+        if (keys.length < 5) return parts;
+        keys.forEach((sharedSlot) => {
+            let rest = keys.filter((k) => k !== sharedSlot);
+            this._kSubsets(rest, 2).forEach((setA) => {
+                let setB = rest.filter((k) => setA.indexOf(k) < 0);
+                if (setB.length !== 2) return;
+                if (this._canonSet(setA) > this._canonSet(setB)) return;
+                this._pushPart(parts, "hunt_2v2_shared", setA, setB, [sharedSlot]);
+            });
+        });
+        return parts;
+    }
+
+    _cyclic1v2Coverage(keys, want) {
+        let picked = [];
+        let seen = {};
+        let n = keys.length;
+        let add = (one, a, b) => {
+            if (picked.length >= want) return;
+            let pair = [keys[a], keys[b]];
+            if (pair[0] === one || pair[1] === one || pair[0] === pair[1]) return;
+            let shared = keys.filter((k) => k !== one && pair.indexOf(k) < 0);
+            let id = this._partitionId([one], pair, shared);
+            if (seen[id]) return;
+            seen[id] = true;
+            this._pushPart(picked, "hunt_1v2", [one], pair, shared);
+        };
+        for (let i = 0; i < n; i++) add(keys[i], (i + 1) % n, (i + 2) % n);
+        for (let i = 0; i < n; i++) add(keys[i], (i + 1) % n, (i + 3) % n);
+        this._oneVsTwoPartitions(keys).forEach((p) => {
+            if (picked.length >= want || seen[p.id]) return;
+            seen[p.id] = true;
+            picked.push(p);
+        });
+        return picked.slice(0, want);
+    }
+
+    _cyclicMorphComplete(keys, want) {
+        let all = this._morphCompletePartitions(keys);
+        if (all.length <= want) return all;
+        let picked = [];
+        let seen = {};
+        let n = keys.length;
+        let nA = Math.ceil(n / 2);
+        for (let i = 0; i < n && picked.length < want; i++) {
+            let setA = [];
+            for (let k = 0; k < nA; k++) setA.push(keys[(i + k) % n]);
+            let setB = keys.filter((slot) => setA.indexOf(slot) < 0);
+            if (!setB.length) continue;
+            let id = this._partitionId(setA, setB, []);
+            if (seen[id]) continue;
+            seen[id] = true;
+            this._pushPart(picked, "morph_complete", setA, setB, []);
+        }
+        all.forEach((part) => {
+            if (picked.length >= want || seen[part.id]) return;
+            seen[part.id] = true;
+            picked.push(part);
+        });
+        return picked.slice(0, want);
+    }
+
+    _onePerShared2v2(keys) {
+        let parts = [];
+        if (keys.length < 5) return parts;
+        keys.forEach((sharedSlot) => {
+            let rest = keys.filter((k) => k !== sharedSlot);
+            if (rest.length < 4) return;
+            this._pushPart(parts, "hunt_2v2_shared", rest.slice(0, 2), rest.slice(2, 4), [sharedSlot]);
+        });
+        return parts;
+    }
+
+    _oneVsRestPartitions(keys) {
+        let parts = [];
+        keys.forEach((one) => {
+            let rest = keys.filter((k) => k !== one);
+            if (!rest.length) return;
+            this._pushPart(parts, "morph_1vRest", [one], rest, []);
+        });
+        return parts;
+    }
+
+    _coveragePartitions() {
+        if (this._coveragePartCache) return this._coveragePartCache;
+        let keys = this.slotKeys || [];
+        let complete = this._morphCompletePartitions(keys);
+        if (!complete.length) this._fail("combo coverage is empty (need 2+ feature groups).");
+        this._coveragePartCache = complete;
+        return this._coveragePartCache;
+    }
+
+    _fishPartitions() {
+        if (this._fishPartCache) return this._fishPartCache;
+        let keys = this.slotKeys || [];
+        let byId = {};
+        let parts = [];
+        this._morphCompletePartitions(keys)
+            .concat(this._oneVsRestPartitions(keys))
+            .forEach((p) => {
+                if (byId[p.id]) return;
+                byId[p.id] = true;
+                parts.push(p);
+            });
+        if (!parts.length) this._fail("combo fishing pool is empty (need 2+ feature groups).");
+        this._fishPartCache = parts;
+        return this._fishPartCache;
+    }
+
     _plannedCount() {
-        let nTypes = this.combo
-            ? this._comboPartitions().length
-            : FeatureKit.unorderedPairs(this.slotKeys || []).length;
-        return (this.skipPractice ? 0 : 2) + nTypes * this.nDuelReps + this.nCatch;
+        return (this.skipPractice ? 0 : 2) + this._maxDuels() + this.nCatch;
     }
 
     _persistQueue() {
         this._persist(this._storeKey("trials"), {
-            version: this.combo ? 3 : 2,
+            version: this._queueVersion(),
             combo: !!this.combo,
             adaptive: this.adaptive,
             queue: this.queue
@@ -356,7 +520,11 @@ class FeatureKitPilotController {
     }
 
     _maxDuels() {
-        if (this.combo) return this._comboPartitions().length * this.nDuelReps;
+        if (this.combo) {
+            let cov = this._coveragePartitions().length * this._coverageReps();
+            if (!this.adaptive) return cov;
+            return cov + this.nAdaptiveDuels;
+        }
         return FeatureKit.unorderedPairs(this.slotKeys || []).length * this.nDuelReps;
     }
 
@@ -390,7 +558,7 @@ class FeatureKitPilotController {
             if (row.selected_parent === "A") wins[id] = (wins[id] || 0) + 1;
         });
         let rates = {};
-        this._comboPartitions().forEach((p) => {
+        this._fishPartitions().forEach((p) => {
             let nn = n[p.id] || 0;
             let w = wins[p.id] || 0;
             rates[p.id] = nn ? w / nn : 0.5;
@@ -407,7 +575,56 @@ class FeatureKitPilotController {
             (t.slot_x === sx && t.slot_y === sy) || (t.slot_x === sy && t.slot_y === sx)
         )).length;
         let explore = 1 / (1 + seen);
-        return 0.45 * close + 0.35 * strong + 0.20 * explore;
+        let novelty = (sx === "stamp" || sy === "stamp") ? 1.2 : 1;
+        return (0.45 * close + 0.35 * strong + 0.20 * explore) * novelty;
+    }
+
+    _canonPair(a, b) {
+        let x = String(a || "");
+        let y = String(b || "");
+        return x < y ? x + ":" + y : y + ":" + x;
+    }
+
+    _tokenPairCounts() {
+        let counts = {};
+        (this.slotKeys || []).forEach((key) => { counts[key] = {}; });
+        let eat = (trial) => {
+            if (!trial || trial.kind !== "duel" || !trial.combo) return;
+            let tokensA = trial.tokens_a || {};
+            let tokensB = trial.tokens_b || {};
+            (trial.set_a || []).concat(trial.set_b || []).forEach((slot) => {
+                if (!tokensA[slot] || !tokensB[slot] || !counts[slot]) return;
+                let id = this._canonPair(tokensA[slot], tokensB[slot]);
+                counts[slot][id] = (counts[slot][id] || 0) + 1;
+            });
+        };
+        (this.queue || []).forEach(eat);
+        return counts;
+    }
+
+    _slotPairHunger(slot) {
+        let tokens = (this.sampledTokens && this.sampledTokens[slot]) || [];
+        let pairs = FeatureKit.unorderedPairs(tokens);
+        if (!pairs.length) return 1;
+        let seen = (this._tokenPairCounts()[slot]) || {};
+        let hunger = 0;
+        pairs.forEach((pair) => {
+            hunger += 1 / (1 + (seen[this._canonPair(pair[0], pair[1])] || 0));
+        });
+        return hunger / pairs.length;
+    }
+
+    _partitionHunger(part) {
+        let slots = (part.set_a || []).concat(part.set_b || []);
+        if (!slots.length) return 1;
+        let sum = 0;
+        let n = 0;
+        slots.forEach((slot) => {
+            if (!this.sampledTokens || !this.sampledTokens[slot]) return;
+            sum += this._slotPairHunger(slot);
+            n += 1;
+        });
+        return n ? sum / n : 1;
     }
 
     _partitionWeight(part) {
@@ -417,7 +634,9 @@ class FeatureKitPilotController {
         let close = 1 - Math.abs(p - 0.5) * 2;
         let seen = this.queue.filter((t) => t.kind === "duel" && t.partition_id === part.id).length;
         let explore = 1 / (1 + seen);
-        return 0.70 * close + 0.30 * explore;
+        let hunger = this._partitionHunger(part);
+        let familyBoost = part.family === "morph_complete" ? 1 : 0.8;
+        return (0.50 * close + 0.20 * explore + 0.30 * hunger) * familyBoost;
     }
 
     _pickAdaptivePair() {
@@ -433,7 +652,7 @@ class FeatureKitPilotController {
     }
 
     _pickAdaptivePartition() {
-        let parts = this._comboPartitions();
+        let parts = this._fishPartitions();
         let weights = parts.map((p) => Math.max(0.02, this._partitionWeight(p)));
         let sum = weights.reduce((a, b) => a + b, 0);
         let pick = experimentRandom() * sum;
@@ -563,7 +782,7 @@ class FeatureKitPilotController {
     _buildQueue() {
         this._initTokenPairDecks();
         let stored = this._restore(this._storeKey("trials"));
-        let wantVersion = this.combo ? 3 : 2;
+        let wantVersion = this._queueVersion();
         if (stored && stored.version === wantVersion && Array.isArray(stored.queue) && stored.queue.length
             && this._queueUsesCurrentTokens(stored.queue)) {
             this.queue = stored.queue;
@@ -577,11 +796,11 @@ class FeatureKitPilotController {
             queue.push(this._practiceTrial("practice_square", "square", "circle", "square"));
         }
 
-        let coverageReps = this.adaptive ? 1 : this.nDuelReps;
+        let coverageReps = this._coverageReps();
         let coverageCatch = this.adaptive ? Math.max(0, this.nCatch - 1) : this.nCatch;
         let paid = [];
         if (this.combo) {
-            this._comboPartitions().forEach((part) => {
+            this._coveragePartitions().forEach((part) => {
                 for (let r = 0; r < coverageReps; r++) {
                     paid.push(this._makeComboTrial(part, "coverage"));
                 }
@@ -766,9 +985,9 @@ class FeatureKitPilotController {
         this._placeProgress();
 
         if (trial.tutorial === "practice") {
-            this._placeCoach("Press F for the left head, J for the right. Go with your first impression.", boxes);
+            this._placeCoach("Press F for the left head, J for the right.", boxes);
         } else if (trial.tutorial === "paid") {
-            this._placeCoach("Same idea — go with your first impression.", boxes);
+            this._placeCoach("Same keys: F for left, J for right.", boxes);
         }
 
         this._setBarsProgress(0);
@@ -1081,7 +1300,9 @@ class FeatureKitPilotController {
             eye: spec.eye || null,
             lowerFace: spec.lowerFace || null,
             hair: spec.hair || null,
-            expression: spec.expression || "happy"
+            stamp: spec.stamp || null,
+            expression: spec.expression || "happy",
+            scales: spec.scales ? JSON.parse(JSON.stringify(spec.scales)) : null
         };
     }
 
