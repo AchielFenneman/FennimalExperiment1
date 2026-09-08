@@ -1258,21 +1258,51 @@ class FeatureKitPilotController {
         }
         let composed = this.kit.compose(spec || this.kit.defaultRecipe(), { showMarkers: false });
         holder.appendChild(composed.group);
-        try {
-            let b = composed.group.getBBox();
-            if (b && b.width > 0 && b.height > 0) {
-                let pad = 0.86;
-                let scale = Math.min(box.w / b.width, box.h / b.height) * pad;
-                let cx = b.x + b.width / 2;
-                let cy = b.y + b.height / 2;
-                holder.setAttribute(
-                    "transform",
-                    "translate(" + box.cx + " " + box.cy + ") scale(" + scale + ") translate(" + (-cx) + " " + (-cy) + ")"
-                );
+        this._fitHeadToWell(holder, composed.group, box);
+    }
+
+    // Fit the shell, not the full drawing. Ears and stamps (painted later) must
+    // not shrink one choice relative to the other — that overall-size cue would
+    // bias "which looks more like the top".
+    _headFitBox(group) {
+        let layer = group && group.querySelector(".kit_shell");
+        let sil = null;
+        if (layer) {
+            let paths = layer.querySelectorAll("path");
+            for (let i = 0; i < paths.length; i++) {
+                let path = paths[i];
+                if ((path.getAttribute("class") || "").indexOf("invisible_element") >= 0) continue;
+                if (path.getAttribute("display") === "none") continue;
+                let fill = path.getAttribute("fill");
+                if (!fill || fill === "none") continue;
+                let opacity = path.getAttribute("opacity");
+                if (opacity != null && Number(opacity) < 0.5) continue;
+                sil = path;
+                break;
             }
-        } catch (err) {
-            holder.setAttribute("transform", "translate(" + (box.cx - 200) + " " + (box.cy - 200) + ")");
         }
+        try {
+            let b = (sil || layer || group).getBBox();
+            if (b && b.width > 0 && b.height > 0) return b;
+        } catch (err) { /* not in the render tree yet */ }
+        return null;
+    }
+
+    _fitHeadToWell(holder, group, box) {
+        let b = this._headFitBox(group);
+        if (!b) {
+            holder.setAttribute("transform", "translate(" + (box.cx - 200) + " " + (box.cy - 200) + ")");
+            return;
+        }
+        let pad = 0.86;
+        let span = Math.max(b.width, b.height);
+        let scale = (Math.min(box.w, box.h) * pad) / span;
+        let cx = b.x + b.width / 2;
+        let cy = b.y + b.height / 2;
+        holder.setAttribute(
+            "transform",
+            "translate(" + box.cx + " " + box.cy + ") scale(" + scale + ") translate(" + (-cx) + " " + (-cy) + ")"
+        );
     }
 
     _drawPracticeShape(parent, shape, box) {
