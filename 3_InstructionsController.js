@@ -1875,6 +1875,10 @@ class InstructionsController {
             && typeof GenParam !== "undefined" && GenParam.FeatureKitComboPilot) {
             copy = Object.assign({}, copy, GenParam.FeatureKitComboPilot);
         }
+        if (this.expCont && this.expCont.currentPhaseType === "feature_kit_size_pilot"
+            && typeof GenParam !== "undefined" && GenParam.FeatureKitSizePilot) {
+            copy = Object.assign({}, copy, GenParam.FeatureKitSizePilot);
+        }
         let title = dayTitle || copy.dayTitle || "Which heads look most alike?";
         document.getElementById("Instructions_Title").innerHTML = title;
 
@@ -1989,6 +1993,9 @@ class InstructionsController {
         }
 
         icon.classList.add("is-slumped");
+        if (typeof set_fennimal_expression_visibility === "function") {
+            set_fennimal_expression_visibility(icon, "sad");
+        }
         icon.classList.add("instruction_element_nonbackground");
         icon.style.display = "none";
 
@@ -2241,7 +2248,7 @@ class InstructionsController {
                 return {
                     ...baseConfig,
                     type: "fennimal",
-                    slumped: true,
+                    slumped: false,
                     mainText: `${displayName} is hungry.`
                 };
 
@@ -2375,6 +2382,9 @@ class InstructionsController {
 
         if (slumped) {
             icon.classList.add("is-slumped");
+            if (typeof set_fennimal_expression_visibility === "function") {
+                set_fennimal_expression_visibility(icon, "sad");
+            }
         }
 
         this._registerHintElem(icon);

@@ -1653,6 +1653,7 @@ class TrialGenerator {
             "morph_task",
             "feature_kit_pilot",
             "feature_kit_combo_pilot",
+            "feature_kit_size_pilot",
             "pseudoday"
         ]);
     }
@@ -3187,7 +3188,44 @@ class ExperimentController {
         });
     }
 
+    /**
+     * Local `test` sandbox skips hat_binding_task. Seed the same ABC/ABD arm draw
+     * the kit binding phase would have written so the snack day can stamp roles.
+     */
+    seedTestFoodTransferBindingIfNeeded() {
+        if (!this.stimuli || this.stimuli.get_experiment_code() !== "test") return;
+        if (!this.dataCont) return;
+        let existing = this.dataCont.experimentData && this.dataCont.experimentData.hatBindingAssignment;
+        if (existing && Array.isArray(existing.selected_arms) && existing.selected_arms.length === 2) {
+            return;
+        }
+        let pair = this.dataCont.getOrCreateBindingArmPair
+            ? this.dataCont.getOrCreateBindingArmPair(
+                "binding_star_arms",
+                ["A", "C", "D"],
+                [["A", "C"], ["A", "D"]]
+            )
+            : ["A", "C"];
+        let unused = ["A", "C", "D"].filter((id) => !pair.includes(id));
+        if (this.dataCont.setHatBindingAssignment) {
+            this.dataCont.setHatBindingAssignment({
+                condition: "group_based",
+                selected_arms: pair.slice(),
+                selected_triad: [pair[0], "B", pair[1]],
+                hub: "B",
+                fillers: unused,
+                all_arms: ["A", "C", "D"]
+            });
+        }
+        console.log(
+            "%c test sandbox: seeded binding triad " +
+            (this.dataCont.experimentData.hatBindingAssignment.selected_triad || []).join("-"),
+            "color:purple; font-weight:bold"
+        );
+    }
+
     startExperiment() {
+        this.seedTestFoodTransferBindingIfNeeded();
         this.checkIfPhoneBoothIsNeeded();
         this.checkIfPhoneRoomAssetIsNeeded();
         // Arm even when the instruction list has no consent page (e.g. test configs).
@@ -3344,6 +3382,7 @@ class ExperimentController {
                 break;
             case "feature_kit_pilot":
             case "feature_kit_combo_pilot":
+            case "feature_kit_size_pilot":
                 this.flagFeatureKitPilotInstructionsShown = false;
                 if (this.currentPhaseData.skip_instructions === true) {
                     this.flagFeatureKitPilotInstructionsShown = true;
@@ -3952,6 +3991,7 @@ class ExperimentController {
                 break;
             case "feature_kit_pilot":
             case "feature_kit_combo_pilot":
+            case "feature_kit_size_pilot":
                 if (!this.flagFeatureKitPilotInstructionsShown) {
                     this.flagFeatureKitPilotInstructionsShown = true;
                     this.setupFeatureKitPilotPhase();

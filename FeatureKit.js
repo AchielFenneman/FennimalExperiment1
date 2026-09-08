@@ -4,8 +4,8 @@
  * by placing shell / ears / eyes / lower-face / hair / cheek-stamps on the shell markers.
  *
  * Used by feature_kit_lab.html, the feature_kit_pilot / feature_kit_combo_pilot
- * experiments, and opt-in training (`semantic_learning_kit`) which registers
- * composed recipes as normal Fennimal_head_* templates under #All_Heads.
+ * / feature_kit_size_pilot tasks, and kit-head training (`semantic_learning_kit`)
+ * which registers composed recipes as normal Fennimal_head_* templates under #All_Heads.
  */
 (function (global) {
     "use strict";
@@ -24,12 +24,14 @@
 
     const HAPPY_CLASSES = [
         "mouth_happy", "eyebrow_happy", "eyelid_happy", "cheek_happy",
-        "moustace_happy", "moustache_happy", "whiskers_happy"
+        "moustace_happy", "moustache_happy", "whiskers_happy", "face_happy"
     ];
     const SAD_CLASSES = [
         "mouth_sad", "eyebrow_sad", "eyelid_sad", "cheek_sad",
-        "moustace_sad", "moustache_sad", "whiskers_sad"
+        "moustace_sad", "moustache_sad", "whiskers_sad", "face_sad"
     ];
+
+    let kitClipSeq = 0;
 
     function FeatureKit() {
         this.svgPath = SVG_PATH;
@@ -321,12 +323,12 @@
         let eyesLayer = createEl("g", { class: "kit_layer kit_eyes" });
         let hairLayer = createEl("g", { class: "kit_layer kit_hair" });
         // SVG source order does not matter. Paint order is hardcoded here:
-        // ears → shell → stamps → snout → eyes → hair.
+        // ears → shell → stamps → eyes → snout → hair.
         head.appendChild(earsLayer);
         head.appendChild(shellLayer);
         head.appendChild(stampLayer);
-        head.appendChild(lowerLayer);
         head.appendChild(eyesLayer);
+        head.appendChild(lowerLayer);
         head.appendChild(hairLayer);
 
         let shellClone = this._cloneToken("shell", recipe.shell, recipe.expression);
@@ -382,20 +384,22 @@
         }
 
         let eyeToken = this._findToken("eye", recipe.eye);
+        let leftEye = null;
+        let rightEye = null;
         if (eyeToken && leftEyeAt) {
-            eyesLayer.appendChild(this._placeClone(eyeToken.element, {
+            leftEye = this._placeClone(eyeToken.element, {
                 dest: leftEyeAt,
                 srcSelectors: [".placement_marker_eye_center", ".eye_marker", ".placement_marker"],
                 scale: recipe.scales.eye,
                 mirror: false,
                 expression: recipe.expression,
                 role: "eye_left"
-            }));
+            });
         }
         if (eyeToken && rightEyeAt) {
             // Mirror the token so brows, lids, and decorations sit on the right,
             // then un-flip .eye_gaze so pupil/iris/shine are not cross-eyed.
-            let rightEye = this._placeClone(eyeToken.element, {
+            rightEye = this._placeClone(eyeToken.element, {
                 dest: rightEyeAt,
                 srcSelectors: [".placement_marker_eye_center", ".eye_marker", ".placement_marker"],
                 scale: recipe.scales.eye,
@@ -404,8 +408,23 @@
                 role: "eye_right"
             });
             unmirrorInnerEye(rightEye);
-            eyesLayer.appendChild(rightEye);
         }
+        // Narrow shells (pear) put the markers close together. Paint the whole
+        // right-eye stack, then the left orb, so a scaled halo/lash from the
+        // right cannot slash across the left white. Own-eye order is preserved
+        // (halo, then orb, then lashes). At large scales the orbs themselves
+        // can still overlap; the left orb wins that intersection.
+        let leftParts = splitPlacedEye(leftEye);
+        let rightParts = splitPlacedEye(rightEye);
+        function appendEyePart(part) {
+            if (part) eyesLayer.appendChild(part);
+        }
+        appendEyePart(rightParts && rightParts.back);
+        appendEyePart(leftParts && leftParts.back);
+        appendEyePart(rightParts && rightParts.orb);
+        appendEyePart(rightParts && rightParts.front);
+        appendEyePart(leftParts && leftParts.orb);
+        appendEyePart(leftParts && leftParts.front);
 
         if (recipe.stamp && recipe.stamp !== "none") {
             let stampToken = this._findToken("stamp", recipe.stamp);
@@ -430,6 +449,7 @@
                     role: "stamp_right"
                 }));
             }
+            clipLayerToShell(stampLayer, head, pickShellSilhouette(shellClone));
         }
 
         if (recipe.hair && recipe.hair !== "none") {
@@ -525,6 +545,88 @@
             while (gaze.firstChild) wrap.appendChild(gaze.firstChild);
             gaze.appendChild(wrap);
         });
+    }
+
+    function splitPlacedEye(clone) {
+        if (!clone) return null;
+        let eyeEl = null;
+        for (let i = 0; i < clone.childNodes.length; i++) {
+            let node = clone.childNodes[i];
+            if (node.nodeType === 1 && node.classList && node.classList.contains("eye")) {
+                eyeEl = node;
+                break;
+            }
+        }
+        if (!eyeEl) return { back: null, orb: clone, front: null };
+        let transform = clone.getAttribute("transform") || "";
+        let role = clone.getAttribute("data-kit-role") || "eye";
+        function layerGroup(suffix, className) {
+            let group = createEl("g", {
+                class: className,
+                "data-kit-role": role + "_" + suffix
+            });
+            group.setAttribute("transform", transform);
+            return group;
+        }
+        let back = layerGroup("back", "kit_eye_back");
+        let orb = layerGroup("orb", "kit_eye_orb");
+        let front = layerGroup("front", "kit_eye_front");
+        let seenEye = false;
+        Array.prototype.slice.call(clone.childNodes).forEach((node) => {
+            if (node === eyeEl) {
+                seenEye = true;
+                orb.appendChild(node);
+            } else if (!seenEye) {
+                back.appendChild(node);
+            } else {
+                front.appendChild(node);
+            }
+        });
+        return {
+            back: back.childNodes.length ? back : null,
+            orb: orb,
+            front: front.childNodes.length ? front : null
+        };
+    }
+
+    function pickShellSilhouette(shellClone) {
+        if (!shellClone) return null;
+        let paths = shellClone.querySelectorAll("path");
+        for (let i = 0; i < paths.length; i++) {
+            let path = paths[i];
+            if (path.classList.contains("invisible_element")) continue;
+            let fill = path.getAttribute("fill");
+            if (!fill || fill === "none") continue;
+            let opacity = path.getAttribute("opacity");
+            if (opacity != null && Number(opacity) < 0.5) continue;
+            return path;
+        }
+        return null;
+    }
+
+    function clipLayerToShell(layer, head, silhouette) {
+        if (!layer || !head || !silhouette) return;
+        kitClipSeq += 1;
+        let id = "kit_shell_clip_" + kitClipSeq;
+        let defs = head.querySelector(":scope > defs");
+        if (!defs) {
+            defs = createEl("defs");
+            head.insertBefore(defs, head.firstChild);
+        }
+        let clip = createEl("clipPath", {
+            id: id,
+            clipPathUnits: "userSpaceOnUse"
+        });
+        let shape = silhouette.cloneNode(true);
+        shape.removeAttribute("id");
+        shape.removeAttribute("class");
+        shape.removeAttribute("style");
+        shape.setAttribute("fill", "#fff");
+        shape.setAttribute("stroke", "none");
+        shape.removeAttribute("opacity");
+        clip.appendChild(shape);
+        defs.appendChild(clip);
+        layer.setAttribute("clip-path", "url(#" + id + ")");
     }
 
     function wrapEarForWiggle(clone, token) {

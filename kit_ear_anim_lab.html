@@ -91,20 +91,60 @@
         .kit_ear_droplet {
             filter: drop-shadow(0px 0px 3px #7ec8e3);
         }
-        .kit_stamp_expr {
+        .kit_stamp_art_box {
             transform-origin: center;
             transform-box: fill-box;
             transition: transform 0.45s ease, filter 0.45s ease;
         }
-        .kit_stamp_shadow_blob {
+        .kit_stamp_outline,
+        .kit_stamp_glimmer,
+        .kit_stamp_outline_pulse {
             pointer-events: none;
-            filter: blur(2.2px);
         }
-        .kit_stamp_mood_happy .kit_stamp_expr {
+        .kit_stamp_glimmer {
+            pointer-events: none;
+        }
+        @keyframes kit-stamp-glimmer-sweep {
+            0% {
+                -webkit-mask-position: 145% 145%;
+                mask-position: 145% 145%;
+                opacity: 0.4;
+            }
+            14% {
+                -webkit-mask-position: -45% -45%;
+                mask-position: -45% -45%;
+                opacity: 0.4;
+            }
+            14.01%, 100% {
+                -webkit-mask-position: -80% -80%;
+                mask-position: -80% -80%;
+                opacity: 0;
+            }
+        }
+        .kit_stamp_live.kit_stamp_lighting .kit_stamp_glimmer_stroke {
+            opacity: 0;
+            -webkit-mask-image: linear-gradient(135deg, transparent 28%, #fff 50%, transparent 72%);
+            mask-image: linear-gradient(135deg, transparent 28%, #fff 50%, transparent 72%);
+            -webkit-mask-size: 240% 240%;
+            mask-size: 240% 240%;
+            -webkit-mask-repeat: no-repeat;
+            mask-repeat: no-repeat;
+            animation: kit-stamp-glimmer-sweep 15.2s linear infinite;
+        }
+        .kit_stamp_outline_pulse path,
+        .kit_stamp_outline_pulse polygon,
+        .kit_stamp_outline_pulse polyline,
+        .kit_stamp_outline_pulse circle,
+        .kit_stamp_outline_pulse ellipse,
+        .kit_stamp_outline_pulse rect,
+        .kit_stamp_outline_pulse line {
+            fill: none !important;
+        }
+        .kit_stamp_mood_happy .kit_stamp_art_box {
             transform: scale(1.16);
             filter: brightness(1.28) saturate(1.55) contrast(1.08);
         }
-        .kit_stamp_mood_sad .kit_stamp_expr {
+        .kit_stamp_mood_sad .kit_stamp_art_box {
             transform: scale(0.82);
             filter: brightness(0.58) saturate(0.42) contrast(0.92);
         }
@@ -122,7 +162,7 @@
         <h1>Kit Ear Animation Lab</h1>
         <p class="lab-sub">
             Live heads: ear motion, cursor gaze, and stamp salience trials.
-            Click a live head to fire the stamp press. Frozen cards stay still.
+            Click a live head to fire the stamp press and a brief outline pulse. Frozen cards stay still.
         </p>
     </header>
 
@@ -140,7 +180,8 @@
         <h2>Stamp trials</h2>
         <label><input id="stampPressInput" type="checkbox" checked> Click press</label>
         <label><input id="stampExprInput" type="checkbox" checked> Expression scale / warmth</label>
-        <label><input id="stampLightInput" type="checkbox" checked> Drop-shadow pulse</label>
+        <label><input id="stampLightInput" type="checkbox" checked> Glimmer</label>
+        <label><input id="stampOutlineInput" type="checkbox"> Pulse outline</label>
     </div>
 
     <section>
@@ -160,8 +201,8 @@
         <div id="stoppedGrid" class="ear-grid"></div>
     </section>
 
-    <script src="FeatureKit.js?v=kit-stamp-salience-2"></script>
-    <script src="1_General_functions.js?v=kit-stamp-salience-2"></script>
-    <script src="KitEarAnimLab.js?v=kit-stamp-salience-2"></script>
+    <script src="FeatureKit.js?v=kit-stamp-glimmer-16"></script>
+    <script src="1_General_functions.js?v=kit-stamp-glimmer-16"></script>
+    <script src="KitEarAnimLab.js?v=kit-stamp-glimmer-16"></script>
 </body>
 </html>

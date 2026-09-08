@@ -931,7 +931,7 @@ function apply_fennimal_eye_gaze(eyes, gazeX, gazeY, scale) {
 function freeze_fennimal_decorative_animations(FennimalSVG) {
     if (!FennimalSVG) return;
     FennimalSVG.classList.add("fennimal_pose_frozen");
-    FennimalSVG.classList.remove("kit_ear_live", "kit_stamp_live", "kit_stamp_lighting", "kit_stamp_mood_happy", "kit_stamp_mood_sad");
+    FennimalSVG.classList.remove("kit_ear_live", "kit_stamp_live", "kit_stamp_lighting", "kit_stamp_outline_live", "kit_stamp_mood_happy", "kit_stamp_mood_sad");
     kit_ear_stop_timers(FennimalSVG);
     kit_ear_strip_motion(FennimalSVG);
     kit_stamp_strip(FennimalSVG);
@@ -946,6 +946,7 @@ function freeze_fennimal_decorative_animations(FennimalSVG) {
 const KIT_EAR_NS = "http://www.w3.org/2000/svg";
 const KIT_EAR_SPORE_FILLS = ["#FFEA00", "#FF9900", "#FFCC44", "#FF6600"];
 const KIT_EAR_DROP_FILLS = ["#7EB8D4", "#A8D8EA", "#5B9BB8", "#E0F4FF"];
+let kit_stamp_glimmer_seq = 0;
 
 function kit_ear_is_live(root) {
     return !!(root
@@ -1320,14 +1321,20 @@ function kit_stamp_nodes(root) {
 function kit_stamp_strip(root) {
     if (!root) return;
     root.classList.remove("kit_stamp_lighting");
+    root.querySelectorAll(".kit_stamp_motion").forEach((motion) => {
+        if (motion._stampGlimmerTimer) {
+            clearTimeout(motion._stampGlimmerTimer);
+            motion._stampGlimmerTimer = null;
+        }
+    });
     root.querySelectorAll("animate.kit_stamp_anim, animateTransform.kit_stamp_anim").forEach((el) => {
         try { if (typeof el.endElement === "function") el.endElement(); } catch (err) {}
         if (el.parentNode) el.parentNode.removeChild(el);
     });
-    root.querySelectorAll(".kit_stamp_spec, .kit_stamp_shadow_filter, .kit_stamp_shadow_blob").forEach((el) => {
+    root.querySelectorAll(".kit_stamp_spec, .kit_stamp_shadow_filter, .kit_stamp_shadow_blob, .kit_stamp_outline, .kit_stamp_glimmer_defs").forEach((el) => {
         if (el.parentNode) el.parentNode.removeChild(el);
     });
-    root.querySelectorAll(".kit_stamp_press, .kit_stamp_expr, .kit_stamp_motion").forEach((el) => {
+    root.querySelectorAll(".kit_stamp_press, .kit_stamp_expr, .kit_stamp_motion, .kit_stamp_art_box").forEach((el) => {
         el.removeAttribute("transform");
         el.removeAttribute("filter");
         el.style.transform = "";
@@ -1346,6 +1353,8 @@ function kit_stamp_ensure_motion(stamp) {
                 if (el.parentNode) el.parentNode.removeChild(el);
             });
             press.appendChild(kit_stamp_press_anim());
+            let art = kit_stamp_art_group(press);
+            if (art) art.classList.add("kit_stamp_art_box");
         }
         return existing;
     }
@@ -1358,6 +1367,7 @@ function kit_stamp_ensure_motion(stamp) {
     });
     let press = kit_ear_el("g", { class: "kit_stamp_press" });
     let unpivot = kit_ear_el("g", {
+        class: "kit_stamp_art_box",
         transform: "translate(" + (-pt.x) + " " + (-pt.y) + ")"
     });
     while (stamp.firstChild) unpivot.appendChild(stamp.firstChild);
@@ -1389,6 +1399,10 @@ function kit_stamp_press_anim() {
 
 function kit_stamp_clear_shadow(motion) {
     if (!motion) return;
+    if (motion._stampGlimmerTimer) {
+        clearTimeout(motion._stampGlimmerTimer);
+        motion._stampGlimmerTimer = null;
+    }
     motion.removeAttribute("filter");
     motion.style.filter = "";
     motion.style.animation = "";
@@ -1396,56 +1410,342 @@ function kit_stamp_clear_shadow(motion) {
     host.querySelectorAll(":scope > .kit_stamp_shadow_filter, :scope > defs.kit_stamp_shadow_filter").forEach((el) => {
         if (el.parentNode) el.parentNode.removeChild(el);
     });
-    motion.querySelectorAll(".kit_stamp_shadow_filter, .kit_stamp_shadow_blob, .kit_stamp_spec").forEach((el) => {
+    motion.querySelectorAll(".kit_stamp_shadow_filter, .kit_stamp_shadow_blob, .kit_stamp_outline, .kit_stamp_spec").forEach((el) => {
         if (el.parentNode) el.parentNode.removeChild(el);
+    });
+    if (host && host.querySelectorAll) {
+        host.querySelectorAll(":scope > .kit_stamp_glimmer_defs").forEach((el) => {
+            if (el.parentNode) el.parentNode.removeChild(el);
+        });
+    }
+}
+
+function kit_stamp_art_group(press) {
+    if (!press) return null;
+    return Array.from(press.children).find((el) => {
+        return el.tagName && el.tagName.toLowerCase() === "g"
+            && !el.classList.contains("kit_stamp_outline");
+    }) || null;
+}
+
+function kit_stamp_prepare_stroke_outline(root) {
+    if (!root) return;
+    root.querySelectorAll(".placement_marker, .stamp_marker, animate, animateTransform").forEach((el) => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+    });
+    root.querySelectorAll("path, polygon, polyline, circle, ellipse, rect, line").forEach((el) => {
+        let sw = parseFloat(el.getAttribute("stroke-width") || "0") || 0;
+        el.setAttribute("fill", "none");
+        el.setAttribute("stroke", "#fff6e8");
+        el.setAttribute("stroke-linejoin", "round");
+        el.setAttribute("stroke-linecap", "round");
+        el.setAttribute("opacity", "1");
+        el.setAttribute("stroke-opacity", "0.22");
+        el.setAttribute("stroke-width", String(sw > 4 ? sw + 3.2 : 3.6));
+        el.style.fill = "none";
+        el.removeAttribute("display");
     });
 }
 
-function kit_stamp_add_shadow(motion, index) {
+function kit_stamp_add_outline(motion) {
     if (!motion) return;
-    kit_stamp_clear_shadow(motion);
-    let stamp = motion.parentNode;
-    let pt = kit_ear_point(stamp, ".stamp_marker");
-    let begin = (index * 0.85) + "s";
-    let blob = kit_ear_el("g", {
-        class: "kit_stamp_shadow_blob",
-        transform: "translate(" + pt.x + " " + (pt.y + 12) + ")",
+    let press = motion.querySelector(".kit_stamp_press");
+    let art = kit_stamp_art_group(press);
+    if (!art) return;
+    let wrap = kit_ear_el("g", {
+        class: "kit_stamp_outline kit_stamp_outline_pulse",
         "pointer-events": "none"
     });
-    let oval = kit_ear_el("ellipse", {
-        cx: "0",
-        cy: "0",
-        rx: "30",
-        ry: "16",
-        fill: "#1a120c",
-        "fill-opacity": "0.28"
+    let scaled = kit_ear_el("g", { transform: "scale(1.08)" });
+    let clone = art.cloneNode(true);
+    kit_stamp_prepare_stroke_outline(clone);
+    scaled.appendChild(clone);
+    wrap.appendChild(scaled);
+    press.insertBefore(wrap, art);
+    wrap.querySelectorAll("path, polygon, polyline, circle, ellipse, rect, line").forEach((el, i) => {
+        let begin = (i * 0.08) + "s";
+        el.appendChild(kit_ear_el("animate", {
+            class: "kit_stamp_anim",
+            attributeName: "stroke-opacity",
+            values: "0.1; 0.5; 0.24; 0.1",
+            keyTimes: "0; 0.3; 0.62; 1",
+            dur: "3.2s",
+            repeatCount: "indefinite",
+            begin: begin
+        }));
+        let sw = parseFloat(el.getAttribute("stroke-width") || "3.6") || 3.6;
+        el.appendChild(kit_ear_el("animate", {
+            class: "kit_stamp_anim",
+            attributeName: "stroke-width",
+            values: sw + ";" + (sw * 1.22) + ";" + sw,
+            dur: "3.2s",
+            repeatCount: "indefinite",
+            begin: begin
+        }));
     });
-    oval.appendChild(kit_ear_el("animate", {
-        class: "kit_stamp_anim",
-        attributeName: "fill-opacity",
-        values: "0.18; 0.72; 0.18",
-        dur: "2.6s",
-        repeatCount: "indefinite",
-        begin: begin
+}
+
+function kit_stamp_ensure_click_pulse(motion) {
+    if (!motion) return null;
+    let press = motion.querySelector(".kit_stamp_press");
+    let art = kit_stamp_art_group(press);
+    if (!art) return null;
+    let wrap = press.querySelector(":scope > .kit_stamp_outline_click");
+    if (wrap) return wrap;
+    wrap = kit_ear_el("g", {
+        class: "kit_stamp_outline kit_stamp_outline_pulse kit_stamp_outline_click",
+        "pointer-events": "none",
+        opacity: "0"
+    });
+    let scaled = kit_ear_el("g", {
+        class: "kit_stamp_outline_click_scale",
+        transform: "scale(1.08)"
+    });
+    let clone = art.cloneNode(true);
+    kit_stamp_prepare_stroke_outline(clone);
+    clone.querySelectorAll("path, polygon, polyline, circle, ellipse, rect, line").forEach((el) => {
+        el.setAttribute("stroke-opacity", "0.55");
+    });
+    scaled.appendChild(clone);
+    wrap.appendChild(scaled);
+    wrap.appendChild(kit_ear_el("animate", {
+        class: "kit_stamp_anim kit_stamp_click_pulse",
+        attributeName: "opacity",
+        values: "0; 1; 0.4; 0",
+        keyTimes: "0; 0.22; 0.58; 1",
+        dur: "0.82s",
+        begin: "indefinite",
+        fill: "freeze",
+        restart: "always",
+        calcMode: "spline",
+        keySplines: "0.2 0.7 0.3 1; 0.25 0 0.5 1; 0.2 0.6 0.3 1"
     }));
-    oval.appendChild(kit_ear_el("animate", {
-        class: "kit_stamp_anim",
-        attributeName: "rx",
-        values: "22; 38; 22",
-        dur: "2.6s",
-        repeatCount: "indefinite",
-        begin: begin
+    scaled.appendChild(kit_ear_el("animateTransform", {
+        class: "kit_stamp_anim kit_stamp_click_pulse",
+        attributeName: "transform",
+        attributeType: "XML",
+        type: "scale",
+        values: "1.08; 1.22; 1.1; 1.08",
+        keyTimes: "0; 0.28; 0.62; 1",
+        dur: "0.82s",
+        begin: "indefinite",
+        fill: "freeze",
+        restart: "always",
+        calcMode: "spline",
+        keySplines: "0.2 0.7 0.3 1; 0.25 0 0.5 1; 0.2 0.6 0.3 1"
     }));
-    oval.appendChild(kit_ear_el("animate", {
+    press.insertBefore(wrap, art);
+    return wrap;
+}
+
+function kit_stamp_fire_click_pulse(wrap) {
+    if (!wrap || !wrap.querySelectorAll) return;
+    wrap.querySelectorAll(".kit_stamp_click_pulse").forEach((anim) => {
+        try { if (typeof anim.beginElement === "function") anim.beginElement(); } catch (err) {}
+    });
+}
+
+function kit_stamp_prepare_outline(root, paint) {
+    if (!root) return;
+    root.querySelectorAll(".placement_marker, .stamp_marker, animate, animateTransform").forEach((el) => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+    });
+    root.querySelectorAll("path, polygon, polyline, circle, ellipse, rect, line").forEach((el) => {
+        let fill = ((el.getAttribute("fill") || "") + "").toLowerCase();
+        let sw = parseFloat(el.getAttribute("stroke-width") || "0") || 0;
+        el.removeAttribute("opacity");
+        el.removeAttribute("display");
+        el.style.opacity = "";
+        if (fill === "none") {
+            el.setAttribute("fill", "none");
+            el.setAttribute("stroke", paint);
+            el.setAttribute("stroke-linejoin", "round");
+            el.setAttribute("stroke-linecap", "round");
+            if (!(sw > 1)) el.setAttribute("stroke-width", "5.5");
+            el.style.fill = "none";
+        } else {
+            el.setAttribute("fill", paint);
+            el.setAttribute("stroke", paint);
+            el.setAttribute("stroke-width", String(Math.max(1.4, sw || 1.4)));
+            el.style.fill = paint;
+        }
+    });
+}
+
+function kit_stamp_glimmer_bbox(art) {
+    try {
+        if (art && typeof art.getBBox === "function") {
+            let bb = art.getBBox();
+            if (bb && bb.width > 2 && bb.height > 2) return bb;
+        }
+    } catch (err) {}
+    return { x: -40, y: -40, width: 80, height: 80 };
+}
+
+function kit_stamp_start_anims(host) {
+    if (!host || !host.querySelectorAll) return;
+    host.querySelectorAll("animate.kit_stamp_anim, animateTransform.kit_stamp_anim").forEach((anim) => {
+        try { if (typeof anim.beginElement === "function") anim.beginElement(); } catch (err) {}
+    });
+}
+
+function kit_stamp_glimmer_band_points(cx, cy, ux, uy, band, span) {
+    let vx = -uy;
+    let vy = ux;
+    let hx = ux * band / 2;
+    let hy = uy * band / 2;
+    let lx = vx * span / 2;
+    let ly = vy * span / 2;
+    return [
+        [cx + hx + lx, cy + hy + ly],
+        [cx + hx - lx, cy + hy - ly],
+        [cx - hx - lx, cy - hy - ly],
+        [cx - hx + lx, cy - hy + ly]
+    ].map(function (p) {
+        return (Math.round(p[0] * 10) / 10) + "," + (Math.round(p[1] * 10) / 10);
+    }).join(" ");
+}
+
+function kit_stamp_clip_shapes(art) {
+    if (!art) return [];
+    return Array.from(art.querySelectorAll("path, polygon, polyline, circle, ellipse, rect")).filter((el) => {
+        let cls = el.getAttribute("class") || "";
+        return cls.indexOf("placement_marker") < 0 && cls.indexOf("stamp_marker") < 0;
+    });
+}
+
+function kit_stamp_add_glimmer(motion) {
+    if (!motion) return;
+    let press = motion.querySelector(".kit_stamp_press");
+    let art = kit_stamp_art_group(press);
+    if (!art) return;
+    let bb = kit_stamp_glimmer_bbox(art);
+    if (!(bb.width > 1 && bb.height > 1)) return;
+    let wrap = kit_ear_el("g", {
+        class: "kit_stamp_outline kit_stamp_glimmer",
+        "pointer-events": "none"
+    });
+    let defs = kit_ear_el("defs", { class: "kit_stamp_glimmer_defs" });
+    let shapes = kit_stamp_clip_shapes(art);
+    let filled = shapes.filter((el) => ((el.getAttribute("fill") || "") + "").toLowerCase() !== "none");
+    let strokeOnly = !filled.length && shapes.length;
+    wrap.appendChild(defs);
+
+    let cx = bb.x + bb.width / 2;
+    let cy = bb.y + bb.height / 2;
+    let diag = Math.sqrt(bb.width * bb.width + bb.height * bb.height);
+    let bandW = Math.max(16, diag * 0.4);
+    let travel = diag * 1.85 + bandW;
+    let ux = 0.7071;
+    let uy = 0.7071;
+    let x0 = ux * travel;
+    let y0 = uy * travel;
+    let x1 = -ux * travel;
+    let y1 = -uy * travel;
+
+    if (strokeOnly) {
+        wrap.classList.add("kit_stamp_glimmer_stroke");
+        let clone = art.cloneNode(true);
+        kit_stamp_prepare_stroke_outline(clone);
+        clone.querySelectorAll("path, polygon, polyline, circle, ellipse, rect, line").forEach((el) => {
+            el.setAttribute("stroke", "#fff");
+            el.setAttribute("stroke-opacity", "1");
+            el.setAttribute("opacity", "1");
+        });
+        wrap.appendChild(clone);
+        if (art.nextSibling) press.insertBefore(wrap, art.nextSibling);
+        else press.appendChild(wrap);
+        return;
+    }
+
+    let clipId = "kit_stamp_glim_clip_" + (++kit_stamp_glimmer_seq);
+    let clip = kit_ear_el("clipPath", {
+        id: clipId,
+        clipPathUnits: "userSpaceOnUse"
+    });
+    if (filled.length) {
+        filled.forEach((el) => {
+            let piece = el.cloneNode(true);
+            piece.removeAttribute("class");
+            piece.removeAttribute("opacity");
+            piece.removeAttribute("display");
+            clip.appendChild(piece);
+        });
+    } else {
+        clip.appendChild(kit_ear_el("circle", {
+            cx: String(bb.x + bb.width / 2),
+            cy: String(bb.y + bb.height / 2),
+            r: String(Math.max(bb.width, bb.height) * 0.62)
+        }));
+    }
+    defs.appendChild(clip);
+    let clipped = kit_ear_el("g", {
+        class: "kit_stamp_glimmer_clip",
+        "clip-path": "url(#" + clipId + ")",
+        "clip-rule": "nonzero",
+        opacity: "0"
+    });
+    clipped.appendChild(kit_ear_el("animate", {
         class: "kit_stamp_anim",
-        attributeName: "ry",
-        values: "11; 22; 11",
-        dur: "2.6s",
+        attributeName: "opacity",
+        values: "0.4;0.4;0;0",
+        keyTimes: "0;0.14;0.1401;1",
+        dur: "15.2s",
         repeatCount: "indefinite",
-        begin: begin
+        calcMode: "linear"
     }));
-    blob.appendChild(oval);
-    motion.insertBefore(blob, motion.firstChild);
+    let move = kit_ear_el("g", { class: "kit_stamp_glimmer_move" });
+    move.appendChild(kit_ear_el("animateTransform", {
+        class: "kit_stamp_anim",
+        attributeName: "transform",
+        type: "translate",
+        values: x0 + " " + y0 + ";" + x1 + " " + y1 + ";" + x1 + " " + y1,
+        keyTimes: "0;0.14;1",
+        dur: "15.2s",
+        repeatCount: "indefinite",
+        calcMode: "linear"
+    }));
+    move.appendChild(kit_ear_el("rect", {
+        class: "kit_stamp_glimmer_band",
+        x: String(cx - bandW / 2),
+        y: String(cy - diag * 1.2),
+        width: String(bandW),
+        height: String(diag * 2.4),
+        fill: "#fff",
+        transform: "rotate(45 " + cx + " " + cy + ")"
+    }));
+    clipped.appendChild(move);
+    wrap.appendChild(clipped);
+    if (art.nextSibling) press.insertBefore(wrap, art.nextSibling);
+    else press.appendChild(wrap);
+    kit_stamp_start_anims(wrap);
+}
+
+// Happy/sad artwork that CSS .is-slumped swaps via opacity. Kit FeatureKit also
+// bakes display="none" on the unused set so getBBox ignores it — slump must
+// restore display or the sad mouth never appears (elephant trunk especially).
+const FENNIMAL_HAPPY_EXPRESSION_CLASSES = [
+    "mouth_happy", "eyebrow_happy", "eyelid_happy", "cheek_happy",
+    "whiskers_happy", "moustache_happy", "moustace_happy", "face_happy"
+];
+const FENNIMAL_SAD_EXPRESSION_CLASSES = [
+    "mouth_sad", "eyebrow_sad", "eyelid_sad", "cheek_sad",
+    "whiskers_sad", "moustache_sad", "moustace_sad", "face_sad"
+];
+
+function set_fennimal_expression_visibility(root, expression) {
+    if (!root || !root.querySelectorAll) return;
+    let sad = expression === "sad";
+    FENNIMAL_SAD_EXPRESSION_CLASSES.forEach((name) => {
+        root.querySelectorAll("." + name).forEach((el) => {
+            el.setAttribute("display", sad ? "inline" : "none");
+        });
+    });
+    FENNIMAL_HAPPY_EXPRESSION_CLASSES.forEach((name) => {
+        root.querySelectorAll("." + name).forEach((el) => {
+            el.setAttribute("display", sad ? "none" : "inline");
+        });
+    });
 }
 
 function set_kit_stamp_expression(root, expression) {
@@ -1458,29 +1758,33 @@ function set_kit_stamp_expression(root, expression) {
 function apply_kit_stamp_salience(root, options) {
     if (!root) return;
     options = options || {};
-    kit_stamp_nodes(root).forEach((stamp, i) => {
+    kit_stamp_nodes(root).forEach((stamp) => {
         let motion = kit_stamp_ensure_motion(stamp);
         kit_stamp_clear_shadow(motion);
-        if (options.lighting) kit_stamp_add_shadow(motion, i);
+        if (options.outline) kit_stamp_add_outline(motion);
+        if (options.lighting) kit_stamp_add_glimmer(motion);
     });
     root.classList.toggle("kit_stamp_lighting", !!options.lighting);
+    root.classList.toggle("kit_stamp_outline_live", !!options.outline);
     set_kit_stamp_expression(root, options.expression || null);
-    if (options.lighting || options.expression || options.press) {
+    if (options.lighting || options.outline || options.expression || options.press) {
         root.classList.add("kit_stamp_live");
         root.classList.remove("fennimal_pose_frozen");
     } else {
-        root.classList.remove("kit_stamp_live", "kit_stamp_lighting");
+        root.classList.remove("kit_stamp_live", "kit_stamp_lighting", "kit_stamp_outline_live");
     }
 }
 
 function play_kit_stamp_press(root) {
     if (!root) return;
     kit_stamp_nodes(root).forEach((stamp, i) => {
-        kit_stamp_ensure_motion(stamp);
+        let motion = kit_stamp_ensure_motion(stamp);
         let anim = stamp.querySelector(".kit_stamp_press > animateTransform.kit_stamp_anim");
-        if (!anim) return;
+        let pulse = kit_stamp_ensure_click_pulse(motion);
+        if (!anim && !pulse) return;
         let fire = function () {
-            try { if (typeof anim.beginElement === "function") anim.beginElement(); } catch (err) {}
+            try { if (anim && typeof anim.beginElement === "function") anim.beginElement(); } catch (err) {}
+            kit_stamp_fire_click_pulse(pulse);
         };
         if (i === 0) fire();
         else if (root.classList.contains("kit_ear_live")) kit_ear_schedule(root, i * 45, fire);

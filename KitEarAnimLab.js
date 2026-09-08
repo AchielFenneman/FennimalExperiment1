@@ -34,6 +34,7 @@
         return {
             press: !!($("stampPressInput") && $("stampPressInput").checked),
             lighting: !!($("stampLightInput") && $("stampLightInput").checked),
+            outline: !!($("stampOutlineInput") && $("stampOutlineInput").checked),
             expression: ($("stampExprInput") && $("stampExprInput").checked) ? expression : null
         };
     }
@@ -214,6 +215,7 @@
             apply_kit_stamp_salience(item.root, {
                 press: true,
                 lighting: true,
+                outline: false,
                 expression: "happy"
             });
             stoppedRoots.push(item.root);
@@ -221,7 +223,7 @@
         });
 
         syncExpressionButtons();
-        setStatus("Heads ready. Click a live head to press stamps. Frozen rows stay still.");
+        setStatus("Heads ready. Click a live head to press stamps and pulse their outlines. Frozen rows stay still.");
     }
 
     function freezeLive() {
@@ -249,7 +251,7 @@
             $("reviveBtn").addEventListener("click", reviveLive);
             $("exprHappyBtn").addEventListener("click", () => setExpression("happy"));
             $("exprSadBtn").addEventListener("click", () => setExpression("sad"));
-            ["stampPressInput", "stampExprInput", "stampLightInput"].forEach((id) => {
+            ["stampPressInput", "stampExprInput", "stampLightInput", "stampOutlineInput"].forEach((id) => {
                 $(id).addEventListener("change", refreshStampTrials);
             });
             startGaze();

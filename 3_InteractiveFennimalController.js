@@ -458,6 +458,9 @@ class BasicElementsModule {
             this.targetGazeX = 0;
             this.targetGazeY = 5;
             this.Fennimal.classList.add("is-slumped");
+            if (typeof set_fennimal_expression_visibility === "function") {
+                set_fennimal_expression_visibility(this.Fennimal, "sad");
+            }
             AudioCont.play_sound_effect("sad");
 
             // ----------------------------------------------------
@@ -542,6 +545,9 @@ class BasicElementsModule {
                     this.Fennimal.style.cursor = "auto";
                     this.Fennimal.style.filter = "none";
                     this.Fennimal.classList.remove("is-slumped");
+                    if (typeof set_fennimal_expression_visibility === "function") {
+                        set_fennimal_expression_visibility(this.Fennimal, "happy");
+                    }
 
                 // Clear the clouds
                 if (this.CloudGroup) {
@@ -10549,12 +10555,22 @@ class HatBlownAwayTrialController {
 
     set_fennimal_sad_expression() {
         this.basics.is_slumped = true;
-        if (this.basics.Fennimal) this.basics.Fennimal.classList.add("is-slumped");
+        if (this.basics.Fennimal) {
+            this.basics.Fennimal.classList.add("is-slumped");
+            if (typeof set_fennimal_expression_visibility === "function") {
+                set_fennimal_expression_visibility(this.basics.Fennimal, "sad");
+            }
+        }
     }
 
     clear_fennimal_sad_expression() {
         this.basics.is_slumped = false;
-        if (this.basics.Fennimal) this.basics.Fennimal.classList.remove("is-slumped");
+        if (this.basics.Fennimal) {
+            this.basics.Fennimal.classList.remove("is-slumped");
+            if (typeof set_fennimal_expression_visibility === "function") {
+                set_fennimal_expression_visibility(this.basics.Fennimal, "happy");
+            }
+        }
     }
 
     create_flying_hat_at(worldX, worldY, parent) {

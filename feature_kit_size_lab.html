@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trio size lab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="morph_lab.css">
+    <link rel="stylesheet" href="feature_kit_lab.css?v=stamp-3">
+    <link rel="stylesheet" href="feature_kit_size_lab.css?v=size-lab-2">
+</head>
+<body>
+    <header class="lab-header">
+        <h1>Trio size lab</h1>
+        <p class="lab-sub">
+            The three frozen fishing heads. Shell stays at 1. Sliders size ears, eyes,
+            mouth, and stamps on all three faces at once.
+            <a href="feature_kit_lab.html">Token lab</a>
+        </p>
+    </header>
+
+    <p id="statusLine" class="status" aria-live="polite">Loading kit…</p>
+
+    <div class="size-layout">
+        <div class="kit-side">
+            <section class="kit-card">
+                <h2>Scale pack</h2>
+                <p class="lab-note" style="margin-top:0">
+                    Same 4-tuple on every head. Baseline / mild / medium are the
+                    planned sitting. Fishing rates below only apply at baseline.
+                </p>
+                <div class="actions" id="packButtons"></div>
+                <div id="scaleControls"></div>
+                <div class="field toggles" style="margin-top:10px">
+                    <label><input id="grayInput" type="checkbox" checked> Grayscale (pilot)</label>
+                </div>
+                <div class="actions">
+                    <button id="resetScaleBtn" type="button" class="secondary">Reset to ×1</button>
+                </div>
+            </section>
+
+            <section class="kit-card">
+                <h2>Pair and polarity</h2>
+                <div class="actions" id="pairButtons"></div>
+                <div class="actions" id="polarityButtons" style="margin-top:8px"></div>
+            </section>
+        </div>
+
+        <div>
+            <section class="kit-stage-wrap">
+                <h2 class="trio-heading">Locked trio</h2>
+                <div id="trioRow" class="trio-row kit-gray"></div>
+            </section>
+
+            <section class="kit-card" style="margin-top:18px">
+                <h2>3v2 trial</h2>
+                <p class="lab-note" style="margin-top:0">
+                    Top head is the mix. The three-slot parent is on the left.
+                    Click a split in the list — rates are from the fishing sample
+                    at scale ×1 (any tokens, 41 people × 2), plus the logistic for
+                    <em>these</em> three recipes at ×1.
+                </p>
+                <div id="scaleWarn" class="scale-warn" hidden>
+                    Sliders are off baseline. Participant bars are still the ×1 fishing numbers.
+                </div>
+                <div class="trial-grid">
+                    <div>
+                        <div id="trialStage" class="trial-stage kit-gray"></div>
+                        <div id="trialCaption" class="trial-caption"></div>
+                        <div id="ratePanel" class="rate-panel"></div>
+                    </div>
+                    <div>
+                        <h3 class="split-heading">Splits (fishing P(3-side) at ×1)</h3>
+                        <div id="splitList" class="split-list"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="kit-card" style="margin-top:18px">
+                <h2>All 3v2 mixes for this pair</h2>
+                <p class="lab-note" style="margin-top:0">
+                    Same polarity as above. Percent is fishing coverage at scale ×1
+                    (any tokens). Click a mix to load it in the trial.
+                </p>
+                <div id="mixGallery" class="mix-gallery kit-gray"></div>
+            </section>
+        </div>
+    </div>
+
+    <script src="FeatureKit.js?v=kit-compose-1"></script>
+    <script src="FeatureKitSizeLab.js?v=size-lab-3"></script>
+</body>
+</html>

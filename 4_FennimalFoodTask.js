@@ -1,6 +1,7 @@
 /**
  * Two-bag snack encounters.
- *   Fennimal_food          — C/D learning: comfort, both bags, wrong snaps back, eat.
+ *   Fennimal_food          — C/D learning: comfort, empty bowl, both bags,
+ *                            drag onto bowl, fill, slide to mouth, eat.
  *   Fennimal_food_transfer — A: empty scene, simultaneous C/D matching overlay,
  *                            A appears, comfort, 2AFC with no eat / no feedback.
  */
@@ -18,6 +19,7 @@ class FennimalFoodTrialController {
             ? FenObj.food_choice_flavors.slice()
             : (this.flavor ? [this.flavor] : []);
         this.bags = [];
+        this.FoodBowl = null;
         this.dragControllers = [];
         this.dragLayer = null;
         this.dropLocked = false;
@@ -240,7 +242,7 @@ class FennimalFoodTrialController {
         } else if (this.isTransfer) {
             this.enable_bag_dragging((event) => this.hit_target_fennimal(event));
         } else {
-            this.enable_bag_dragging((event) => this.hit_target_fennimal(event));
+            this.enable_bag_dragging((event) => this.hit_bowl(event));
         }
     }
 
@@ -250,10 +252,173 @@ class FennimalFoodTrialController {
         return { id: this.FenObj.id, el: this.basics.Fennimal, flavor: this.flavor };
     }
 
+    hit_bowl(event) {
+        if (!this.FoodBowl) return null;
+        let pad = this.params.bowlDropPad != null ? this.params.bowlDropPad : 56;
+        if (!this.point_over_element(event, this.FoodBowl, pad)) return null;
+        return { id: "bowl", el: this.FoodBowl, flavor: this.flavor };
+    }
+
+    set_element_center(elem, x, y, time) {
+        if (!elem) return Promise.resolve();
+        let center = getSVGInternalCenter(elem);
+        let dx = x - center.x;
+        let dy = y - center.y;
+        let ms = time || 0;
+        elem.style.transition = ms > 0 ? ("transform " + ms + "ms ease-in-out") : "";
+        elem.style.transform = (elem.style.transform || "") + " translate(" + dx + "px, " + dy + "px)";
+        return ms > 0 ? wait(ms) : Promise.resolve();
+    }
+
+    async spawn_empty_bowl() {
+        const p = this.params;
+        let template = document.getElementById("foodbowl");
+        if (!template) {
+            throw new Error("FennimalFood: missing #foodbowl template in Items.svg.");
+        }
+        this.FoodBowl = copy_scale_and_move_object_to_position(
+            template,
+            this.basics.ItemLayers.Main,
+            (p.bowlX != null ? p.bowlX : 0.58) * this.basics.W,
+            (p.bowlY != null ? p.bowlY : 0.78) * this.basics.H,
+            p.bowlScale != null ? p.bowlScale : 3.5
+        );
+        this.FoodBowl.id = "food_trial_foodbowl";
+        this.FoodBowl.querySelectorAll(".food").forEach((food) => {
+            food.style.display = "none";
+            food.style.opacity = 0;
+        });
+        this.FoodBowl.style.opacity = 0;
+        window.getComputedStyle(this.FoodBowl).opacity;
+        this.FoodBowl.style.transition = "opacity 250ms ease-out";
+        this.FoodBowl.style.opacity = 1;
+        await wait(250);
+    }
+
+    reveal_bowl_food(options) {
+        if (!this.FoodBowl || !this.flavor) return;
+        let fadeMs = options && options.fadeMs;
+        ["first", "second", "third"].forEach((portion) => {
+            let food = Array.from(this.FoodBowl.querySelectorAll(".food." + this.flavor))
+                .find((el) => (el.id || "").includes(portion));
+            if (!food) return;
+            food.style.display = "inherit";
+            if (fadeMs) {
+                food.style.transition = "none";
+                food.style.opacity = 0;
+                window.getComputedStyle(food).opacity;
+                food.style.transition = "opacity " + fadeMs + "ms ease-out";
+                food.style.opacity = 1;
+            } else {
+                food.style.opacity = 1;
+            }
+        });
+    }
+
+    get_bowl_food_pieces() {
+        if (!this.FoodBowl || !this.flavor) return [];
+        let pieces = Array.from(this.FoodBowl.querySelectorAll(".food." + this.flavor));
+        const order = { first: 0, second: 1, third: 2 };
+        pieces.sort((a, b) => {
+            let ka = Object.keys(order).find((k) => (a.id || "").includes(k));
+            let kb = Object.keys(order).find((k) => (b.id || "").includes(k));
+            return (order[ka] != null ? order[ka] : 9) - (order[kb] != null ? order[kb] : 9);
+        });
+        return pieces;
+    }
+
+    async fade_out_bags(fadeMs) {
+        let ms = fadeMs != null ? fadeMs : 350;
+        let fadeTargets = this.bags.map((b) => b.elem).filter(Boolean);
+        fadeTargets.forEach((el) => {
+            el.style.transition = "opacity " + ms + "ms ease-out";
+            window.getComputedStyle(el).opacity;
+            el.style.opacity = 0;
+            el.style.pointerEvents = "none";
+        });
+        await wait(ms);
+        fadeTargets.forEach((el) => { if (el.parentNode) el.remove(); });
+        this.bags = [];
+    }
+
+    async slide_bowl_to_mouth() {
+        if (!this.FoodBowl) return;
+        let mouthEl = this.basics.TargetPoints.Fennimal_mouth;
+        let mouth = mouthEl
+            ? getSVGInternalCenter(mouthEl)
+            : getSVGInternalCenter(this.basics.Fennimal);
+        let bowlCenter = getSVGInternalCenter(this.FoodBowl);
+        let slideMs = this.params.bowlSlideTime != null ? this.params.bowlSlideTime : 500;
+        await this.set_element_center(this.FoodBowl, mouth.x, bowlCenter.y, slideMs);
+        await wait(200);
+    }
+
+    async animate_eating() {
+        let mouthEl = this.basics.TargetPoints.Fennimal_mouth;
+        let mouth = mouthEl
+            ? getSVGInternalCenter(mouthEl)
+            : getSVGInternalCenter(this.basics.Fennimal);
+        let pieces = this.get_bowl_food_pieces();
+        let layer = this.basics.ItemLayers.Plus2;
+        let scale = this.params.bowlScale != null ? this.params.bowlScale : 3.5;
+        let eatMs = this.params.eatMoveTime != null ? this.params.eatMoveTime : 420;
+
+        Interface.Prompt.show_message(
+            this.FenObj.name + " loves " + this.flavor_label(this.flavor) + "!"
+        );
+
+        for (let i = 0; i < pieces.length; i++) {
+            let food = pieces[i];
+            let start = getSVGInternalCenter(food);
+
+            food.removeAttribute("transform");
+            food.style.transition = "none";
+            food.style.transform = "";
+            food.style.opacity = 1;
+            food.style.display = "inherit";
+
+            let zeroGroup = create_SVG_group(0, 0, "zero_translate_group");
+            let scaleGroup = create_SVG_group(0, 0, "scale_group");
+            let mainPos = create_SVG_group(0, 0, "main_translate_group");
+            zeroGroup.appendChild(food);
+            scaleGroup.appendChild(zeroGroup);
+            mainPos.appendChild(scaleGroup);
+            layer.appendChild(mainPos);
+
+            let baseCenter = getSVGInternalCenter(zeroGroup);
+            zeroGroup.style.transform = "translate(" + (-baseCenter.x) + "px, " + (-baseCenter.y) + "px)";
+            scaleGroup.style.transform = "scale(" + scale + ")";
+            mainPos.style.transition = "none";
+            mainPos.style.transform = "translate(" + start.x + "px, " + start.y + "px)";
+
+            window.getComputedStyle(mainPos).transform;
+            mainPos.style.transition = "transform " + eatMs + "ms ease-in-out";
+            mainPos.style.transform = "translate(" + mouth.x + "px, " + mouth.y + "px)";
+            await wait(eatMs);
+
+            food.style.transition = "opacity 150ms ease-out";
+            food.style.opacity = 0;
+            AudioCont.play_sound_effect("chew");
+
+            for (let h = 0; h < 2; h++) {
+                setTimeout(() => {
+                    this.basics.spawn_happy_heart(
+                        mouth.x + (Math.random() - 0.5) * 40,
+                        mouth.y - 20,
+                        layer
+                    );
+                }, h * 80);
+            }
+            await wait(180);
+            mainPos.style.display = "none";
+        }
+    }
+
     hit_quiz_slot(event) {
+        let pad = this.params.quizDropPad != null ? this.params.quizDropPad : 12;
         for (let i = 0; i < this.quizSlots.length; i++) {
             let slot = this.quizSlots[i];
-            if (this.point_over_element(event, slot.el)) return slot;
+            if (this.point_over_element(event, slot.el, pad)) return slot;
         }
         return null;
     }
@@ -331,10 +496,9 @@ class FennimalFoodTrialController {
         info.placed = true;
         this.placedQuizFlavors[hit.id] = info.flavor;
         this.destroy_all_drag_controllers();
-        let restX = hit.side === "left"
-            ? hit.x + 0.08 * this.basics.W
-            : hit.x - 0.08 * this.basics.W;
-        await this.move_bag_to(info, restX, hit.y - 40, this.params.bagMoveTime || 280);
+        let restX = hit.cx != null ? hit.cx : hit.x;
+        let restY = hit.cy != null ? (hit.cy + 90) : (hit.y - 40);
+        await this.move_bag_to(info, restX, restY, this.params.bagMoveTime || 280);
 
         let bothPlaced = this.quizSlots.every((slot) => this.placedQuizFlavors[slot.id]);
         if (!bothPlaced) {
@@ -345,7 +509,7 @@ class FennimalFoodTrialController {
         this.FenObj.quiz_rt_ms = Math.round(this.now_ms() - (this.quizArmedAt || this.now_ms()));
         let cx = 0.5 * this.basics.W;
         let cy = 0.42 * this.basics.H;
-        await spawn_confetti_burst(this.basics.ItemLayers.Questions, cx, cy, { awaitPopMs: 700 });
+        await spawn_confetti_burst(this.overlayGroup || this.basics.ItemLayers.Questions, cx, cy, { awaitPopMs: 700 });
         await wait(250);
         if (this.overlayGroup) {
             this.overlayGroup.style.transition = "opacity 280ms ease-out";
@@ -354,9 +518,10 @@ class FennimalFoodTrialController {
             this.overlayGroup.remove();
             this.overlayGroup = null;
         }
-        this.bags.forEach((b) => { if (b.elem) b.elem.remove(); });
+        this.bags.forEach((b) => { if (b.elem && b.elem.parentNode) b.elem.remove(); });
         this.bags = [];
         this.quizSlots = [];
+        await wait(this.params.quizClearBeatMs != null ? this.params.quizClearBeatMs : 750);
         if (this._quizResolve) {
             this._quizResolve();
             this._quizResolve = null;
@@ -384,51 +549,28 @@ class FennimalFoodTrialController {
 
     async handle_correct_feed(correctBag) {
         AudioCont.play_sound_effect("success");
-        this.bags.forEach((b) => {
-            if (b === correctBag || !b.elem) return;
-            b.elem.style.transition = "opacity 280ms ease-out";
-            b.elem.style.opacity = 0;
-            b.elem.style.pointerEvents = "none";
-        });
-        let mouth = this.basics.TargetPoints.Fennimal_mouth
-            ? getSVGInternalCenter(this.basics.TargetPoints.Fennimal_mouth)
-            : getSVGInternalCenter(this.basics.Fennimal);
-        await this.move_bag_to(
-            correctBag,
-            mouth.x,
-            mouth.y + 20,
-            this.params.eatMoveTime || 420
-        );
-        correctBag.elem.style.transition = "opacity 180ms ease-out";
-        correctBag.elem.style.opacity = 0;
-        if (AudioCont.play_sound_effect) {
-            try { AudioCont.play_sound_effect("chew"); } catch (err) { /* optional */ }
-        }
-        Interface.Prompt.show_message(
-            this.FenObj.name + " loves " + this.flavor_label(this.flavor) + "!"
-        );
-        for (let i = 0; i < 4; i++) {
-            setTimeout(() => {
-                this.basics.spawn_happy_heart(
-                    mouth.x + (Math.random() - 0.5) * 50,
-                    mouth.y - 20,
-                    this.basics.ItemLayers.Plus2
-                );
-            }, i * 90);
-        }
-        await wait(400);
+        let pourMs = this.params.bagPourFadeMs != null ? this.params.bagPourFadeMs : 320;
+        this.reveal_bowl_food({ fadeMs: pourMs });
+        await this.fade_out_bags(pourMs);
+        await wait(180);
+        await this.slide_bowl_to_mouth();
+        await this.animate_eating();
         await this.basics.perform_success_celebration(null);
-        await wait(600);
+        await wait(750);
         Interface.Prompt.show_message(this.FenObj.name + " has wandered off...");
         let fenCenter = getSVGInternalCenter(this.basics.Fennimal);
         await this.basics.Fennimal_move_relative(-(fenCenter.x + 300), 0, 750);
-        await wait(400);
+        await wait(500);
         this.returnfunc();
     }
 
     async fade_scene_out() {
+        if (typeof Interface !== "undefined" && Interface.Prompt && Interface.Prompt.hide) {
+            Interface.Prompt.hide();
+        }
         let fadeTargets = [];
         if (this.basics.Fennimal) fadeTargets.push(this.basics.Fennimal);
+        if (this.FoodBowl) fadeTargets.push(this.FoodBowl);
         this.bags.forEach((b) => { if (b.elem) fadeTargets.push(b.elem); });
         fadeTargets.forEach((el) => {
             el.style.transition = "opacity 450ms ease-out";
@@ -436,6 +578,229 @@ class FennimalFoodTrialController {
             el.style.pointerEvents = "none";
         });
         await wait(480);
+    }
+
+    hide_prompt() {
+        if (typeof Interface !== "undefined" && Interface.Prompt && Interface.Prompt.hide) {
+            Interface.Prompt.hide();
+        }
+    }
+
+    quiz_card_layout() {
+        const p = this.params;
+        const W = this.basics.W;
+        const H = this.basics.H;
+        const gap = (p.quizCardGap != null ? p.quizCardGap : 0.04) * W;
+        const cardW = (p.quizCardW != null ? p.quizCardW : 0.28) * W;
+        const cardY = (p.quizCardY != null ? p.quizCardY : 0.185) * H;
+        const cardH = (p.quizCardH != null ? p.quizCardH : 0.74) * H;
+        const leftX = gap;
+        return {
+            W: W,
+            H: H,
+            cardW: cardW,
+            cardH: cardH,
+            cardY: cardY,
+            gap: gap,
+            leftX: leftX,
+            midX: leftX + cardW + gap,
+            rightX: leftX + 2 * (cardW + gap),
+            instructionY: (p.quizInstructionY != null ? p.quizInstructionY : 0.045) * H,
+            instructionH: (p.quizInstructionH != null ? p.quizInstructionH : 0.12) * H
+        };
+    }
+
+    apply_sorting_card_chrome(rect) {
+        rect.style.fill = "#FFFFFFBB";
+        rect.style.stroke = "#B0BEC5";
+        rect.style.strokeWidth = "6px";
+        rect.setAttribute("rx", "20");
+        rect.setAttribute("ry", "20");
+        rect.style.pointerEvents = "none";
+        return rect;
+    }
+
+    create_quiz_instruction_panel(text, x, y, w, h) {
+        let group = create_SVG_group(0, 0);
+        group.style.transform = "translate(" + x + "px, " + y + "px)";
+        let rect = this.apply_sorting_card_chrome(create_SVG_rect(0, 0, w, h));
+        rect.style.fill = "#FFFFFF";
+        rect.style.fillOpacity = "0.94";
+        group.appendChild(rect);
+        let fo = create_SVG_foreignElement(18, 8, Math.max(40, w - 36), Math.max(24, h - 16));
+        fo.style.pointerEvents = "none";
+        let div = document.createElement("div");
+        div.style.width = "100%";
+        div.style.height = "100%";
+        div.style.display = "flex";
+        div.style.alignItems = "center";
+        div.style.justifyContent = "center";
+        div.style.textAlign = "center";
+        div.style.fontWeight = "700";
+        div.style.fontSize = "30px";
+        div.style.lineHeight = "1.3";
+        div.style.color = "#37474F";
+        div.style.fontFamily = "'Source Sans 3', 'PT Sans', sans-serif";
+        div.style.boxSizing = "border-box";
+        div.style.padding = "0 8px";
+        div.textContent = text;
+        fo.appendChild(div);
+        group.appendChild(fo);
+        return group;
+    }
+
+    create_quiz_name_banner(name, width, height, fill) {
+        let banner = create_SVG_group(0, 0);
+        let rect = create_SVG_rect(0, 0, width, height);
+        rect.style.fill = fill || "#37474F";
+        rect.style.pointerEvents = "none";
+        banner.appendChild(rect);
+        let label = create_SVG_text_elem(0.5 * width, 0.68 * height, name || "");
+        label.setAttribute("text-anchor", "middle");
+        label.style.fontSize = Math.max(26, Math.min(40, 0.48 * height)) + "px";
+        label.style.fontWeight = "700";
+        label.style.fill = "white";
+        label.style.pointerEvents = "none";
+        banner.appendChild(label);
+        return banner;
+    }
+
+    fit_local_svg_element(element, cx, cy, maxW, maxH) {
+        if (!element) return;
+        const apply = (attempt) => {
+            let box = { width: 0, height: 0, x: 0, y: 0 };
+            try { box = element.getBBox(); } catch (err) { box = { width: 0, height: 0, x: 0, y: 0 }; }
+            if ((!box || box.width <= 0 || box.height <= 0) && attempt < 8) {
+                setTimeout(() => apply(attempt + 1), 40);
+                return;
+            }
+            if (!box || box.width <= 0 || box.height <= 0) return;
+            let scale = Math.min(maxW / box.width, maxH / box.height);
+            let boxCx = box.x + 0.5 * box.width;
+            let boxCy = box.y + 0.5 * box.height;
+            element.setAttribute(
+                "transform",
+                "translate(" + cx + ", " + cy + ") scale(" + scale + ") translate(" + (-boxCx) + ", " + (-boxCy) + ")"
+            );
+        };
+        apply(0);
+    }
+
+    create_quiz_portrait_card(fenObj, x, y, w, h) {
+        let group = create_SVG_group(0, 0);
+        group.style.transform = "translate(" + x + "px, " + y + "px)";
+        group.style.pointerEvents = "none";
+
+        let region = fenObj && fenObj.region;
+        let regionData = (typeof GenParam !== "undefined" && GenParam.RegionData && region)
+            ? GenParam.RegionData[region]
+            : null;
+        let bannerFill = (regionData && regionData.darker_color) ? regionData.darker_color : "#37474F";
+        let bannerH = Math.max(62, (this.params.quizBannerH != null ? this.params.quizBannerH : 0.13) * h);
+        let sceneH = Math.max(40, h - bannerH);
+
+        let clipId = "food_quiz_scene_" + String(fenObj && fenObj.id != null ? fenObj.id : "x") + "_" + Math.floor(Math.random() * 1e6);
+        let defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+        let clip = document.createElementNS("http://www.w3.org/2000/svg", "clipPath");
+        clip.setAttribute("id", clipId);
+        let clipRect = create_SVG_rect(0, bannerH, w, sceneH);
+        clip.appendChild(clipRect);
+        defs.appendChild(clip);
+        group.appendChild(defs);
+
+        let fill = this.apply_sorting_card_chrome(create_SVG_rect(0, 0, w, h));
+        group.appendChild(fill);
+
+        let scene = create_SVG_group(0, 0);
+        scene.setAttribute("clip-path", "url(#" + clipId + ")");
+
+        let bgImage = document.createElementNS("http://www.w3.org/2000/svg", "image");
+        let locName = fenObj && fenObj.location ? fenObj.location : "lake";
+        let regName = region ? capitalize_first_letter_in_string(region) : "North";
+        if (typeof set_location_background_image === "function") {
+            set_location_background_image(bgImage, regName, locName);
+        }
+        bgImage.setAttribute("width", String(w));
+        bgImage.setAttribute("height", String(sceneH));
+        bgImage.setAttribute("y", String(bannerH));
+        bgImage.setAttribute("preserveAspectRatio", "xMidYMid slice");
+        scene.appendChild(bgImage);
+
+        let bgMask = create_SVG_rect(0, bannerH, w, sceneH);
+        bgMask.style.fill = "white";
+        bgMask.style.opacity = "0.75";
+        bgMask.style.pointerEvents = "none";
+        scene.appendChild(bgMask);
+
+        let fenGroup = create_SVG_group(0, 0);
+        let fenIcon = create_Fennimal_SVG_object(fenObj, 0.5, false);
+        if (typeof apply_Fennimal_animation_pivots === "function") {
+            apply_Fennimal_animation_pivots(fenIcon);
+        }
+        if (typeof cleanSVGElements === "function") {
+            cleanSVGElements(fenIcon);
+        }
+        fenGroup.appendChild(fenIcon);
+        fenGroup.style.pointerEvents = "none";
+        scene.appendChild(fenGroup);
+        group.appendChild(scene);
+
+        group.appendChild(this.create_quiz_name_banner(fenObj && fenObj.name, w, bannerH, bannerFill));
+
+        let stroke = this.apply_sorting_card_chrome(create_SVG_rect(0, 0, w, h));
+        stroke.style.fill = "none";
+        group.appendChild(stroke);
+
+        this.fit_local_svg_element(
+            fenGroup,
+            0.5 * w,
+            bannerH + 0.58 * sceneH,
+            0.62 * w,
+            0.64 * sceneH
+        );
+
+        return {
+            group: group,
+            dropEl: group,
+            x: x,
+            y: y,
+            w: w,
+            h: h,
+            bannerH: bannerH,
+            cx: x + 0.5 * w,
+            cy: y + bannerH + 0.55 * sceneH
+        };
+    }
+
+    create_quiz_snacks_card(x, y, w, h) {
+        let group = create_SVG_group(0, 0);
+        group.style.transform = "translate(" + x + "px, " + y + "px)";
+        group.style.pointerEvents = "none";
+        let fill = this.apply_sorting_card_chrome(create_SVG_rect(0, 0, w, h));
+        group.appendChild(fill);
+        let bannerH = Math.max(56, (this.params.quizBannerH != null ? this.params.quizBannerH : 0.13) * h);
+        group.appendChild(this.create_quiz_name_banner("Snacks", w, bannerH, "#37474F"));
+        return { group: group, x: x, y: y, w: w, h: h, bannerH: bannerH };
+    }
+
+    async show_transfer_decision_bubble(text) {
+        this.hide_prompt();
+        let dim = (this.params.transferDecisionDim != null) ? this.params.transferDecisionDim : 0.5;
+        if (typeof Interface !== "undefined" && typeof Interface.showPartnerSpeechBubble === "function") {
+            await Interface.showPartnerSpeechBubble({
+                target: this.basics.Fennimal,
+                context: "location",
+                text: text,
+                buttonLabel: "Continue",
+                dimOpacity: dim,
+                preferredSide: "up"
+            });
+            return;
+        }
+        if (Interface && Interface.Prompt) {
+            Interface.Prompt.show_message(String(text).replace(/<br\s*\/?>/gi, " "));
+            await wait(1600);
+        }
     }
 
     async run_learning_trial() {
@@ -457,16 +822,18 @@ class FennimalFoodTrialController {
         await this.basics.trigger_comfort_checkin();
         await wait(300);
 
+        await this.spawn_empty_bowl();
+
         let leftX = (p.bagLeftX != null ? p.bagLeftX : 0.68) * this.basics.W;
         let rightX = (p.bagRightX != null ? p.bagRightX : 0.86) * this.basics.W;
         let bagY = (p.bagY != null ? p.bagY : 0.72) * this.basics.H;
         this.spawn_bag_pair(this.choiceFlavors, leftX, rightX, bagY, this.basics.ItemLayers.Plus2);
         Interface.Prompt.show_message(
             this.FenObj.name + " likes " + this.flavor_label(this.flavor) +
-            ". Drag that bag onto " + this.FenObj.name + "!"
+            ". Drag that bag onto " + this.FenObj.name + "'s bowl!"
         );
         AudioCont.play_sound_effect("alert_minor");
-        this.enable_bag_dragging((event) => this.hit_target_fennimal(event));
+        this.enable_bag_dragging((event) => this.hit_bowl(event));
     }
 
     async run_food_match_overlay() {
@@ -475,71 +842,72 @@ class FennimalFoodTrialController {
         if (!leftFen || !rightFen) {
             throw new Error("FennimalFood: transfer trial is missing quiz Fennimal copies.");
         }
-        const p = this.params;
-        let W = this.basics.W;
-        let H = this.basics.H;
+        this.hide_prompt();
+        let layout = this.quiz_card_layout();
         this.overlayGroup = create_SVG_group(0, 0, undefined, "food_match_overlay");
         this.basics.ItemLayers.Questions.appendChild(this.overlayGroup);
 
-        let dim = create_SVG_rect(0, 0, W, H);
+        let dim = create_SVG_rect(0, 0, layout.W, layout.H);
         dim.style.fill = "rgba(255,255,255,0.55)";
         dim.style.pointerEvents = "none";
         this.overlayGroup.appendChild(dim);
 
-        const card = (x, y, w, h) => {
-            let rect = create_SVG_rect(x, y, w, h);
-            rect.style.fill = "rgba(255,255,255,0.92)";
-            rect.style.stroke = "rgba(40,40,70,0.18)";
-            rect.style.strokeWidth = "4";
-            rect.setAttribute("rx", "28");
-            rect.setAttribute("ry", "28");
-            rect.style.pointerEvents = "none";
-            this.overlayGroup.appendChild(rect);
-            return rect;
-        };
-        card(0.04 * W, 0.16 * H, 0.28 * W, 0.72 * H);
-        card(0.36 * W, 0.16 * H, 0.28 * W, 0.72 * H);
-        card(0.68 * W, 0.16 * H, 0.28 * W, 0.72 * H);
+        let instruction = this.FenObj.name +
+            " isn’t here yet. First, can you remember who likes which food? " +
+            "Drag each snack to the Fennimal who likes it.";
+        this.overlayGroup.appendChild(this.create_quiz_instruction_panel(
+            instruction,
+            layout.leftX,
+            layout.instructionY,
+            layout.rightX + layout.cardW - layout.leftX,
+            layout.instructionH
+        ));
 
-        let leftX = (p.quizLeftX != null ? p.quizLeftX : 0.18) * W;
-        let rightX = (p.quizRightX != null ? p.quizRightX : 0.82) * W;
-        let fenY = (p.quizFenY != null ? p.quizFenY : 0.70) * H;
-        let fenScale = p.quizFenScale != null ? p.quizFenScale : 1.35;
-        let leftEl = this.place_fennimal_svg(leftFen, this.overlayGroup, leftX, fenY, fenScale);
-        let rightEl = this.place_fennimal_svg(rightFen, this.overlayGroup, rightX, fenY, fenScale);
+        let snacks = this.create_quiz_snacks_card(layout.midX, layout.cardY, layout.cardW, layout.cardH);
+        this.overlayGroup.appendChild(snacks.group);
 
-        let nameY = (p.quizNameY != null ? p.quizNameY : 0.82) * H;
-        [ [leftFen, leftX], [rightFen, rightX] ].forEach((entry) => {
-            let label = create_SVG_text_elem(entry[1], nameY, entry[0].name);
-            label.setAttribute("text-anchor", "middle");
-            label.style.fontSize = "34px";
-            label.style.fontWeight = "700";
-            label.style.fill = "#2b2b40";
-            label.style.pointerEvents = "none";
-            this.overlayGroup.appendChild(label);
-        });
+        let leftCard = this.create_quiz_portrait_card(leftFen, layout.leftX, layout.cardY, layout.cardW, layout.cardH);
+        let rightCard = this.create_quiz_portrait_card(rightFen, layout.rightX, layout.cardY, layout.cardW, layout.cardH);
+        this.overlayGroup.appendChild(leftCard.group);
+        this.overlayGroup.appendChild(rightCard.group);
 
         this.quizSlots = [
-            { id: leftFen.id, el: leftEl, flavor: leftFen.food_preference, x: leftX, y: fenY, side: "left" },
-            { id: rightFen.id, el: rightEl, flavor: rightFen.food_preference, x: rightX, y: fenY, side: "right" }
+            {
+                id: leftFen.id,
+                el: leftCard.dropEl,
+                flavor: leftFen.food_preference,
+                x: leftCard.cx,
+                y: leftCard.cy,
+                cx: leftCard.cx,
+                cy: leftCard.cy,
+                side: "left"
+            },
+            {
+                id: rightFen.id,
+                el: rightCard.dropEl,
+                flavor: rightFen.food_preference,
+                x: rightCard.cx,
+                y: rightCard.cy,
+                cx: rightCard.cx,
+                cy: rightCard.cy,
+                side: "right"
+            }
         ];
 
         let foodOrder = Array.isArray(this.FenObj.quiz_food_order) && this.FenObj.quiz_food_order.length === 2
             ? this.FenObj.quiz_food_order.slice()
             : this.choiceFlavors.slice();
-        let foodX = (p.quizFoodX != null ? p.quizFoodX : 0.50) * W;
-        let topY = (p.quizFoodTopY != null ? p.quizFoodTopY : 0.38) * H;
-        let bottomY = (p.quizFoodBottomY != null ? p.quizFoodBottomY : 0.58) * H;
+        let foodX = snacks.x + 0.5 * snacks.w;
+        let sceneTop = snacks.y + snacks.bannerH;
+        let sceneH = snacks.h - snacks.bannerH;
+        let topY = sceneTop + 0.32 * sceneH;
+        let bottomY = sceneTop + 0.70 * sceneH;
         this.spawn_bag_pair(foodOrder, foodX, foodX, topY, this.overlayGroup);
         if (this.bags[1]) {
             this.bags[1].homeY = bottomY;
             this.bags[1].elem.style.transform = "translate(" + foodX + "px, " + bottomY + "px)";
         }
 
-        Interface.Prompt.show_message(
-            this.FenObj.name + " isn’t here yet. First, can you remember who likes which food? " +
-            "Drag each snack to the Fennimal who likes it."
-        );
         AudioCont.play_sound_effect("alert_minor");
         this.quizArmedAt = this.now_ms();
         this.placedQuizFlavors = {};
@@ -568,11 +936,12 @@ class FennimalFoodTrialController {
         let stars = (typeof this.FenObj.bonus_stars_earnable === "number")
             ? this.FenObj.bonus_stars_earnable
             : 2;
-        Interface.Prompt.show_message(
-            this.FenObj.name + " is here! Give them the snack you think they will like. " +
+        await this.show_transfer_decision_bubble(
+            this.FenObj.name + " is here! Give them the snack you think they will like.<br><br>" +
             "You can earn " + stars + " bonus stars for a correct answer. " +
             "You won’t find out how you did until the end of the experiment."
         );
+        this.hide_prompt();
         AudioCont.play_sound_effect("alert_minor");
 
         let leftX = (p.transferBagLeftX != null ? p.transferBagLeftX : 0.28) * this.basics.W;
@@ -594,6 +963,8 @@ class FennimalFoodTrialController {
         this.trialComplete = true;
         this.destroy_all_drag_controllers();
         this.bags.forEach((b) => { if (b.elem && b.elem.parentNode) b.elem.remove(); });
+        if (this.FoodBowl && this.FoodBowl.parentNode) this.FoodBowl.remove();
+        this.FoodBowl = null;
         if (this.overlayGroup && this.overlayGroup.parentNode) this.overlayGroup.remove();
         this.basics.clean_up();
     }

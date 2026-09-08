@@ -1,9 +1,11 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["feature_kit_combo_pilot"];
-    // Live default: feature_kit_combo_pilot. Other codes: feature_kit_pilot |
-    // semantic_learning_kit | semantic_learning_star | mentalizing_between_subjects.
-    // Override (no file edit): ?EXP=semantic_learning_kit&SEED=kitlive09&SKIP_INTRO=1
+    this.Experiment_Code = ["feature_kit_size_pilot"];
+    // Live default: feature_kit_size_pilot (frozen-trio size sitting). Other codes:
+    // feature_kit_combo_pilot | feature_kit_pilot | test | semantic_learning_kit |
+    // semantic_learning_star | mentalizing_between_subjects.
+    // Override (no file edit): ?EXP=test&SEED=foodbowl01&SKIP_INTRO=1
+    // Optional pack pin: &PACK=baseline | mild | medium (else 1/3 between-subjects).
     // Archived recipes: archive/experiments/ (see archive/MANIFEST.md)
 
     // Independent of Heads.svg token ids so kit Fennimals are not named "the elephant one".
@@ -29,11 +31,13 @@ let StimulusSettings = function () {
     };
 
     const All_Instructions_At_Start = {
+        test: [],
         semantic_learning_star: [], //"browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview"
         semantic_learning_kit: [], // ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview"],
         mentalizing_between_subjects: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
         feature_kit_pilot: ["browser_check_and_full_screen_prompt", "consent", "single_sitting"],
         feature_kit_combo_pilot: ["browser_check_and_full_screen_prompt", "consent", "single_sitting"],
+        feature_kit_size_pilot: ["browser_check_and_full_screen_prompt", "consent", "single_sitting"],
     };
 
     // ----------------------------------------------------
@@ -77,6 +81,9 @@ let StimulusSettings = function () {
             "P": { head: "A", region: "A" }
         },
         feature_kit_combo_pilot: {
+            "P": { head: "A", region: "A" }
+        },
+        feature_kit_size_pilot: {
             "P": { head: "A", region: "A" }
         },
     };
@@ -369,6 +376,18 @@ let StimulusSettings = function () {
                 exclude_slots: ["hair"]
             }
         ],
+        feature_kit_size_pilot: [
+            {
+                type: "feature_kit_size_pilot",
+                skip_instructions: false,
+                skip_practice: false,
+                partner_behavior: "absent",
+                trial_speed: 7500,
+                n_catch: 3,
+                adaptive: false,
+                exclude_slots: ["hair"]
+            }
+        ],
     };
 
     All_Experiment_Structures.semantic_learning_kit = JSON.parse(
@@ -390,7 +409,7 @@ let StimulusSettings = function () {
                 skip_instructions: false,
                 partner_behavior: "absent",
                 include_Fennefinder: false,
-                return_to_phone_room_after_final_trial: true,
+                return_to_phone_room_after_final_trial: false,
                 randomization_id: "food_transfer_layout",
                 bonus_stars_per_correct_answer: 2,
                 day_title: "snack time",
@@ -482,22 +501,37 @@ let StimulusSettings = function () {
         morph.trials = trials;
     })();
 
+    All_Fennimal_Sets.test = JSON.parse(JSON.stringify(All_Fennimal_Sets.semantic_learning_kit));
+    (function patchTestSnackSandbox() {
+        let snack = (All_Experiment_Structures.semantic_learning_kit || []).find((p) =>
+            p && p.randomization_id === "food_transfer_layout"
+        );
+        if (!snack) {
+            throw new Error("test: kit snack-day phase (food_transfer_layout) is missing.");
+        }
+        All_Experiment_Structures.test = [JSON.parse(JSON.stringify(snack))];
+    })();
+
     const All_Questionnaire_Page_sets = {
+        test: [],
         semantic_learning_star: ["demographics_questionnaire"],
         semantic_learning_kit: ["demographics_questionnaire"],
         mentalizing_between_subjects: ["demographics_questionnaire"],
         feature_kit_pilot: [],
         feature_kit_combo_pilot: [],
+        feature_kit_size_pilot: [],
     };
 
     const All_Allowed_Head_Lists = {};
     const All_Banned_Head_Lists = {};
     const All_Forced_Head_Lists = {
+        test: ["bell"],
         semantic_learning_star: ["bell", "pig", "bun"],
         semantic_learning_kit: ["bell"],
         mentalizing_between_subjects: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
         feature_kit_pilot: ["bell"],
         feature_kit_combo_pilot: ["bell"],
+        feature_kit_size_pilot: ["bell"],
     };
 
     const All_Allowed_Head_Groups_List = {};
@@ -521,7 +555,7 @@ let StimulusSettings = function () {
     if (!this.Experiment_Structure || !this.Fennimal_Dictionary) {
         throw new Error(
             'Unknown experiment code "' + this.Experiment_Code + '". ' +
-            'Live codes: semantic_learning_star, semantic_learning_kit, mentalizing_between_subjects, feature_kit_pilot, feature_kit_combo_pilot. ' +
+            'Live codes: test, semantic_learning_star, semantic_learning_kit, mentalizing_between_subjects, feature_kit_pilot, feature_kit_combo_pilot, feature_kit_size_pilot. ' +
             'Archived recipes are in archive/experiments/ (see archive/MANIFEST.md).'
         );
     }
@@ -535,7 +569,9 @@ let StimulusSettings = function () {
     this.allowed_head_groups = All_Allowed_Head_Groups_List[this.Experiment_Code] || false;
     this.banned_head_groups = All_Banned_Head_Groups_List[this.Experiment_Code] || false;
 
-    this.head_source = this.Experiment_Code === "semantic_learning_kit" ? "feature_kit" : "svg";
+    this.head_source = (this.Experiment_Code === "semantic_learning_kit" || this.Experiment_Code === "test")
+        ? "feature_kit"
+        : "svg";
     this.kit_recipes = this.head_source === "feature_kit" ? KIT_RECIPES : null;
     this.kit_name_pool = KIT_NAME_POOL.slice();
 

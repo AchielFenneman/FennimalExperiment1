@@ -9,6 +9,11 @@
  * Shared-slot 1v2 / 2v2 families are out — those are not mixes of two
  * non-overlapping heads. Hair is excluded; stamps contest. All four SVG
  * tokens per slot are on stage (no between-subjects subsample). Scales stay 1.
+ *
+ * Size mode (`feature_kit_size_pilot`): same 3-up UI, frozen trio, one
+ * between-subjects scale pack (baseline / mild / medium), 10 morph-complete
+ * 3v2 splits × 3 pairs, one each, no adaptive, no token sampling. Pack is
+ * drawn 1/3 in-session and persisted; pin with ?PACK=baseline|mild|medium.
  * No morphing, names, hats, map, or bonus stars.
  */
 class FeatureKitPilotController {
@@ -18,23 +23,32 @@ class FeatureKitPilotController {
         this.returnfunc = returnfunc;
         this.expCont = expCont;
         this.params = (typeof GenParam !== "undefined" && GenParam.FeatureKitPilot) || {};
-        this.combo = phaseData.combo === true
+        this.size = phaseData.size === true
+            || phaseData.mode === "size"
+            || phaseData.type === "feature_kit_size_pilot";
+        this.combo = !this.size && (phaseData.combo === true
             || phaseData.mode === "combo"
-            || phaseData.type === "feature_kit_combo_pilot";
-        if (this.combo && typeof GenParam !== "undefined" && GenParam.FeatureKitComboPilot) {
+            || phaseData.type === "feature_kit_combo_pilot");
+        if (this.size && typeof GenParam !== "undefined" && GenParam.FeatureKitSizePilot) {
+            this.params = Object.assign({}, this.params, GenParam.FeatureKitSizePilot);
+        } else if (this.combo && typeof GenParam !== "undefined" && GenParam.FeatureKitComboPilot) {
             this.params = Object.assign({}, this.params, GenParam.FeatureKitComboPilot);
         }
         this.W = GenParam.SVG_width;
         this.H = GenParam.SVG_height;
         this.trialSpeedMs = this._num("trialSpeedMs", this.phaseData.trial_speed || 7500);
-        this.nTokensSampled = this._int("nTokensSampled", this.phaseData.n_tokens_sampled, this.combo ? 4 : 3);
+        this.nTokensSampled = this._int("nTokensSampled", this.phaseData.n_tokens_sampled, this.combo || this.size ? 4 : 3);
         this.nDuelReps = this._int("nDuelReps", this.phaseData.n_duel_reps, 3);
         this.nCatch = this._int("nCatch", this.phaseData.n_catch, 3);
-        this.nAdaptiveDuels = this._int("nAdaptiveDuels", this.phaseData.n_adaptive_duels, 16);
+        this.nAdaptiveDuels = this._int("nAdaptiveDuels", this.phaseData.n_adaptive_duels, this.size ? 0 : 16);
         this.skipPractice = this.phaseData.skip_practice === true;
         this.minChoiceMs = this._num("minChoiceMs", 750);
-        this.adaptive = this.phaseData.adaptive !== false && this.params.adaptive !== false;
+        this.adaptive = this.size
+            ? false
+            : (this.phaseData.adaptive !== false && this.params.adaptive !== false);
         this.grayscaleFilter = this.params.grayscaleFilter || "grayscale(100%)";
+        this.packId = null;
+        this.packScales = null;
         this.plannedCount = 0;
         this._tokenPairs = {};
         this._tokenPairCursor = {};
@@ -100,6 +114,7 @@ class FeatureKitPilotController {
     async start_sequence() {
         try {
             await this.kit.load();
+            this._assignPack();
             this._sampleTokens();
             this._buildQueue();
             this._ensureLayers();
@@ -175,6 +190,10 @@ class FeatureKitPilotController {
         this.phaseData.queue_version = this._queueVersion();
         this.phaseData.slot_keys = (this.slotKeys || []).slice();
         this.phaseData.combo = !!this.combo;
+        this.phaseData.size = !!this.size;
+        this.phaseData.pack_id = this.packId;
+        this.phaseData.pack_scales = this.packScales;
+        if (this.size) this.phaseData.frozen_heads = JSON.parse(JSON.stringify(this._frozenHeads()));
         if (this.combo) this.phaseData.combo_partitions = this._coveragePartitions().map((p) => p.id);
         if (this.combo) this.phaseData.fish_partitions = this._fishPartitions().map((p) => p.id);
         if (typeof this.returnfunc === "function") this.returnfunc();
@@ -203,6 +222,10 @@ class FeatureKitPilotController {
             && this._catalogsMatch(stored.catalog, this.catalogTokens);
         slotKeys.forEach((key) => {
             let pool = this.catalogTokens[key].slice();
+            if (this.size) {
+                sampled[key] = pool.slice();
+                return;
+            }
             let keep = [];
             if (validStored && Array.isArray(stored.tokens[key])) {
                 stored.tokens[key].forEach((token) => {
@@ -259,7 +282,16 @@ class FeatureKitPilotController {
                 : { ear: 1, eye: 1, lowerFace: 1, hair: 1, stamp: 1 },
             rec.scales || {}
         );
-        Object.keys(rec.scales).forEach((key) => { rec.scales[key] = 1; });
+        if (this.size && this.packScales) {
+            rec.scales = Object.assign(
+                (typeof FeatureKit !== "undefined" && FeatureKit.defaultScales)
+                    ? FeatureKit.defaultScales()
+                    : { ear: 1, eye: 1, lowerFace: 1, hair: 1, stamp: 1 },
+                this.packScales
+            );
+        } else {
+            Object.keys(rec.scales).forEach((key) => { rec.scales[key] = 1; });
+        }
         this._excludeSlots().forEach((key) => { rec[key] = "none"; });
         return rec;
     }
@@ -278,7 +310,9 @@ class FeatureKitPilotController {
     }
 
     _storeKey(kind) {
-        let prefix = this.combo ? "feature_kit_combo_pilot_" : "feature_kit_pilot_";
+        let prefix = this.size
+            ? "feature_kit_size_pilot_"
+            : (this.combo ? "feature_kit_combo_pilot_" : "feature_kit_pilot_");
         return prefix + kind;
     }
 
@@ -288,6 +322,91 @@ class FeatureKitPilotController {
         if (Array.isArray(fromPhase)) return fromPhase.slice();
         if (Array.isArray(fromParams)) return fromParams.slice();
         return ["hair"];
+    }
+
+    _packTable() {
+        return (this.params && this.params.packs) || {
+            baseline: { ear: 1, eye: 1, lowerFace: 1, stamp: 1 },
+            mild: { ear: 0.92, eye: 1.12, lowerFace: 0.90, stamp: 1.18 },
+            medium: { ear: 0.82, eye: 1.22, lowerFace: 0.85, stamp: 1.35 }
+        };
+    }
+
+    _assignPack() {
+        if (!this.size) {
+            this.packId = null;
+            this.packScales = null;
+            return;
+        }
+        let packs = this._packTable();
+        let ids = ["baseline", "mild", "medium"].filter((id) => !!packs[id]);
+        if (!ids.length) this._fail("size pilot has no scale packs.");
+        let fromUrl = "";
+        if (typeof getUrlSearchParam === "function") {
+            fromUrl = String(getUrlSearchParam("PACK") || getUrlSearchParam("pack") || "").toLowerCase();
+        }
+        if (fromUrl && packs[fromUrl]) {
+            this.packId = fromUrl;
+        } else {
+            let stored = this._restore(this._storeKey("pack"));
+            if (stored && stored.pack_id && packs[stored.pack_id]) {
+                this.packId = stored.pack_id;
+            } else {
+                this.packId = ids[experimentRandomInt(ids.length)];
+            }
+        }
+        this.packScales = Object.assign(
+            (typeof FeatureKit !== "undefined" && FeatureKit.defaultScales)
+                ? FeatureKit.defaultScales()
+                : { ear: 1, eye: 1, lowerFace: 1, hair: 1, stamp: 1 },
+            packs[this.packId]
+        );
+        this._persist(this._storeKey("pack"), {
+            pack_id: this.packId,
+            pack_scales: JSON.parse(JSON.stringify(this.packScales))
+        });
+        this.phaseData.pack_id = this.packId;
+        this.phaseData.pack_scales = this.packScales;
+        console.log(
+            "%c FeatureKitSizePilot: pack " + this.packId + " " + JSON.stringify(this.packScales),
+            "color:#0b6; font-weight:bold"
+        );
+    }
+
+    _frozenHeads() {
+        let heads = this.params && this.params.frozenHeads;
+        if (!Array.isArray(heads) || heads.length < 3) {
+            this._fail("size pilot needs three frozenHeads in GenParam.FeatureKitSizePilot.");
+        }
+        return heads;
+    }
+
+    _sizePairs() {
+        let heads = this._frozenHeads();
+        return [
+            { id: heads[0].id + heads[1].id, a: heads[0], b: heads[1] },
+            { id: heads[0].id + heads[2].id, a: heads[0], b: heads[2] },
+            { id: heads[1].id + heads[2].id, a: heads[1], b: heads[2] }
+        ];
+    }
+
+    _frozenRecipe(head) {
+        (this.slotKeys || []).forEach((key) => {
+            let token = head[key];
+            if (!token || token === "none") return;
+            if (!this.catalogTokens[key] || this.catalogTokens[key].indexOf(token) < 0) {
+                this._fail('frozen head ' + (head.id || "?") + ' uses unknown ' + key + ' token "' + token + '".');
+            }
+        });
+        return this._fillRecipe({
+            shell: head.shell,
+            ear: head.ear,
+            eye: head.eye,
+            lowerFace: head.lowerFace,
+            stamp: head.stamp,
+            hair: "none",
+            expression: "happy"
+        });
     }
 
     _canonSet(arr) {
@@ -304,6 +423,7 @@ class FeatureKitPilotController {
     }
 
     _queueVersion() {
+        if (this.size) return 1;
         return this.combo ? 6 : 3;
     }
 
@@ -490,6 +610,8 @@ class FeatureKitPilotController {
         this._persist(this._storeKey("trials"), {
             version: this._queueVersion(),
             combo: !!this.combo,
+            size: !!this.size,
+            pack_id: this.packId,
             adaptive: this.adaptive,
             queue: this.queue
         });
@@ -520,6 +642,9 @@ class FeatureKitPilotController {
     }
 
     _maxDuels() {
+        if (this.size) {
+            return this._sizePairs().length * this._morphCompletePartitions(this.slotKeys || []).length;
+        }
         if (this.combo) {
             let cov = this._coveragePartitions().length * this._coverageReps();
             if (!this.adaptive) return cov;
@@ -712,6 +837,52 @@ class FeatureKitPilotController {
         };
     }
 
+    _makeSizeTrial(pair, part) {
+        let recA = this._frozenRecipe(pair.a);
+        let recB = this._frozenRecipe(pair.b);
+        let polarity = experimentRandom() < 0.5 ? 1 : 0;
+        let probe = this._fillRecipe(FeatureKit.mixRecipes(recA, recB, {
+            set_a: part.set_a,
+            set_b: part.set_b
+        }, polarity));
+        let donor3 = polarity === 0 ? recA : recB;
+        let donor2 = polarity === 0 ? recB : recA;
+        this._adaptiveSeq += 1;
+        return {
+            id: "duel_size_" + pair.id + "_" + this._adaptiveSeq,
+            kind: "duel",
+            is_practice: false,
+            wave: "coverage",
+            combo: false,
+            size: true,
+            family: part.family || "morph_complete",
+            pair_id: pair.id,
+            head_a_id: pair.a.id,
+            head_b_id: pair.b.id,
+            polarity: polarity,
+            three_side_parent: polarity === 0 ? "A" : "B",
+            pack_id: this.packId,
+            pack_scales: JSON.parse(JSON.stringify(this.packScales)),
+            partition_id: part.id,
+            set_a: part.set_a.slice(),
+            set_b: part.set_b.slice(),
+            shared_slots: [],
+            tokens_a: Object.fromEntries(part.set_a.map((s) => [s, donor3[s]])),
+            tokens_b: Object.fromEntries(part.set_b.map((s) => [s, donor2[s]])),
+            n_a: part.set_a.length,
+            n_b: part.set_b.length,
+            slot_x: null,
+            slot_y: null,
+            shared_tokens: null,
+            parentA: recA,
+            parentB: recB,
+            probe: probe,
+            left_parent: experimentRandom() < 0.5 ? "A" : "B",
+            tutorial: null,
+            partition_win_rates: null
+        };
+    }
+
     _makeDuelTrial(sx, sy, wave) {
         let px = this._nextTokenPair(sx);
         let py = this._nextTokenPair(sy);
@@ -756,6 +927,9 @@ class FeatureKitPilotController {
             kind: "catch",
             is_practice: false,
             wave: wave,
+            size: !!this.size,
+            pack_id: this.packId,
+            pack_scales: this.packScales ? JSON.parse(JSON.stringify(this.packScales)) : null,
             parentA: parentA,
             parentB: parentB,
             probe: probeIsA ? parentA : parentB,
@@ -765,7 +939,7 @@ class FeatureKitPilotController {
     }
 
     _nextAdaptiveTrial() {
-        if (!this.adaptive) return null;
+        if (!this.adaptive || this.size) return null;
         let nDuel = this._countKind("duel");
         let nCatch = this._countKind("catch");
         let maxDuel = this._maxDuels();
@@ -784,6 +958,8 @@ class FeatureKitPilotController {
         let stored = this._restore(this._storeKey("trials"));
         let wantVersion = this._queueVersion();
         if (stored && stored.version === wantVersion && Array.isArray(stored.queue) && stored.queue.length
+            && !!stored.size === !!this.size
+            && (!this.size || stored.pack_id === this.packId)
             && this._queueUsesCurrentTokens(stored.queue)) {
             this.queue = stored.queue;
             this.phaseData.morph_trial_order = this.queue.map((t) => t.id);
@@ -799,7 +975,15 @@ class FeatureKitPilotController {
         let coverageReps = this._coverageReps();
         let coverageCatch = this.adaptive ? Math.max(0, this.nCatch - 1) : this.nCatch;
         let paid = [];
-        if (this.combo) {
+        if (this.size) {
+            let parts = this._morphCompletePartitions(this.slotKeys);
+            if (!parts.length) this._fail("size coverage is empty (need 2+ feature groups).");
+            this._sizePairs().forEach((pair) => {
+                parts.forEach((part) => {
+                    paid.push(this._makeSizeTrial(pair, part));
+                });
+            });
+        } else if (this.combo) {
             this._coveragePartitions().forEach((part) => {
                 for (let r = 0; r < coverageReps; r++) {
                     paid.push(this._makeComboTrial(part, "coverage"));
@@ -821,10 +1005,10 @@ class FeatureKitPilotController {
         if (firstPaid) firstPaid.tutorial = "paid";
         this._persistQueue();
         console.log(
-            "%c FeatureKitPilot: " + (this.combo ? "combo " : "") +
+            "%c FeatureKitPilot: " + (this.size ? ("size pack=" + this.packId + " ") : (this.combo ? "combo " : "")) +
             "coverage " + this._countKind("duel") + " duels / " +
             this._countKind("catch") + " catch" +
-            (this.adaptive ? (" → adaptive to " + this._plannedCount() + " total") : "") +
+            (this.adaptive ? (" → adaptive to " + this._plannedCount() + " total") : (" → " + this._plannedCount() + " total")) +
             ", " + (this.skipPractice ? 0 : 2) + " practice",
             "color:#0b6"
         );
@@ -863,7 +1047,10 @@ class FeatureKitPilotController {
             let trial = queue[t];
             if (!trial || trial.kind === "practice") continue;
             if (trial.kind === "duel") {
-                if (this.combo) {
+                if (this.size) {
+                    if (!trial.pair_id || !trial.partition_id || trial.pack_id !== this.packId) return false;
+                    if (!Array.isArray(trial.set_a) || !Array.isArray(trial.set_b)) return false;
+                } else if (this.combo) {
                     if (!trial.partition_id || !Array.isArray(trial.set_a) || !Array.isArray(trial.set_b)) {
                         return false;
                     }
@@ -1314,8 +1501,17 @@ class FeatureKitPilotController {
         let loserToken = null;
         let winnerSlots = null;
         let loserSlots = null;
+        let chose3 = null;
+        let threeParent = null;
         if (trial.kind === "duel") {
-            if (trial.combo && Array.isArray(trial.set_a) && Array.isArray(trial.set_b)) {
+            if (trial.size && Array.isArray(trial.set_a) && Array.isArray(trial.set_b)) {
+                threeParent = trial.three_side_parent || (trial.polarity ? "B" : "A");
+                chose3 = selectedParent === threeParent;
+                winnerSlots = chose3 ? trial.set_a.slice() : trial.set_b.slice();
+                loserSlots = chose3 ? trial.set_b.slice() : trial.set_a.slice();
+                winnerSlot = this._canonSet(winnerSlots);
+                loserSlot = this._canonSet(loserSlots);
+            } else if (trial.combo && Array.isArray(trial.set_a) && Array.isArray(trial.set_b)) {
                 winnerSlots = selectedParent === "A" ? trial.set_a.slice() : trial.set_b.slice();
                 loserSlots = selectedParent === "A" ? trial.set_b.slice() : trial.set_a.slice();
                 winnerSlot = this._canonSet(winnerSlots);
@@ -1363,6 +1559,15 @@ class FeatureKitPilotController {
             winner_token: winnerToken,
             loser_token: loserToken,
             combo: !!trial.combo,
+            size: !!trial.size || !!this.size,
+            pack_id: trial.pack_id || this.packId || null,
+            pack_scales: trial.pack_scales || this.packScales || null,
+            pair_id: trial.pair_id || null,
+            head_a_id: trial.head_a_id || null,
+            head_b_id: trial.head_b_id || null,
+            polarity: trial.polarity == null ? null : trial.polarity,
+            three_side_parent: threeParent,
+            chose_3_side: chose3,
             family: trial.family || null,
             partition_id: trial.partition_id || null,
             set_a: trial.set_a || null,
@@ -1394,7 +1599,9 @@ class FeatureKitPilotController {
         dataCont.experimentData.featureKitPilotProgress = {
             answers: JSON.parse(JSON.stringify(this.answers)),
             sampled_tokens: JSON.parse(JSON.stringify(this.sampledTokens || {})),
-            catalog_tokens: JSON.parse(JSON.stringify(this.catalogTokens || {}))
+            catalog_tokens: JSON.parse(JSON.stringify(this.catalogTokens || {})),
+            pack_id: this.packId,
+            pack_scales: this.packScales
         };
         if (typeof dataCont.storeAllData === "function") dataCont.storeAllData(false);
     }

@@ -954,9 +954,16 @@ GENERALPARAM = function () {
         transferBagLeftX: 0.28,
         transferBagRightX: 0.72,
         transferBagY: 0.74,
+        bowlX: 0.58,
+        bowlY: 0.78,
+        bowlScale: 3.5,
+        bowlDropPad: 56,
+        bowlSlideTime: 500,
+        bagPourFadeMs: 320,
         dropPad: 48,
         bagMoveTime: 280,
         eatMoveTime: 420,
+        quizClearBeatMs: 750,
         quizLeftX: 0.18,
         quizRightX: 0.82,
         quizFenY: 0.70,
@@ -964,7 +971,16 @@ GENERALPARAM = function () {
         quizFoodX: 0.50,
         quizFoodTopY: 0.38,
         quizFoodBottomY: 0.58,
-        quizNameY: 0.82
+        quizNameY: 0.82,
+        quizInstructionY: 0.045,
+        quizInstructionH: 0.12,
+        quizCardY: 0.185,
+        quizCardH: 0.74,
+        quizCardW: 0.28,
+        quizCardGap: 0.04,
+        quizBannerH: 0.13,
+        quizDropPad: 12,
+        transferDecisionDim: 0.5
     }
 
     // Match a hatless Fennimal with their hat from a laundry basket of phase hats.
@@ -1832,6 +1848,33 @@ GENERALPARAM = function () {
         nDuelReps: 2,
         nAdaptiveDuels: 16,
         excludeSlots: ["hair"],
+        dayTitle: "Which heads look most alike?",
+        dayBody:
+            "You'll see three heads at a time. The one on top is made of pieces from the two below.<br><br>" +
+            "Which of the lower heads looks more like the top one? Press <b>F</b> for the left head or <b>J</b> for the right (clicking a side head also works).<br><br>" +
+            "The green bars are a gentle pace cue (about 7 seconds). Even after they run out, please still choose — there is no right or wrong answer.<br><br>" +
+            "We'll start with two practice rounds using simple shapes."
+    };
+
+    // Size sitting: frozen trio, one between-subjects scale pack, 30 coverage
+    // 3v2 duels + 2 practice + 3 catch. Same UI as combo. Override pack with ?PACK=.
+    this.FeatureKitSizePilot = {
+        nTokensSampled: 4,
+        nDuelReps: 1,
+        nAdaptiveDuels: 0,
+        nCatch: 3,
+        adaptive: false,
+        excludeSlots: ["hair"],
+        packs: {
+            baseline: { ear: 1, eye: 1, lowerFace: 1, stamp: 1 },
+            mild: { ear: 0.92, eye: 1.12, lowerFace: 0.90, stamp: 1.18 },
+            medium: { ear: 0.82, eye: 1.22, lowerFace: 0.85, stamp: 1.35 }
+        },
+        frozenHeads: [
+            { id: "H1", shell: "pear", ear: "mechanical", eye: "round", lowerFace: "pig", stamp: "freckles", hair: "none" },
+            { id: "H2", shell: "point", ear: "mushroom", eye: "square", lowerFace: "shark", stamp: "chevrons", hair: "none" },
+            { id: "H3", shell: "tall", ear: "seashell", eye: "slanted", lowerFace: "elephant", stamp: "smiley", hair: "none" }
+        ],
         dayTitle: "Which heads look most alike?",
         dayBody:
             "You'll see three heads at a time. The one on top is made of pieces from the two below.<br><br>" +
