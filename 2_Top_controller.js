@@ -542,6 +542,9 @@ class DataController {
             use_toy_gist_descriptions: Object.prototype.hasOwnProperty.call(record, "use_toy_gist_descriptions")
                 ? record.use_toy_gist_descriptions === true
                 : (prev ? prev.use_toy_gist_descriptions === true : false),
+            use_head_portrait_choices: Object.prototype.hasOwnProperty.call(record, "use_head_portrait_choices")
+                ? record.use_head_portrait_choices === true
+                : (prev ? prev.use_head_portrait_choices === true : false),
             // Name-recall freebie. Binding reconstructs this object without these
             // fields; keep a prior pick unless the caller is explicitly setting them.
             starter_name_id: Object.prototype.hasOwnProperty.call(record, "starter_name_id")
@@ -785,6 +788,8 @@ class TrialGenerator {
         orthogonalTrials = this.applyAskHatSettingsToTrials(orthogonalTrials, phaseData);
         mainTrials = this.applyIntroduceNameOnPolaroidToTrials(mainTrials, phaseData);
         orthogonalTrials = this.applyIntroduceNameOnPolaroidToTrials(orthogonalTrials, phaseData);
+        mainTrials = this.applyPhotoHeadshotSettingsToTrials(mainTrials, phaseData);
+        orthogonalTrials = this.applyPhotoHeadshotSettingsToTrials(orthogonalTrials, phaseData);
         mainTrials = this.stripAskFlagsForSpecialRoles(mainTrials);
         orthogonalTrials = this.stripAskFlagsForSpecialRoles(orthogonalTrials);
         mainTrials = this.applyPlacementQuizOptionsToTrials(mainTrials, phaseData);
@@ -1654,6 +1659,7 @@ class TrialGenerator {
             "feature_kit_pilot",
             "feature_kit_combo_pilot",
             "feature_kit_size_pilot",
+            "feature_kit_fade_pilot",
             "pseudoday"
         ]);
     }
@@ -2837,6 +2843,20 @@ class TrialGenerator {
     }
 
     /**
+     * Photo trials: opt-in head close-up (viewfinder + polaroid) and post-shot face match.
+     */
+    applyPhotoHeadshotSettingsToTrials(trials, phaseData) {
+        if (!trials || trials.length === 0) return trials;
+        if (phaseData.photo_target === "head") {
+            trials = set_property_to_all_elem_in_arr("photo_target", "head", trials);
+        }
+        if (phaseData.face_match_after_photo) {
+            trials = set_property_to_all_elem_in_arr("face_match_after_photo", true, trials);
+        }
+        return trials;
+    }
+
+    /**
      * Stamp ask_name onto all trials. names_asked defaults to unique names of Fennimals in the phase.
      * Singleton sets widen to all experiment Fennimal names.
      */
@@ -3113,6 +3133,19 @@ class ExperimentController {
 
         // State Tracking
         this.remainingExperimentPhases = JSON.parse(JSON.stringify(this.stimulusSettings.Experiment_Structure));
+        if (window.__SKIP_TO_PHASE__) {
+            let want = String(window.__SKIP_TO_PHASE__);
+            let idx = this.remainingExperimentPhases.findIndex((p) => p && p.type === want);
+            if (idx >= 0) {
+                this.remainingExperimentPhases = this.remainingExperimentPhases.slice(idx);
+                console.log(
+                    "%c SKIP_TO_PHASE: starting at " + want + " (dropped " + idx + " earlier phase(s))",
+                    "color:purple; font-weight:bold"
+                );
+            } else {
+                console.warn("SKIP_TO_PHASE: no phase typed \"" + want + "\" in this experiment structure.");
+            }
+        }
         this.currentPhaseData = null;
         this.currentPhaseType = null;
 
@@ -3195,6 +3228,9 @@ class ExperimentController {
     seedTestFoodTransferBindingIfNeeded() {
         if (!this.stimuli || this.stimuli.get_experiment_code() !== "test") return;
         if (!this.dataCont) return;
+        let phases = this.stimuli.Experiment_Structure || [];
+        let needsSnackRoles = phases.some((p) => p && p.randomization_id === "food_transfer_layout");
+        if (!needsSnackRoles) return;
         let existing = this.dataCont.experimentData && this.dataCont.experimentData.hatBindingAssignment;
         if (existing && Array.isArray(existing.selected_arms) && existing.selected_arms.length === 2) {
             return;
@@ -3383,6 +3419,7 @@ class ExperimentController {
             case "feature_kit_pilot":
             case "feature_kit_combo_pilot":
             case "feature_kit_size_pilot":
+            case "feature_kit_fade_pilot":
                 this.flagFeatureKitPilotInstructionsShown = false;
                 if (this.currentPhaseData.skip_instructions === true) {
                     this.flagFeatureKitPilotInstructionsShown = true;
@@ -3992,6 +4029,7 @@ class ExperimentController {
             case "feature_kit_pilot":
             case "feature_kit_combo_pilot":
             case "feature_kit_size_pilot":
+            case "feature_kit_fade_pilot":
                 if (!this.flagFeatureKitPilotInstructionsShown) {
                     this.flagFeatureKitPilotInstructionsShown = true;
                     this.setupFeatureKitPilotPhase();

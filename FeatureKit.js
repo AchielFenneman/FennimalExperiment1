@@ -1,34 +1,47 @@
 /**
- * Feature-kit head composer.
- * Loads SVG/Heads features.svg, catalogs tokens, and assembles a Fennimal head
- * by placing shell / ears / eyes / lower-face / hair / cheek-stamps on the shell markers.
+ * Feature-kit head composer (shared baseline + theme overlays).
+ * Loads SVG/Heads features compatible.svg and assembles a Fennimal head
+ * by cloning one feature root per slot, always showing .baseline parts, and
+ * toggling family frills (mechanical / sea / sweet; mushroom leftover in art).
  *
- * Used by feature_kit_lab.html, the feature_kit_pilot / feature_kit_combo_pilot
- * / feature_kit_size_pilot tasks, and kit-head training (`semantic_learning_kit`)
- * which registers composed recipes as normal Fennimal_head_* templates under #All_Heads.
+ * Recipe tokens are theme names per slot, or "none" for baseline only.
+ * Arrays (or "sea+sweet") stack overlays — overlay lab and overlay-fade morphs.
+ * Game recipes are one theme per slot. Hair is unused.
+ *
+ * composeOverlayFade keeps .baseline at full opacity, omits stacked shell
+ * textures by default, and sets family-frill opacity so the jumble swings
+ * toward either parent.
+ *
+ * Used by kit_overlay_lab.html, feature_kit_lab.html, the kit pilots, and
+ * kit-head training (`semantic_learning_kit`) which registers composed
+ * recipes as Fennimal_head_* templates under #All_Heads.
  */
 (function (global) {
     "use strict";
 
     const NS = "http://www.w3.org/2000/svg";
-    const SVG_PATH = "./SVG/Heads features.svg";
+    const SVG_PATH = "./SVG/Heads features compatible.svg";
+    const THEMES = ["mechanical", "mushroom", "sea", "sweet"];
+    const LIVE_THEMES = ["mechanical", "sea", "sweet"];
 
     const SLOTS = [
-        { key: "shell", featureId: "feature_shell", groupClass: "shell_group", idPrefix: "shell_group_", required: true },
-        { key: "ear", featureId: "feature_ear", groupClass: "ear_group", idPrefix: "ear_group_", required: true },
-        { key: "eye", featureId: "feature_eye", groupClass: "eye_group", idPrefix: "eye_group_", required: true },
-        { key: "lowerFace", featureId: "feature_lower_face", groupClass: "lower_face_group", idPrefix: "lower_face_group_", required: true },
-        { key: "hair", featureId: "feature_hair", groupClass: "hair_group", idPrefix: "hair_group_", required: false },
-        { key: "stamp", featureId: "feature_stamp", groupClass: "stamp_group", idPrefix: "stamp_group_", required: false }
+        { key: "shell", featureId: "feature_shell", overlayClass: "texture", required: true, noneable: true },
+        { key: "ear", featureId: "feature_ear", overlayClass: "ear_part", required: true, noneable: true },
+        { key: "eye", featureId: "feature_eye", overlayClass: "eye_part", required: true, noneable: true },
+        { key: "lowerFace", featureId: "feature_lower_face", overlayClass: "lower_face_part", required: true, noneable: true },
+        { key: "hair", featureId: "feature_hair", overlayClass: null, required: false, noneable: true },
+        { key: "stamp", featureId: "feature_stamp", overlayClass: null, stampPrefix: "stamp_group_", required: false, noneable: true }
     ];
 
     const HAPPY_CLASSES = [
         "mouth_happy", "eyebrow_happy", "eyelid_happy", "cheek_happy",
-        "moustace_happy", "moustache_happy", "whiskers_happy", "face_happy"
+        "moustace_happy", "moustache_happy", "whiskers_happy", "beard_happy", "face_happy",
+        "meter_happy"
     ];
     const SAD_CLASSES = [
         "mouth_sad", "eyebrow_sad", "eyelid_sad", "cheek_sad",
-        "moustace_sad", "moustache_sad", "whiskers_sad", "face_sad"
+        "moustace_sad", "moustache_sad", "whiskers_sad", "beard_sad", "face_sad",
+        "meter_sad"
     ];
 
     let kitClipSeq = 0;
@@ -42,14 +55,30 @@
 
     FeatureKit.SVG_PATH = SVG_PATH;
     FeatureKit.SLOTS = SLOTS;
+    FeatureKit.THEMES = THEMES.slice();
+    FeatureKit.LIVE_THEMES = LIVE_THEMES.slice();
     FeatureKit.slotKeys = function () {
         return SLOTS.map((s) => s.key);
     };
     FeatureKit.noneableKeys = function () {
-        return SLOTS.filter((s) => !s.required).map((s) => s.key);
+        return SLOTS.filter((s) => s.noneable !== false).map((s) => s.key);
     };
     FeatureKit.defaultScales = function () {
         return { ear: 1, eye: 1, lowerFace: 1, hair: 1, stamp: 1 };
+    };
+    FeatureKit.overlayTokens = overlayTokens;
+    FeatureKit.familyRecipe = function (theme, extra) {
+        let t = String(theme || "").trim();
+        return Object.assign({
+            shell: t || "none",
+            ear: t || "none",
+            eye: t || "none",
+            lowerFace: t || "none",
+            hair: "none",
+            stamp: t || "none",
+            expression: "happy",
+            scales: FeatureKit.defaultScales()
+        }, extra || {});
     };
     FeatureKit.slotDef = function (key) {
         for (let i = 0; i < SLOTS.length; i++) {
@@ -76,11 +105,11 @@
         let fromFenA = pol === 0 ? setA : setB;
         let fromFenB = pol === 0 ? setB : setA;
         let out = Object.assign({}, a);
-        out.scales = Object.assign(FeatureKit.defaultScales(), a.scales || {}, b.scales || {});
+        out.scales = Object.assign(FeatureKit.defaultScales());
         FeatureKit.slotKeys().forEach((key) => {
-            if (fromFenA.indexOf(key) >= 0) out[key] = a[key];
-            else if (fromFenB.indexOf(key) >= 0) out[key] = b[key];
-            else out[key] = a[key];
+            let src = fromFenA.indexOf(key) >= 0 ? a : (fromFenB.indexOf(key) >= 0 ? b : a);
+            out[key] = src[key];
+            if (src.scales && src.scales[key] != null) out.scales[key] = src.scales[key];
         });
         out.expression = a.expression === "sad" || b.expression === "sad" ? (a.expression || "happy") : (a.expression || "happy");
         return out;
@@ -126,19 +155,109 @@
         return out;
     };
 
+    FeatureKit.CONTESTED_SLOTS = ["shell", "ear", "eye", "lowerFace", "stamp"];
+    FeatureKit.WELL_FIT_PAD = 0.86;
+
+    FeatureKit.parentSlotCounts = function (slotMap, keys) {
+        let counts = {};
+        (keys || FeatureKit.CONTESTED_SLOTS).forEach((key) => {
+            let parent = slotMap && slotMap[key];
+            if (parent == null || String(parent).trim() === "") return;
+            let id = String(parent);
+            counts[id] = (counts[id] || 0) + 1;
+        });
+        return counts;
+    };
+
+    FeatureKit.majorityParent = function (slotMap, keys) {
+        let counts = FeatureKit.parentSlotCounts(slotMap, keys);
+        let best = null;
+        let n = 0;
+        let tie = false;
+        Object.keys(counts).forEach((id) => {
+            if (counts[id] > n) {
+                best = id;
+                n = counts[id];
+                tie = false;
+            } else if (counts[id] === n && n > 0) {
+                tie = true;
+            }
+        });
+        return tie ? null : best;
+    };
+
+    FeatureKit.shellSilhouetteBox = function (group) {
+        let layer = group && group.querySelector(".kit_shell");
+        let sil = null;
+        if (layer) {
+            let paths = layer.querySelectorAll("path");
+            for (let i = 0; i < paths.length; i++) {
+                let path = paths[i];
+                if ((path.getAttribute("class") || "").indexOf("invisible_element") >= 0) continue;
+                if ((path.getAttribute("class") || "").indexOf("texture") >= 0) continue;
+                if (path.getAttribute("display") === "none") continue;
+                let fill = path.getAttribute("fill");
+                if (!fill || fill === "none") continue;
+                let opacity = path.getAttribute("opacity");
+                if (opacity != null && Number(opacity) < 0.5) continue;
+                sil = path;
+                break;
+            }
+        }
+        try {
+            let b = (sil || layer || group).getBBox();
+            if (b && b.width > 0 && b.height > 0) return b;
+        } catch (err) { /* not in the render tree yet */ }
+        return null;
+    };
+
+    FeatureKit.fitGroupInBoxByShell = function (node, box, opts) {
+        if (!node || !box) return false;
+        opts = opts || {};
+        let pad = opts.pad != null ? opts.pad : FeatureKit.WELL_FIT_PAD;
+        let align = opts.align || "center";
+        let b = FeatureKit.shellSilhouetteBox(node);
+        if (!b || !(b.width > 0 && b.height > 0)) return false;
+        let wellW = box.width != null ? box.width : box.w;
+        let wellH = box.height != null ? box.height : box.h;
+        let wellX = box.x != null ? box.x : (box.cx - wellW / 2);
+        let wellY = box.y != null ? box.y : (box.cy - wellH / 2);
+        if (![wellW, wellH, wellX, wellY].every(Number.isFinite)) return false;
+        let span = Math.max(b.width, b.height);
+        let scale = (Math.min(wellW, wellH) * pad) / span;
+        if (!Number.isFinite(scale) || scale <= 0) return false;
+        let cx = b.x + b.width / 2;
+        let cy = b.y + b.height / 2;
+        let inset = Math.max(4, wellW * 0.02);
+        let wellCx = (align === "right")
+            ? (wellX + wellW - inset - (b.width * scale) / 2)
+            : (wellX + wellW / 2);
+        let wellCy = wellY + wellH / 2;
+        node.setAttribute(
+            "transform",
+            "translate(" + wellCx + " " + wellCy + ") scale(" + scale + ") translate(" + (-cx) + " " + (-cy) + ")"
+        );
+        return true;
+    };
+
     FeatureKit.gistLinesForRecipe = function (recipe) {
         recipe = recipe || {};
-        let shell = String(recipe.shell || "round").replace(/_/g, " ");
-        let ear = String(recipe.ear || "side").replace(/_/g, " ");
-        let eye = String(recipe.eye || "round").replace(/_/g, " ");
-        let mouth = String(recipe.lowerFace || "simple").replace(/_/g, " ");
-        let stamp = !recipe.stamp || recipe.stamp === "none"
-            ? "no cheek marks"
-            : String(recipe.stamp).replace(/_/g, " ") + " on the cheeks";
+        function slotWords(value, fallback) {
+            let tokens = overlayTokens(value);
+            if (!tokens.length) return fallback;
+            return tokens.join(" and ").replace(/_/g, " ");
+        }
+        let family = slotWords(recipe.shell, "plain");
+        let ear = slotWords(recipe.ear, "simple") + " ears";
+        let eye = slotWords(recipe.eye, "plain") + " eyes";
+        let mouth = slotWords(recipe.lowerFace, "simple") + " snout";
+        let stamp = overlayTokens(recipe.stamp).length
+            ? slotWords(recipe.stamp, "") + " on the cheeks"
+            : "no cheek marks";
         return [
-            "A " + shell + "-shaped head with " + ear + " ears and a " + mouth + " mouth",
-            "A face with " + eye + " eyes and " + stamp,
-            "A " + shell + " outline, " + ear + " ears, " + eye + " eyes, and " + mouth + " features"
+            "A round face with " + ear + " and a " + mouth,
+            "A face with " + eye + " and " + stamp,
+            "A " + family + " face: " + ear + ", " + eye + ", and " + mouth
         ];
     };
     FeatureKit.unorderedPairs = function (arr) {
@@ -208,7 +327,7 @@
             let result = this.compose(recipesById[rawId], { showMarkers: false });
             let head = result.group;
             head.setAttribute("id", "Fennimal_head_" + id);
-            head.classList.add("Fennimal_head", "kit_head");
+            head.classList.add("Fennimal_head", "kit_head", "overlay_head");
             if (typeof set_Fennimal_color_classes === "function") {
                 set_Fennimal_color_classes(head);
             }
@@ -222,17 +341,22 @@
     FeatureKit.prototype._buildCatalog = function () {
         let catalog = {};
         SLOTS.forEach((slot) => {
-            let root = this.sourceSvg.getElementById(slot.featureId);
-            if (!root) {
-                catalog[slot.key] = [];
+            catalog[slot.key] = [];
+            if (slot.key === "hair") return;
+            if (slot.stampPrefix) {
+                THEMES.forEach((theme) => {
+                    let el = this.sourceSvg.getElementById(slot.stampPrefix + theme);
+                    if (el) catalog[slot.key].push({ token: theme, id: el.id, element: el });
+                });
                 return;
             }
-            let groups = Array.prototype.slice.call(root.querySelectorAll("." + slot.groupClass));
-            catalog[slot.key] = groups.map((el) => {
-                let id = el.getAttribute("id") || "";
-                let token = id.indexOf(slot.idPrefix) === 0 ? id.slice(slot.idPrefix.length) : id;
-                return { token: token, id: id, element: el };
-            }).filter((row) => row.token);
+            let root = this.sourceSvg.getElementById(slot.featureId);
+            if (!root || !slot.overlayClass) return;
+            THEMES.forEach((theme) => {
+                if (overlayPartNodes(root, slot.overlayClass, theme).length) {
+                    catalog[slot.key].push({ token: theme, id: slot.overlayClass + "_" + theme, element: root });
+                }
+            });
         });
         return catalog;
     };
@@ -243,33 +367,29 @@
     };
 
     FeatureKit.prototype.tokensForPilot = function (slotKey) {
-        return this.listTokens(slotKey).filter((token) => token && token !== "none");
+        return this.listTokens(slotKey).filter((token) => {
+            return token && token !== "none" && LIVE_THEMES.indexOf(token) >= 0;
+        });
+    };
+
+    FeatureKit.prototype.familyRecipe = function (theme, extra) {
+        let rec = FeatureKit.familyRecipe(theme, extra);
+        FeatureKit.slotKeys().forEach((key) => {
+            if (key === "hair") {
+                rec[key] = "none";
+                return;
+            }
+            if (rec[key] !== "none" && !tokenExists(this, key, rec[key])) rec[key] = "none";
+        });
+        return rec;
     };
 
     FeatureKit.prototype.defaultRecipe = function () {
-        return {
-            shell: firstToken(this, "shell", "pear"),
-            ear: firstToken(this, "ear", "elephant"),
-            eye: firstToken(this, "eye", "round"),
-            lowerFace: firstToken(this, "lowerFace", "smile"),
-            hair: firstToken(this, "hair", "horns") || "none",
-            stamp: firstToken(this, "stamp", "freckles") || "none",
-            expression: "happy",
-            scales: FeatureKit.defaultScales()
-        };
+        return this.familyRecipe(LIVE_THEMES[0] || THEMES[0]);
     };
 
     FeatureKit.prototype.altRecipe = function () {
-        return {
-            shell: firstToken(this, "shell", "point"),
-            ear: firstToken(this, "ear", "spikes"),
-            eye: firstToken(this, "eye", "square"),
-            lowerFace: firstToken(this, "lowerFace", "teeth"),
-            hair: firstToken(this, "hair", "spikes") || "none",
-            stamp: firstToken(this, "stamp", "heart") || "none",
-            expression: "happy",
-            scales: FeatureKit.defaultScales()
-        };
+        return this.familyRecipe(LIVE_THEMES[1] || LIVE_THEMES[0] || THEMES[0]);
     };
 
     FeatureKit.prototype.randomRecipe = function (locks, base) {
@@ -279,10 +399,11 @@
         FeatureKit.slotKeys().forEach((key) => {
             if (locks[key]) return;
             let tokens = this.listTokens(key).slice();
-            if (FeatureKit.noneableKeys().indexOf(key) >= 0) tokens.push("none");
+            tokens.push("none");
             if (!tokens.length) return;
             recipe[key] = tokens[Math.floor(Math.random() * tokens.length)];
         });
+        recipe.hair = "none";
         return recipe;
     };
 
@@ -291,12 +412,13 @@
         let out = Object.assign({}, defaults, recipe || {});
         out.scales = Object.assign(FeatureKit.defaultScales(), defaults.scales, (recipe && recipe.scales) || {});
         out.expression = out.expression === "sad" ? "sad" : "happy";
-        ["shell", "ear", "eye", "lowerFace"].forEach((key) => {
-            if (!tokenExists(this, key, out[key])) out[key] = defaults[key];
+        FeatureKit.slotKeys().forEach((key) => {
+            let tokens = overlayTokens(out[key]).filter((token) => tokenExists(this, key, token));
+            if (!tokens.length) out[key] = "none";
+            else if (tokens.length === 1) out[key] = tokens[0];
+            else out[key] = tokens;
         });
-        FeatureKit.noneableKeys().forEach((key) => {
-            if (out[key] !== "none" && !tokenExists(this, key, out[key])) out[key] = "none";
-        });
+        out.hair = "none";
         return out;
     };
 
@@ -305,34 +427,39 @@
         options = options || {};
         recipe = this.normalizeRecipe(recipe);
         let showMarkers = !!options.showMarkers;
+        let slotAttr = function (value) {
+            let tokens = overlayTokens(value);
+            return tokens.length ? tokens.join("+") : "none";
+        };
 
         let head = createEl("g", {
-            class: "Fennimal_head kit_head",
-            "data-kit-shell": recipe.shell,
-            "data-kit-ear": recipe.ear,
-            "data-kit-eye": recipe.eye,
-            "data-kit-lower-face": recipe.lowerFace,
-            "data-kit-hair": recipe.hair || "none",
-            "data-kit-stamp": recipe.stamp || "none"
+            class: "Fennimal_head kit_head overlay_head",
+            "data-kit-shell": slotAttr(recipe.shell),
+            "data-kit-ear": slotAttr(recipe.ear),
+            "data-kit-eye": slotAttr(recipe.eye),
+            "data-kit-lower-face": slotAttr(recipe.lowerFace),
+            "data-kit-hair": "none",
+            "data-kit-stamp": slotAttr(recipe.stamp)
         });
 
         let earsLayer = createEl("g", { class: "kit_layer kit_ears" });
         let shellLayer = createEl("g", { class: "kit_layer kit_shell" });
+        let eyesLayer = createEl("g", { class: "kit_layer kit_eyes" });
         let lowerLayer = createEl("g", { class: "kit_layer kit_lower_face" });
         let stampLayer = createEl("g", { class: "kit_layer kit_stamp" });
-        let eyesLayer = createEl("g", { class: "kit_layer kit_eyes" });
         let hairLayer = createEl("g", { class: "kit_layer kit_hair" });
-        // SVG source order does not matter. Paint order is hardcoded here:
-        // ears → shell → stamps → eyes → snout → hair.
+        // Paint order: ears → shell → eyes → snout → stamps. Hair unused.
         head.appendChild(earsLayer);
         head.appendChild(shellLayer);
-        head.appendChild(stampLayer);
         head.appendChild(eyesLayer);
         head.appendChild(lowerLayer);
+        head.appendChild(stampLayer);
         head.appendChild(hairLayer);
 
-        let shellClone = this._cloneToken("shell", recipe.shell, recipe.expression);
-        if (!shellClone) throw new Error("Missing shell token: " + recipe.shell);
+        let shellClone = this._cloneFeature("feature_shell");
+        if (!shellClone) throw new Error("Missing feature_shell in " + this.svgPath);
+        this._applySlotOverlays(shellClone, "texture", recipe.shell);
+        this._prepareOverlayClone(shellClone, recipe.expression);
         shellLayer.appendChild(shellClone);
 
         let leftEarAt = markerPoint(shellClone, [".ear_marker_left"]);
@@ -344,9 +471,11 @@
         let leftStampAt = markerPoint(shellClone, [".stamp_marker_left"]);
         let rightStampAt = markerPoint(shellClone, [".stamp_marker_right"]);
 
-        let earToken = this._findToken("ear", recipe.ear);
-        if (earToken && leftEarAt) {
-            earsLayer.appendChild(wrapEarForWiggle(this._placeClone(earToken.element, {
+        let earSrc = this._cloneFeature("feature_ear");
+        this._applySlotOverlays(earSrc, "ear_part", recipe.ear);
+        this._prepareOverlayClone(earSrc, recipe.expression);
+        if (earSrc && leftEarAt) {
+            earsLayer.appendChild(wrapEarForWiggle(this._placeClone(earSrc, {
                 dest: leftEarAt,
                 srcSelectors: [".ear_marker", ".placement_marker"],
                 scale: recipe.scales.ear,
@@ -355,8 +484,8 @@
                 role: "ear_left"
             }), recipe.ear));
         }
-        if (earToken && rightEarAt) {
-            earsLayer.appendChild(wrapEarForWiggle(this._placeClone(earToken.element, {
+        if (earSrc && rightEarAt) {
+            earsLayer.appendChild(wrapEarForWiggle(this._placeClone(earSrc, {
                 dest: rightEarAt,
                 srcSelectors: [".ear_marker", ".placement_marker"],
                 scale: recipe.scales.ear,
@@ -366,9 +495,11 @@
             }), recipe.ear));
         }
 
-        let lowerToken = this._findToken("lowerFace", recipe.lowerFace);
-        if (lowerToken && lowerAt) {
-            lowerLayer.appendChild(this._placeClone(lowerToken.element, {
+        let lowerSrc = this._cloneFeature("feature_lower_face");
+        this._applySlotOverlays(lowerSrc, "lower_face_part", recipe.lowerFace);
+        this._prepareOverlayClone(lowerSrc, recipe.expression);
+        if (lowerSrc && lowerAt) {
+            lowerLayer.appendChild(this._placeClone(lowerSrc, {
                 dest: lowerAt,
                 srcSelectors: [
                     ".placement_marker_lower_face_center",
@@ -383,11 +514,13 @@
             }));
         }
 
-        let eyeToken = this._findToken("eye", recipe.eye);
+        let eyeSrc = this._cloneFeature("feature_eye");
+        this._applySlotOverlays(eyeSrc, "eye_part", recipe.eye);
+        this._prepareOverlayClone(eyeSrc, recipe.expression);
         let leftEye = null;
         let rightEye = null;
-        if (eyeToken && leftEyeAt) {
-            leftEye = this._placeClone(eyeToken.element, {
+        if (eyeSrc && leftEyeAt) {
+            leftEye = this._placeClone(eyeSrc, {
                 dest: leftEyeAt,
                 srcSelectors: [".placement_marker_eye_center", ".eye_marker", ".placement_marker"],
                 scale: recipe.scales.eye,
@@ -396,10 +529,8 @@
                 role: "eye_left"
             });
         }
-        if (eyeToken && rightEyeAt) {
-            // Mirror the token so brows, lids, and decorations sit on the right,
-            // then un-flip .eye_gaze so pupil/iris/shine are not cross-eyed.
-            rightEye = this._placeClone(eyeToken.element, {
+        if (eyeSrc && rightEyeAt) {
+            rightEye = this._placeClone(eyeSrc, {
                 dest: rightEyeAt,
                 srcSelectors: [".placement_marker_eye_center", ".eye_marker", ".placement_marker"],
                 scale: recipe.scales.eye,
@@ -409,11 +540,6 @@
             });
             unmirrorInnerEye(rightEye);
         }
-        // Narrow shells (pear) put the markers close together. Paint the whole
-        // right-eye stack, then the left orb, so a scaled halo/lash from the
-        // right cannot slash across the left white. Own-eye order is preserved
-        // (halo, then orb, then lashes). At large scales the orbs themselves
-        // can still overlap; the left orb wins that intersection.
         let leftParts = splitPlacedEye(leftEye);
         let rightParts = splitPlacedEye(rightEye);
         function appendEyePart(part) {
@@ -426,44 +552,35 @@
         appendEyePart(leftParts && leftParts.orb);
         appendEyePart(leftParts && leftParts.front);
 
-        if (recipe.stamp && recipe.stamp !== "none") {
-            let stampToken = this._findToken("stamp", recipe.stamp);
+        overlayTokens(recipe.stamp).forEach((theme) => {
+            let stampSrc = this.sourceSvg.getElementById("stamp_group_" + theme);
+            if (!stampSrc) return;
             let stampScale = (recipe.scales && recipe.scales.stamp) || 1;
-            if (stampToken && leftStampAt) {
-                stampLayer.appendChild(this._placeClone(stampToken.element, {
+            if (leftStampAt) {
+                stampLayer.appendChild(this._placeClone(stampSrc, {
                     dest: leftStampAt,
                     srcSelectors: [".stamp_marker", ".placement_marker"],
                     scale: stampScale,
                     mirror: false,
                     expression: recipe.expression,
-                    role: "stamp_left"
+                    role: "stamp_left",
+                    theme: theme
                 }));
             }
-            if (stampToken && rightStampAt) {
-                stampLayer.appendChild(this._placeClone(stampToken.element, {
+            if (rightStampAt) {
+                stampLayer.appendChild(this._placeClone(stampSrc, {
                     dest: rightStampAt,
                     srcSelectors: [".stamp_marker", ".placement_marker"],
                     scale: stampScale,
                     mirror: true,
                     expression: recipe.expression,
-                    role: "stamp_right"
+                    role: "stamp_right",
+                    theme: theme
                 }));
             }
+        });
+        if (stampLayer.childNodes.length) {
             clipLayerToShell(stampLayer, head, pickShellSilhouette(shellClone));
-        }
-
-        if (recipe.hair && recipe.hair !== "none") {
-            let hairToken = this._findToken("hair", recipe.hair);
-            if (hairToken && hairAt) {
-                hairLayer.appendChild(this._placeClone(hairToken.element, {
-                    dest: hairAt,
-                    srcSelectors: [".hair_marker", ".placement_marker"],
-                    scale: recipe.scales.hair,
-                    mirror: false,
-                    expression: recipe.expression,
-                    role: "hair"
-                }));
-            }
         }
 
         this._stampMouthPoint(head, lowerLayer);
@@ -483,6 +600,110 @@
                 stampRight: rightStampAt
             }
         };
+    };
+
+    FeatureKit.overlayFadeOpacity = function (inA, inB, mixTowardA) {
+        let a = Math.max(0, Math.min(1, Number(mixTowardA)));
+        if (!Number.isFinite(a)) a = 0.5;
+        if (inA && inB) return 1;
+        function uniqueOp(weight) {
+            if (weight <= 0) return 0;
+            if (weight >= 1) return 1;
+            // Shared baseline stays at 1; lift mid-mix unique frills so they
+            // don't wash out. 50/50 → 0.65 instead of 0.5.
+            return 0.3 + 0.7 * weight;
+        }
+        if (inA) return uniqueOp(a);
+        if (inB) return uniqueOp(1 - a);
+        return 0;
+    };
+
+    FeatureKit.applyOverlayFade = function (root, recipeA, recipeB, mixTowardA, options) {
+        if (!root) return;
+        options = options || {};
+        recipeA = recipeA || {};
+        recipeB = recipeB || {};
+        SLOTS.forEach((slot) => {
+            if (slot.key === "shell" && !options.includeShellTexture) return;
+            let tokensA = overlayTokens(recipeA[slot.key]);
+            let tokensB = overlayTokens(recipeB[slot.key]);
+            if (slot.stampPrefix) {
+                root.querySelectorAll("[data-kit-role='stamp_left'], [data-kit-role='stamp_right']").forEach((el) => {
+                    let theme = el.getAttribute("data-kit-theme");
+                    let op = FeatureKit.overlayFadeOpacity(
+                        tokensA.indexOf(theme) >= 0,
+                        tokensB.indexOf(theme) >= 0,
+                        mixTowardA
+                    );
+                    el.setAttribute("opacity", String(op));
+                    el.setAttribute("display", op > 0 ? "inline" : "none");
+                });
+                return;
+            }
+            if (!slot.overlayClass) return;
+            THEMES.forEach((theme) => {
+                overlayPartNodes(root, slot.overlayClass, theme).forEach((el) => {
+                    let op = FeatureKit.overlayFadeOpacity(
+                        tokensA.indexOf(theme) >= 0,
+                        tokensB.indexOf(theme) >= 0,
+                        mixTowardA
+                    );
+                    el.setAttribute("opacity", String(op));
+                    el.setAttribute("display", op > 0 ? "inline" : "none");
+                });
+            });
+        });
+    };
+
+    FeatureKit.prototype.composeOverlayFade = function (recipeA, recipeB, mixTowardA, options) {
+        options = options || {};
+        recipeA = this.normalizeRecipe(recipeA);
+        recipeB = this.normalizeRecipe(recipeB);
+        let mix = Math.max(0, Math.min(1, Number(mixTowardA)));
+        if (!Number.isFinite(mix)) mix = 0.5;
+        let stacked = {
+            expression: recipeA.expression === "sad" || recipeB.expression === "sad" ? "sad" : "happy",
+            scales: Object.assign(FeatureKit.defaultScales(), recipeA.scales, recipeB.scales),
+            hair: "none"
+        };
+        FeatureKit.slotKeys().forEach((key) => {
+            if (key === "hair") {
+                stacked[key] = "none";
+                return;
+            }
+            // Stacked family textures turn the shared shell into camouflage.
+            // Overlay fade keeps the homologous baseline shell only.
+            if (key === "shell" && !options.includeShellTexture) {
+                stacked[key] = "none";
+                return;
+            }
+            let tokens = [];
+            overlayTokens(recipeA[key]).concat(overlayTokens(recipeB[key])).forEach((token) => {
+                if (token && tokens.indexOf(token) < 0) tokens.push(token);
+            });
+            stacked[key] = tokens.length ? tokens : "none";
+        });
+        let result = this.compose(stacked, options);
+        FeatureKit.applyOverlayFade(result.group, recipeA, recipeB, mix, options);
+        result.group.setAttribute("data-kit-overlay-fade", String(Math.round(mix * 1000) / 1000));
+        result.mixTowardA = mix;
+        result.recipeA = recipeA;
+        result.recipeB = recipeB;
+        return result;
+    };
+
+    FeatureKit.prototype.composeOverlayFadeSvg = function (recipeA, recipeB, mixTowardA, options) {
+        options = options || {};
+        let svg = createEl("svg", {
+            viewBox: options.viewBox || "-40 -80 480 520",
+            xmlns: NS
+        });
+        svg.setAttribute("width", options.width || "400");
+        svg.setAttribute("height", options.height || "400");
+        let result = this.composeOverlayFade(recipeA, recipeB, mixTowardA, options);
+        svg.appendChild(result.group);
+        result.svg = svg;
+        return result;
     };
 
     FeatureKit.prototype.composeSvg = function (recipe, options) {
@@ -507,21 +728,44 @@
         return null;
     };
 
-    FeatureKit.prototype._cloneToken = function (slotKey, token, expression) {
-        let row = this._findToken(slotKey, token);
-        if (!row) return null;
-        let clone = row.element.cloneNode(true);
-        prepareClone(clone, expression);
+    FeatureKit.prototype._cloneFeature = function (id) {
+        let src = this.sourceSvg.getElementById(id);
+        if (!src) return null;
+        let clone = src.cloneNode(true);
+        stripIds(clone);
         clone.removeAttribute("id");
-        clone.setAttribute("data-kit-token", token);
+        clone.setAttribute("display", "inline");
         return clone;
+    };
+
+    FeatureKit.prototype._applySlotOverlays = function (root, partClass, value) {
+        if (!root || !partClass) return;
+        let on = {};
+        overlayTokens(value).forEach((theme) => { on[theme] = true; });
+        THEMES.forEach((theme) => {
+            overlayPartNodes(root, partClass, theme).forEach((el) => {
+                setDisplay(el, !!on[theme]);
+            });
+        });
+    };
+
+    FeatureKit.prototype._prepareOverlayClone = function (root, expression) {
+        if (!root) return;
+        stripIds(root);
+        root.setAttribute("display", "inline");
+        root.querySelectorAll(".baseline").forEach((el) => setDisplay(el, true));
+        applyExpression(root, expression);
+        root.querySelectorAll(".hair_bbox, .lower_face_bbox").forEach((el) => {
+            el.setAttribute("display", "none");
+        });
     };
 
     FeatureKit.prototype._placeClone = function (sourceEl, spec) {
         let clone = sourceEl.cloneNode(true);
-        prepareClone(clone, spec.expression);
+        preparePlacedClone(clone, spec.expression);
         clone.removeAttribute("id");
         clone.setAttribute("data-kit-role", spec.role);
+        if (spec.theme) clone.setAttribute("data-kit-theme", spec.theme);
         let src = pickSourceMarker(clone, spec.srcSelectors, spec.preferOrigin);
         let srcPt = src || { x: 0, y: 0 };
         let scale = Number(spec.scale);
@@ -563,7 +807,8 @@
         function layerGroup(suffix, className) {
             let group = createEl("g", {
                 class: className,
-                "data-kit-role": role + "_" + suffix
+                "data-kit-role": role + "_" + suffix,
+                "data-kit-eye-side": role
             });
             group.setAttribute("transform", transform);
             return group;
@@ -595,6 +840,7 @@
         for (let i = 0; i < paths.length; i++) {
             let path = paths[i];
             if (path.classList.contains("invisible_element")) continue;
+            if (path.classList.contains("texture")) continue;
             let fill = path.getAttribute("fill");
             if (!fill || fill === "none") continue;
             let opacity = path.getAttribute("opacity");
@@ -631,10 +877,10 @@
 
     function wrapEarForWiggle(clone, token) {
         if (!clone) return clone;
-        clone.setAttribute("data-kit-token", token || "");
-        let inner = createEl("g", {
-            class: "kit_ear_wiggle kit_ear_wiggle_" + String(token || "ear")
-        });
+        let names = overlayTokens(token);
+        clone.setAttribute("data-kit-token", names.join("+"));
+        let cls = "kit_ear_wiggle" + names.map((name) => " kit_ear_wiggle_" + name).join("");
+        let inner = createEl("g", { class: cls });
         while (clone.firstChild) inner.appendChild(clone.firstChild);
         inner.appendChild(createEl("g", { class: "kit_ear_fx" }));
         clone.appendChild(inner);
@@ -671,74 +917,56 @@
 
     FeatureKit.prototype._collectNotes = function () {
         let notes = [];
-        let shells = this.listTokens("shell");
-        let visibleShells = [];
-        (this.catalog.shell || []).forEach((row) => {
-            if (!isDisplayNone(row.element)) visibleShells.push(row.token);
+        let shell = this.sourceSvg.getElementById("feature_shell");
+        if (!shell) {
+            notes.push("Missing #feature_shell.");
+            return notes;
+        }
+        ["ear_marker_left", "ear_marker_right", "eye_marker_left", "eye_marker_right",
+            "lower_face_marker", "stamp_marker_left", "stamp_marker_right"].forEach((cls) => {
+            if (!shell.querySelector("." + cls)) notes.push("Shell is missing ." + cls + ".");
         });
-        if (visibleShells.length > 1) {
-            notes.push("Multiple shells are visible in the SVG (" + visibleShells.join(", ") + "). Hide unused shells with display=\"none\".");
-        }
-        let visibleHair = [];
-        (this.catalog.hair || []).forEach((row) => {
-            if (!isDisplayNone(row.element)) visibleHair.push(row.token);
+        let mouth = this.sourceSvg.querySelector("#feature_lower_face > .Fennimal_head_mouth_point, #feature_lower_face .Fennimal_head_mouth_point");
+        if (!mouth) notes.push("Mouth attachment should live on feature_lower_face, not inside an overlay.");
+        LIVE_THEMES.forEach((theme) => {
+            SLOTS.forEach((slot) => {
+                if (slot.key === "hair") return;
+                if (this.listTokens(slot.key).indexOf(theme) < 0) {
+                    notes.push("Live family \"" + theme + "\" has no " + slot.key + " overlay yet.");
+                }
+            });
         });
-        if (visibleHair.length > 1) {
-            notes.push("Multiple hair groups are visible (" + visibleHair.join(", ") + ").");
+        if (this.listTokens("ear").indexOf("mushroom") >= 0) {
+            notes.push("Mushroom overlays are still in the sheet; live recipes use mechanical / sea / sweet.");
         }
-        let hairOnShell = this.sourceSvg.querySelector("#feature_shell .hair_marker.ear_marker");
-        if (hairOnShell) {
-            notes.push("Shell hair markers also have class ear_marker. The composer uses .hair_marker / .ear_marker_left specifically; dropping ear_marker from hair points would avoid future collisions.");
-        }
-        let shellsMissingStamp = [];
-        (this.catalog.shell || []).forEach((row) => {
-            if (!row.element) return;
-            if (!row.element.querySelector(".stamp_marker_left") || !row.element.querySelector(".stamp_marker_right")) {
-                shellsMissingStamp.push(row.token);
-            }
-        });
-        if (shellsMissingStamp.length) {
-            notes.push("Shell tokens missing stamp_marker_left/right: " + shellsMissingStamp.join(", ") + ".");
-        }
-        let human = this.sourceSvg.getElementById("ear_group_human");
-        if (human && human.querySelector("path[display='none']")) {
-            notes.push("ear_group_human: the ear path itself is display=\"none\" (the composer unhides it).");
-        }
-        ["pig", "teeth"].forEach((token) => {
-            let row = this._findToken("lowerFace", token);
-            if (!row) return;
-            if (!row.element.querySelector(".placement_marker_lower_face_center")) {
-                notes.push("lower_face_group_" + token + " is missing placement_marker_lower_face_center; falling back to origin / lower_face_marker.");
-            }
-        });
-        let moustache = this._findToken("lowerFace", "moustace") || this._findToken("lowerFace", "moustache");
-        if (moustache) {
-            let extras = moustache.element.querySelectorAll(".lower_face_marker");
-            if (extras.length > 1) {
-                notes.push("lower_face_group_moustace has extra lower_face_marker circles far from the origin (leftover construction).");
-            }
-            if (moustache.token === "moustace") {
-                notes.push("Token id is moustace (missing 'h'). Fine for now; rename later if you want the spelling in recipes.");
-            }
-        }
-        let square = this._findToken("eye", "square");
-        if (square && square.element.querySelector(".eye_marker_right")) {
-            notes.push("eye_group_square is a left-eye template but includes class eye_marker_right. Composer places from placement_marker_eye_center.");
-        }
-        let pearBbox = this.sourceSvg.querySelector("#shell_group_pear .hair_bbox");
-        if (pearBbox) {
-            notes.push("shell_group_pear has a hair_bbox path far outside the 400² artboard (ignored).");
-        }
-        if (shells.indexOf("point") >= 0 && shells.indexOf("pint") < 0) {
-            notes.push("Shell token is point (not pint).");
+        if (this.listTokens("shell").indexOf("sweet") >= 0) {
+            notes.push("Sweet shell texture and stamp_group_sweet are present.");
         }
         return notes;
     };
 
-    function firstToken(kit, slotKey, preferred) {
-        let tokens = kit.listTokens(slotKey);
-        if (preferred && tokens.indexOf(preferred) >= 0) return preferred;
-        return tokens[0] || "";
+    function overlayTokens(value) {
+        if (value == null || value === "" || value === "none") return [];
+        if (Array.isArray(value)) {
+            return value.map((item) => String(item || "").trim()).filter((item) => item && item !== "none");
+        }
+        return String(value).split("+").map((item) => item.trim()).filter((item) => item && item !== "none");
+    }
+
+    function overlayPartNodes(root, partClass, theme) {
+        if (!root) return [];
+        let seen = [];
+        function add(el) {
+            if (el && seen.indexOf(el) < 0) seen.push(el);
+        }
+        root.querySelectorAll("." + partClass + "." + theme).forEach(add);
+        root.querySelectorAll("." + partClass + "_" + theme).forEach(add);
+        return seen;
+    }
+
+    function setDisplay(el, on) {
+        if (!el) return;
+        el.setAttribute("display", on ? "inline" : "none");
     }
 
     function tokenExists(kit, slotKey, token) {
@@ -787,9 +1015,8 @@
         return circleCenter(candidates[0]);
     }
 
-    function prepareClone(root, expression) {
+    function preparePlacedClone(root, expression) {
         stripIds(root);
-        revealArt(root);
         applyExpression(root, expression);
         root.querySelectorAll(".hair_bbox, .lower_face_bbox").forEach((el) => {
             el.setAttribute("display", "none");
@@ -799,30 +1026,6 @@
     function stripIds(root) {
         if (root.removeAttribute) root.removeAttribute("id");
         root.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
-    }
-
-    function revealArt(root) {
-        function show(el) {
-            if (el.nodeType !== 1) return;
-            if (el.hasAttribute("display") && el.getAttribute("display") === "none") {
-                if (isConstruction(el) || isExpressionVariant(el)) return;
-                el.setAttribute("display", "inline");
-            }
-        }
-        show(root);
-        root.querySelectorAll("*").forEach(show);
-    }
-
-    function isConstruction(el) {
-        let cls = el.getAttribute("class") || "";
-        return cls.indexOf("invisible_element") >= 0
-            || cls.indexOf("placement_marker") >= 0
-            || cls.indexOf("_bbox") >= 0;
-    }
-
-    function isExpressionVariant(el) {
-        let cls = el.getAttribute("class") || "";
-        return HAPPY_CLASSES.concat(SAD_CLASSES).some((name) => cls.indexOf(name) >= 0);
     }
 
     function applyExpression(root, expression) {
@@ -846,17 +1049,6 @@
             if (cls.indexOf("Fennimal_head_hat_point") >= 0) return;
             el.setAttribute("display", "none");
         });
-    }
-
-    function isDisplayNone(el) {
-        let d = el.getAttribute("display");
-        if (d === "none") return true;
-        let parent = el.parentElement;
-        while (parent) {
-            if (parent.getAttribute && parent.getAttribute("display") === "none") return true;
-            parent = parent.parentElement;
-        }
-        return false;
     }
 
     function transformPoint(el, pt) {

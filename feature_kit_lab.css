@@ -112,6 +112,14 @@
     display: inline !important;
 }
 
+.kit-hide-hat-mouth .Fennimal_head_hat_point,
+.kit-hide-hat-mouth .Fennimal_head_mouth_point,
+.kit-stage.kit-hide-hat-mouth.kit-show-markers .Fennimal_head_hat_point,
+.kit-stage.kit-hide-hat-mouth.kit-show-markers .Fennimal_head_mouth_point {
+    opacity: 0 !important;
+    pointer-events: none;
+}
+
 .recipe-line {
     margin: 10px 0 0;
     font-size: 12px;
@@ -119,8 +127,26 @@
     word-break: break-word;
 }
 
-.variant-row,
+.family-row,
 .chimera-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.family-row .mini-head,
+.chimera-row .mini-head {
+    width: auto;
+}
+
+.family-row .mini-head svg,
+.chimera-row .mini-head svg {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+}
+
+.variant-row {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
@@ -137,6 +163,13 @@
     background: #ece7dc;
     cursor: pointer;
     color: inherit;
+    font-weight: 400;
+}
+
+button.mini-head {
+    background: #ece7dc;
+    color: inherit;
+    font-weight: 400;
 }
 
 .mini-head svg {
@@ -184,6 +217,68 @@
 
 .notes-list li {
     margin-bottom: 6px;
+}
+
+.kit_overlay_candle_flame {
+    pointer-events: none;
+    filter:
+        drop-shadow(0px 0px 5px #ffea00)
+        drop-shadow(0px 0px 14px #ff9900)
+        drop-shadow(0px 0px 28px rgba(255, 140, 0, 0.55));
+    animation: kit-candle-glow-pulse 2.8s ease-in-out infinite;
+}
+
+@keyframes kit-candle-glow-pulse {
+    0%, 100% {
+        filter:
+            drop-shadow(0px 0px 5px #ffea00)
+            drop-shadow(0px 0px 14px #ff9900)
+            drop-shadow(0px 0px 28px rgba(255, 140, 0, 0.55));
+    }
+    50% {
+        filter:
+            drop-shadow(0px 0px 8px #fff6a0)
+            drop-shadow(0px 0px 20px #ff9900)
+            drop-shadow(0px 0px 40px rgba(255, 150, 0, 0.7));
+    }
+}
+
+.pearl.kit_pearl_glow,
+.seashell_pearl.kit_pearl_glow {
+    animation: kit-pearl-glow-pulse 18s linear infinite;
+}
+
+@keyframes kit-pearl-glow-pulse {
+    0%, 11% {
+        filter:
+            drop-shadow(0px 0px 3px rgba(255, 255, 255, 0.35))
+            drop-shadow(0px 0px 8px rgba(190, 230, 255, 0.22));
+    }
+    14% {
+        filter:
+            drop-shadow(0px 0px 8px #ffffff)
+            drop-shadow(0px 0px 20px rgba(255, 255, 255, 0.9))
+            drop-shadow(0px 0px 38px rgba(180, 220, 255, 0.65));
+    }
+    20%, 100% {
+        filter:
+            drop-shadow(0px 0px 2px rgba(255, 255, 255, 0.2))
+            drop-shadow(0px 0px 6px rgba(190, 230, 255, 0.12));
+    }
+}
+
+.kit_pearl_glimmer {
+    pointer-events: none;
+}
+
+.kit_overlay_candle_spark {
+    pointer-events: none;
+    filter: drop-shadow(0px 0px 5px #ffea00);
+}
+
+.kit_overlay_candle_smoke {
+    pointer-events: none;
+    opacity: 0.9;
 }
 
 details.kit-card summary {

@@ -1,43 +1,122 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["feature_kit_size_pilot"];
-    // Live default: feature_kit_size_pilot (frozen-trio size sitting). Other codes:
-    // feature_kit_combo_pilot | feature_kit_pilot | test | semantic_learning_kit |
-    // semantic_learning_star | mentalizing_between_subjects.
-    // Override (no file edit): ?EXP=test&SEED=foodbowl01&SKIP_INTRO=1
-    // Optional pack pin: &PACK=baseline | mild | medium (else 1/3 between-subjects).
+    this.Experiment_Code = ["feature_kit_fade_pilot"];
+    // Live default: feature_kit_fade_pilot (overlay-fade dominance sitting).
+    // Other codes: semantic_learning_kit | feature_kit_size_pilot | feature_kit_combo_pilot |
+    // feature_kit_pilot | test | semantic_learning_star | mentalizing_between_subjects.
+    // Override (no file edit): ?EXP=semantic_learning_kit&SEED=kitwire01&SKIP_INTRO=1
+    // Jump to morph (software QA): &SKIP_TO_PHASE=morph_task
+    // Size sitting: ?EXP=feature_kit_size_pilot&PACK=baseline
+    // Overlay-fade sitting is the live default; pin with ?EXP=feature_kit_fade_pilot&SKIP_INTRO=1
     // Archived recipes: archive/experiments/ (see archive/MANIFEST.md)
 
-    // Independent of Heads.svg token ids so kit Fennimals are not named "the elephant one".
-    const KIT_NAME_POOL = ["Pip", "Loma", "Nedd", "Sora", "Vell", "Kiri", "Tams", "Orin"];
-
-    // Three disjoint recipes shuffled onto head codes {B, C, D}. A clones B's
-    // recipe (shared head). Bald re-pilot: hair is "none" on every face so hats
-    // cannot hide a jumble slot. Unused tokens: tall, mushroom, slanted, shark,
-    // and all hair (tuft, feathers, flowers, antlers).
-    const KIT_RECIPES = [
-        { id: "R1", shell: "pear", ear: "bat", eye: "round", lowerFace: "elephant", hair: "none", stamp: "none", expression: "happy" },
-        { id: "R2", shell: "point", ear: "seashell", eye: "square", lowerFace: "pig", hair: "none", stamp: "none", expression: "happy" },
-        { id: "R3", shell: "wide", ear: "mechanical", eye: "egg", lowerFace: "cat", hair: "none", stamp: "none", expression: "happy" }
-    ];
-
-    // C-vs-D jumbles. Hair is pinned (all faces bald) and does not contest.
-    // Remaining four slots are three complementary 2-vs-2 coalitions; reverse
-    // = C↔D on every slot, so direction of effect is still a chance control.
-    const KIT_JUMBLES = {
-        X: { shell: "C", ear: "C", eye: "D", lowerFace: "D", hair: "C", stamp: "C" }, // shell+ear vs eye+mouth
-        Y: { shell: "C", ear: "D", eye: "C", lowerFace: "D", hair: "C", stamp: "C" }, // shell+eye vs ear+mouth
-        Z: { shell: "C", ear: "D", eye: "D", lowerFace: "C", hair: "C", stamp: "C" }  // shell+mouth vs ear+eye
+    // Two names per frozen head (A and B share a recipe; C and D each use one).
+    // Head-linked for memorability; gist still uses the overlay family labels.
+    // H1 mechanical, H2 sweet, H3 sea (see GenParam.FeatureKitSizePilot.frozenHeads).
+    const KIT_HEAD_NAMES = {
+        H1: ["Tinker", "Crank"],
+        H2: ["Frosty", "Sweets"],
+        H3: ["Clammy", "Pearl"],
+        // Theme aliases so names stay tied to family if recipe ids shift.
+        mechanical: ["Tinker", "Crank"],
+        sweet: ["Frosty", "Sweets"],
+        sea: ["Clammy", "Pearl"]
     };
+
+    // Frozen H1/H2/H3 overlay families, shuffled onto head codes {B, C, D}.
+    // A clones B's recipe (shared head). Hair is "none" so hats cannot hide a slot.
+    // Pack lock: baseline ×1 (mild/medium pre-load the salience channel the prime
+    // is supposed to move). Live families: mechanical, sweet, sea.
+    const KIT_SIZE_PILOT = (typeof GenParam !== "undefined" && GenParam.FeatureKitSizePilot) || {};
+    const KIT_BASELINE_SCALES = Object.assign(
+        { ear: 1, eye: 1, lowerFace: 1, hair: 1, stamp: 1 },
+        (KIT_SIZE_PILOT.packs && KIT_SIZE_PILOT.packs.baseline) || {}
+    );
+    const KIT_RECIPES = (KIT_SIZE_PILOT.frozenHeads || []).map((head) => Object.assign({}, head, {
+        expression: head.expression || "happy",
+        pack: "baseline",
+        scales: Object.assign({}, KIT_BASELINE_SCALES, head.scales || {})
+    }));
+    if (KIT_RECIPES.length < 3) {
+        throw new Error("semantic_learning_kit needs GenParam.FeatureKitSizePilot.frozenHeads (H1/H2/H3).");
+    }
+
+    // Locked leftover-of-trio jumble: shell + eyes + stamp vs ears + mouth.
+    // Size-sitting baseline QC sat at 50% for this split. Reverse = C↔D on every
+    // slot (chance control of 3-side direction). Hair is bald and does not contest.
+    // Do not ship the blowout shell+ears+mouth vs eyes+stamp.
+    const KIT_EVEN_3_SLOTS = ["shell", "eye", "stamp"];
+    const KIT_EVEN_2_SLOTS = ["ear", "lowerFace"];
+    const KIT_JUMBLES = {
+        E: { shell: "C", ear: "D", eye: "C", lowerFace: "D", hair: "C", stamp: "C" }
+    };
+
+    function reverseKitJumble(jumble) {
+        let out = {};
+        Object.keys(jumble || {}).forEach((slot) => {
+            let v = jumble[slot];
+            out[slot] = v === "C" ? "D" : (v === "D" ? "C" : v);
+        });
+        return out;
+    }
+
+    // Locked jumble E + reverse × (2 A-prime + 2 none-prime) = 8,
+    // plus 2 C/D-prime pattern-breakers (E→C, E′→D) = 10 paid.
+    function buildKitEvenMorphTrials() {
+        const kitTrial = (id, mixId, polarity, jumble, prime, extra) => Object.assign({
+            id: id,
+            fenA: "C",
+            fenB: "D",
+            target: "C",
+            mix: 50,
+            morph: "kit",
+            jumble_source: "feature_kit",
+            p_design: "even_3v2_shell_eye_stamp",
+            kit_mix_id: mixId,
+            kit_polarity: polarity,
+            kit_three_side_slots: KIT_EVEN_3_SLOTS.slice(),
+            kit_two_side_slots: KIT_EVEN_2_SLOTS.slice(),
+            jumble: JSON.parse(JSON.stringify(jumble)),
+            prime: prime
+        }, extra || {});
+
+        let trials = [];
+        let breakers = { E: "C", Ep: "D" };
+        ["E"].forEach((base) => {
+            let fwd = KIT_JUMBLES[base];
+            [
+                { id: base, jumble: fwd, pol: 0 },
+                { id: base + "p", jumble: reverseKitJumble(fwd), pol: 1 }
+            ].forEach((mix) => {
+                trials.push(kitTrial("kit_" + mix.id + "_A_1", mix.id, mix.pol, mix.jumble, "A"));
+                trials.push(kitTrial("kit_" + mix.id + "_A_2", mix.id, mix.pol, mix.jumble, "A"));
+                trials.push(kitTrial("kit_" + mix.id + "_none_1", mix.id, mix.pol, mix.jumble, "none"));
+                trials.push(kitTrial("kit_" + mix.id + "_none_2", mix.id, mix.pol, mix.jumble, "none"));
+                let br = breakers[mix.id];
+                if (br) {
+                    trials.push(kitTrial(
+                        "kit_" + mix.id + "_" + br,
+                        mix.id,
+                        mix.pol,
+                        mix.jumble,
+                        br,
+                        { kind: "pattern_breaker", role: "pattern_breaker" }
+                    ));
+                }
+            });
+        });
+        return trials;
+    }
 
     const All_Instructions_At_Start = {
         test: [],
         semantic_learning_star: [], //"browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview"
-        semantic_learning_kit: [], // ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview"],
+        semantic_learning_kit: ["browser_check_and_full_screen_prompt", "consent", "single_sitting"],
         mentalizing_between_subjects: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
         feature_kit_pilot: ["browser_check_and_full_screen_prompt", "consent", "single_sitting"],
         feature_kit_combo_pilot: ["browser_check_and_full_screen_prompt", "consent", "single_sitting"],
         feature_kit_size_pilot: ["browser_check_and_full_screen_prompt", "consent", "single_sitting"],
+        feature_kit_fade_pilot: ["browser_check_and_full_screen_prompt", "consent", "single_sitting"],
     };
 
     // ----------------------------------------------------
@@ -76,7 +155,7 @@ let StimulusSettings = function () {
         },
 
         // Dummy roster so the FeatureMap / map boot. Kit heads come from
-        // SVG/Heads features.svg at runtime, not from this dictionary.
+        // SVG/Heads features compatible.svg at runtime, not from this dictionary.
         feature_kit_pilot: {
             "P": { head: "A", region: "A" }
         },
@@ -84,6 +163,9 @@ let StimulusSettings = function () {
             "P": { head: "A", region: "A" }
         },
         feature_kit_size_pilot: {
+            "P": { head: "A", region: "A" }
+        },
+        feature_kit_fade_pilot: {
             "P": { head: "A", region: "A" }
         },
     };
@@ -346,6 +428,197 @@ let StimulusSettings = function () {
             
         ],
 
+        semantic_learning_kit: [
+
+
+            // TRAINING PHASE
+            // Block 1: free exploration — photograph each Fennimal; polaroid introduces the name
+            { type: "free_exploration",
+                interaction_type: ["photo_Fennimal"],
+                Fennimals_encountered: ["A", "B", "C", "D"],
+                partner_behavior: "absent",
+                include_Fennefinder: true,
+                force_climbing_tower_first: true,
+                introduce_name_on_polaroid: true
+            },
+            
+            // Name-cued toy search, then phone-room toy repair + hat rescue
+            { type: "hint_and_search",
+                hint_type: "name",
+                interaction_type: ["Fennimal_toy"],
+                Fennimals_encountered: ["A", "B", "C", "D"],
+                partner_behavior: "absent",
+                include_Fennefinder: true,
+                ask_Fennimal: true,
+                ask_name: false,
+                ask_hat: false,
+                ask_toy: false
+            },
+            {type: "phone_room",
+                interaction_type: [ "broken_toy_no_box", "hat_blown_away"],
+                Fennimals_encountered: ["A", "B", "C", "D"],
+                partner_behavior: "absent",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: true,
+                ask_Fennimal: true,
+                ask_name: true,
+                ask_hat: true,
+                ask_toy: true
+            },
+
+            // Extra portrait pass — identity questions, then a head close-up + face match
+            {type: "phone_room",
+                skip_instructions: false,
+                partner_behavior: "absent",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: true,
+                interaction_type: ["photo_Fennimal"],
+                Fennimals_encountered: ["A", "B", "C", "D"],
+                ask_Fennimal: true,
+                ask_name: true,
+                ask_hat: true,
+                ask_toy: true,
+                introduce_name_on_polaroid: false,
+                photo_target: "head",
+                face_match_after_photo: true,
+                day_title: "another look",
+                day_body:
+                    "These faces take a little extra looking. The phone will ring for each Fennimal. " +
+                    "First answer a few questions about who they are. Then take a close-up of their face, " +
+                    "and pick the matching portrait."
+            },
+
+            // QUIZ
+            {type: "Fennimal_attribute_sorting_task",
+                Fennimals_asked: ["A", "B", "C", "D"],
+                attribute_order: ["region", "head", "hat", "toy"],
+                presentation: "single",
+                maximum_earnable_stars: 5,
+                pass_if_errors_at_most: 3,
+                max_attempts: 3,
+                on_fail: {
+                    type: "phone_room",
+                    interaction_type: "Fennimal_toy",
+                    partner_behavior: "absent",
+                    include_Fennefinder: false,
+                    return_to_phone_room_after_final_trial: true,
+                    skip_instructions: true,
+                    ask_hat: true,
+                    ask_toy: false
+                }
+            },
+
+            //BINDING PHASE
+            // Always include hub-arm A so the triad is ABC (head+region) or ABD (head+toy).
+            {type: "hat_binding_task",
+                skip_instructions: false,
+                randomization_id: "binding_search_condition",
+                arm_randomization_id: "binding_star_arms",
+                allowed_arm_pairs: [["A", "C"], ["A", "D"]],
+                always_include_arm: "A",
+                condition: ["group_based"], //["group_based", "pair_based", "control"]
+                retraining_fennimals: ["A", "B", "C", "D"],
+                use_head_gist_descriptions: true,
+                use_region_gist_descriptions: false,
+                use_toy_gist_descriptions: false,
+                use_kit_slot_head_gists: false,
+                use_head_portrait_choices: true,
+                blocks: [
+                    
+                   
+                    
+                    {
+                        kind: "binding",
+                        flavour: "lost_and_found",
+                        cover_story: "Oh no, the Fennimals have lost their hats! Let's help return these hats to their correct owner. Unfortunately, the post office forgot to print the names on the boxes. Instead, we need to rely on your memories. One hat at a time, we will give you a description of a Fennimal. First, answer a few questions to help you picture that Fennimal. Then place this Fennimal's hat in the shipping box."
+                    },
+                    {
+                        kind: "join",
+                        flavour: "exam"
+                    },
+                    
+                   
+                    
+                    {
+                        kind: "retraining",
+                        cover_story: "Let's double-check that we can still match each Fennimal to their hat. You will see a photo of a Fennimal — pick the hat that belongs to them."
+                    },
+
+                    {
+                        kind: "binding",
+                        flavour: "laundry",
+                        cover_story: "It's laundry day! All the Fennimals have had their hats washed and dried. Unfortunately, the name-tags also got washed and are now unusable. Instead, you will have to help match a new tag to the correct hat. First, answer a few questions to help you picture the Fennimal. Then place the tag on that Fennimal's hat."
+                    },
+                    
+                    {
+                        kind: "join",
+                        flavour: "shipping"
+                    },
+                    
+                    {
+                        kind: "binding",
+                        flavour: "gift_shop",
+                        cover_story: "Let's buy some new hats for the Fennimals! One hat at a time, we will give you a description of a Fennimal. First, answer a few questions to help you picture that Fennimal. Then place a new version of this Fennimal's hat in the shopping cart."
+                    },
+                    {
+                        kind: "join",
+                        flavour: "party"
+                    },
+                    
+                ]
+            },
+
+            //TEST PHASE
+            // Snack day instead of typed name recall: C/D learn food, then A transfer 2AFC.
+            {type: "phone_room",
+                skip_instructions: false,
+                partner_behavior: "absent",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                randomization_id: "food_transfer_layout",
+                bonus_stars_per_correct_answer: 2,
+                day_title: "snack time",
+                day_body:
+                    "The Fennimals are getting hungry. The phone will ring when someone wants a snack. " +
+                    "Answer the phone, travel there, and give them the food they like.",
+                trial_subblocks: [
+                    {
+                        Fennimals_encountered: ["C", "D"],
+                        interaction_type: "Fennimal_food"
+                    },
+                    {
+                        trials: [
+                            { Fennimal: "A", interaction_type: "Fennimal_food_transfer" }
+                        ]
+                    }
+                ]
+            },
+            
+            {
+                type: "morph_task",
+                skip_instructions: false,
+                skip_practice: false,
+                partner_behavior: "absent",
+                trial_speed: 7500,
+                jumble_source: "feature_kit",
+                morphs: ["kit"],
+                prime_quiz: "hat_from_name",
+                allow_prime_as_parent: true,
+                show_head_on_prime: false,
+                response_key_icons: "names",
+                names_options: ["A", "B", "C", "D"],
+                day_body:
+                    "The camera glitched this morning. Each polaroid shows a mixed picture — two Fennimals in one frame.<br><br>" +
+                    "When a name appears, pick the hat that Fennimal wears (F / J to move, Space to confirm). The correct hat then appears above the mix. Sometimes there is no hat — there is no one to name, just the mix.<br><br>" +
+                    "Then the mix is uncovered. Use F and J to pick which name the mix looks like, as quickly as you can. Faster answers leave more points (100 points = 1 bonus star). An incorrect answer quietly costs points — there is no trial-by-trial feedback.<br><br>" +
+                    "We will start with two practice rounds using simple shapes.",
+                trials: buildKitEvenMorphTrials()
+            }
+
+            
+            
+        ],
+
         feature_kit_pilot: [
             {
                 type: "feature_kit_pilot",
@@ -388,128 +661,29 @@ let StimulusSettings = function () {
                 exclude_slots: ["hair"]
             }
         ],
+        feature_kit_fade_pilot: [
+            {
+                type: "feature_kit_fade_pilot",
+                skip_instructions: false,
+                skip_practice: false,
+                partner_behavior: "absent",
+                trial_speed: 7500,
+                n_catch: 3,
+                adaptive: false,
+                exclude_slots: ["hair"]
+            }
+        ],
     };
 
-    All_Experiment_Structures.semantic_learning_kit = JSON.parse(
-        JSON.stringify(All_Experiment_Structures.semantic_learning_star)
-    );
-    (function patchKitTraining() {
-        let phases = All_Experiment_Structures.semantic_learning_kit || [];
-        let binding = phases.find((p) => p && p.type === "hat_binding_task");
-        if (binding) {
-            // Always include hub-arm A so the triad is ABC (head+region) or ABD (head+toy).
-            binding.allowed_arm_pairs = [["A", "C"], ["A", "D"]];
-            binding.always_include_arm = "A";
-        }
-
-        let recallIdx = phases.findIndex((p) => p && p.type === "name_recall_task");
-        if (recallIdx >= 0) {
-            phases[recallIdx] = {
-                type: "phone_room",
-                skip_instructions: false,
-                partner_behavior: "absent",
-                include_Fennefinder: false,
-                return_to_phone_room_after_final_trial: false,
-                randomization_id: "food_transfer_layout",
-                bonus_stars_per_correct_answer: 2,
-                day_title: "snack time",
-                day_body:
-                    "The Fennimals are getting hungry. The phone will ring when someone wants a snack. " +
-                    "Answer the phone, travel there, and give them the food they like.",
-                trial_subblocks: [
-                    {
-                        Fennimals_encountered: ["C", "D"],
-                        interaction_type: "Fennimal_food"
-                    },
-                    {
-                        trials: [
-                            { Fennimal: "A", interaction_type: "Fennimal_food_transfer" }
-                        ]
-                    }
-                ]
-            };
-        }
-
-        let morph = phases.find((p) => p && p.type === "morph_task");
-        if (!morph) return;
-        morph.jumble_source = "feature_kit";
-        morph.morphs = ["kit"];
-        morph.trial_speed = 7500;
-        morph.prime_quiz = "hat_from_name";
-        morph.allow_prime_as_parent = true;
-        morph.show_head_on_prime = false;
-        morph.response_key_icons = "names";
-        delete morph.mixes;
-        delete morph.pairs;
-        delete morph.kit_polarities;
-        delete morph.kit_partitions;
-        morph.day_body =
-            "The camera glitched this morning. Each polaroid has two shots: a small picture on the left, and a mixed picture on the right.<br><br>" +
-            "When a name appears, pick the hat that Fennimal wears (F / J to move, Space to confirm). The correct hat is then stamped on the polaroid. Sometimes the small picture stays empty — there is no one to name, just the mix.<br><br>" +
-            "Then the mix is uncovered — two Fennimals in one frame. Use F and J to pick which name the mix looks like, as quickly as you can. Faster answers leave more points (100 points = 1 bonus star). An incorrect answer quietly costs points — there is no trial-by-trial feedback.<br><br>" +
-            "We will start with two practice rounds using simple shapes.";
-
-        const reverseJumble = (jumble) => {
-            let out = {};
-            Object.keys(jumble || {}).forEach((slot) => {
-                let v = jumble[slot];
-                out[slot] = v === "C" ? "D" : (v === "D" ? "C" : v);
-            });
-            return out;
-        };
-        const kitTrial = (id, mixId, polarity, jumble, prime, extra) => Object.assign({
-            id: id,
-            fenA: "C",
-            fenB: "D",
-            target: "C",
-            mix: 50,
-            morph: "kit",
-            jumble_source: "feature_kit",
-            kit_mix_id: mixId,
-            kit_polarity: polarity,
-            jumble: JSON.parse(JSON.stringify(jumble)),
-            prime: prime
-        }, extra || {});
-
-        // 6 pictures (X,Y,Z and reverses) × (2 A-prime + 2 none-prime) = 24,
-        // plus 4 C/D-prime pattern-breakers (X→C, X′→D, Y→D, Y′→C) = 28 paid.
-        let trials = [];
-        let breakers = { X: "C", Xp: "D", Y: "D", Yp: "C" };
-        ["X", "Y", "Z"].forEach((base) => {
-            let fwd = KIT_JUMBLES[base];
-            [
-                { id: base, jumble: fwd, pol: 0 },
-                { id: base + "p", jumble: reverseJumble(fwd), pol: 1 }
-            ].forEach((mix) => {
-                trials.push(kitTrial("kit_" + mix.id + "_A_1", mix.id, mix.pol, mix.jumble, "A"));
-                trials.push(kitTrial("kit_" + mix.id + "_A_2", mix.id, mix.pol, mix.jumble, "A"));
-                trials.push(kitTrial("kit_" + mix.id + "_none_1", mix.id, mix.pol, mix.jumble, "none"));
-                trials.push(kitTrial("kit_" + mix.id + "_none_2", mix.id, mix.pol, mix.jumble, "none"));
-                let br = breakers[mix.id];
-                if (br) {
-                    trials.push(kitTrial(
-                        "kit_" + mix.id + "_" + br,
-                        mix.id,
-                        mix.pol,
-                        mix.jumble,
-                        br,
-                        { kind: "pattern_breaker", role: "pattern_breaker" }
-                    ));
-                }
-            });
-        });
-        morph.trials = trials;
-    })();
-
     All_Fennimal_Sets.test = JSON.parse(JSON.stringify(All_Fennimal_Sets.semantic_learning_kit));
-    (function patchTestSnackSandbox() {
-        let snack = (All_Experiment_Structures.semantic_learning_kit || []).find((p) =>
-            p && p.randomization_id === "food_transfer_layout"
+    (function patchTestPortraitSandbox() {
+        let portrait = (All_Experiment_Structures.semantic_learning_kit || []).find((p) =>
+            p && p.type === "phone_room" && p.day_title === "another look"
         );
-        if (!snack) {
-            throw new Error("test: kit snack-day phase (food_transfer_layout) is missing.");
+        if (!portrait) {
+            throw new Error("test: kit extra portrait pass (day_title \"another look\") is missing.");
         }
-        All_Experiment_Structures.test = [JSON.parse(JSON.stringify(snack))];
+        All_Experiment_Structures.test = [JSON.parse(JSON.stringify(portrait))];
     })();
 
     const All_Questionnaire_Page_sets = {
@@ -520,10 +694,20 @@ let StimulusSettings = function () {
         feature_kit_pilot: [],
         feature_kit_combo_pilot: [],
         feature_kit_size_pilot: [],
+        feature_kit_fade_pilot: ["demographics_questionnaire"],
     };
 
     const All_Allowed_Head_Lists = {};
     const All_Banned_Head_Lists = {};
+    // Kit heads are mechanical / sea / sweet — robot toy and party hat clash with those families.
+    const All_Banned_Hat_Lists = {
+        semantic_learning_kit: ["partyhat"],
+        test: ["partyhat"],
+    };
+    const All_Banned_Toy_Lists = {
+        semantic_learning_kit: ["robot"],
+        test: ["robot"],
+    };
     const All_Forced_Head_Lists = {
         test: ["bell"],
         semantic_learning_star: ["bell", "pig", "bun"],
@@ -532,6 +716,7 @@ let StimulusSettings = function () {
         feature_kit_pilot: ["bell"],
         feature_kit_combo_pilot: ["bell"],
         feature_kit_size_pilot: ["bell"],
+        feature_kit_fade_pilot: ["bell"],
     };
 
     const All_Allowed_Head_Groups_List = {};
@@ -555,7 +740,7 @@ let StimulusSettings = function () {
     if (!this.Experiment_Structure || !this.Fennimal_Dictionary) {
         throw new Error(
             'Unknown experiment code "' + this.Experiment_Code + '". ' +
-            'Live codes: test, semantic_learning_star, semantic_learning_kit, mentalizing_between_subjects, feature_kit_pilot, feature_kit_combo_pilot, feature_kit_size_pilot. ' +
+            'Live codes: test, semantic_learning_star, semantic_learning_kit, mentalizing_between_subjects, feature_kit_pilot, feature_kit_combo_pilot, feature_kit_size_pilot, feature_kit_fade_pilot. ' +
             'Archived recipes are in archive/experiments/ (see archive/MANIFEST.md).'
         );
     }
@@ -568,12 +753,14 @@ let StimulusSettings = function () {
     this.forced_heads = All_Forced_Head_Lists[this.Experiment_Code] || false;
     this.allowed_head_groups = All_Allowed_Head_Groups_List[this.Experiment_Code] || false;
     this.banned_head_groups = All_Banned_Head_Groups_List[this.Experiment_Code] || false;
+    this.banned_hats = All_Banned_Hat_Lists[this.Experiment_Code] || false;
+    this.banned_toys = All_Banned_Toy_Lists[this.Experiment_Code] || false;
 
     this.head_source = (this.Experiment_Code === "semantic_learning_kit" || this.Experiment_Code === "test")
         ? "feature_kit"
         : "svg";
     this.kit_recipes = this.head_source === "feature_kit" ? KIT_RECIPES : null;
-    this.kit_name_pool = KIT_NAME_POOL.slice();
+    this.kit_head_names = JSON.parse(JSON.stringify(KIT_HEAD_NAMES));
 
     this.use_region_preferred_body_types = true;
     this.preferred_region_sample_order = [["Jungle", "Village", "North", "Desert"], ["Beach", "Mountains", "Flowerfields", "Swamp"]]; // [["Jungle", "Village", "North", "Desert","Beach", "Mountains", "Flowerfields", "Swamp"]] // [["Jungle", "Village", "North", "Desert"], ["Beach", "Mountains", "Flowerfields", "Swamp"]];
@@ -895,13 +1082,21 @@ let StimulusTransformer = function (StimTemplate) {
         // SVG DOM EXTRACTION HELPERS
         // ----------------------------------------------------
         function get_all_available_hats() {
-            return Array.from(SVG_Hats_Layer.childNodes)
+            let hats = Array.from(SVG_Hats_Layer.childNodes)
                 .filter(n => n.nodeType === Node.ELEMENT_NODE)
                 .map(n => n.id.replace("hat_", ""));
+            if (StimTemplate.banned_hats) {
+                hats = hats.filter(h => !StimTemplate.banned_hats.includes(h));
+            }
+            return hats;
         }
 
         function get_all_available_toys() {
-            return Array.from(document.getElementsByClassName("toy")).map(t => t.id.split("_")[1]);
+            let toys = Array.from(document.getElementsByClassName("toy")).map(t => t.id.split("_")[1]);
+            if (StimTemplate.banned_toys) {
+                toys = toys.filter(t => !StimTemplate.banned_toys.includes(t));
+            }
+            return toys;
         }
 
         function get_all_food_flavors_in_SVG() {
@@ -1070,20 +1265,33 @@ let StimulusTransformer = function (StimTemplate) {
         }
         let shuffled = shuffleArray(recipes.slice());
         let byCode = {};
+        let namesByCode = {};
         headCodes.forEach((code, i) => {
-            byCode[code] = JSON.parse(JSON.stringify(shuffled[i]));
+            let recipe = JSON.parse(JSON.stringify(shuffled[i]));
+            let family = recipe.shell || recipe.ear || recipe.eye || recipe.lowerFace || recipe.stamp;
+            let pair = (StimTemplate.kit_head_names && (
+                StimTemplate.kit_head_names[recipe.id]
+                || (family && StimTemplate.kit_head_names[family])
+            )) || null;
+            if (!pair || pair.length < 2) {
+                throw new Error(
+                    'semantic_learning_kit head "' + (recipe.id || family || "?") +
+                    '" needs two names in KIT_HEAD_NAMES.'
+                );
+            }
+            byCode[code] = recipe;
+            namesByCode[code] = shuffleArray(pair.slice());
         });
-        return byCode;
+        return { recipes: byCode, names: namesByCode };
     }
 
     function create_Fennimals_from_stimulus_template(Dict, Map) {
         let Arr = [];
-        let kitNames = StimTemplate.head_source === "feature_kit"
-            ? shuffleArray((StimTemplate.kit_name_pool || []).slice())
-            : [];
-        let kitRecipeByHeadCode = StimTemplate.head_source === "feature_kit"
+        let kitAssign = StimTemplate.head_source === "feature_kit"
             ? assignKitRecipesToHeadCodes(Dict)
             : null;
+        let kitRecipeByHeadCode = kitAssign && kitAssign.recipes;
+        let kitNamesByHeadCode = kitAssign && kitAssign.names;
 
         let Region_in_map = Object.values(Map.region || {}).map(r => r.region);
         let Unmapped_regions = StimTemplate.preferred_region_sample_order.flat().filter(x => !Region_in_map.includes(x));
@@ -1131,7 +1339,14 @@ let StimulusTransformer = function (StimTemplate) {
                     throw new Error('Fennimal "' + fenID + '" is missing a kit recipe for head code "' + headCode + '".');
                 }
                 FenObj.kit_recipe = JSON.parse(JSON.stringify(recipe));
-                FenObj.name = kitNames.shift() || ("Fen " + fenID);
+                let namePool = kitNamesByHeadCode && kitNamesByHeadCode[headCode];
+                if (!namePool || namePool.length < 1) {
+                    throw new Error(
+                        'Fennimal "' + fenID + '" has no leftover name for head "' +
+                        (recipe.id || headCode) + '".'
+                    );
+                }
+                FenObj.name = namePool.shift();
             } else {
                 FenObj.head = Map.head[req.head];
                 if (!FenObj.head) {
@@ -1347,12 +1562,16 @@ let StimulusTransformer = function (StimTemplate) {
      * Used as the widest ask_* distractor fallback when the experiment only has one option.
      */
     this.get_all_software_options_of_type = function (type) {
+        const withoutBanned = (ids, banned) => {
+            if (!banned || !banned.length) return ids;
+            return ids.filter((id) => !banned.includes(id));
+        };
         if (type === "toy") {
-            return [...new Set(
+            return withoutBanned([...new Set(
                 Array.from(document.getElementsByClassName("toy"))
                     .map((t) => (t.id || "").split("_")[1])
                     .filter(Boolean)
-            )];
+            )], StimTemplate.banned_toys || []);
         }
         if (type === "toybox") {
             return [...new Set(
@@ -1369,14 +1588,14 @@ let StimulusTransformer = function (StimTemplate) {
             )];
         }
         if (type === "hat") {
-            return [...new Set(
+            return withoutBanned([...new Set(
                 Array.from(document.getElementsByClassName("hat"))
                     .map((h) => {
                         let id = h.id || "";
                         return id.startsWith("hat_") ? id.slice(4) : null;
                     })
                     .filter(Boolean)
-            )];
+            )], StimTemplate.banned_hats || []);
         }
         return [];
     };

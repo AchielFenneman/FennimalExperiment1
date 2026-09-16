@@ -6,12 +6,16 @@
  * mirrored to experimentData.hatBindingAssignment for easy top-level export.
  *
  * Visualization:
- *   group_based — gist checks on each hop of the two-hop bound trials (the two
- *     joining features of the selected triad). Early hops also ask that
- *     Fennimal's hat after the joining features; the last hop does not (the
- *     flavour task is the hat pick). The leftover unused arm is an unbound
- *     hat-gist. Hub B never gets its own hat-selection trial (B is only the
- *     middle hop, plus a hat gist on that hop).
+ *   group_based — gist checks on each hop of the two-hop bound trials.
+ *     Each hop asks only the *outgoing* joining feature (the link to the next
+ *     node). The incoming feature from the previous hop is not asked again.
+ *     Early hops also ask that Fennimal's hat after the joining feature; the
+ *     last hop has no gist page (the flavour task is the hat pick). Kit head
+ *     hops use unlabeled grayscale portraits (unique roster faces) instead of
+ *     verbal gist; the leftover unused-arm self-trial asks the same portrait
+ *     3AFC so that unique face is a target, not only a foil. Join tasks still
+ *     use the 3-line head gist. Hub B never gets its own hat-selection
+ *     trial (B is only the middle hop, plus a hat gist on that hop).
  *   control — hat-gist for every self trial, including hub B.
  *   pair_based — honor-system "I can picture this Fennimal" (no gist). If this
  *     condition is re-implemented with gist, focus the questions on hub B.
@@ -74,6 +78,8 @@ class HatBindingTaskController {
         this.phaseData.use_head_gist_descriptions = this._usesGistDescription("head");
         this.phaseData.use_region_gist_descriptions = this._usesGistDescription("region");
         this.phaseData.use_toy_gist_descriptions = this._usesGistDescription("toy");
+        this.phaseData.use_hat_gist_descriptions = this._usesGistDescription("hat");
+        this.phaseData.use_head_portrait_choices = this._usesHeadPortraits();
         this.phaseData.answers = this.answers;
         if (this.expCont && this.expCont.dataCont && this.expCont.dataCont.setHatBindingAssignment) {
             this.expCont.dataCont.setHatBindingAssignment({
@@ -86,7 +92,8 @@ class HatBindingTaskController {
                 joining_features: this.graph.joiningFeatureKinds.slice(),
                 use_head_gist_descriptions: this.phaseData.use_head_gist_descriptions,
                 use_region_gist_descriptions: this.phaseData.use_region_gist_descriptions,
-                use_toy_gist_descriptions: this.phaseData.use_toy_gist_descriptions
+                use_toy_gist_descriptions: this.phaseData.use_toy_gist_descriptions,
+                use_head_portrait_choices: this.phaseData.use_head_portrait_choices
             });
         }
     }
@@ -373,7 +380,8 @@ class HatBindingTaskController {
         });
 
         // Two joining feature types of the selected triad (e.g. ABC → head+region).
-        // Unused arm D is not a joining feature of ABC; it is the unbound hat-gist.
+        // Unused arm D is not a joining feature of ABC; it is the unbound
+        // self-trial (hat gist, plus kit head portraits when those are on).
         let joiningFeatureKinds = selectedArmIds.map((armId) => {
             return this._relationToFeatureKind(hubRelationByArm.get(armId));
         });
@@ -544,7 +552,7 @@ class HatBindingTaskController {
     _defaultBindingTrialSpecs() {
         // group_based: two-hop bound trials Y→X and X→Y via the hub (hat of the
         // endpoint). Hub B is never itself the hat target. Leftover unused arm
-        // is a filler self-trial (hat-gist).
+        // is a filler self-trial (hat-gist, plus kit head portraits when on).
         // pair_based: honor-system one-hop from the hub. If gist is added later,
         // start on B and focus questions on B.
         // control: self-trial hat-gist for X, H, Y, and fillers (including hub B).
@@ -800,6 +808,19 @@ class HatBindingTaskController {
         return !trial.path || trial.path.length === 0;
     }
 
+    _isOutOfTriadSelfTrial(trial) {
+        if (!this._isSelfTrial(trial)) return false;
+        let id = trial.cue && trial.cue.id;
+        return Array.isArray(this.graph.unusedArmIds) && this.graph.unusedArmIds.indexOf(id) >= 0;
+    }
+
+    _selfTrialGistKinds(trial) {
+        if (this._usesHeadPortraits() && this._isOutOfTriadSelfTrial(trial)) {
+            return ["head", "hat"];
+        }
+        return ["hat"];
+    }
+
     _relationLabel(relation) {
         if (relation === "neighbour") return "neighbour";
         if (relation === "cousin") return "cousin";
@@ -861,15 +882,16 @@ class HatBindingTaskController {
         if (kind === "head") return "use_head_gist_descriptions";
         if (kind === "region") return "use_region_gist_descriptions";
         if (kind === "toy") return "use_toy_gist_descriptions";
+        if (kind === "hat") return "use_hat_gist_descriptions";
         return null;
     }
 
-    // Hats always use gist lines. Linking features (head / region / toy) use
-    // gistDescriptions only when the matching flag is strictly true; otherwise
-    // questions fall back to generic names (region map labels, Tomato, Globe, …).
+    // Linking features (head / region / toy) use gistDescriptions only when the
+    // matching flag is strictly true; otherwise questions fall back to generic
+    // names (region map labels, Tomato, Globe, …). Hats default to printed
+    // names ("Chef's hat"); long hat gist lines are opt-in.
     // phaseData overrides GenParam.HatBinding.gist when the key is present.
     _usesGistDescription(kind) {
-        if (kind === "hat") return true;
         let key = this._gistFlagKey(kind);
         if (!key) this._fail(`unknown gist feature "${kind}".`);
         if (this.phaseData && Object.prototype.hasOwnProperty.call(this.phaseData, key)) {
@@ -896,6 +918,23 @@ class HatBindingTaskController {
 
     _hasKitHeads() {
         return this._rosterFens().some((fen) => fen && fen.kit_recipe);
+    }
+
+    _usesKitSlotHeadGists() {
+        if (this.phaseData && Object.prototype.hasOwnProperty.call(this.phaseData, "use_kit_slot_head_gists")) {
+            return this.phaseData.use_kit_slot_head_gists === true;
+        }
+        return this._gistCfg().use_kit_slot_head_gists === true;
+    }
+
+    _usesHeadPortraits() {
+        let flagged = false;
+        if (this.phaseData && Object.prototype.hasOwnProperty.call(this.phaseData, "use_head_portrait_choices")) {
+            flagged = this.phaseData.use_head_portrait_choices === true;
+        } else {
+            flagged = this._gistCfg().use_head_portrait_choices === true;
+        }
+        return flagged && this._hasKitHeads();
     }
 
     _kitSlotLabel(slot, token) {
@@ -983,18 +1022,28 @@ class HatBindingTaskController {
                 }
             });
         };
-        collect("hat", this.hatFens);
+        if (this._usesGistDescription("hat")) collect("hat", this.hatFens);
         if (this.condition === "group_based") {
             (this.graph.joiningFeatureKinds || []).forEach((kind) => {
                 if (kind === "head" && this._hasKitHeads()) {
-                    ["lowerFace", "ear"].forEach((slot) => {
-                        this._uniqueKitSlotTokens(slot).forEach((token) => {
-                            let dict = (typeof GenParam !== "undefined" && GenParam.kitSlotGists)
-                                ? GenParam.kitSlotGists[slot]
-                                : null;
-                            if (!dict || !dict[token]) missing.push('kitSlotGists.' + slot + '["' + token + '"]');
+                    if (this._usesHeadPortraits()) {
+                        // Hop questions show unlabeled faces. Join prompts still
+                        // need verbal head gist when that flag is on.
+                        if (this._usesGistDescription("head")) collect("head", this._rosterFens());
+                        return;
+                    }
+                    if (this._usesKitSlotHeadGists()) {
+                        ["lowerFace", "ear"].forEach((slot) => {
+                            this._uniqueKitSlotTokens(slot).forEach((token) => {
+                                let dict = (typeof GenParam !== "undefined" && GenParam.kitSlotGists)
+                                    ? GenParam.kitSlotGists[slot]
+                                    : null;
+                                if (!dict || !dict[token]) missing.push('kitSlotGists.' + slot + '["' + token + '"]');
+                            });
                         });
-                    });
+                    } else {
+                        collect("head", this._rosterFens());
+                    }
                     return;
                 }
                 if (this._usesGistDescription(kind)) collect(kind, this._rosterFens());
@@ -1056,6 +1105,13 @@ class HatBindingTaskController {
             if (!label) this._fail(`missing RegionData["${id}"].display_name for questions.`);
             return String(label);
         }
+        if (kind === "hat") {
+            let raw = (typeof GenParam !== "undefined" && GenParam.get_hat_printed_name)
+                ? GenParam.get_hat_printed_name(id)
+                : id;
+            let label = String(raw || id);
+            return label.charAt(0).toUpperCase() + label.slice(1);
+        }
         return String(id).charAt(0).toUpperCase() + String(id).slice(1);
     }
 
@@ -1098,9 +1154,10 @@ class HatBindingTaskController {
         let tmpl = stems[kind];
         if (tmpl) return String(tmpl).split("{subject}").join(subject);
         if (kind === "head") return "What does " + subject + "'s head look like?";
+        if (kind === "headPortrait") return "Which is " + subject + "'s face?";
         if (kind === "region") return "Where does " + subject + " live?";
         if (kind === "toy") return "What does " + subject + " play with?";
-        if (kind === "hat") return "What does " + subject + "'s hat look like?";
+        if (kind === "hat") return "Which hat does " + subject + " wear?";
         this._fail(`no gist stem for "${kind}".`);
     }
 
@@ -1117,8 +1174,48 @@ class HatBindingTaskController {
         return "<b>" + name + "</b>'s " + prior + " has " + desc + ". Visualize that " + role + ".";
     }
 
+    _uniqueRosterFensByHead() {
+        let seen = new Set();
+        let fens = [];
+        this._rosterFens().forEach((fen) => {
+            let id = this._normalizeFeatureId("head", fen && fen.head);
+            if (!id || seen.has(id)) return;
+            seen.add(id);
+            fens.push(fen);
+        });
+        if (!fens.length) this._fail("no unique roster heads for portraits.");
+        return fens;
+    }
+
+    _makeHeadPortraitQuestion(fen, subject) {
+        let correctId = this._normalizeFeatureId("head", this._fenFeatureId(fen, "head"));
+        if (!correctId) this._fail('Fennimal "' + (fen && fen.id) + '" has no head for portraits.');
+        let uniqueFens = this._uniqueRosterFensByHead();
+        if (!uniqueFens.some((optFen) => this._normalizeFeatureId("head", optFen.head) === correctId)) {
+            this._fail('portrait pool is missing head "' + correctId + '" for "' + fen.id + '".');
+        }
+        shuffleArray(uniqueFens);
+        return {
+            feature: "head",
+            used_gist: false,
+            used_portrait: true,
+            used_kit_slot: false,
+            stem: this._gistStem("headPortrait", subject),
+            correct_value: correctId,
+            correct_text: "",
+            options: uniqueFens.map((optFen) => ({
+                value: this._normalizeFeatureId("head", optFen.head),
+                fen_id: optFen.id,
+                text: ""
+            }))
+        };
+    }
+
     _makeGistQuestion(fen, kind, subject) {
-        if (kind === "head" && fen && fen.kit_recipe) {
+        if (kind === "head" && this._usesHeadPortraits()) {
+            return this._makeHeadPortraitQuestion(fen, subject);
+        }
+        if (kind === "head" && fen && fen.kit_recipe && this._usesKitSlotHeadGists()) {
             return this._makeKitHeadGistQuestion(fen, subject);
         }
         let poolFens = (kind === "hat") ? this.hatFens.slice() : this._rosterFens();
@@ -1158,6 +1255,19 @@ class HatBindingTaskController {
         return ordered;
     }
 
+    // Bound hops: only the outgoing link (the feature that gets you to the next
+    // node). Incoming link was just answered. Last hop has no gist page.
+    _hopGistKinds(trial, hopIndex) {
+        let path = trial.path || [];
+        let nHops = path.length;
+        let kinds = [];
+        if (hopIndex < nHops) {
+            kinds.push(this._relationToFeatureKind(path[hopIndex]));
+        }
+        if (hopIndex !== nHops) kinds.push("hat");
+        return kinds;
+    }
+
     _makeGistPage(trial, hopIndex, kinds, isLast) {
         let fen = this._fenAtHop(trial, hopIndex);
         let subject = this._gistSubjectPhrase(trial, hopIndex);
@@ -1182,22 +1292,21 @@ class HatBindingTaskController {
     async _runGistVisualization(trial) {
         let pages;
         if (this._isSelfTrial(trial)) {
-            pages = [this._makeGistPage(trial, 0, ["hat"], true)];
+            pages = [this._makeGistPage(trial, 0, this._selfTrialGistKinds(trial), true)];
         } else {
-            let joining = (this.graph.joiningFeatureKinds || []).slice();
             let nHops = (trial.path || []).length;
             pages = [];
             for (let hop = 0; hop <= nHops; hop++) {
                 let isLast = hop === nHops;
-                let kinds = joining.slice();
-                if (!isLast) kinds.push("hat");
+                let kinds = this._hopGistKinds(trial, hop);
+                if (!kinds.length) continue;
                 pages.push(this._makeGistPage(trial, hop, kinds, isLast));
             }
         }
         let out = {
             kind: this._isSelfTrial(trial) ? "hat_gist" : "bound_hops",
             joining_features: this._isSelfTrial(trial)
-                ? ["hat"]
+                ? this._selfTrialGistKinds(trial).slice()
                 : (this.graph.joiningFeatureKinds || []).slice(),
             n_errors: 0,
             pages: []
@@ -1217,6 +1326,144 @@ class HatBindingTaskController {
         if (text) text.textContent = label;
     }
 
+    _fitHeadIconInBox(icon, size, pad) {
+        pad = pad == null ? 0.86 : pad;
+        let box = null;
+        try { box = icon.getBBox(); } catch (err) { box = null; }
+        if (!box || !(box.width > 0) || !(box.height > 0)) {
+            box = { x: 0, y: 0, width: 100, height: 100 };
+        }
+        let span = Math.max(box.width, box.height, 1);
+        let scale = (size * pad) / span;
+        let cx = box.x + box.width / 2;
+        let cy = box.y + box.height / 2;
+        icon.setAttribute(
+            "transform",
+            "translate(" + (size / 2) + " " + (size / 2) + ") scale(" + scale + ") translate(" + (-cx) + " " + (-cy) + ")"
+        );
+    }
+
+    _mountHeadPortraitChoices(answerHost, question, onChange) {
+        let cfg = this._gistCfg();
+        let size = Number(cfg.portraitTile) || 156;
+        let selectedValue = "";
+        let tiles = [];
+
+        let row = document.createElement("div");
+        row.style.display = "flex";
+        row.style.flexDirection = "row";
+        row.style.justifyContent = "center";
+        row.style.alignItems = "center";
+        row.style.flexWrap = "wrap";
+        row.style.gap = "18px";
+        answerHost.appendChild(row);
+
+        (question.options || []).forEach((opt, idx) => {
+            let fen = this._getFen(opt.fen_id, "portrait option");
+            if (!fen.ColorScheme || !fen.ColorScheme.Head) {
+                this._fail('portrait fen "' + fen.id + '" missing ColorScheme.Head');
+            }
+            let btn = document.createElement("button");
+            btn.type = "button";
+            btn.setAttribute("aria-label", "Face option " + (idx + 1));
+            btn.style.width = size + "px";
+            btn.style.height = size + "px";
+            btn.style.padding = "0";
+            btn.style.margin = "0";
+            btn.style.border = "3px solid #b89f5d";
+            btn.style.borderRadius = "16px";
+            btn.style.background = "#d8c381";
+            btn.style.cursor = "pointer";
+            btn.style.overflow = "visible";
+            btn.style.boxSizing = "border-box";
+            btn.style.flex = "0 0 auto";
+            btn.style.appearance = "none";
+            btn.style.WebkitAppearance = "none";
+
+            let ns = "http://www.w3.org/2000/svg";
+            let svg = document.createElementNS(ns, "svg");
+            svg.setAttribute("width", String(size));
+            svg.setAttribute("height", String(size));
+            svg.setAttribute("viewBox", "0 0 " + size + " " + size);
+            svg.style.display = "block";
+            svg.style.overflow = "visible";
+            svg.style.filter = "grayscale(100%)";
+            svg.style.pointerEvents = "none";
+
+            let icon = create_Fennimal_SVG_object_head_only(fen, false, false);
+            icon.style.pointerEvents = "none";
+            svg.appendChild(icon);
+            btn.appendChild(svg);
+            row.appendChild(btn);
+            this._fitHeadIconInBox(icon, size, 0.86);
+
+            const paint = (state) => {
+                if (state === "correct") {
+                    btn.style.border = "4px solid #1f7a3a";
+                    btn.style.background = "#e4f3e6";
+                    btn.style.boxShadow = "0 0 0 3px rgba(31,122,58,0.25)";
+                    btn.style.opacity = "1";
+                } else if (state === "selected") {
+                    btn.style.border = "4px solid gold";
+                    btn.style.background = "#ebd89b";
+                    btn.style.boxShadow = "0 0 0 3px rgba(212,175,55,0.35)";
+                    btn.style.opacity = "1";
+                } else if (state === "dim") {
+                    btn.style.border = "3px solid #cbb98a";
+                    btn.style.background = "#d8c381";
+                    btn.style.opacity = "0.38";
+                    btn.style.boxShadow = "none";
+                } else {
+                    btn.style.border = "3px solid #b89f5d";
+                    btn.style.background = "#d8c381";
+                    btn.style.opacity = "1";
+                    btn.style.boxShadow = "none";
+                }
+            };
+
+            btn.addEventListener("pointerenter", () => {
+                if (btn.disabled) return;
+                if (selectedValue !== opt.value) {
+                    btn.style.background = "#ebd89b";
+                    btn.style.border = "3px solid gold";
+                }
+            });
+            btn.addEventListener("pointerleave", () => {
+                if (btn.disabled) return;
+                paint(selectedValue === opt.value ? "selected" : "idle");
+            });
+            btn.addEventListener("click", (ev) => {
+                ev.preventDefault();
+                if (btn.disabled) return;
+                selectedValue = opt.value;
+                tiles.forEach((t) => paint(t.opt.value === selectedValue ? "selected" : "idle"));
+                if (typeof AudioCont !== "undefined") AudioCont.play_sound_effect("button_click");
+                if (typeof onChange === "function") onChange();
+            });
+
+            tiles.push({ btn: btn, opt: opt, paint: paint, icon: icon });
+        });
+
+        const refit = () => {
+            tiles.forEach((t) => this._fitHeadIconInBox(t.icon, size, 0.86));
+        };
+        requestAnimationFrame(refit);
+
+        return {
+            getValue: () => selectedValue,
+            lock: () => {
+                tiles.forEach((t) => {
+                    t.btn.disabled = true;
+                    t.btn.style.cursor = "default";
+                    t.btn.style.pointerEvents = "none";
+                    if (t.opt.value === question.correct_value) t.paint("correct");
+                    else t.paint("dim");
+                });
+            },
+            refit: refit
+        };
+    }
+
     _showGistPage(page) {
         let cfg = this._gistCfg();
         let instruction = cfg.instruction
@@ -1225,6 +1472,17 @@ class HatBindingTaskController {
         let continueLabel = cfg.continueLabel || "Continue";
         let selectHatLine = cfg.selectHatLine || "Now select this Fennimal's hat.";
         let placeholder = cfg.placeholder || "Choose one…";
+
+        let questions = page.questions || [];
+        let hasPortrait = questions.some((q) => q && q.used_portrait);
+        let hasMenu = questions.some((q) => q && !q.used_portrait);
+        if (hasPortrait && hasMenu) {
+            instruction = cfg.instructionWithPortraitsAndMenus
+                || "Click the matching face and choose the hat. Then press Check.";
+        } else if (hasPortrait) {
+            instruction = cfg.instructionWithPortraits
+                || "Click the matching face. Then press Check.";
+        }
 
         let group = create_SVG_group(0, 0, undefined, "hat_binding_gist_panel");
         this.ItemLayers.Plus2.appendChild(group);
@@ -1276,7 +1534,7 @@ class HatBindingTaskController {
         div.appendChild(instr);
 
         let pageStart = performance.now();
-        let rows = (page.questions || []).map((q) => {
+        let rows = questions.map((q) => {
             let block = document.createElement("div");
             block.style.width = "100%";
             block.style.textAlign = "left";
@@ -1291,49 +1549,60 @@ class HatBindingTaskController {
             block.appendChild(stem);
 
             let answerHost = document.createElement("div");
-            let select = document.createElement("select");
-            select.style.width = "100%";
-            select.style.boxSizing = "border-box";
-            select.style.fontSize = "18px";
-            select.style.padding = "10px 12px";
-            select.style.borderRadius = "10px";
-            select.style.border = "2px solid #7a5a1e";
-            select.style.background = "#fffdf6";
-            select.style.fontFamily = "Arial, sans-serif";
-            select.style.color = "#3b2f14";
-            select.style.cursor = "pointer";
-
-            let ph = document.createElement("option");
-            ph.value = "";
-            ph.disabled = true;
-            ph.selected = true;
-            ph.textContent = placeholder;
-            select.appendChild(ph);
-            (q.options || []).forEach((opt) => {
-                let o = document.createElement("option");
-                o.value = opt.value;
-                o.textContent = opt.text;
-                select.appendChild(o);
-            });
-
-            const clearRed = () => { stem.style.color = "#3b2f14"; };
-            select.addEventListener("mousedown", clearRed);
-            select.addEventListener("focus", clearRed);
-            select.addEventListener("change", clearRed);
-
-            answerHost.appendChild(select);
             block.appendChild(answerHost);
             div.appendChild(block);
 
-            return {
+            const clearRed = () => { stem.style.color = "#3b2f14"; };
+            let row = {
                 question: q,
                 stem: stem,
-                select: select,
+                select: null,
+                portraits: null,
                 answerHost: answerHost,
                 locked: false,
                 n_errors: 0,
-                attempts: []
+                attempts: [],
+                getValue: () => ""
             };
+
+            if (q.used_portrait) {
+                row.portraits = this._mountHeadPortraitChoices(answerHost, q, clearRed);
+                row.getValue = () => row.portraits.getValue();
+            } else {
+                let select = document.createElement("select");
+                select.style.width = "100%";
+                select.style.boxSizing = "border-box";
+                select.style.fontSize = "18px";
+                select.style.padding = "10px 12px";
+                select.style.borderRadius = "10px";
+                select.style.border = "2px solid #7a5a1e";
+                select.style.background = "#fffdf6";
+                select.style.fontFamily = "Arial, sans-serif";
+                select.style.color = "#3b2f14";
+                select.style.cursor = "pointer";
+
+                let ph = document.createElement("option");
+                ph.value = "";
+                ph.disabled = true;
+                ph.selected = true;
+                ph.textContent = placeholder;
+                select.appendChild(ph);
+                (q.options || []).forEach((opt) => {
+                    let o = document.createElement("option");
+                    o.value = opt.value;
+                    o.textContent = opt.text;
+                    select.appendChild(o);
+                });
+
+                select.addEventListener("mousedown", clearRed);
+                select.addEventListener("focus", clearRed);
+                select.addEventListener("change", clearRed);
+                answerHost.appendChild(select);
+                row.select = select;
+                row.getValue = () => select.value;
+            }
+
+            return row;
         });
 
         let nextHint = document.createElement("div");
@@ -1378,12 +1647,20 @@ class HatBindingTaskController {
             wrap.setAttribute("y", panelY + padTop);
             wrap.setAttribute("height", Math.max(40, panelH - padTop - gap - btnH - padBot));
             btnHolder.style.transform = "translate(0px, " + (panelY + panelH - padBot - btnH / 2) + "px)";
+            rows.forEach((row) => {
+                if (row.portraits && typeof row.portraits.refit === "function") row.portraits.refit();
+            });
         };
         layout();
         requestAnimationFrame(layout);
 
         const lockRow = (row) => {
             row.locked = true;
+            row.stem.style.color = "#3b2f14";
+            if (row.portraits) {
+                row.portraits.lock();
+                return;
+            }
             if (row.select && row.select.parentNode) row.select.remove();
             let text = document.createElement("div");
             text.textContent = row.question.correct_text;
@@ -1393,23 +1670,24 @@ class HatBindingTaskController {
             text.style.color = "#1f7a3a";
             text.style.paddingLeft = "22px";
             row.answerHost.appendChild(text);
-            row.stem.style.color = "#3b2f14";
         };
 
         const buildPageLog = () => {
             let nErrors = 0;
-            let questions = rows.map((row) => {
+            let logged = rows.map((row) => {
                 nErrors += row.n_errors;
                 return {
                     feature: row.question.feature,
                     kit_slot: row.question.kit_slot || null,
                     used_gist: !!row.question.used_gist,
                     used_kit_slot: !!row.question.used_kit_slot,
+                    used_portrait: !!row.question.used_portrait,
                     stem: row.question.stem,
                     correct_value: row.question.correct_value,
                     correct_text: row.question.correct_text,
                     option_values: (row.question.options || []).map((o) => o.value),
                     option_texts: (row.question.options || []).map((o) => o.text),
+                    option_fen_ids: (row.question.options || []).map((o) => o.fen_id || null),
                     n_errors: row.n_errors,
                     attempts: row.attempts.slice()
                 };
@@ -1420,7 +1698,7 @@ class HatBindingTaskController {
                 is_last: !!page.isLast,
                 n_errors: nErrors,
                 rt_ms: Math.round(performance.now() - pageStart),
-                questions: questions
+                questions: logged
             };
         };
 
@@ -1436,13 +1714,13 @@ class HatBindingTaskController {
                     resolve(buildPageLog());
                     return;
                 }
-                if (rows.some((row) => !row.locked && row.select && !row.select.value)) return;
+                if (rows.some((row) => !row.locked && !row.getValue())) return;
                 busy = true;
                 let anyWrong = false;
                 let anyNewCorrect = false;
                 rows.forEach((row) => {
                     if (row.locked) return;
-                    let val = row.select.value;
+                    let val = row.getValue();
                     let correct = val === row.question.correct_value;
                     row.attempts.push({
                         selected_value: val,

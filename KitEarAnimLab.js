@@ -1,8 +1,17 @@
 /**
- * Standalone preview for live kit-ear motion and stamp salience trials.
+ * Standalone preview for live kit overlay motion and stamp salience trials.
+ * Uses live families from SVG/Heads features compatible.svg:
+ * mechanical (gears + moustache), sweet (candles), and sea (spray + pulse).
  */
 (function () {
     "use strict";
+
+    const THEME_SVG = "./SVG/Heads features compatible.svg?v=clam-3";
+    const THEME_FAMILIES = [
+        { id: "mechanical", label: "Mechanical" },
+        { id: "sweet", label: "Sweet" },
+        { id: "sea", label: "Sea" }
+    ];
 
     let kit = new FeatureKit();
     let liveRoots = [];
@@ -21,13 +30,21 @@
         $("statusLine").textContent = msg;
     }
 
-    function pick(arr) {
-        return arr[Math.floor(Math.random() * arr.length)];
+    function familySlot(family, key) {
+        let aliases = family && family.aliases;
+        return (aliases && aliases[key]) || family.id;
     }
 
-    function stampToken() {
-        let stamps = kit.listTokens("stamp").filter((t) => t && t !== "none");
-        return stamps.length ? pick(stamps) : "none";
+    function familyRecipe(family) {
+        return {
+            shell: familySlot(family, "shell"),
+            ear: familySlot(family, "ear"),
+            eye: familySlot(family, "eye"),
+            lowerFace: familySlot(family, "lowerFace"),
+            hair: "none",
+            stamp: familySlot(family, "stamp"),
+            expression: expression
+        };
     }
 
     function stampOptions() {
@@ -44,29 +61,37 @@
         apply_kit_stamp_salience(root, stampOptions());
     }
 
-    function randomRecipe(earToken) {
-        let locks = { hair: true };
-        let base = { hair: "none", expression: expression };
-        if (earToken) {
-            locks.ear = true;
-            base.ear = earToken;
+    function applyLiveMotion(root) {
+        if (!root || typeof apply_kit_ear_wiggle !== "function") return;
+        apply_kit_ear_wiggle(root, { expression: expression });
+    }
+
+    function applyMoodMotion(root, animated) {
+        if (!root) return;
+        if (typeof kit_candle_set_mood === "function") {
+            kit_candle_set_mood(root, expression, animated !== false);
         }
-        let recipe = kit.randomRecipe(locks, base);
-        recipe.hair = "none";
-        recipe.stamp = stampToken();
-        recipe.expression = expression;
-        if (earToken) recipe.ear = earToken;
-        return recipe;
+        if (typeof kit_moustache_set_mood === "function") {
+            kit_moustache_set_mood(root, expression, animated !== false);
+        }
+        if (typeof kit_muffin_set_mood === "function") {
+            kit_muffin_set_mood(root, expression, animated !== false);
+        }
+        if (typeof kit_clam_set_mood === "function") {
+            kit_clam_set_mood(root, expression, animated !== false);
+        }
+        if (typeof kit_sea_nose_set_mood === "function") {
+            kit_sea_nose_set_mood(root, expression, animated !== false);
+        }
     }
 
     function recipeCaption(recipe) {
-        return [
-            recipe.ear + " ears",
-            recipe.shell + " shell",
-            recipe.eye + " eyes",
-            recipe.lowerFace + " face",
-            recipe.stamp + " stamp"
-        ].join(" · ");
+        let family = THEME_FAMILIES.find((row) => row.id === recipe.ear);
+        let label = family ? family.label : recipe.ear;
+        if (recipe.lowerFace && recipe.lowerFace !== recipe.ear) {
+            return label + " family · " + recipe.lowerFace + " mouth";
+        }
+        return label + " family";
     }
 
     function makeCard(recipe, title, live) {
@@ -145,13 +170,6 @@
         gazeRaf = requestAnimationFrame(tickGaze);
     }
 
-    function liveRecipes() {
-        let ears = kit.listTokens("ear");
-        let list = ears.map((ear) => randomRecipe(ear));
-        while (list.length < 8) list.push(randomRecipe());
-        return list;
-    }
-
     function syncExpressionButtons() {
         let happy = $("exprHappyBtn");
         let sad = $("exprSadBtn");
@@ -170,9 +188,12 @@
         syncExpressionButtons();
         liveRoots.forEach((root) => {
             applyFaceExpression(root);
+            applyMoodMotion(root, true);
             applyStampOptions(root);
         });
-        setStatus(expression === "sad" ? "Sad faces. Stamps dim and shrink if the expression trial is on." : "Happy faces. Stamps brighten and grow if the expression trial is on.");
+        setStatus(expression === "sad"
+            ? "Sad faces. Mechanical moustache drops, candles snuff, sea shell hangs, stamps dim if the expression trial is on."
+            : "Happy faces. Mechanical moustache lifts, candles relight, sea shell rocks, stamps brighten if the expression trial is on.");
     }
 
     function refreshStampTrials() {
@@ -192,26 +213,31 @@
         liveRoots = [];
         stoppedRoots = [];
 
-        liveRecipes().forEach((recipe, i) => {
-            let item = makeCard(recipe, "Live · " + recipe.ear, true);
+        THEME_FAMILIES.forEach((family) => {
+            let recipe = familyRecipe(family);
+            if (!kit.listTokens("ear").includes(recipe.ear)) return;
+            let item = makeCard(recipe, "Live · " + family.label, true);
             liveHost.appendChild(item.card);
-            apply_kit_ear_wiggle(item.root);
+            applyLiveMotion(item.root);
             applyStampOptions(item.root);
             liveRoots.push(item.root);
-            if (i < 4) {
-                let frozen = makeCard(recipe, "Frozen · " + recipe.ear, false);
-                frozen.card.classList.add("is-frozen");
-                freeze_fennimal_decorative_animations(frozen.root);
-                frozenHost.appendChild(frozen.card);
+
+            let frozen = makeCard(recipe, "Frozen · " + family.label, false);
+            frozen.card.classList.add("is-frozen");
+            if (typeof kit_overlay_ensure_static === "function") {
+                kit_overlay_ensure_static(frozen.root);
             }
+            freeze_fennimal_decorative_animations(frozen.root);
+            frozenHost.appendChild(frozen.card);
         });
 
-        ["bat", "mushroom", "mechanical", "seashell"].forEach((ear) => {
-            if (kit.listTokens("ear").indexOf(ear) < 0) return;
-            let item = makeCard(randomRecipe(ear), "Stopped · " + ear, false);
+        THEME_FAMILIES.forEach((family) => {
+            let recipe = familyRecipe(family);
+            if (!kit.listTokens("ear").includes(recipe.ear)) return;
+            let item = makeCard(recipe, "Stopped · " + family.label, false);
             item.card.classList.add("is-frozen");
             stoppedHost.appendChild(item.card);
-            apply_kit_ear_wiggle(item.root);
+            applyLiveMotion(item.root);
             apply_kit_stamp_salience(item.root, {
                 press: true,
                 lighting: true,
@@ -223,7 +249,7 @@
         });
 
         syncExpressionButtons();
-        setStatus("Heads ready. Click a live head to press stamps and pulse their outlines. Frozen rows stay still.");
+        setStatus("Theme heads ready. Live row: mechanical gears + moustache, sweet candles, sea clam blink + pearl shine + shell nose.");
     }
 
     function freezeLive() {
@@ -231,13 +257,14 @@
             restEyes(root);
             freeze_fennimal_decorative_animations(root);
         });
-        setStatus("Live row frozen. Ear motion, gaze, spores, and stamp pulse should stop.");
+        setStatus("Live row frozen. Ear motion, gaze, moustache, candles, spores, spray, and stamp pulse should stop.");
     }
 
     function reviveLive() {
         liveRoots.forEach((root) => {
-            apply_kit_ear_wiggle(root);
+            applyLiveMotion(root);
             applyFaceExpression(root);
+            applyMoodMotion(root, false);
             applyStampOptions(root);
         });
         setStatus("Live row restarted.");
@@ -245,7 +272,7 @@
 
     async function start() {
         try {
-            await kit.load();
+            await kit.load(THEME_SVG);
             $("regenBtn").addEventListener("click", render);
             $("freezeLiveBtn").addEventListener("click", freezeLive);
             $("reviveBtn").addEventListener("click", reviveLive);

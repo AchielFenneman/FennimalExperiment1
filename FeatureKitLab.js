@@ -1,8 +1,12 @@
 /**
  * Interactive mix-and-match lab for FeatureKit heads.
+ * Optional window.FEATURE_KIT_LAB:
+ *   svgPath, recipeA, recipeB, families: [{ id, label, aliases }]
  */
 (function () {
     "use strict";
+
+    const LAB_CFG = window.FEATURE_KIT_LAB || {};
 
     const SLOT_LABELS = {
         shell: "Shell",
@@ -68,11 +72,78 @@
         return !!($("grayInput") && $("grayInput").checked);
     }
 
-    function applyGray() {
-        ["mainStage", "variantRow", "chimeraRow", "shellRow"].forEach((id) => {
+    function hideHatMouth() {
+        return !!($("hideHatMouthInput") && $("hideHatMouthInput").checked);
+    }
+
+    function applyPreviewFlags() {
+        ["mainStage", "variantRow", "chimeraRow", "shellRow", "familyRow"].forEach((id) => {
             let el = $(id);
-            if (el) el.classList.toggle("kit-gray", showGray());
+            if (!el) return;
+            el.classList.toggle("kit-gray", showGray());
+            el.classList.toggle("kit-hide-hat-mouth", hideHatMouth());
         });
+    }
+
+    function familyToken(family, key) {
+        if (key === "hair") return "none";
+        let aliases = family && family.aliases;
+        let want = (aliases && aliases[key]) || family.id;
+        let tokens = kit.listTokens(key);
+        if (tokens.indexOf(want) >= 0) return want;
+        return null;
+    }
+
+    function cloneRecipe(rec) {
+        return kit.normalizeRecipe(Object.assign({}, rec, {
+            scales: Object.assign({}, rec && rec.scales)
+        }));
+    }
+
+    function recipeEquals(a, b) {
+        if (!a || !b) return false;
+        if ((a.expression || "happy") !== (b.expression || "happy")) return false;
+        return slotKeys().every((key) => {
+            if ((a[key] || "none") !== (b[key] || "none")) return false;
+            if (key === "shell") return true;
+            let sa = Number((a.scales && a.scales[key]) || 1);
+            let sb = Number((b.scales && b.scales[key]) || 1);
+            return Math.abs(sa - sb) < 0.001;
+        });
+    }
+
+    function writeControlsFromRecipe() {
+        slotKeys().forEach((key) => {
+            let sel = $("slot_" + key);
+            if (sel) sel.value = recipe[key];
+            let scale = $("scale_" + key);
+            if (scale) {
+                scale.value = String((recipe.scales && recipe.scales[key]) || 1);
+                let read = $("scaleRead_" + key);
+                if (read) read.textContent = Number(scale.value).toFixed(2);
+            }
+        });
+        let sad = $("exprSad");
+        let happy = $("exprHappy");
+        if (recipe.expression === "sad" && sad) sad.checked = true;
+        else if (happy) happy.checked = true;
+    }
+
+    function adoptRecipe(rec) {
+        if (!rec) return;
+        recipe = cloneRecipe(rec);
+        writeControlsFromRecipe();
+        renderAll();
+    }
+
+    function applyFamily(family) {
+        if (!family) return;
+        slotKeys().forEach((key) => {
+            let token = familyToken(family, key);
+            if (token) recipe[key] = token;
+        });
+        writeControlsFromRecipe();
+        renderAll();
     }
 
     function pickToken(key, preferred) {
@@ -193,8 +264,51 @@
         let composed = kit.composeSvg(recipe, { showMarkers: showMarkers() });
         mountSvg(stage, composed);
         $("recipeLine").textContent = recipeLabel(composed.recipe);
-        applyGray();
+        applyPreviewFlags();
         drawShellStrip();
+        drawFamilyStrip();
+    }
+
+    function familyList() {
+        return Array.isArray(LAB_CFG.families) ? LAB_CFG.families : [];
+    }
+
+    function buildFamilyButtons() {
+        let host = $("familyButtons");
+        if (!host) return;
+        host.innerHTML = "";
+        familyList().forEach((family) => {
+            let btn = document.createElement("button");
+            btn.type = "button";
+            btn.textContent = family.label || family.id;
+            btn.addEventListener("click", () => applyFamily(family));
+            host.appendChild(btn);
+        });
+    }
+
+    function drawFamilyStrip() {
+        let host = $("familyRow");
+        if (!host) return;
+        host.innerHTML = "";
+        familyList().forEach((family) => {
+            let next = Object.assign({}, recipe, { scales: Object.assign({}, recipe.scales) });
+            slotKeys().forEach((key) => {
+                let token = familyToken(family, key);
+                if (token) next[key] = token;
+            });
+            next = kit.normalizeRecipe(next);
+            let composed = kit.composeSvg(next, { showMarkers: false });
+            let btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "mini-head" + (recipeEquals(recipe, next) ? " is-active" : "");
+            btn.appendChild(composed.svg);
+            let cap = document.createElement("span");
+            cap.textContent = family.label || family.id;
+            btn.appendChild(cap);
+            btn.addEventListener("click", () => applyFamily(family));
+            host.appendChild(btn);
+        });
+        applyPreviewFlags();
     }
 
     function drawVariants() {
@@ -222,7 +336,7 @@
             });
             host.appendChild(btn);
         });
-        applyGray();
+        applyPreviewFlags();
     }
 
     function buildVaryButtons() {
@@ -242,42 +356,123 @@
         });
     }
 
-    function mixRecipe() {
-        let a = recipe;
-        let b = parentB || kit.altRecipe();
+    function mixWithMap(a, b, fromMap) {
+        let map = fromMap || mixFrom;
         let out = {
-            expression: a.expression,
-            scales: Object.assign({}, a.scales)
+            expression: (a && a.expression) || currentExpression(),
+            scales: Object.assign({}, FeatureKit.defaultScales(), a && a.scales)
         };
         slotKeys().forEach((key) => {
-            out[key] = mixFrom[key] === "B" ? b[key] : a[key];
+            let src = map[key] === "B" ? b : a;
+            out[key] = src[key];
             if (key !== "shell") {
-                let src = mixFrom[key] === "B" ? b : a;
                 out.scales[key] = (src.scales && src.scales[key]) || 1;
             }
         });
-        return { mixed: kit.normalizeRecipe(out), a: a, b: b };
+        return kit.normalizeRecipe(out);
+    }
+
+    function invertMixMap(map) {
+        let out = {};
+        slotKeys().forEach((key) => {
+            out[key] = map[key] === "B" ? "A" : "B";
+        });
+        return out;
+    }
+
+    function familyRecipeFrom(family) {
+        let next = {
+            expression: currentExpression(),
+            scales: Object.assign({}, FeatureKit.defaultScales(), recipe && recipe.scales)
+        };
+        slotKeys().forEach((key) => {
+            let token = familyToken(family, key);
+            if (token) next[key] = token;
+            else if (noneable(key)) next[key] = "none";
+            else if (recipe) next[key] = recipe[key];
+        });
+        return kit.normalizeRecipe(next);
+    }
+
+    function mixRecipe() {
+        let a = recipe;
+        let b = parentB || kit.altRecipe();
+        return { mixed: mixWithMap(a, b, mixFrom), a: a, b: b };
+    }
+
+    function chimeraExampleItems(parts) {
+        let fams = familyList();
+        if (fams.length >= 2) {
+            let items = [];
+            for (let i = 0; i < fams.length; i++) {
+                for (let j = i + 1; j < fams.length; j++) {
+                    let recA = familyRecipeFrom(fams[i]);
+                    let recB = familyRecipeFrom(fams[j]);
+                    items.push({
+                        label: (fams[i].label || fams[i].id) + " + " + (fams[j].label || fams[j].id),
+                        rec: mixWithMap(recA, recB, mixFrom)
+                    });
+                }
+            }
+            return items;
+        }
+        let a = parts.a;
+        let b = parts.b;
+        return [
+            {
+                label: "swap A/B",
+                rec: mixWithMap(a, b, invertMixMap(mixFrom))
+            },
+            {
+                label: "even 3v2",
+                rec: mixWithMap(a, b, {
+                    shell: "A",
+                    ear: "B",
+                    eye: "A",
+                    lowerFace: "B",
+                    hair: "A",
+                    stamp: "A"
+                })
+            },
+            {
+                label: "shell·ears from B",
+                rec: mixWithMap(a, b, {
+                    shell: "B",
+                    ear: "B",
+                    eye: "A",
+                    lowerFace: "A",
+                    hair: "A",
+                    stamp: "A"
+                })
+            }
+        ];
+    }
+
+    function appendChimeraHead(host, label, rec) {
+        let composed = kit.composeSvg(rec, { showMarkers: false });
+        let btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "mini-head" + (recipeEquals(recipe, rec) ? " is-active" : "");
+        btn.appendChild(composed.svg);
+        let cap = document.createElement("span");
+        cap.textContent = label;
+        btn.appendChild(cap);
+        btn.addEventListener("click", () => adoptRecipe(rec));
+        host.appendChild(btn);
     }
 
     function drawChimera() {
         let host = $("chimeraRow");
+        if (!host) return;
         host.innerHTML = "";
         let parts = mixRecipe();
-        [
-            { label: "A", rec: parts.a },
-            { label: "Mix", rec: parts.mixed },
-            { label: "B", rec: parts.b }
-        ].forEach((item) => {
-            let composed = kit.composeSvg(item.rec, { showMarkers: false });
-            let box = document.createElement("div");
-            box.className = "mini-head preview-only";
-            box.appendChild(composed.svg);
-            let cap = document.createElement("span");
-            cap.textContent = item.label === "Mix" ? "chimera" : "parent " + item.label;
-            box.appendChild(cap);
-            host.appendChild(box);
+        appendChimeraHead(host, "parent A", parts.a);
+        appendChimeraHead(host, "chimera", parts.mixed);
+        appendChimeraHead(host, "parent B", parts.b);
+        chimeraExampleItems(parts).forEach((item) => {
+            appendChimeraHead(host, item.label, item.rec);
         });
-        applyGray();
+        applyPreviewFlags();
     }
 
     function drawShellStrip() {
@@ -288,15 +483,22 @@
             let next = Object.assign({}, recipe, { scales: Object.assign({}, recipe.scales) });
             next.shell = shell;
             let composed = kit.composeSvg(next, { showMarkers: false });
-            let box = document.createElement("div");
-            box.className = "mini-head preview-only" + (recipe.shell === shell ? " is-active" : "");
-            box.appendChild(composed.svg);
+            let btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "mini-head" + (recipe.shell === shell ? " is-active" : "");
+            btn.appendChild(composed.svg);
             let cap = document.createElement("span");
             cap.textContent = shell;
-            box.appendChild(cap);
-            host.appendChild(box);
+            btn.appendChild(cap);
+            btn.addEventListener("click", () => {
+                recipe.shell = shell;
+                let sel = $("slot_shell");
+                if (sel) sel.value = shell;
+                renderAll();
+            });
+            host.appendChild(btn);
         });
-        applyGray();
+        applyPreviewFlags();
     }
 
     function buildMixToggles() {
@@ -350,29 +552,32 @@
 
     async function boot() {
         try {
-            await kit.load();
-            recipe = kit.normalizeRecipe({
-                shell: pickToken("shell", "pear"),
-                ear: pickToken("ear", "bat"),
-                eye: pickToken("eye", "round"),
-                lowerFace: pickToken("lowerFace", "elephant"),
+            await kit.load(LAB_CFG.svgPath);
+            let fallbackA = {
+                shell: pickToken("shell", "mechanical"),
+                ear: pickToken("ear", "mechanical"),
+                eye: pickToken("eye", "mechanical"),
+                lowerFace: pickToken("lowerFace", "mechanical"),
                 hair: "none",
-                stamp: pickToken("stamp", "freckles"),
+                stamp: pickToken("stamp", "mechanical"),
                 expression: "happy",
                 scales: FeatureKit.defaultScales()
-            });
-            parentB = kit.normalizeRecipe({
-                shell: pickToken("shell", "point"),
-                ear: pickToken("ear", "seashell"),
-                eye: pickToken("eye", "square"),
-                lowerFace: pickToken("lowerFace", "pig"),
+            };
+            let fallbackB = {
+                shell: pickToken("shell", "sea"),
+                ear: pickToken("ear", "sea"),
+                eye: pickToken("eye", "sea"),
+                lowerFace: pickToken("lowerFace", "sea"),
                 hair: "none",
-                stamp: pickToken("stamp", "heart"),
+                stamp: pickToken("stamp", "sea"),
                 expression: "happy",
                 scales: FeatureKit.defaultScales()
-            });
+            };
+            recipe = kit.normalizeRecipe(LAB_CFG.recipeA || fallbackA);
+            parentB = kit.normalizeRecipe(LAB_CFG.recipeB || fallbackB);
             locks.hair = true;
             buildSlotControls();
+            buildFamilyButtons();
             let hairLock = $("lock_hair");
             if (hairLock) hairLock.checked = true;
             buildVaryButtons();
@@ -382,19 +587,11 @@
                 let el = $(id);
                 if (el) el.addEventListener("change", renderAll);
             });
-            if ($("grayInput")) $("grayInput").addEventListener("change", applyGray);
+            if ($("grayInput")) $("grayInput").addEventListener("change", applyPreviewFlags);
+            if ($("hideHatMouthInput")) $("hideHatMouthInput").addEventListener("change", applyPreviewFlags);
             $("randomBtn").addEventListener("click", () => {
                 recipe = kit.randomRecipe(locks, recipe);
-                slotKeys().forEach((key) => {
-                    let sel = $("slot_" + key);
-                    if (sel) sel.value = recipe[key];
-                    let scale = $("scale_" + key);
-                    if (scale) {
-                        scale.value = String(recipe.scales[key] || 1);
-                        let read = $("scaleRead_" + key);
-                        if (read) read.textContent = Number(scale.value).toFixed(2);
-                    }
-                });
+                writeControlsFromRecipe();
                 renderAll();
             });
             $("resetScaleBtn").addEventListener("click", () => {

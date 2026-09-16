@@ -668,7 +668,8 @@ class PartnerSpeechBubbleController {
             textDiv.style.justifyContent = "center";
             textDiv.style.height = "100%";
             textDiv.style.width = "100%";
-            textDiv.innerHTML = text;
+            // One flex child so spaces around <b>names</b> are not stripped.
+            textDiv.innerHTML = "<span>" + text + "</span>";
             fo.appendChild(textDiv);
             bubbleGroup.appendChild(fo);
 

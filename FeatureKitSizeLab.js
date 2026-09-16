@@ -13,9 +13,9 @@
     };
     const SCALE_KEYS = ["ear", "eye", "lowerFace", "stamp"];
     const HEADS = [
-        { id: "H1", shell: "pear", ear: "mechanical", eye: "round", lowerFace: "pig", stamp: "freckles", hair: "none" },
-        { id: "H2", shell: "point", ear: "mushroom", eye: "square", lowerFace: "shark", stamp: "chevrons", hair: "none" },
-        { id: "H3", shell: "tall", ear: "seashell", eye: "slanted", lowerFace: "elephant", stamp: "smiley", hair: "none" }
+        { id: "H1", shell: "mechanical", ear: "mechanical", eye: "mechanical", lowerFace: "mechanical", stamp: "mechanical", hair: "none" },
+        { id: "H2", shell: "sweet", ear: "sweet", eye: "sweet", lowerFace: "sweet", stamp: "sweet", hair: "none" },
+        { id: "H3", shell: "sea", ear: "sea", eye: "sea", lowerFace: "sea", stamp: "sea", hair: "none" }
     ];
     const PACKS = {
         baseline: { ear: 1, eye: 1, lowerFace: 1, stamp: 1 },

@@ -313,8 +313,40 @@ class BasicElementsModule {
         }
 
         if (this.Fennimal) {
+            this.unbind_kit_stamp_click();
             freeze_fennimal_decorative_animations(this.Fennimal);
         }
+    }
+
+    unbind_kit_stamp_click() {
+        if (this.Fennimal && this._kitStampClickHandler) {
+            this.Fennimal.removeEventListener("pointerdown", this._kitStampClickHandler);
+        }
+        this._kitStampClickHandler = null;
+    }
+
+    kit_stamp_click_is_on_hat(event) {
+        if (!this.Fennimal || !event) return false;
+        let hat = this.Fennimal.getElementsByClassName("hat")[0];
+        if (!hat) return false;
+        let node = event.target;
+        while (node && node !== this.Fennimal) {
+            if (node === hat || (node.classList && node.classList.contains("hat"))) return true;
+            node = node.parentNode;
+        }
+        return false;
+    }
+
+    bind_kit_stamp_click() {
+        this.unbind_kit_stamp_click();
+        if (!this.Fennimal || typeof play_kit_stamp_press !== "function") return;
+        if (typeof kit_stamp_nodes !== "function" || !kit_stamp_nodes(this.Fennimal).length) return;
+        this._kitStampClickHandler = (event) => {
+            if (this.character_animation_frozen) return;
+            if (this.kit_stamp_click_is_on_hat(event)) return;
+            play_kit_stamp_press(this.Fennimal);
+        };
+        this.Fennimal.addEventListener("pointerdown", this._kitStampClickHandler);
     }
 
     setup_character_animation() {
@@ -346,7 +378,12 @@ class BasicElementsModule {
 
         window.addEventListener('pointermove', this.gaze_tracker);
 
-        if (typeof apply_kit_ear_wiggle === "function") apply_kit_ear_wiggle(this.Fennimal);
+        if (typeof apply_kit_closeup_decorations === "function") {
+            apply_kit_closeup_decorations(this.Fennimal);
+        } else if (typeof apply_kit_ear_wiggle === "function") {
+            apply_kit_ear_wiggle(this.Fennimal);
+        }
+        this.bind_kit_stamp_click();
 
         this.animation_start_time = performance.now();
         this.animation_frame_id = requestAnimationFrame((t) => this.render_character_frame(t));
@@ -709,6 +746,7 @@ class BasicElementsModule {
 
     clean_up() {
         // Kill the life support first so late RAF/pointer callbacks cannot resurrect nodes.
+        this.unbind_kit_stamp_click();
         if (this.gaze_tracker) window.removeEventListener('pointermove', this.gaze_tracker);
         if (this.animation_frame_id) cancelAnimationFrame(this.animation_frame_id);
         this.gaze_tracker = null;
@@ -3365,17 +3403,27 @@ class GeneralTrialController {
     // --- SCENARIO BRANCHING LOGIC ---
 
     async appear_fennimal_with_name_prompt() {
-        if (this.basics.Fennimal) return;
-        await this.basics.create_and_appear_Fennimal(
-            this.basics.ItemLayers.Main,
-            0.4 * this.basics.W,
-            0.8 * this.basics.H,
-            1.75,
-            250
-        );
-        AudioCont.play_sound_effect("alert");
-        Interface.Prompt.show_message("This Fennimal is called " + this.FenObj.name);
-        await wait(1000);
+        if (!this.basics.Fennimal) {
+            await this.basics.create_and_appear_Fennimal(
+                this.basics.ItemLayers.Main,
+                0.4 * this.basics.W,
+                0.8 * this.basics.H,
+                1.75,
+                250,
+                this.FenObj.ask_hat ? () => AskHatOverlay.hideWornHat(this) : undefined
+            );
+            AudioCont.play_sound_effect("alert");
+        }
+        if (this.FenObj.ask_name) {
+            await TypedNameAskOverlay.run(this);
+        } else {
+            Interface.Prompt.show_message("This Fennimal is called " + this.FenObj.name);
+            await wait(1000);
+        }
+        if (this.FenObj.ask_hat) {
+            await AskHatOverlay.run(this);
+            await AskHatOverlay.revealWornHat(this);
+        }
     }
 
     async appear_correct_toy_on_fennimal() {
@@ -7552,9 +7600,33 @@ class PhotoTrialController {
         this.ViewfinderReticle = null;
         this.PolaroidGroup = null;
         this.CloseButton = null;
+        this.PolaroidFrame = null;
 
         this._onPointerMove = null;
         this._onPointerDown = null;
+    }
+
+    isHeadshot() {
+        return this.targetType === "fennimal" && this.FenObj && this.FenObj.photo_target === "head";
+    }
+
+    wantsFaceMatch() {
+        return this.isHeadshot() && this.FenObj && this.FenObj.face_match_after_photo === true;
+    }
+
+    photoLensWidth() {
+        if (this.isHeadshot() && this.params.headshotLensWidth != null) return this.params.headshotLensWidth;
+        return this.params.lensWidth;
+    }
+
+    photoLensHeight() {
+        if (this.isHeadshot() && this.params.headshotLensHeight != null) return this.params.headshotLensHeight;
+        return this.params.lensHeight;
+    }
+
+    photoReticleRadius() {
+        if (this.isHeadshot() && this.params.headshotReticleRadius != null) return this.params.headshotReticleRadius;
+        return this.params.reticleRadius;
     }
 
     getElementHalfWidthSVG(elem) {
@@ -7575,7 +7647,8 @@ class PhotoTrialController {
         p2.y = rect.bottom;
         p1 = p1.matrixTransform(inv);
         p2 = p2.matrixTransform(inv);
-        return Math.max(Math.abs(p2.x - p1.x) / 2, 80);
+        let min = this.isHeadshot() ? 40 : 80;
+        return Math.max(Math.abs(p2.x - p1.x) / 2, min);
     }
 
     getElementHalfHeightSVG(elem) {
@@ -7584,7 +7657,7 @@ class PhotoTrialController {
         let rect = elem.getBoundingClientRect();
         let svg = GenParam.SVGObject;
         if (!svg || !svg.getScreenCTM) {
-            return Math.max(rect.height / 2, 120);
+            return Math.max(rect.height / 2, this.isHeadshot() ? 40 : 120);
         }
 
         let inv = svg.getScreenCTM().inverse();
@@ -7596,7 +7669,8 @@ class PhotoTrialController {
         p2.y = rect.bottom;
         p1 = p1.matrixTransform(inv);
         p2 = p2.matrixTransform(inv);
-        return Math.max(Math.abs(p2.y - p1.y) / 2, 80);
+        let min = this.isHeadshot() ? 40 : 80;
+        return Math.max(Math.abs(p2.y - p1.y) / 2, min);
     }
 
     pickRandomInRange(min, max) {
@@ -7739,6 +7813,22 @@ class PhotoTrialController {
         this.photoTargetElements = [this.basics.Fennimal].filter(Boolean);
     }
 
+    prepareHeadshotScene() {
+        let fennimal = this.basics && this.basics.Fennimal;
+        if (fennimal) {
+            let hat = fennimal.getElementsByClassName("hat")[0];
+            if (hat) {
+                hat.style.opacity = 0;
+                hat.style.pointerEvents = "none";
+            }
+        }
+        if (typeof AskToyOverlay !== "undefined") {
+            AskToyOverlay.cleanUp(this);
+        }
+        let head = fennimal && fennimal.getElementsByClassName("Fennimal_head")[0];
+        this.photoTargetElements = [head || fennimal].filter(Boolean);
+    }
+
     get_target_label() {
         if (this._targetLabelOverride) return this._targetLabelOverride;
         if (this.targetType === "toybox") return this.box.boxname;
@@ -7747,6 +7837,9 @@ class PhotoTrialController {
 
     get_intro_prompt() {
         if (this.targetType === "fennimal") {
+            if (this.isHeadshot()) {
+                return "Please take a close-up of " + this.get_target_label() + "'s face";
+            }
             if (this.FenObj.introduce_name_on_polaroid) {
                 return "Please take a photo of this Fennimal!";
             }
@@ -7757,6 +7850,9 @@ class PhotoTrialController {
 
     get_retry_prompt() {
         if (this.targetType === "fennimal") {
+            if (this.isHeadshot()) {
+                return "Take a close-up of " + this.get_target_label() + "'s face";
+            }
             if (this.FenObj.introduce_name_on_polaroid) {
                 return "Take a photo of this Fennimal";
             }
@@ -7768,6 +7864,9 @@ class PhotoTrialController {
     get_success_prompt() {
         if (this._successPromptOverride) return this._successPromptOverride;
         if (this.targetType === "fennimal") {
+            if (this.isHeadshot()) {
+                return "Nice shot! That's a great close-up of " + this.get_target_label();
+            }
             return "Nice shot! Thats a great photo of " + this.get_target_label();
         }
         return "Nice shot! The " + this.get_target_label() + " looks good.";
@@ -7810,6 +7909,29 @@ class PhotoTrialController {
         }
 
         if (this.targetType === "fennimal") {
+            if (this.isHeadshot()) {
+                let fenIcon = create_Fennimal_SVG_object_head_only(this.FenObj, false, false);
+                fenIcon.querySelectorAll(".prep_element_hidden").forEach((el) => el.remove());
+                fenIcon.style.display = "inherit";
+                freeze_fennimal_decorative_animations(fenIcon);
+                groupScale.appendChild(fenIcon);
+
+                let fenBox = fenIcon.getBBox();
+                let bgRect = groupScale.getElementsByTagName("rect")[0];
+                let frameBox = bgRect ? bgRect.getBBox() : { width: 500, height: 600 };
+                let fenScale = Math.min(
+                    (frameBox.width * 0.78) / Math.max(fenBox.width, 1),
+                    (frameBox.height * 0.72) / Math.max(fenBox.height, 1)
+                );
+                let fenCx = fenBox.x + fenBox.width / 2;
+                let fenCy = fenBox.y + fenBox.height / 2;
+                fenIcon.setAttribute(
+                    "transform",
+                    `translate(${targetCircle.x}, ${targetCircle.y}) scale(${fenScale}) translate(${-fenCx}, ${-fenCy})`
+                );
+                return fenIcon;
+            }
+
             let fenIcon = create_Fennimal_SVG_object(this.FenObj, GenParam.Fennimal_head_size, false);
             fenIcon.querySelectorAll(".prep_element_hidden").forEach((el) => el.remove());
             fenIcon.style.display = "inherit";
@@ -7914,10 +8036,10 @@ class PhotoTrialController {
 
         const stroke = "#fff";
         const strokeW = 5;
-        const r = p.reticleRadius;
+        const r = this.photoReticleRadius();
         const bl = p.bracketLength;
-        const halfLensW = 0.5 * p.lensWidth;
-        const halfLensH = 0.5 * p.lensHeight;
+        const halfLensW = 0.5 * this.photoLensWidth();
+        const halfLensH = 0.5 * this.photoLensHeight();
 
         // Corner brackets relative to lens corners (updated each move via group transform).
         const corners = [
@@ -7979,9 +8101,8 @@ class PhotoTrialController {
     update_viewfinder_at(x, y) {
         const W = this.basics.W;
         const H = this.basics.H;
-        const p = this.params;
-        const halfW = 0.5 * p.lensWidth;
-        const halfH = 0.5 * p.lensHeight;
+        const halfW = 0.5 * this.photoLensWidth();
+        const halfH = 0.5 * this.photoLensHeight();
 
         this.reticlePos = { x, y };
 
@@ -8045,7 +8166,11 @@ class PhotoTrialController {
         this.is_photo_mode = true;
         this.hide_camera_button();
         AudioCont.play_sound_effect("camera_pickup");
-        Interface.Prompt.show_message("Aim at the " + this.get_target_label() + " and click to take a photo");
+        Interface.Prompt.show_message(
+            this.isHeadshot()
+                ? "Aim at " + this.get_target_label() + "'s face and click to take a photo"
+                : "Aim at the " + this.get_target_label() + " and click to take a photo"
+        );
 
         this.reticlePos = { x: 0.5 * this.basics.W, y: 0.5 * this.basics.H };
         this.build_viewfinder();
@@ -8086,7 +8211,7 @@ class PhotoTrialController {
 
         let rx = this.reticlePos.x;
         let ry = this.reticlePos.y;
-        let pad = this.params.reticleRadius * 0.35;
+        let pad = this.photoReticleRadius() * 0.35;
 
         return rx >= (minX - pad) && rx <= (maxX + pad) && ry >= (minY - pad) && ry <= (maxY + pad);
     }
@@ -8145,6 +8270,7 @@ class PhotoTrialController {
             this.PolaroidGroup.remove();
             this.PolaroidGroup = null;
         }
+        this.PolaroidFrame = null;
     }
 
     async show_polaroid(withContents, { awaitClose = false } = {}) {
@@ -8154,7 +8280,12 @@ class PhotoTrialController {
         const H = this.basics.H;
         const p = this.params;
         const cx = 0.5 * W;
-        const cy = p.polaroidCenterY * H;
+        const cy = (this.isHeadshot() && p.headshotPolaroidCenterY != null
+            ? p.headshotPolaroidCenterY
+            : p.polaroidCenterY) * H;
+        const polaroidScale = (this.isHeadshot() && p.headshotPolaroidScale != null)
+            ? p.headshotPolaroidScale
+            : p.polaroidScale;
 
         let groupTranslate = create_SVG_group(0, 0, undefined, "photo_trial_polaroid");
         let groupRotate = create_SVG_group(0, 0, undefined, undefined);
@@ -8171,6 +8302,7 @@ class PhotoTrialController {
             cy,
             1
         );
+        this.PolaroidFrame = frame;
 
         let bgRect = frame.getElementsByTagName("rect")[0];
         if (bgRect) {
@@ -8194,7 +8326,7 @@ class PhotoTrialController {
 
         groupScale.style.transformOrigin = "center";
         groupRotate.style.transformOrigin = `${cx}px ${cy}px`;
-        groupScale.style.transform = `scale(${p.polaroidScale})`;
+        groupScale.style.transform = `scale(${polaroidScale})`;
         groupRotate.style.transform = "rotate(-3deg)";
 
         groupTranslate.style.opacity = 0;
@@ -8268,7 +8400,14 @@ class PhotoTrialController {
             ? this.partner.celebrate_success()
             : Promise.resolve();
 
-        await this.show_polaroid(true, { awaitClose: true });
+        await this.show_polaroid(true, { awaitClose: false });
+        if (this.wantsFaceMatch() && typeof FaceMatchOverlay !== "undefined") {
+            await FaceMatchOverlay.run(this);
+            Interface.Prompt.show_message(this.get_success_prompt());
+        }
+        if (this.PolaroidFrame && this.PolaroidGroup) {
+            await this.attach_polaroid_close_button(this.PolaroidFrame, this.PolaroidGroup);
+        }
         await celebratePromise;
 
         this.remove_polaroid();
@@ -8348,9 +8487,13 @@ class PhotoTrialController {
             // (quiz → place), or immediately if there is no ask_toy quiz.
             if (this.FenObj.ask_toy) {
                 await AskToyOverlay.run(this, { placement: "held" });
-            } else {
+            } else if (!this.isHeadshot()) {
                 this.askToyElement = AskToyOverlay.attachHeldToy(this);
             }
+        }
+
+        if (this.isHeadshot()) {
+            this.prepareHeadshotScene();
         }
 
         Interface.Prompt.show_message(this.get_intro_prompt());

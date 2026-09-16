@@ -1879,6 +1879,10 @@ class InstructionsController {
             && typeof GenParam !== "undefined" && GenParam.FeatureKitSizePilot) {
             copy = Object.assign({}, copy, GenParam.FeatureKitSizePilot);
         }
+        if (this.expCont && this.expCont.currentPhaseType === "feature_kit_fade_pilot"
+            && typeof GenParam !== "undefined" && GenParam.FeatureKitFadePilot) {
+            copy = Object.assign({}, copy, GenParam.FeatureKitSizePilot || {}, GenParam.FeatureKitFadePilot);
+        }
         let title = dayTitle || copy.dayTitle || "Which heads look most alike?";
         document.getElementById("Instructions_Title").innerHTML = title;
 
@@ -2226,7 +2230,9 @@ class InstructionsController {
                     ...baseConfig,
                     type: "fennimal",
                     slumped: false,
-                    mainText: `Please take a photo of ${displayName}`
+                    mainText: trialObj.photo_target === "head"
+                        ? `Please take a close-up of ${displayName}'s face`
+                        : `Please take a photo of ${displayName}`
                 };
 
             case "check_box_contents":

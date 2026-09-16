@@ -14,7 +14,11 @@
  * between-subjects scale pack (baseline / mild / medium), 10 morph-complete
  * 3v2 splits × 3 pairs, one each, no adaptive, no token sampling. Pack is
  * drawn 1/3 in-session and persisted; pin with ?PACK=baseline|mild|medium.
- * No morphing, names, hats, map, or bonus stars.
+ *
+ * Fade mode (`feature_kit_fade_pilot`): same 3-up UI and frozen trio, overlay-fade
+ * probes aimed at feature dominance: same-slot 1v1 at 50 + all cross-slot 1v1
+ * pairs at 50 (count-matched; both polarities). Palette gray, no candle flames.
+ * No adaptive. No morphing, names, hats, map, or bonus stars.
  */
 class FeatureKitPilotController {
     constructor(parentLayer, phaseData, returnfunc, expCont) {
@@ -23,13 +27,23 @@ class FeatureKitPilotController {
         this.returnfunc = returnfunc;
         this.expCont = expCont;
         this.params = (typeof GenParam !== "undefined" && GenParam.FeatureKitPilot) || {};
-        this.size = phaseData.size === true
+        this.fade = phaseData.fade === true
+            || phaseData.mode === "fade"
+            || phaseData.type === "feature_kit_fade_pilot";
+        this.size = !this.fade && (phaseData.size === true
             || phaseData.mode === "size"
-            || phaseData.type === "feature_kit_size_pilot";
-        this.combo = !this.size && (phaseData.combo === true
+            || phaseData.type === "feature_kit_size_pilot");
+        this.combo = !this.fade && !this.size && (phaseData.combo === true
             || phaseData.mode === "combo"
             || phaseData.type === "feature_kit_combo_pilot");
-        if (this.size && typeof GenParam !== "undefined" && GenParam.FeatureKitSizePilot) {
+        if (this.fade && typeof GenParam !== "undefined") {
+            this.params = Object.assign(
+                {},
+                this.params,
+                GenParam.FeatureKitSizePilot || {},
+                GenParam.FeatureKitFadePilot || {}
+            );
+        } else if (this.size && typeof GenParam !== "undefined" && GenParam.FeatureKitSizePilot) {
             this.params = Object.assign({}, this.params, GenParam.FeatureKitSizePilot);
         } else if (this.combo && typeof GenParam !== "undefined" && GenParam.FeatureKitComboPilot) {
             this.params = Object.assign({}, this.params, GenParam.FeatureKitComboPilot);
@@ -37,13 +51,13 @@ class FeatureKitPilotController {
         this.W = GenParam.SVG_width;
         this.H = GenParam.SVG_height;
         this.trialSpeedMs = this._num("trialSpeedMs", this.phaseData.trial_speed || 7500);
-        this.nTokensSampled = this._int("nTokensSampled", this.phaseData.n_tokens_sampled, this.combo || this.size ? 4 : 3);
+        this.nTokensSampled = this._int("nTokensSampled", this.phaseData.n_tokens_sampled, this.combo || this.size || this.fade ? 4 : 3);
         this.nDuelReps = this._int("nDuelReps", this.phaseData.n_duel_reps, 3);
         this.nCatch = this._int("nCatch", this.phaseData.n_catch, 3);
-        this.nAdaptiveDuels = this._int("nAdaptiveDuels", this.phaseData.n_adaptive_duels, this.size ? 0 : 16);
+        this.nAdaptiveDuels = this._int("nAdaptiveDuels", this.phaseData.n_adaptive_duels, this.size || this.fade ? 0 : 16);
         this.skipPractice = this.phaseData.skip_practice === true;
         this.minChoiceMs = this._num("minChoiceMs", 750);
-        this.adaptive = this.size
+        this.adaptive = (this.size || this.fade)
             ? false
             : (this.phaseData.adaptive !== false && this.params.adaptive !== false);
         this.grayscaleFilter = this.params.grayscaleFilter || "grayscale(100%)";
@@ -191,11 +205,15 @@ class FeatureKitPilotController {
         this.phaseData.slot_keys = (this.slotKeys || []).slice();
         this.phaseData.combo = !!this.combo;
         this.phaseData.size = !!this.size;
+        this.phaseData.fade = !!this.fade;
         this.phaseData.pack_id = this.packId;
         this.phaseData.pack_scales = this.packScales;
-        if (this.size) this.phaseData.frozen_heads = JSON.parse(JSON.stringify(this._frozenHeads()));
+        this.phaseData.fade_slots = this.fade ? this._fadeSlots() : null;
+        this.phaseData.planned_count = this._plannedCount();
+        if (this.size || this.fade) this.phaseData.frozen_heads = JSON.parse(JSON.stringify(this._frozenHeads()));
         if (this.combo) this.phaseData.combo_partitions = this._coveragePartitions().map((p) => p.id);
         if (this.combo) this.phaseData.fish_partitions = this._fishPartitions().map((p) => p.id);
+        this._persistProgress();
         if (typeof this.returnfunc === "function") this.returnfunc();
     }
 
@@ -206,7 +224,7 @@ class FeatureKitPilotController {
             return this.kit.tokensForPilot(key).length >= 2;
         });
         if (slotKeys.length < 2) {
-            this._fail("need at least two feature groups with 2+ tokens in Heads features.svg.");
+            this._fail("need at least two feature groups with 2+ overlay themes in Heads features compatible.svg.");
         }
         this.slotKeys = slotKeys;
         this.catalogTokens = {};
@@ -222,7 +240,7 @@ class FeatureKitPilotController {
             && this._catalogsMatch(stored.catalog, this.catalogTokens);
         slotKeys.forEach((key) => {
             let pool = this.catalogTokens[key].slice();
-            if (this.size) {
+            if (this.size || this.fade) {
                 sampled[key] = pool.slice();
                 return;
             }
@@ -282,7 +300,7 @@ class FeatureKitPilotController {
                 : { ear: 1, eye: 1, lowerFace: 1, hair: 1, stamp: 1 },
             rec.scales || {}
         );
-        if (this.size && this.packScales) {
+        if ((this.size || this.fade) && this.packScales) {
             rec.scales = Object.assign(
                 (typeof FeatureKit !== "undefined" && FeatureKit.defaultScales)
                     ? FeatureKit.defaultScales()
@@ -310,9 +328,11 @@ class FeatureKitPilotController {
     }
 
     _storeKey(kind) {
-        let prefix = this.size
-            ? "feature_kit_size_pilot_"
-            : (this.combo ? "feature_kit_combo_pilot_" : "feature_kit_pilot_");
+        let prefix = this.fade
+            ? "feature_kit_fade_pilot_"
+            : (this.size
+                ? "feature_kit_size_pilot_"
+                : (this.combo ? "feature_kit_combo_pilot_" : "feature_kit_pilot_"));
         return prefix + kind;
     }
 
@@ -333,6 +353,15 @@ class FeatureKitPilotController {
     }
 
     _assignPack() {
+        if (this.fade) {
+            this.packId = "baseline";
+            this.packScales = (typeof FeatureKit !== "undefined" && FeatureKit.defaultScales)
+                ? FeatureKit.defaultScales()
+                : { ear: 1, eye: 1, lowerFace: 1, hair: 1, stamp: 1 };
+            this.phaseData.pack_id = this.packId;
+            this.phaseData.pack_scales = this.packScales;
+            return;
+        }
         if (!this.size) {
             this.packId = null;
             this.packScales = null;
@@ -376,7 +405,7 @@ class FeatureKitPilotController {
     _frozenHeads() {
         let heads = this.params && this.params.frozenHeads;
         if (!Array.isArray(heads) || heads.length < 3) {
-            this._fail("size pilot needs three frozenHeads in GenParam.FeatureKitSizePilot.");
+            this._fail((this.fade ? "fade" : "size") + " pilot needs three frozenHeads in GenParam.FeatureKitSizePilot.");
         }
         return heads;
     }
@@ -388,6 +417,129 @@ class FeatureKitPilotController {
             { id: heads[0].id + heads[2].id, a: heads[0], b: heads[2] },
             { id: heads[1].id + heads[2].id, a: heads[1], b: heads[2] }
         ];
+    }
+
+    _fadeSlots() {
+        let slots = this.params && this.params.fadeSlots;
+        if (Array.isArray(slots) && slots.length) return slots.slice();
+        return ["ear", "eye", "lowerFace", "stamp"];
+    }
+
+    // Count-matched cross-slot duels: every unique-slot pair, both polarities.
+    _fadeCrossPairs() {
+        return FeatureKit.unorderedPairs(this._fadeSlots());
+    }
+
+    _maskFadeRecipe(rec, liveSlots) {
+        let out = JSON.parse(JSON.stringify(rec || {}));
+        let live = liveSlots || [];
+        this._fadeSlots().forEach((key) => {
+            if (live.indexOf(key) < 0) out[key] = "none";
+        });
+        out.hair = "none";
+        return out;
+    }
+
+    _makeFadeProbe(recipeA, recipeB, mixTowardA, liveSlotsA, liveSlotsB) {
+        let slotsA = Array.isArray(liveSlotsA) ? liveSlotsA.slice() : [];
+        let slotsB = Array.isArray(liveSlotsB) ? liveSlotsB.slice() : slotsA.slice();
+        let union = [];
+        slotsA.concat(slotsB).forEach((slot) => {
+            if (slot && union.indexOf(slot) < 0) union.push(slot);
+        });
+        return {
+            overlayFade: true,
+            mixTowardA: mixTowardA,
+            live_slots: union,
+            live_slots_a: slotsA,
+            live_slots_b: slotsB,
+            recipeA: this._maskFadeRecipe(recipeA, slotsA),
+            recipeB: this._maskFadeRecipe(recipeB, slotsB)
+        };
+    }
+
+    _makeFadeTrial(pair, spec) {
+        let recA = this._frozenRecipe(pair.a);
+        let recB = this._frozenRecipe(pair.b);
+        let liveA = spec.liveSlotsA || spec.liveSlots || [];
+        let liveB = spec.liveSlotsB || spec.liveSlots || liveA;
+        this._adaptiveSeq += 1;
+        return {
+            id: "duel_fade_" + spec.block + "_" + pair.id + "_" + spec.label + "_" + this._adaptiveSeq,
+            kind: "duel",
+            is_practice: false,
+            wave: "coverage",
+            fade: true,
+            fade_block: spec.block,
+            mixTowardA: spec.mixTowardA,
+            mix_label: spec.label,
+            live_slots: (spec.liveSlots || []).slice(),
+            live_slots_a: liveA.slice(),
+            live_slots_b: liveB.slice(),
+            blank_slot: spec.blankSlot || null,
+            only_slot: spec.onlySlot || null,
+            slot_x: liveA[0] || spec.slotX || null,
+            slot_y: liveB[0] || spec.slotY || null,
+            token_x_a: liveA[0] ? recA[liveA[0]] : null,
+            token_y_b: liveB[0] ? recB[liveB[0]] : null,
+            singleton_slot: spec.singletonSlot || null,
+            singleton_parent: spec.singletonParent || null,
+            rest_slots: spec.restSlots ? spec.restSlots.slice() : null,
+            polarity: spec.polarity == null ? null : spec.polarity,
+            pair_id: pair.id,
+            head_a_id: pair.a.id,
+            head_b_id: pair.b.id,
+            pack_id: this.packId,
+            pack_scales: JSON.parse(JSON.stringify(this.packScales)),
+            parentA: recA,
+            parentB: recB,
+            probe: this._makeFadeProbe(recA, recB, spec.mixTowardA, liveA, liveB),
+            left_parent: experimentRandom() < 0.5 ? "A" : "B",
+            tutorial: null
+        };
+    }
+
+    _buildFadePaidTrials() {
+        let paid = [];
+        let slots = this._fadeSlots();
+        this._sizePairs().forEach((pair) => {
+            slots.forEach((slot) => {
+                paid.push(this._makeFadeTrial(pair, {
+                    block: "single",
+                    mixTowardA: 0.5,
+                    label: "50_only_" + slot,
+                    liveSlots: [slot],
+                    liveSlotsA: [slot],
+                    liveSlotsB: [slot],
+                    onlySlot: slot
+                }));
+            });
+            this._fadeCrossPairs().forEach((cross) => {
+                paid.push(this._makeFadeTrial(pair, {
+                    block: "cross",
+                    mixTowardA: 0.5,
+                    label: "50_A_" + cross[0] + "_vs_B_" + cross[1],
+                    liveSlots: [cross[0], cross[1]],
+                    liveSlotsA: [cross[0]],
+                    liveSlotsB: [cross[1]],
+                    slotX: cross[0],
+                    slotY: cross[1],
+                    polarity: 0
+                }));
+                paid.push(this._makeFadeTrial(pair, {
+                    block: "cross",
+                    mixTowardA: 0.5,
+                    label: "50_A_" + cross[1] + "_vs_B_" + cross[0],
+                    liveSlots: [cross[0], cross[1]],
+                    liveSlotsA: [cross[1]],
+                    liveSlotsB: [cross[0]],
+                    slotX: cross[1],
+                    slotY: cross[0],
+                    polarity: 1
+                }));
+            });
+        });
+        return paid;
     }
 
     _frozenRecipe(head) {
@@ -423,6 +575,7 @@ class FeatureKitPilotController {
     }
 
     _queueVersion() {
+        if (this.fade) return 4;
         if (this.size) return 1;
         return this.combo ? 6 : 3;
     }
@@ -611,6 +764,7 @@ class FeatureKitPilotController {
             version: this._queueVersion(),
             combo: !!this.combo,
             size: !!this.size,
+            fade: !!this.fade,
             pack_id: this.packId,
             adaptive: this.adaptive,
             queue: this.queue
@@ -642,6 +796,11 @@ class FeatureKitPilotController {
     }
 
     _maxDuels() {
+        if (this.fade) {
+            let nPairs = this._sizePairs().length;
+            let nSlots = this._fadeSlots().length;
+            return nPairs * (nSlots + this._fadeCrossPairs().length * 2);
+        }
         if (this.size) {
             return this._sizePairs().length * this._morphCompletePartitions(this.slotKeys || []).length;
         }
@@ -918,6 +1077,31 @@ class FeatureKitPilotController {
     }
 
     _makeCatchTrial(wave) {
+        if (this.fade) {
+            let pairs = this._sizePairs();
+            let pair = pairs[this._catchMade % pairs.length];
+            let recA = this._frozenRecipe(pair.a);
+            let recB = this._frozenRecipe(pair.b);
+            let probeIsA = experimentRandom() < 0.5;
+            this._catchMade += 1;
+            return {
+                id: "catch_" + wave + "_" + this._catchMade,
+                kind: "catch",
+                is_practice: false,
+                wave: wave,
+                fade: true,
+                pair_id: pair.id,
+                head_a_id: pair.a.id,
+                head_b_id: pair.b.id,
+                pack_id: this.packId,
+                pack_scales: this.packScales ? JSON.parse(JSON.stringify(this.packScales)) : null,
+                parentA: recA,
+                parentB: recB,
+                probe: probeIsA ? recA : recB,
+                catch_parent: probeIsA ? "A" : "B",
+                left_parent: experimentRandom() < 0.5 ? "A" : "B"
+            };
+        }
         let parentA = this._randomFullRecipe(null);
         let parentB = this._randomFullRecipe(parentA);
         let probeIsA = experimentRandom() < 0.5;
@@ -939,7 +1123,7 @@ class FeatureKitPilotController {
     }
 
     _nextAdaptiveTrial() {
-        if (!this.adaptive || this.size) return null;
+        if (!this.adaptive || this.size || this.fade) return null;
         let nDuel = this._countKind("duel");
         let nCatch = this._countKind("catch");
         let maxDuel = this._maxDuels();
@@ -959,6 +1143,7 @@ class FeatureKitPilotController {
         let wantVersion = this._queueVersion();
         if (stored && stored.version === wantVersion && Array.isArray(stored.queue) && stored.queue.length
             && !!stored.size === !!this.size
+            && !!stored.fade === !!this.fade
             && (!this.size || stored.pack_id === this.packId)
             && this._queueUsesCurrentTokens(stored.queue)) {
             this.queue = stored.queue;
@@ -975,7 +1160,9 @@ class FeatureKitPilotController {
         let coverageReps = this._coverageReps();
         let coverageCatch = this.adaptive ? Math.max(0, this.nCatch - 1) : this.nCatch;
         let paid = [];
-        if (this.size) {
+        if (this.fade) {
+            paid = this._buildFadePaidTrials();
+        } else if (this.size) {
             let parts = this._morphCompletePartitions(this.slotKeys);
             if (!parts.length) this._fail("size coverage is empty (need 2+ feature groups).");
             this._sizePairs().forEach((pair) => {
@@ -1005,7 +1192,7 @@ class FeatureKitPilotController {
         if (firstPaid) firstPaid.tutorial = "paid";
         this._persistQueue();
         console.log(
-            "%c FeatureKitPilot: " + (this.size ? ("size pack=" + this.packId + " ") : (this.combo ? "combo " : "")) +
+            "%c FeatureKitPilot: " + (this.fade ? "fade " : (this.size ? ("size pack=" + this.packId + " ") : (this.combo ? "combo " : ""))) +
             "coverage " + this._countKind("duel") + " duels / " +
             this._countKind("catch") + " catch" +
             (this.adaptive ? (" → adaptive to " + this._plannedCount() + " total") : (" → " + this._plannedCount() + " total")) +
@@ -1047,7 +1234,11 @@ class FeatureKitPilotController {
             let trial = queue[t];
             if (!trial || trial.kind === "practice") continue;
             if (trial.kind === "duel") {
-                if (this.size) {
+                if (this.fade) {
+                    if (!trial.pair_id || trial.mixTowardA == null) return false;
+                    if (trial.fade_block !== "single" && trial.fade_block !== "cross") return false;
+                    if (!Array.isArray(trial.live_slots_a) || !Array.isArray(trial.live_slots_b)) return false;
+                } else if (this.size) {
                     if (!trial.pair_id || !trial.partition_id || trial.pack_id !== this.packId) return false;
                     if (!Array.isArray(trial.set_a) || !Array.isArray(trial.set_b)) return false;
                 } else if (this.combo) {
@@ -1058,14 +1249,18 @@ class FeatureKitPilotController {
                     return false;
                 }
             }
-            let recs = [trial.parentA, trial.parentB, trial.probe];
+            let recs = [trial.parentA, trial.parentB];
+            if (trial.probe && !trial.probe.overlayFade && !trial.probe.shape) recs.push(trial.probe);
+            if (trial.probe && trial.probe.overlayFade) {
+                recs.push(trial.probe.recipeA, trial.probe.recipeB);
+            }
             for (let r = 0; r < recs.length; r++) {
                 let rec = recs[r];
-                if (!rec || rec.shape) continue;
+                if (!rec || rec.shape || rec.overlayFade) continue;
                 for (let s = 0; s < this.slotKeys.length; s++) {
                     let key = this.slotKeys[s];
                     let token = rec[key];
-                    if (!token) continue;
+                    if (!token || token === "none" || Array.isArray(token)) continue;
                     if (!sampled[key] || sampled[key].indexOf(token) < 0) return false;
                 }
             }
@@ -1169,7 +1364,6 @@ class FeatureKitPilotController {
         this._placePrompt(trial);
         this._placeKeys(boxes);
         this._placeTimeBars(boxes);
-        this._placeProgress();
 
         if (trial.tutorial === "practice") {
             this._placeCoach("Press F for the left head, J for the right.", boxes);
@@ -1194,7 +1388,9 @@ class FeatureKitPilotController {
         let fontSize = this.params.promptSize || 34;
         let chipW = Math.min(this.W * 0.72, Math.max(720, text.length * fontSize * 0.52));
         let chipH = 64;
-        let chip = create_SVG_rect(this.W / 2 - chipW / 2, y - chipH / 2, chipW, chipH);
+        let chipX = this.W / 2 - chipW / 2;
+        let chipY = y - chipH / 2;
+        let chip = create_SVG_rect(chipX, chipY, chipW, chipH);
         chip.setAttribute("rx", "18");
         chip.setAttribute("fill", "#f7f3ea");
         chip.setAttribute("fill-opacity", "0.94");
@@ -1210,6 +1406,7 @@ class FeatureKitPilotController {
         el.style.textAnchor = "middle";
         el.style.dominantBaseline = "middle";
         this.layers.Hud.appendChild(el);
+        this._placeProgress({ x: chipX, y: chipY, w: chipW, h: chipH });
     }
 
     _placeCoach(message, boxes) {
@@ -1222,15 +1419,61 @@ class FeatureKitPilotController {
         this.layers.Hud.appendChild(el);
     }
 
-    _placeProgress() {
-        let n = this.plannedCount || this.queue.length;
-        let i = this.currentTrialIndex + 1;
-        let el = create_SVG_text_elem(this.W - 56, 36, i + " / " + n, "kit_pilot_progress");
-        el.style.fontFamily = "'Source Sans 3', 'PT Sans', sans-serif";
-        el.style.fontSize = "20px";
-        el.setAttribute("fill", "#4b5563");
-        el.style.textAnchor = "end";
-        this.layers.Hud.appendChild(el);
+    _placeProgress(promptBox) {
+        promptBox = promptBox || {};
+        let n = this.plannedCount || this.queue.length || 1;
+        let done = Math.max(0, this.currentTrialIndex);
+        let t = n > 0 ? Math.min(1, Math.max(0, done / n)) : 0;
+        let h = promptBox.h || 64;
+        let w = h;
+        let gap = 12;
+        let x = (promptBox.x != null && promptBox.w != null)
+            ? promptBox.x + promptBox.w + gap
+            : this.W - 56 - w;
+        let y = promptBox.y != null ? promptBox.y : 8;
+        let g = create_SVG_group(0, 0, "kit_pilot_progress");
+        g.style.pointerEvents = "none";
+
+        let rect = create_SVG_rect(x, y, w, h);
+        rect.setAttribute("rx", "18");
+        rect.setAttribute("fill", "#f7f3ea");
+        rect.setAttribute("fill-opacity", "0.94");
+        rect.setAttribute("stroke", "#4b5563");
+        rect.setAttribute("stroke-width", "3");
+        g.appendChild(rect);
+
+        let cx = x + w / 2;
+        let cy = y + h / 2;
+        let r = Math.max(12, Math.round(h * 0.36));
+        let track = create_SVG_circle(cx, cy, r);
+        track.setAttribute("fill", "#d4d4d4");
+        g.appendChild(track);
+
+        if (t >= 1) {
+            let full = create_SVG_circle(cx, cy, r);
+            full.setAttribute("fill", "navy");
+            full.style.opacity = "0.7";
+            g.appendChild(full);
+        } else if (t > 0) {
+            let slice = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            slice.setAttribute("d", this._pieSlicePath(cx, cy, r, t));
+            slice.setAttribute("fill", "navy");
+            slice.style.opacity = "0.7";
+            g.appendChild(slice);
+        }
+
+        this.layers.Hud.appendChild(g);
+    }
+
+    _pieSlicePath(cx, cy, r, t) {
+        let a = -Math.PI / 2 + t * 2 * Math.PI;
+        let px = cx + r * Math.cos(a);
+        let py = cy + r * Math.sin(a);
+        let large = t > 0.5 ? 1 : 0;
+        return "M " + cx + " " + cy +
+            " L " + cx + " " + (cy - r) +
+            " A " + r + " " + r + " 0 " + large + " 1 " + px + " " + py +
+            " Z";
     }
 
     _placeWell(box, opts) {
@@ -1247,16 +1490,55 @@ class FeatureKitPilotController {
         return rect;
     }
 
+    _paletteGrayScheme() {
+        let s = (typeof GenParam !== "undefined" && GenParam.MorphTask && GenParam.MorphTask.grayscaleScheme) || {};
+        return {
+            primary_color: s.primary_color || "#c4c4c4",
+            secondary_color: s.secondary_color || "#8e8e8e",
+            tertiary_color: s.tertiary_color || "#5a5a5a",
+            eye_color: s.eye_color || "#3a3a3a"
+        };
+    }
+
+    _applyPaletteGray(root) {
+        if (!root) return;
+        if (typeof set_Fennimal_color_classes === "function") set_Fennimal_color_classes(root);
+        if (typeof set_fill_for_all_elements_in_array !== "function") return;
+        let scheme = this._paletteGrayScheme();
+        set_fill_for_all_elements_in_array(root.getElementsByClassName("Fennimal_primary_color"), scheme.primary_color);
+        set_fill_for_all_elements_in_array(root.getElementsByClassName("Fennimal_secondary_color"), scheme.secondary_color);
+        set_fill_for_all_elements_in_array(root.getElementsByClassName("Fennimal_tertiary_color"), scheme.tertiary_color);
+        set_fill_for_all_elements_in_array(root.getElementsByClassName("Fennimal_eye_color"), scheme.eye_color);
+    }
+
     async _placeHead(spec, box) {
         let holder = create_SVG_group(0, 0, "kit_pilot_head");
-        holder.style.filter = this.grayscaleFilter;
-        holder.setAttribute("filter", "url(#kit_pilot_gray)");
+        if (!this.fade) {
+            holder.style.filter = this.grayscaleFilter;
+            holder.setAttribute("filter", "url(#kit_pilot_gray)");
+        }
         this.layers.Main.appendChild(holder);
         if (spec && spec.shape) {
             this._drawPracticeShape(holder, spec.shape, box);
             return;
         }
-        let composed = this.kit.compose(spec || this.kit.defaultRecipe(), { showMarkers: false });
+        let composed;
+        if (spec && spec.overlayFade) {
+            composed = this.kit.composeOverlayFade(
+                spec.recipeA,
+                spec.recipeB,
+                spec.mixTowardA,
+                { showMarkers: false }
+            );
+        } else {
+            composed = this.kit.compose(spec || this.kit.defaultRecipe(), { showMarkers: false });
+        }
+        if (this.fade) {
+            this._applyPaletteGray(composed.group);
+            if (typeof freeze_fennimal_decorative_animations === "function") {
+                freeze_fennimal_decorative_animations(composed.group);
+            }
+        }
         holder.appendChild(composed.group);
         this._fitHeadToWell(holder, composed.group, box);
     }
@@ -1265,6 +1547,9 @@ class FeatureKitPilotController {
     // not shrink one choice relative to the other — that overall-size cue would
     // bias "which looks more like the top".
     _headFitBox(group) {
+        if (typeof FeatureKit !== "undefined" && FeatureKit.shellSilhouetteBox) {
+            return FeatureKit.shellSilhouetteBox(group);
+        }
         let layer = group && group.querySelector(".kit_shell");
         let sil = null;
         if (layer) {
@@ -1511,6 +1796,17 @@ class FeatureKitPilotController {
     _snapshotHead(spec) {
         if (!spec) return null;
         if (spec.shape) return { shape: spec.shape };
+        if (spec.overlayFade) {
+            return {
+                overlayFade: true,
+                mixTowardA: spec.mixTowardA,
+                live_slots: spec.live_slots ? spec.live_slots.slice() : null,
+                live_slots_a: spec.live_slots_a ? spec.live_slots_a.slice() : null,
+                live_slots_b: spec.live_slots_b ? spec.live_slots_b.slice() : null,
+                recipeA: this._snapshotHead(spec.recipeA),
+                recipeB: this._snapshotHead(spec.recipeB)
+            };
+        }
         return {
             shell: spec.shell || null,
             ear: spec.ear || null,
@@ -1546,6 +1842,22 @@ class FeatureKitPilotController {
                 loserSlots = selectedParent === "A" ? trial.set_b.slice() : trial.set_a.slice();
                 winnerSlot = this._canonSet(winnerSlots);
                 loserSlot = this._canonSet(loserSlots);
+            } else if (trial.fade) {
+                if (trial.fade_block === "cross") {
+                    winnerSlot = selectedParent === "A" ? trial.slot_x : trial.slot_y;
+                    loserSlot = selectedParent === "A" ? trial.slot_y : trial.slot_x;
+                    winnerSlots = winnerSlot ? [winnerSlot] : null;
+                    loserSlots = loserSlot ? [loserSlot] : null;
+                    winnerToken = selectedParent === "A" ? trial.token_x_a : trial.token_y_b;
+                    loserToken = selectedParent === "A" ? trial.token_y_b : trial.token_x_a;
+                } else {
+                    winnerSlot = trial.only_slot || trial.slot_x || "single";
+                    loserSlot = winnerSlot;
+                    winnerSlots = trial.live_slots ? trial.live_slots.slice() : null;
+                    loserSlots = winnerSlots;
+                    winnerToken = selectedParent === "A" ? trial.token_x_a : trial.token_y_b;
+                    loserToken = selectedParent === "A" ? trial.token_y_b : trial.token_x_a;
+                }
             } else {
                 winnerSlot = selectedParent === "A" ? trial.slot_x : trial.slot_y;
                 loserSlot = selectedParent === "A" ? trial.slot_y : trial.slot_x;
@@ -1590,6 +1902,22 @@ class FeatureKitPilotController {
             loser_token: loserToken,
             combo: !!trial.combo,
             size: !!trial.size || !!this.size,
+            fade: !!trial.fade || !!this.fade,
+            fade_block: trial.fade_block || null,
+            mixTowardA: trial.mixTowardA == null ? null : trial.mixTowardA,
+            mix_label: trial.mix_label || null,
+            live_slots: trial.live_slots || null,
+            live_slots_a: trial.live_slots_a || null,
+            live_slots_b: trial.live_slots_b || null,
+            n_live_a: Array.isArray(trial.live_slots_a) ? trial.live_slots_a.length : null,
+            n_live_b: Array.isArray(trial.live_slots_b) ? trial.live_slots_b.length : null,
+            blank_slot: trial.blank_slot || null,
+            only_slot: trial.only_slot || null,
+            singleton_slot: trial.singleton_slot || null,
+            singleton_parent: trial.singleton_parent || null,
+            rest_slots: trial.rest_slots || null,
+            chose_singleton: trial.singleton_parent ? selectedParent === trial.singleton_parent : null,
+            chose_a: selectedParent === "A",
             pack_id: trial.pack_id || this.packId || null,
             pack_scales: trial.pack_scales || this.packScales || null,
             pair_id: trial.pair_id || null,
@@ -1626,13 +1954,24 @@ class FeatureKitPilotController {
     _persistProgress() {
         let dataCont = this.expCont && this.expCont.dataCont;
         if (!dataCont || !dataCont.experimentData) return;
-        dataCont.experimentData.featureKitPilotProgress = {
+        let payload = {
             answers: JSON.parse(JSON.stringify(this.answers)),
             sampled_tokens: JSON.parse(JSON.stringify(this.sampledTokens || {})),
             catalog_tokens: JSON.parse(JSON.stringify(this.catalogTokens || {})),
             pack_id: this.packId,
-            pack_scales: this.packScales
+            pack_scales: this.packScales ? JSON.parse(JSON.stringify(this.packScales)) : null,
+            fade: !!this.fade,
+            size: !!this.size,
+            combo: !!this.combo,
+            queue_version: this._queueVersion(),
+            planned_count: this._plannedCount(),
+            current_trial_index: this.currentTrialIndex,
+            n_answers: this.answers.length,
+            fade_slots: this.fade ? this._fadeSlots() : null,
+            frozen_heads: (this.size || this.fade) ? JSON.parse(JSON.stringify(this._frozenHeads())) : null
         };
+        dataCont.experimentData.featureKitPilotProgress = payload;
+        if (this.fade) dataCont.experimentData.featureKitFadeResults = payload;
         if (typeof dataCont.storeAllData === "function") dataCont.storeAllData(false);
     }
 

@@ -17,8 +17,16 @@
     }
 
     const DEFAULT_HEADS = ["tomato", "bun", "bell", "cloud"];
+    const KIT_DEFAULT_HEADS = ["mechanical", "sweet", "sea"];
     const DEFAULT_MIXES = [50, 55, 60, 65];
-    const MORPH_KINDS = ["crossfade", "interlace", "mesh", "mesh_landmark", "feature_anchored_mesh", "layer_morph", "mesh_shell", "composite_morph", "mesh_regions", "mean_shape", "beier_neely", "silhouette"];
+    const SVG_MORPH_KINDS = ["kit", "overlay_fade"];
+    const MORPH_KINDS = ["kit", "overlay_fade", "crossfade", "split", "interlace", "mesh", "mesh_landmark", "feature_anchored_mesh", "layer_morph", "mesh_shell", "composite_morph", "mesh_regions", "mean_shape", "beier_neely", "silhouette"];
+    const SHELVED_MORPH_KINDS = ["interlace", "mesh", "mesh_landmark", "feature_anchored_mesh", "layer_morph", "mesh_shell", "composite_morph", "mesh_regions", "mean_shape"];
+    const RASTER_MORPH_KINDS = MORPH_KINDS.filter((k) => SVG_MORPH_KINDS.indexOf(k) < 0);
+    // Live semantic_learning_kit jumble: shell + eyes + stamp vs ears + mouth.
+    const KIT_EVEN_3_SLOTS = ["shell", "eye", "stamp"];
+    const KIT_EVEN_2_SLOTS = ["ear", "lowerFace"];
+    const KIT_LIVE_JUMBLE = { shell: "A", ear: "B", eye: "A", lowerFace: "B", hair: "A", stamp: "A" };
 
     function MorphLabRenderer() {
         this.params = Object.assign({}, (typeof GenParam !== "undefined" && GenParam.MorphTask) || {});
@@ -48,10 +56,9 @@
         let kind = morph;
         if (MORPH_KINDS.indexOf(kind) < 0) kind = "crossfade";
 
-        let raw = await Promise.all([
-            this._meshRasterSource(trial.targetFen, schemes.target),
-            this._meshRasterSource(trial.otherFen, schemes.other)
-        ]);
+        let raw = await this._loadMorphRasterPair(
+            trial.targetFen, schemes.target, trial.otherFen, schemes.other
+        );
 
         let threshold = Math.max(1, Math.min(255, Math.round(this._num("meshAlphaThreshold", 18))));
         let aligned = this._alignMorphSources(raw[0], raw[1], size, threshold);
@@ -317,9 +324,9 @@
         return n ? sum / n : null;
     }
 
-    async function loadHeadTemplates() {
-        if (document.getElementById("All_Heads")) return;
-
+    function ensureTemplateLayer() {
+        let allHeads = document.getElementById("All_Heads");
+        if (allHeads) return allHeads;
         let ns = "http://www.w3.org/2000/svg";
         let svg = document.createElementNS(ns, "svg");
         svg.setAttribute("width", "0");
@@ -328,14 +335,19 @@
         svg.style.left = "-9999px";
         svg.style.top = "0";
         svg.style.overflow = "hidden";
-
         let templates = document.createElementNS(ns, "g");
         templates.id = "Fennimal_Templates_Layer";
-        let allHeads = document.createElementNS(ns, "g");
+        allHeads = document.createElementNS(ns, "g");
         allHeads.id = "All_Heads";
         templates.appendChild(allHeads);
         svg.appendChild(templates);
         document.body.appendChild(svg);
+        return allHeads;
+    }
+
+    async function loadHeadTemplates() {
+        let allHeads = ensureTemplateLayer();
+        if (document.getElementById("Fennimal_head_tomato")) return;
 
         let hidden = document.createElement("div");
         hidden.style.display = "none";
@@ -359,6 +371,127 @@
         hidden.remove();
     }
 
+    function reverseKitJumble(jumble) {
+        let out = {};
+        Object.keys(jumble || {}).forEach((slot) => {
+            let v = jumble[slot];
+            out[slot] = v === "A" ? "B" : (v === "B" ? "A" : v);
+        });
+        return out;
+    }
+
+    function prettySlots(keys) {
+        return (keys || []).map((k) => k === "lowerFace" ? "mouth" : k).join(" · ");
+    }
+
+    function kitJumbleHint(jumble, headA, headB) {
+        let fromA = [];
+        let fromB = [];
+        Object.keys(jumble || {}).forEach((slot) => {
+            if (slot === "hair") return;
+            if (jumble[slot] === "A") fromA.push(slot);
+            else if (jumble[slot] === "B") fromB.push(slot);
+        });
+        return prettySlots(fromA) + " \u2190 " + headA + "  ·  " + prettySlots(fromB) + " \u2190 " + headB;
+    }
+
+    function mixTowardAFromColumn(col) {
+        if (!col || col.mix === 50 || !col.target) return 0.5;
+        let t = col.mix / 100;
+        return col.target === "B" ? (1 - t) : t;
+    }
+
+    function familyRecipeFor(theme) {
+        if (typeof FeatureKit === "undefined") {
+            throw new Error("FeatureKit.js is required for overlay kit morphs.");
+        }
+        return FeatureKit.shared().normalizeRecipe(FeatureKit.shared().familyRecipe(theme));
+    }
+
+    async function loadKitFamilies(themes) {
+        if (typeof FeatureKit === "undefined") {
+            throw new Error("FeatureKit.js is required for overlay kit morphs.");
+        }
+        ensureTemplateLayer();
+        let kit = FeatureKit.shared();
+        await kit.ensureLoaded();
+        let recipes = {};
+        (themes || []).forEach((theme) => {
+            recipes[theme] = familyRecipeFor(theme);
+        });
+        kit.registerRoster(recipes);
+        return kit;
+    }
+
+    function prepareKitThumb(svg, opts) {
+        if (!svg) return svg;
+        opts = opts || {};
+        if (opts.candles !== false && typeof apply_kit_candle_flames === "function") {
+            apply_kit_candle_flames(svg, { dance: false, lit: true });
+        }
+        if (typeof freeze_fennimal_decorative_animations === "function") {
+            freeze_fennimal_decorative_animations(svg);
+        }
+        svg.classList.add("morph-output", "morph-output-kit");
+        svg.setAttribute("width", "188");
+        svg.setAttribute("height", "188");
+        svg.removeAttribute("xmlns");
+        return svg;
+    }
+
+    function applyKitPaletteGray(svg) {
+        if (!svg) return svg;
+        if (typeof set_Fennimal_color_classes === "function") set_Fennimal_color_classes(svg);
+        let s = (typeof GenParam !== "undefined" && GenParam.MorphTask && GenParam.MorphTask.grayscaleScheme) || {};
+        let scheme = {
+            primary_color: s.primary_color || "#c4c4c4",
+            secondary_color: s.secondary_color || "#8e8e8e",
+            tertiary_color: s.tertiary_color || "#5a5a5a",
+            eye_color: s.eye_color || "#3a3a3a"
+        };
+        if (typeof set_fill_for_all_elements_in_array !== "function") {
+            svg.style.filter = "grayscale(100%)";
+            return svg;
+        }
+        set_fill_for_all_elements_in_array(svg.getElementsByClassName("Fennimal_primary_color"), scheme.primary_color);
+        set_fill_for_all_elements_in_array(svg.getElementsByClassName("Fennimal_secondary_color"), scheme.secondary_color);
+        set_fill_for_all_elements_in_array(svg.getElementsByClassName("Fennimal_tertiary_color"), scheme.tertiary_color);
+        set_fill_for_all_elements_in_array(svg.getElementsByClassName("Fennimal_eye_color"), scheme.eye_color);
+        return svg;
+    }
+
+    function composeKitThumb(recipe, gray, paletteGray) {
+        let kit = FeatureKit.shared();
+        let composed = kit.composeSvg(recipe, { showMarkers: false, width: "188", height: "188" });
+        prepareKitThumb(composed.svg);
+        if (gray) {
+            if (paletteGray) applyKitPaletteGray(composed.svg);
+            else composed.svg.style.filter = "grayscale(100%)";
+        }
+        return composed.svg;
+    }
+
+    function composeOverlayFadeThumb(headA, headB, mixTowardA, gray) {
+        let kit = FeatureKit.shared();
+        let composed = kit.composeOverlayFadeSvg(
+            familyRecipeFor(headA),
+            familyRecipeFor(headB),
+            mixTowardA,
+            { showMarkers: false, width: "188", height: "188" }
+        );
+        prepareKitThumb(composed.svg, { candles: false });
+        composed.svg.classList.add("morph-output-overlay-fade");
+        if (gray) applyKitPaletteGray(composed.svg);
+        return composed.svg;
+    }
+
+    function mixKitPair(headA, headB, jumble) {
+        let recipes = {};
+        recipes.A = familyRecipeFor(headA);
+        recipes.B = familyRecipeFor(headB);
+        return FeatureKit.mixFromSlotMap(recipes, jumble);
+    }
+
     function assertHeadsExist(heads) {
         let missing = heads.filter((h) => !document.getElementById("Fennimal_head_" + h));
         if (missing.length) {
@@ -369,6 +502,9 @@
     function readUrlConfig() {
         try {
             let params = new URL(window.location.href).searchParams;
+            if (params.get("source") === "svg" || params.get("source") === "kit") {
+                document.getElementById("sourceInput").value = params.get("source");
+            }
             if (params.get("heads")) {
                 document.getElementById("headsInput").value = params.get("heads");
             }
@@ -377,6 +513,9 @@
             }
             if (params.get("blind") === "1") {
                 document.getElementById("blindInput").checked = true;
+            }
+            if (params.get("gray") === "0") {
+                document.getElementById("grayInput").checked = false;
             }
             let morphs = params.get("morphs");
             if (morphs) {
@@ -392,12 +531,12 @@
         let img = document.createElement("img");
         img.src = canvas.toDataURL("image/png");
         img.alt = "";
-        img.width = 104;
-        img.height = 104;
+        img.width = THUMB_PX;
+        img.height = THUMB_PX;
         return img;
     }
 
-    const THUMB_PX = 104;
+    const THUMB_PX = 188;
 
     function canvasToDisplay(canvas, morphKind) {
         if (morphKind === "interlace") {
@@ -423,9 +562,10 @@
     function makeCell(labelText, visual, extraClass, hint) {
         let cell = document.createElement("div");
         cell.className = "morph-cell" + (extraClass ? " " + extraClass : "");
+        visual.setAttribute("title", "Click to enlarge");
         cell.appendChild(visual);
         let label = document.createElement("div");
-        label.className = "cell-label" + (extraClass === "parent" ? " parent-label" : "");
+        label.className = "cell-label" + (/\bparent\b/.test(extraClass || "") ? " parent-label" : "");
         label.textContent = labelText;
         if (hint) {
             let span = document.createElement("span");
@@ -442,13 +582,28 @@
         let gridRoot = document.getElementById("gridRoot");
         gridRoot.innerHTML = "";
         let pairs = orderedPairs(options.heads);
-        let columns = ladderColumns(options.mixes);
-        let total = pairs.length * options.morphs.length * (2 + columns.length);
+        let kitMorphs = options.morphs.filter((m) => m === "kit");
+        let fadeMorphs = options.morphs.filter((m) => m === "overlay_fade");
+        let rasterMorphs = options.morphs.filter((m) => m !== "kit" && m !== "overlay_fade");
+        let rasterColumns = ladderColumns(options.mixes);
+        let kitColumns = [
+            { id: "E", jumble: KIT_LIVE_JUMBLE, label: "E · 3-side A", three: "A" },
+            { id: "Ep", jumble: reverseKitJumble(KIT_LIVE_JUMBLE), label: "E\u2032 · 3-side B", three: "B" }
+        ];
+        let total = pairs.length * (
+            (kitMorphs.length ? ((options.showParents ? 2 : 0) + kitColumns.length) : 0)
+            + (fadeMorphs.length ? ((options.showParents ? 2 : 0) + rasterColumns.length) : 0)
+            + (rasterMorphs.length ? (2 + rasterColumns.length * rasterMorphs.length) : 0)
+        );
         let done = 0;
 
         function tick(msg) {
             done++;
-            options.onStatus("Rendering " + done + " / " + total + (msg ? " — " + msg : ""));
+            options.onStatus("Rendering " + done + " / " + Math.max(1, total) + (msg ? " — " + msg : ""));
+        }
+
+        if (kitMorphs.length || fadeMorphs.length || options.source === "kit") {
+            await loadKitFamilies(options.heads);
         }
 
         for (let pi = 0; pi < pairs.length; pi++) {
@@ -461,24 +616,127 @@
             let title = document.createElement("h2");
             title.className = "pair-title";
             title.textContent = headA + " \u00d7 " + headB;
+            if (kitMorphs.length) {
+                let note = document.createElement("div");
+                note.className = "jumble-chip";
+                note.textContent = "Live split: " + prettySlots(KIT_EVEN_3_SLOTS) + " vs " + prettySlots(KIT_EVEN_2_SLOTS) + ". Reverse swaps every slot.";
+                title.appendChild(note);
+            }
+            if (fadeMorphs.length) {
+                let note = document.createElement("div");
+                note.className = "jumble-chip";
+                note.textContent = "Overlay fade: one baseline shell (no stacked textures). Unique frills swing toward either parent.";
+                title.appendChild(note);
+            }
             pairBlock.appendChild(title);
 
-            let parentA = await renderer.renderParentCanvas(headA);
-            tick(headA);
-            let parentB = await renderer.renderParentCanvas(headB);
-            tick(headB);
+            let parentA = null;
+            let parentB = null;
+            let parentACtx = null;
+            let parentBCtx = null;
+            if (rasterMorphs.length) {
+                parentA = await renderer.renderParentCanvas(headA);
+                tick(headA);
+                parentB = await renderer.renderParentCanvas(headB);
+                tick(headB);
+                parentACtx = parentA.getContext("2d").getImageData(0, 0, parentA.width, parentA.height).data;
+                parentBCtx = parentB.getContext("2d").getImageData(0, 0, parentB.width, parentB.height).data;
+            }
 
-            let parentACtx = parentA.getContext("2d").getImageData(0, 0, parentA.width, parentA.height).data;
-            let parentBCtx = parentB.getContext("2d").getImageData(0, 0, parentB.width, parentB.height).data;
+            if (kitMorphs.length) {
+                let methodBlock = document.createElement("div");
+                methodBlock.className = "method-block";
+                let methodTitle = document.createElement("h3");
+                methodTitle.className = "method-title";
+                methodTitle.textContent = "kit jumble";
+                methodBlock.appendChild(methodTitle);
 
-            for (let mi = 0; mi < options.morphs.length; mi++) {
-                let morph = options.morphs[mi];
+                let row = document.createElement("div");
+                row.className = "ladder-row";
+                let gray = !!options.gray;
+
+                if (options.showParents) {
+                    row.appendChild(makeCell(headA, composeKitThumb(familyRecipeFor(headA), gray), "parent kit"));
+                    tick(headA + " kit parent");
+                }
+                kitColumns.forEach((col, ci) => {
+                    let mixed = mixKitPair(headA, headB, col.jumble);
+                    let hint = options.blind ? "" : kitJumbleHint(col.jumble, headA, headB);
+                    let label = options.blind ? "???" : col.label;
+                    row.appendChild(makeCell(label, composeKitThumb(mixed, gray), "kit", hint));
+                    let cell = row.lastElementChild;
+                    cell.dataset.ladderOrder = String(ci);
+                    cell.dataset.truth = col.label;
+                    cell.dataset.hint = hint;
+                    cell.dataset.target = col.three === "B" ? headB : headA;
+                    cell.dataset.morph = "kit";
+                    tick(col.label);
+                });
+                if (options.showParents) {
+                    row.appendChild(makeCell(headB, composeKitThumb(familyRecipeFor(headB), gray), "parent kit"));
+                    tick(headB + " kit parent");
+                }
+                methodBlock.appendChild(row);
+                pairBlock.appendChild(methodBlock);
+            }
+
+            if (fadeMorphs.length) {
+                let methodBlock = document.createElement("div");
+                methodBlock.className = "method-block";
+                let methodTitle = document.createElement("h3");
+                methodTitle.className = "method-title";
+                methodTitle.textContent = "overlay fade";
+                methodBlock.appendChild(methodTitle);
+
+                let row = document.createElement("div");
+                row.className = "ladder-row";
+                let gray = !!options.gray;
+
+                if (options.showParents) {
+                    row.appendChild(makeCell(headA, composeKitThumb(familyRecipeFor(headA), gray, true), "parent kit"));
+                    tick(headA + " overlay-fade parent");
+                }
+                rasterColumns.forEach((col, ci) => {
+                    let mixTowardA = mixTowardAFromColumn(col);
+                    let targetHead = col.target === "B" ? headB : headA;
+                    if (col.mix === 50) targetHead = headA;
+                    let hint = options.blind
+                        ? ""
+                        : ("no shell texture · " + headA + " " + Math.round(mixTowardA * 100)
+                            + "% · " + headB + " " + Math.round((1 - mixTowardA) * 100) + "%");
+                    let label = options.blind ? "???" : col.label;
+                    row.appendChild(makeCell(
+                        label,
+                        composeOverlayFadeThumb(headA, headB, mixTowardA, gray),
+                        "kit overlay-fade",
+                        hint
+                    ));
+                    let cell = row.lastElementChild;
+                    cell.dataset.ladderOrder = String(ci);
+                    cell.dataset.truth = col.label;
+                    cell.dataset.hint = hint;
+                    cell.dataset.target = targetHead;
+                    cell.dataset.morph = "overlay_fade";
+                    tick(col.label + " overlay_fade");
+                });
+                if (options.showParents) {
+                    row.appendChild(makeCell(headB, composeKitThumb(familyRecipeFor(headB), gray, true), "parent kit"));
+                    tick(headB + " overlay-fade parent");
+                }
+                methodBlock.appendChild(row);
+                pairBlock.appendChild(methodBlock);
+            }
+
+            for (let mi = 0; mi < rasterMorphs.length; mi++) {
+                let morph = rasterMorphs[mi];
                 let methodBlock = document.createElement("div");
                 methodBlock.className = "method-block";
 
                 let methodTitle = document.createElement("h3");
                 methodTitle.className = "method-title";
-                methodTitle.textContent = morph;
+                methodTitle.textContent = (morph === "crossfade" && options.source === "kit")
+                    ? "crossfade (locked overlap)"
+                    : (morph === "split" ? "split (left/right clip)" : morph);
                 methodBlock.appendChild(methodTitle);
 
                 let row = document.createElement("div");
@@ -488,8 +746,8 @@
                     row.appendChild(makeCell(headA, canvasToImg(parentA), "parent"));
                 }
 
-                for (let ci = 0; ci < columns.length; ci++) {
-                    let col = columns[ci];
+                for (let ci = 0; ci < rasterColumns.length; ci++) {
+                    let col = rasterColumns[ci];
                     let targetHead = col.target === "B" ? headB : headA;
                     if (col.mix === 50) targetHead = headA;
 
@@ -534,14 +792,24 @@
         return gridRoot;
     }
 
+    function svgToImage(svg) {
+        return new Promise((resolve, reject) => {
+            let xml = new XMLSerializer().serializeToString(svg);
+            let img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error("Could not rasterize kit SVG for export."));
+            img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(xml);
+        });
+    }
+
     async function exportSheet() {
         let gridRoot = document.getElementById("gridRoot");
         let blocks = gridRoot.querySelectorAll(".pair-block");
         if (!blocks.length) return;
 
         let pad = 24;
-        let cell = 120;
-        let labelH = 28;
+        let cell = 200;
+        let labelH = 36;
         let rowH = cell + labelH + 12;
         let maxCols = 0;
         blocks.forEach((block) => {
@@ -553,7 +821,7 @@
         let sheetW = pad * 2 + maxCols * (cell + 8);
         let sheetH = pad * 2;
         blocks.forEach((block) => {
-            sheetH += 36;
+            sheetH += 48;
             sheetH += block.querySelectorAll(".method-block").length * rowH;
             sheetH += 16;
         });
@@ -571,7 +839,7 @@
 
         for (let bi = 0; bi < blocks.length; bi++) {
             let block = blocks[bi];
-            ctx.fillText(block.querySelector(".pair-title").textContent, pad, y + 14);
+            ctx.fillText(block.querySelector(".pair-title").textContent.split("\n")[0], pad, y + 14);
             y += 32;
 
             let methods = block.querySelectorAll(".method-block");
@@ -586,9 +854,16 @@
                 let cells = row.querySelectorAll(".morph-cell");
                 let x = pad;
                 for (let ci = 0; ci < cells.length; ci++) {
-                    let img = cells[ci].querySelector("img");
-                    if (img && img.complete) {
-                        ctx.drawImage(img, x, y, cell, cell);
+                    let visual = cells[ci].querySelector("canvas, img, svg");
+                    if (visual) {
+                        if (visual.tagName === "svg" || visual.tagName === "SVG") {
+                            try {
+                                let img = await svgToImage(visual);
+                                ctx.drawImage(img, x, y, cell, cell);
+                            } catch (err) { /* skip */ }
+                        } else if (visual.complete !== false) {
+                            ctx.drawImage(visual, x, y, cell, cell);
+                        }
                     }
                     let label = cells[ci].querySelector(".cell-label");
                     ctx.font = "11px 'Source Sans 3', sans-serif";
@@ -668,12 +943,52 @@
         restoreOrderBtn.disabled = !hasGrid || !anyRowShuffled();
     }
 
+    function currentSource() {
+        let el = document.getElementById("sourceInput");
+        return el && el.value === "svg" ? "svg" : "kit";
+    }
+
+    function syncSourceUi(resetHeads) {
+        let kit = currentSource() === "kit";
+        let headsLabel = document.getElementById("headsLabel");
+        let headsInput = document.getElementById("headsInput");
+        let mixesField = document.getElementById("mixesField");
+        let grayToggle = document.getElementById("grayToggle");
+        if (headsLabel) {
+            headsLabel.textContent = kit ? "Families (comma-separated)" : "Heads (comma-separated SVG ids)";
+        }
+        if (mixesField) mixesField.hidden = false;
+        if (grayToggle) grayToggle.hidden = !kit;
+        document.querySelectorAll("[data-kit-method]").forEach((el) => { el.hidden = !kit; });
+        document.querySelectorAll("[data-raster-method]").forEach((el) => {
+            // Raster methods still work on registered overlay heads; keep them visible
+            // but unchecked in kit mode so the live jumble is the default.
+        });
+        if (resetHeads && headsInput) {
+            headsInput.value = kit ? KIT_DEFAULT_HEADS.join(",") : DEFAULT_HEADS.join(",");
+        }
+        let kitBox = document.querySelector('input[name="morph"][value="kit"]');
+        let meshBox = document.querySelector('input[name="morph"][value="feature_anchored_mesh"]');
+        if (kit && kitBox) kitBox.checked = true;
+        if (!kit && kitBox) kitBox.checked = false;
+        if (!kit && meshBox) {
+            let anyRaster = Array.from(document.querySelectorAll("[data-raster-method] input")).some((el) => el.checked);
+            if (!anyRaster) meshBox.checked = true;
+        }
+        if (kit && resetHeads) {
+            document.querySelectorAll("[data-raster-method] input").forEach((el) => { el.checked = false; });
+            let fadeBox = document.querySelector('input[name="morph"][value="overlay_fade"]');
+            if (fadeBox) fadeBox.checked = false;
+        }
+    }
+
     async function init() {
         if (typeof GenParam === "undefined") {
             window.GenParam = new GENERALPARAM();
         }
 
         readUrlConfig();
+        syncSourceUi(false);
 
         let statusLine = document.getElementById("statusLine");
         let renderBtn = document.getElementById("renderBtn");
@@ -681,11 +996,23 @@
         let restoreOrderBtn = document.getElementById("restoreOrderBtn");
         let revealBtn = document.getElementById("revealBtn");
         let exportBtn = document.getElementById("exportBtn");
+        let sourceInput = document.getElementById("sourceInput");
 
-        statusLine.textContent = "Loading head templates…";
+        sourceInput.addEventListener("change", () => {
+            syncSourceUi(true);
+        });
+
+        statusLine.textContent = currentSource() === "kit"
+            ? "Loading overlay kit…"
+            : "Loading head templates…";
 
         try {
-            await loadHeadTemplates();
+            if (currentSource() === "kit") {
+                let heads = parseList(document.getElementById("headsInput").value, KIT_DEFAULT_HEADS);
+                await loadKitFamilies(heads);
+            } else {
+                await loadHeadTemplates();
+            }
             statusLine.textContent = "Ready. Adjust settings and generate.";
         } catch (err) {
             statusLine.textContent = "Failed to load heads: " + err.message;
@@ -700,25 +1027,39 @@
             shuffleBtn.disabled = true;
             restoreOrderBtn.disabled = true;
 
-            let heads = parseList(document.getElementById("headsInput").value, DEFAULT_HEADS);
+            let source = currentSource();
+            let fallbackHeads = source === "kit" ? KIT_DEFAULT_HEADS : DEFAULT_HEADS;
+            let heads = parseList(document.getElementById("headsInput").value, fallbackHeads);
             let mixes = parseMixes(document.getElementById("mixesInput").value);
             let morphs = [];
             document.querySelectorAll('input[name="morph"]:checked').forEach((el) => {
+                if (el.closest("[hidden]")) return;
+                if (SHELVED_MORPH_KINDS.indexOf(el.value) >= 0) return;
                 morphs.push(el.value);
             });
-            if (!morphs.length) morphs = ["crossfade"];
+            if (source === "svg") morphs = morphs.filter((m) => m !== "kit" && m !== "overlay_fade");
+            if (!morphs.length) morphs = source === "kit" ? ["kit"] : ["crossfade"];
 
             let blind = document.getElementById("blindInput").checked;
             let showParents = document.getElementById("parentsInput").checked;
+            let gray = !!(document.getElementById("grayInput") && document.getElementById("grayInput").checked);
 
             try {
+                if (source === "kit" || morphs.indexOf("kit") >= 0 || morphs.indexOf("overlay_fade") >= 0) {
+                    await loadKitFamilies(heads);
+                }
+                if (source === "svg" || morphs.some((m) => RASTER_MORPH_KINDS.indexOf(m) >= 0)) {
+                    if (source === "svg") await loadHeadTemplates();
+                }
                 assertHeadsExist(heads);
                 await buildGrid({
+                    source,
                     heads,
                     mixes,
                     morphs,
                     blind,
                     showParents,
+                    gray,
                     onStatus: (msg) => { statusLine.textContent = msg; }
                 });
                 revealBtn.disabled = !blind;
@@ -770,6 +1111,57 @@
             exportSheet().catch((err) => {
                 statusLine.textContent = "Export failed: " + err.message;
             });
+        });
+
+        bindHeadLightbox();
+    }
+
+    function cloneHeadVisual(visual) {
+        if (!visual) return null;
+        if (visual.tagName === "CANVAS") {
+            let copy = document.createElement("canvas");
+            copy.width = visual.width;
+            copy.height = visual.height;
+            copy.className = visual.className;
+            copy.getContext("2d").drawImage(visual, 0, 0);
+            return copy;
+        }
+        return visual.cloneNode(true);
+    }
+
+    function bindHeadLightbox() {
+        let box = document.getElementById("headLightbox");
+        let stage = box && box.querySelector(".head-lightbox-stage");
+        let gridRoot = document.getElementById("gridRoot");
+        if (!box || !stage || !gridRoot) return;
+
+        function closeLightbox() {
+            box.hidden = true;
+            stage.innerHTML = "";
+        }
+
+        gridRoot.addEventListener("click", (e) => {
+            let visual = e.target.closest(".morph-cell canvas, .morph-cell img, .morph-cell svg");
+            if (!visual || visual.closest("#headLightbox")) return;
+            let copy = cloneHeadVisual(visual);
+            if (!copy) return;
+            if (copy.tagName !== "CANVAS") {
+                copy.removeAttribute("width");
+                copy.removeAttribute("height");
+            }
+            copy.style.width = "";
+            copy.style.height = "";
+            stage.innerHTML = "";
+            stage.appendChild(copy);
+            box.hidden = false;
+        });
+
+        box.addEventListener("click", (e) => {
+            if (e.target === box || e.target.closest(".head-lightbox-close")) closeLightbox();
+        });
+
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && !box.hidden) closeLightbox();
         });
     }
 

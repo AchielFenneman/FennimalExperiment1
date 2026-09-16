@@ -904,6 +904,11 @@ GENERALPARAM = function () {
         lensHeight: 480,
         reticleRadius: 36,
         bracketLength: 48,
+        headshotLensWidth: 260,
+        headshotLensHeight: 300,
+        headshotReticleRadius: 28,
+        headshotPolaroidScale: 0.62,
+        headshotPolaroidCenterY: 0.34,
         viewfinderDimOpacity: 0.55,
         flashPeakOpacity: 0.5,
         flashInTime: 70,
@@ -1179,13 +1184,19 @@ GENERALPARAM = function () {
             elephant: "elephant trunk",
             cat: "cat whiskers",
             pig: "pig snout",
-            shark: "shark teeth"
+            shark: "shark teeth",
+            mechanical: "gear snout",
+            sea: "sea snout",
+            sweet: "frosting snout",
+            mushroom: "bearded snout"
         },
         ear: {
             bat: "bat wings",
             seashell: "seashells",
-            mechanical: "robot ears",
-            mushroom: "mushroom caps"
+            sea: "seashell ears",
+            mechanical: "gear ears",
+            mushroom: "mushroom caps",
+            sweet: "candle ears"
         },
         hair: {
             feathers: "feathers",
@@ -1197,7 +1208,11 @@ GENERALPARAM = function () {
             freckles: "freckles",
             heart: "heart cheeks",
             smiley: "smile marks",
-            chevrons: "V-marks"
+            chevrons: "V-marks",
+            mechanical: "bolt cheeks",
+            sea: "sea stamps",
+            sweet: "candy stamps",
+            mushroom: "spore stamps"
         }
     };
 
@@ -1466,22 +1481,32 @@ GENERALPARAM = function () {
         },
         gist: {
             instruction: "Select the option which most accurately describes the answer",
+            instructionWithPortraits: "Click the matching face. Then press Check.",
+            instructionWithPortraitsAndMenus: "Click the matching face and choose the hat. Then press Check.",
             checkLabel: "Check",
             continueLabel: "Continue",
             selectHatLine: "Now select this Fennimal's hat.",
             placeholder: "Choose one…",
             // Linking-feature question copy (hops + join). true = gistDescriptions
             // lines, sampled as now. Anything other than true = generic names
-            // (region map labels; head ids; toy ids). Hats always stay gist.
-            // A hat_binding_task block can override any of these on phaseData.
+            // (region map labels; head ids; toy ids). Hats default to printed
+            // names ("Chef's hat"); set true for the long gist lines.
+            // Kit mouths/ears 4AFC is opt-in; default is 3-line face gist.
+            // Kit hop "head" questions: unlabeled grayscale portraits (3 unique
+            // faces when A/B share a head). Join prompts still use verbal gist.
             use_head_gist_descriptions: true,
             use_region_gist_descriptions: true,
             use_toy_gist_descriptions: true,
+            use_hat_gist_descriptions: false,
+            use_kit_slot_head_gists: false,
+            use_head_portrait_choices: true,
+            portraitTile: 156,
             stems: {
                 head: "What does {subject}'s head look like?",
+                headPortrait: "Which is {subject}'s face?",
                 region: "Where does {subject} live?",
                 toy: "What does {subject} play with?",
-                hat: "What does {subject}'s hat look like?"
+                hat: "Which hat does {subject} wear?"
             }
         },
         join: {
@@ -1519,7 +1544,7 @@ GENERALPARAM = function () {
     }
 
 
-    // Live morph_task: extra-wide two-spot polaroid, static jumble.
+    // Live morph_task: tall polaroid, hat band above a centered chimera.
     // F/J 2AFC icons: phase.response_key_icons = "hats"|"heads"|"names".
     this.MorphTask = {
         trialSpeedMs: 5000,
@@ -1723,6 +1748,10 @@ GENERALPARAM = function () {
         },
         primeNameRadialRadius: 250,
         radialRadius: 250,
+        // Practice name chips orbit the top circle, not the jumble [?].
+        // Radius is clamped so the 12 o'clock chip stays under the HUD.
+        practiceQuizRadius: 168,
+        quizHudGap: 10,
         primeNameIncorrectMs: 1000,
         jumbleFadeMs: 1400,
         primeRevealHoldMs: 1000,
@@ -1732,8 +1761,8 @@ GENERALPARAM = function () {
         identityKeyW: 112,
         identityKeyH: 88,
         identityKeyYFrac: 0.52,
-        identityKeyLeftXFrac: 0.265,
-        identityKeyRightXFrac: 0.735,
+        identityKeyLeftXFrac: 0.22,
+        identityKeyRightXFrac: 0.78,
         identityKeyLetterSize: 40,
         identityHatSlotW: 150,
         identityHatSlotH: 118,
@@ -1751,20 +1780,25 @@ GENERALPARAM = function () {
         flyMs: 650,
         flyScale: 0.35,
         trialFadeMs: 450,
-        polaroidScale: 0.86,
+        polaroidScale: 0.84,
         polaroidX: 0.50,
         polaroidY: 0.50,
         polaroidRotateDeg: -2.5,
-        // Code-drawn frame (local units, before polaroidScale).
-        polaroidFrameW: 800,
-        polaroidFrameH: 740,
-        polaroidWellPadX: 32,
-        polaroidWellPadTop: 36,
-        polaroidWellPadBottom: 118,
+        // Code-drawn frame (local units, before polaroidScale). Wider paper so
+        // kit ears can sit on the margins; jumble shell-fit stays 454 wide so
+        // head size does not grow with the frame.
+        polaroidFrameW: 680,
+        polaroidFrameH: 860,
+        polaroidWellPadX: 88,
+        kitJumbleFitWidth: 454,
+        polaroidWellPadTop: 28,
+        polaroidWellPadBottom: 108,
         polaroidWellRx: 28,
         polaroidPaperRx: 36,
-        primeSlot: { x: 0.02, y: 0.06, w: 0.42, h: 0.70 },
-        jumbleSlot: { x: 0.34, y: 0.06, w: 0.64, h: 0.90 },
+        primeSlot: { x: 0.16, y: 0.025, w: 0.68, h: 0.22 },
+        jumbleSlot: { x: 0.05, y: 0.28, w: 0.90, h: 0.68 },
+        primeHatWidthFrac: 0.78,
+        primeHatHeightFrac: 0.86,
         polaroidPaperFill: "#f4efe4",
         polaroidWellFill: "#e2dfd8",
         polaroidCaptionFill: "#8a8680",
@@ -1871,13 +1905,29 @@ GENERALPARAM = function () {
             medium: { ear: 0.82, eye: 1.22, lowerFace: 0.85, stamp: 1.35 }
         },
         frozenHeads: [
-            { id: "H1", shell: "pear", ear: "mechanical", eye: "round", lowerFace: "pig", stamp: "freckles", hair: "none" },
-            { id: "H2", shell: "point", ear: "mushroom", eye: "square", lowerFace: "shark", stamp: "chevrons", hair: "none" },
-            { id: "H3", shell: "tall", ear: "seashell", eye: "slanted", lowerFace: "elephant", stamp: "smiley", hair: "none" }
+            { id: "H1", shell: "mechanical", ear: "mechanical", eye: "mechanical", lowerFace: "mechanical", stamp: "mechanical", hair: "none" },
+            { id: "H2", shell: "sweet", ear: "sweet", eye: "sweet", lowerFace: "sweet", stamp: "sweet", hair: "none" },
+            { id: "H3", shell: "sea", ear: "sea", eye: "sea", lowerFace: "sea", stamp: "sea", hair: "none" }
         ],
         dayTitle: "Which heads look most alike?",
         dayBody:
             "You'll see three heads at a time. The one on top is made of pieces from the two below.<br><br>" +
+            "Which of the lower heads looks more like the top one? Press <b>F</b> for the left head or <b>J</b> for the right (clicking a side head also works).<br><br>" +
+            "The green bars are a gentle pace cue (about 7 seconds). Even after they run out, please still choose — there is no right or wrong answer.<br><br>" +
+            "We'll start with two practice rounds using simple shapes."
+    };
+
+    // Overlay-fade sitting: same-slot 1v1 at 50 + cross-slot 1v1 at 50 (both polarities).
+    // Launch: ?EXP=feature_kit_fade_pilot&SKIP_INTRO=1
+    this.FeatureKitFadePilot = {
+        nCatch: 3,
+        adaptive: false,
+        nAdaptiveDuels: 0,
+        excludeSlots: ["hair"],
+        fadeSlots: ["ear", "eye", "lowerFace", "stamp"],
+        dayTitle: "Which heads look most alike?",
+        dayBody:
+            "You'll see three heads at a time. The one on top is a mix of the two below — sometimes the same part from each parent, sometimes one part from one parent against a different part from the other.<br><br>" +
             "Which of the lower heads looks more like the top one? Press <b>F</b> for the left head or <b>J</b> for the right (clicking a side head also works).<br><br>" +
             "The green bars are a gentle pace cue (about 7 seconds). Even after they run out, please still choose — there is no right or wrong answer.<br><br>" +
             "We'll start with two practice rounds using simple shapes."

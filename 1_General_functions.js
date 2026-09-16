@@ -9,6 +9,8 @@
 // URL: ?SEED=slides01   (reload → same world)
 //      ?EXP=semantic_learning_kit   (opt-in kit training; default is the live code in 2_Stimulus_data.js)
 //      ?SKIP_INTRO=1    (skip consent / character-creation / overview pages)
+//      ?SKIP_TO_PHASE=morph_task   (drop earlier phases; software QA only)
+//      ?FORCE_NEW_SESSION=1
 // ----------------------------------------------------
 let _experimentRandomFn = Math.random.bind(Math);
 
@@ -66,6 +68,13 @@ function installExperimentSeedFromUrl() {
     if (skip === "1" || skip === "true") {
         window.__SKIP_INTRO__ = true;
         console.log("%c SKIP_INTRO: start instruction pages will be skipped", "color:purple");
+    }
+
+    let skipTo = getUrlSearchParam("SKIP_TO_PHASE");
+    if (skipTo == null || skipTo === "") skipTo = getUrlSearchParam("PHASE");
+    if (skipTo) {
+        window.__SKIP_TO_PHASE__ = String(skipTo).trim();
+        console.log("%c SKIP_TO_PHASE: will start at " + window.__SKIP_TO_PHASE__, "color:purple; font-weight:bold");
     }
 }
 
@@ -909,7 +918,13 @@ function apply_Fennimal_animation_pivots(FennimalSVG) {
 // mirrored artwork and left-of-center shine alone.
 function fennimal_eye_gaze_x_sign(eye) {
     if (!eye || typeof eye.closest !== "function") return 1;
-    return eye.closest("[data-kit-role='eye_right']") ? -1 : 1;
+    // splitPlacedEye keeps the side on data-kit-eye-side and suffixes
+    // data-kit-role (eye_right_orb / _back / _front). Match all of those.
+    if (eye.closest("[data-kit-eye-side='eye_right']")) return -1;
+    let host = eye.closest("[data-kit-role]");
+    if (!host) return 1;
+    let role = host.getAttribute("data-kit-role") || "";
+    return (role === "eye_right" || role.indexOf("eye_right_") === 0) ? -1 : 1;
 }
 
 function apply_fennimal_eye_gaze(eyes, gazeX, gazeY, scale) {
@@ -932,9 +947,25 @@ function freeze_fennimal_decorative_animations(FennimalSVG) {
     if (!FennimalSVG) return;
     FennimalSVG.classList.add("fennimal_pose_frozen");
     FennimalSVG.classList.remove("kit_ear_live", "kit_stamp_live", "kit_stamp_lighting", "kit_stamp_outline_live", "kit_stamp_mood_happy", "kit_stamp_mood_sad");
-    kit_ear_stop_timers(FennimalSVG);
-    kit_ear_strip_motion(FennimalSVG);
-    kit_stamp_strip(FennimalSVG);
+    // Capture clam mood before strip clears host bags.
+    let clamPoses = [];
+    if (typeof kit_clam_hosts === "function") {
+        kit_clam_hosts(FennimalSVG).forEach((host) => {
+            let bag = host._kitClam;
+            clamPoses.push({
+                host: host,
+                open: !(bag && bag.pose === "closed")
+            });
+        });
+    }
+    if (typeof kit_ear_stop_timers === "function") kit_ear_stop_timers(FennimalSVG);
+    if (typeof kit_ear_strip_motion === "function") kit_ear_strip_motion(FennimalSVG);
+    if (typeof kit_stamp_strip === "function") kit_stamp_strip(FennimalSVG);
+    // Settle clam eyes: happy/static = base + open lid + pearl; sad keeps closed.
+    clamPoses.forEach((row) => {
+        if (typeof kit_clam_set_parts === "function") kit_clam_set_parts(row.host, row.open);
+        if (typeof kit_clam_stop_shine === "function") kit_clam_stop_shine(row.host);
+    });
     // Inline fallback so mid-keyframe transforms also settle even if class CSS lags.
     FennimalSVG.querySelectorAll("*").forEach((el) => {
         el.style.animation = "none";
@@ -943,782 +974,9 @@ function freeze_fennimal_decorative_animations(FennimalSVG) {
     });
 }
 
-const KIT_EAR_NS = "http://www.w3.org/2000/svg";
-const KIT_EAR_SPORE_FILLS = ["#FFEA00", "#FF9900", "#FFCC44", "#FF6600"];
-const KIT_EAR_DROP_FILLS = ["#7EB8D4", "#A8D8EA", "#5B9BB8", "#E0F4FF"];
-let kit_stamp_glimmer_seq = 0;
-
-function kit_ear_is_live(root) {
-    return !!(root
-        && root.isConnected
-        && root.classList
-        && root.classList.contains("kit_ear_live")
-        && !root.classList.contains("fennimal_pose_frozen"));
-}
-
-function kit_ear_stop_timers(root) {
-    let bag = root && root._kitEarAnim;
-    if (!bag || !bag.timeouts) return;
-    bag.timeouts.forEach((id) => clearTimeout(id));
-    bag.timeouts.length = 0;
-}
-
-function kit_ear_schedule(root, delay, fn) {
-    if (!root) return 0;
-    if (!root._kitEarAnim) root._kitEarAnim = { timeouts: [] };
-    let id = setTimeout(() => {
-        let bag = root._kitEarAnim;
-        if (bag && bag.timeouts) {
-            let i = bag.timeouts.indexOf(id);
-            if (i >= 0) bag.timeouts.splice(i, 1);
-        }
-        if (!kit_ear_is_live(root)) return;
-        fn();
-    }, delay);
-    root._kitEarAnim.timeouts.push(id);
-    return id;
-}
-
-function kit_ear_strip_motion(root) {
-    if (!root) return;
-    root.querySelectorAll("animateTransform.kit_ear_wiggle_anim, animateTransform.kit_ear_anim").forEach((el) => {
-        try { if (typeof el.endElement === "function") el.endElement(); } catch (err) {}
-        if (el.parentNode) el.parentNode.removeChild(el);
-    });
-    root.querySelectorAll(".kit_ear_particle").forEach((el) => {
-        if (el.parentNode) el.parentNode.removeChild(el);
-    });
-    root.querySelectorAll(".kit_ear_motion_scale").forEach((el) => {
-        el.removeAttribute("transform");
-        el.style.transform = "";
-    });
-    root.querySelectorAll(".sprocket.sprocket_upper, .sprocket.sprocket_middle, .sprocket.sprocket_lower").forEach((el) => {
-        el.removeAttribute("transform");
-        el.style.transform = "";
-    });
-}
-
-function kit_ear_el(name, attrs) {
-    let el = document.createElementNS(KIT_EAR_NS, name);
-    Object.keys(attrs || {}).forEach((key) => {
-        if (attrs[key] == null) return;
-        el.setAttribute(key, attrs[key]);
-    });
-    return el;
-}
-
-function kit_ear_point(root, selector) {
-    let el = root && root.querySelector(selector);
-    if (!el) return { x: 0, y: 0 };
-    return {
-        x: parseFloat(el.getAttribute("cx") || "0") || 0,
-        y: parseFloat(el.getAttribute("cy") || "0") || 0
-    };
-}
-
-function kit_ear_token_name(el) {
-    let cls = (el && el.getAttribute("class")) || "";
-    let names = ["mechanical", "mushroom", "seashell", "bat"];
-    for (let i = 0; i < names.length; i++) {
-        if (cls.indexOf("kit_ear_wiggle_" + names[i]) >= 0) return names[i];
-    }
-    return "";
-}
-
-function kit_ear_ensure_fx(earInner) {
-    let fx = earInner.querySelector(":scope > .kit_ear_fx");
-    if (!fx) {
-        fx = kit_ear_el("g", { class: "kit_ear_fx" });
-        earInner.appendChild(fx);
-    }
-    return fx;
-}
-
-function kit_ear_wrap_element_for_scale(el, cx, cy, scaleClass) {
-    let parent = el && el.parentNode;
-    if (!parent) return null;
-    if (parent.getAttribute && parent.getAttribute("data-kit-unpivot") === "1") {
-        let scaleG = parent.parentNode;
-        if (scaleG && scaleG.classList && scaleG.classList.contains("kit_ear_motion_scale")) return scaleG;
-    }
-    let pivot = kit_ear_el("g", {
-        class: "kit_ear_pivot",
-        transform: "translate(" + cx + " " + cy + ")"
-    });
-    let scaleG = kit_ear_el("g", { class: "kit_ear_motion_scale " + scaleClass });
-    let unpivot = kit_ear_el("g", {
-        "data-kit-unpivot": "1",
-        transform: "translate(" + (-cx) + " " + (-cy) + ")"
-    });
-    parent.insertBefore(pivot, el);
-    pivot.appendChild(scaleG);
-    scaleG.appendChild(unpivot);
-    unpivot.appendChild(el);
-    return scaleG;
-}
-
-function kit_ear_wrap_children_for_scale(earInner, cx, cy, scaleClass) {
-    let existing = earInner.querySelector(":scope > .kit_ear_pivot");
-    if (existing) {
-        let scaleG = existing.querySelector(".kit_ear_motion_scale");
-        if (scaleG) return scaleG;
-    }
-    let fx = kit_ear_ensure_fx(earInner);
-    let pivot = kit_ear_el("g", {
-        class: "kit_ear_pivot",
-        transform: "translate(" + cx + " " + cy + ")"
-    });
-    let scaleG = kit_ear_el("g", { class: "kit_ear_motion_scale " + scaleClass });
-    let unpivot = kit_ear_el("g", {
-        "data-kit-unpivot": "1",
-        transform: "translate(" + (-cx) + " " + (-cy) + ")"
-    });
-    Array.from(earInner.children).forEach((ch) => {
-        if (ch !== fx) unpivot.appendChild(ch);
-    });
-    scaleG.appendChild(unpivot);
-    pivot.appendChild(scaleG);
-    earInner.insertBefore(pivot, fx);
-    return scaleG;
-}
-
-function kit_ear_add_smil(el, attrs) {
-    let anim = kit_ear_el("animateTransform", Object.assign({
-        class: "kit_ear_anim kit_ear_wiggle_anim",
-        attributeName: "transform",
-        attributeType: "XML"
-    }, attrs));
-    el.appendChild(anim);
-    return anim;
-}
-
-function kit_ear_rotate_values(angles, cx, cy) {
-    return angles.map((a) => a + " " + cx + " " + cy).join("; ");
-}
-
-function kit_ear_clock_steps(stepDeg, nSteps) {
-    let angles = [];
-    for (let i = 0; i <= nSteps; i++) angles.push(i * stepDeg);
-    return angles;
-}
-
-function apply_kit_ear_mechanical(earInner, earIndex) {
-    let specs = [
-        { sel: ".sprocket_upper", step: 20, ticks: 18, dur: 7.4, extraBegin: 0 },
-        { sel: ".sprocket_lower", step: 30, ticks: 12, dur: 5.1, extraBegin: 0.24 },
-        {
-            sel: ".sprocket_middle",
-            angles: [0, 12, 25, 12, 0, -12, -25, -12, 0],
-            dur: 4.6,
-            extraBegin: 0.12
-        }
-    ];
-    specs.forEach((spec) => {
-        let sprocket = earInner.querySelector(spec.sel);
-        if (!sprocket) return;
-        if (sprocket.querySelector("animateTransform.kit_ear_anim")) return;
-        let pt = kit_ear_point(sprocket, ".sprocket_rotation_point");
-        let angles = spec.angles || kit_ear_clock_steps(spec.step, spec.ticks);
-        kit_ear_add_smil(sprocket, {
-            type: "rotate",
-            values: kit_ear_rotate_values(angles, pt.x, pt.y),
-            calcMode: "discrete",
-            dur: spec.dur + "s",
-            repeatCount: "indefinite",
-            begin: (earIndex * 0.2 + spec.extraBegin) + "s"
-        });
-    });
-}
-
-function apply_kit_ear_bat(earInner, earIndex) {
-    let attach = kit_ear_point(earInner, ".ear_marker");
-    let scaleG = kit_ear_wrap_children_for_scale(earInner, attach.x, attach.y, "kit_ear_bat_flutter");
-    if (!scaleG || scaleG.querySelector("animateTransform.kit_ear_anim")) return;
-    kit_ear_add_smil(scaleG, {
-        type: "scale",
-        values: "1 1; 1.11 0.9; 0.9 1.1; 1.08 0.93; 0.96 1.05; 1 1; 1 1",
-        keyTimes: "0; 0.019; 0.041; 0.063; 0.085; 0.102; 1",
-        calcMode: "spline",
-        keySplines: "0.37 0 0.63 1; 0.37 0 0.63 1; 0.37 0 0.63 1; 0.37 0 0.63 1; 0.37 0 0.63 1; 0 0 1 1",
-        dur: "11.3s",
-        repeatCount: "indefinite",
-        begin: (earIndex * 0.18) + "s"
-    });
-}
-
-function apply_kit_ear_mushroom(earInner, root, earIndex) {
-    let cap = earInner.querySelector(".cap");
-    if (!cap) return;
-    let attach = kit_ear_point(cap, ".cap_attachment_point");
-    let scaleG = kit_ear_wrap_element_for_scale(cap, attach.x, attach.y, "kit_ear_cap_squash");
-    if (!scaleG) return;
-    let anim = scaleG.querySelector("animateTransform.kit_ear_anim");
-    if (!anim) {
-        anim = kit_ear_add_smil(scaleG, {
-            type: "scale",
-            values: "1 1; 1.16 0.78; 1.05 0.94; 1 1",
-            keyTimes: "0; 0.38; 0.7; 1",
-            dur: "0.72s",
-            begin: "indefinite",
-            fill: "freeze",
-            restart: "always"
-        });
-    }
-    let fx = kit_ear_ensure_fx(earInner);
-    let points = Array.from(earInner.querySelectorAll(".spore_release_point")).map((el) => ({
-        x: parseFloat(el.getAttribute("cx") || "0") || 0,
-        y: parseFloat(el.getAttribute("cy") || "0") || 0
-    }));
-    let beat = () => {
-        if (!kit_ear_is_live(root)) return;
-        try { if (typeof anim.beginElement === "function") anim.beginElement(); } catch (err) {}
-        points.forEach((pt, i) => {
-            let n = 1 + Math.floor(Math.random() * 2);
-            for (let s = 0; s < n; s++) {
-                kit_ear_schedule(root, i * 40 + s * 55, () => kit_ear_spawn_spore(fx, pt.x, pt.y, root));
-            }
-        });
-        kit_ear_schedule(root, 9600 + Math.random() * 4400, beat);
-    };
-    kit_ear_schedule(root, 420 + earIndex * 900, beat);
-}
-
-function apply_kit_ear_seashell(earInner, root, earIndex) {
-    let attach = kit_ear_point(earInner, ".ear_marker");
-    let scaleG = kit_ear_wrap_children_for_scale(earInner, attach.x, attach.y, "kit_ear_shell_squeeze");
-    if (!scaleG) return;
-    let anim = scaleG.querySelector("animateTransform.kit_ear_anim");
-    if (!anim) {
-        anim = kit_ear_add_smil(scaleG, {
-            type: "scale",
-            values: "1 1; 0.93 1.07; 1.04 0.97; 1 1",
-            keyTimes: "0; 0.32; 0.62; 1",
-            dur: "0.48s",
-            begin: "indefinite",
-            fill: "freeze",
-            restart: "always"
-        });
-    }
-    let fx = kit_ear_ensure_fx(earInner);
-    let sprout = kit_ear_point(earInner, ".water_sprout");
-    let beat = () => {
-        if (!kit_ear_is_live(root)) return;
-        try { if (typeof anim.beginElement === "function") anim.beginElement(); } catch (err) {}
-        kit_ear_schedule(root, 160, () => kit_ear_spawn_water(fx, sprout.x, sprout.y, root));
-        kit_ear_schedule(root, 12400 + Math.random() * 4400, beat);
-    };
-    kit_ear_schedule(root, 700 + earIndex * 1100, beat);
-}
-
-function kit_ear_spawn_spore(fx, x, y, root) {
-    if (!fx || !kit_ear_is_live(root)) return;
-    let r = 3.4 + Math.random() * 3.2;
-    let spore = kit_ear_el("circle", {
-        class: "kit_ear_particle kit_ear_spore",
-        cx: String(x + (Math.random() - 0.5) * 8),
-        cy: String(y + (Math.random() - 0.5) * 6),
-        r: String(r),
-        fill: KIT_EAR_SPORE_FILLS[Math.floor(Math.random() * KIT_EAR_SPORE_FILLS.length)],
-        stroke: "#111",
-        "stroke-width": "1.7"
-    });
-    spore.style.pointerEvents = "none";
-    spore.style.opacity = "0.95";
-    spore.style.transform = "translate(0px, 0px)";
-    fx.appendChild(spore);
-    let drift = (Math.random() - 0.5) * 46;
-    requestAnimationFrame(() => {
-        if (!kit_ear_is_live(root) || !spore.parentNode) {
-            if (spore.parentNode) spore.parentNode.removeChild(spore);
-            return;
-        }
-        spore.style.transition = "transform 1.15s cubic-bezier(0.4, 0, 1, 1)";
-        spore.style.transform = "translate(" + drift + "px, 200px)";
-        kit_ear_schedule(root, 1150, () => {
-            if (!spore.parentNode) return;
-            spore.style.transition = "opacity 1s ease-in";
-            spore.style.opacity = "0";
-            kit_ear_schedule(root, 1050, () => {
-                if (spore.parentNode) spore.parentNode.removeChild(spore);
-            });
-        });
-    });
-}
-
-function kit_ear_spawn_water(fx, x, y, root) {
-    if (!fx || !kit_ear_is_live(root)) return;
-    let count = 5 + Math.floor(Math.random() * 4);
-    for (let i = 0; i < count; i++) {
-        kit_ear_schedule(root, i * 28, () => {
-            if (!kit_ear_is_live(root)) return;
-            let drop = kit_ear_el("g", { class: "kit_ear_particle kit_ear_droplet" });
-            let rx = 6.2 + Math.random() * 4.4;
-            let body = kit_ear_el("ellipse", {
-                rx: String(rx),
-                ry: String(rx * 1.35),
-                fill: KIT_EAR_DROP_FILLS[Math.floor(Math.random() * KIT_EAR_DROP_FILLS.length)],
-                stroke: "#111",
-                "stroke-width": "1.7"
-            });
-            let shine = kit_ear_el("ellipse", {
-                rx: String(rx * 0.35),
-                ry: String(rx * 0.42),
-                cy: String(-rx * 0.35),
-                fill: "#fff",
-                opacity: "0.45"
-            });
-            drop.appendChild(body);
-            drop.appendChild(shine);
-            drop.style.pointerEvents = "none";
-            drop.style.opacity = "0.95";
-            drop.style.transform = "translate(" + x + "px, " + y + "px)";
-            fx.appendChild(drop);
-            let dx = (Math.random() - 0.5) * 36;
-            let up = 42 + Math.random() * 38;
-            requestAnimationFrame(() => {
-                if (!kit_ear_is_live(root) || !drop.parentNode) {
-                    if (drop.parentNode) drop.parentNode.removeChild(drop);
-                    return;
-                }
-                drop.style.transition = "transform 0.28s cubic-bezier(0.15, 0.75, 0.25, 1)";
-                drop.style.transform = "translate(" + (x + dx) + "px, " + (y - up) + "px)";
-                kit_ear_schedule(root, 280, () => {
-                    if (!drop.parentNode) return;
-                    drop.style.transition = "transform 0.9s cubic-bezier(0.4, 0, 1, 1), opacity 0.7s ease-in";
-                    drop.style.transform = "translate(" + (x + dx * 1.15) + "px, " + (y + 170) + "px)";
-                    kit_ear_schedule(root, 280, () => { drop.style.opacity = "0"; });
-                    kit_ear_schedule(root, 950, () => {
-                        if (drop.parentNode) drop.parentNode.removeChild(drop);
-                    });
-                });
-            });
-        });
-    }
-}
-
-function apply_kit_ear_wiggle(root) {
-    if (!root) return;
-    kit_ear_stop_timers(root);
-    kit_ear_strip_motion(root);
-    root.classList.remove("fennimal_pose_frozen");
-    root.classList.add("kit_ear_live");
-    let ears = Array.from(root.querySelectorAll(".kit_ear_wiggle"));
-    ears.forEach((el, i) => {
-        let token = kit_ear_token_name(el);
-        kit_ear_ensure_fx(el);
-        if (token === "mechanical") apply_kit_ear_mechanical(el, i);
-        else if (token === "bat") apply_kit_ear_bat(el, i);
-        else if (token === "mushroom") apply_kit_ear_mushroom(el, root, i);
-        else if (token === "seashell") apply_kit_ear_seashell(el, root, i);
-    });
-}
-
-function kit_stamp_nodes(root) {
-    if (!root) return [];
-    return Array.from(root.querySelectorAll("[data-kit-role='stamp_left'], [data-kit-role='stamp_right']"));
-}
-
-function kit_stamp_strip(root) {
-    if (!root) return;
-    root.classList.remove("kit_stamp_lighting");
-    root.querySelectorAll(".kit_stamp_motion").forEach((motion) => {
-        if (motion._stampGlimmerTimer) {
-            clearTimeout(motion._stampGlimmerTimer);
-            motion._stampGlimmerTimer = null;
-        }
-    });
-    root.querySelectorAll("animate.kit_stamp_anim, animateTransform.kit_stamp_anim").forEach((el) => {
-        try { if (typeof el.endElement === "function") el.endElement(); } catch (err) {}
-        if (el.parentNode) el.parentNode.removeChild(el);
-    });
-    root.querySelectorAll(".kit_stamp_spec, .kit_stamp_shadow_filter, .kit_stamp_shadow_blob, .kit_stamp_outline, .kit_stamp_glimmer_defs").forEach((el) => {
-        if (el.parentNode) el.parentNode.removeChild(el);
-    });
-    root.querySelectorAll(".kit_stamp_press, .kit_stamp_expr, .kit_stamp_motion, .kit_stamp_art_box").forEach((el) => {
-        el.removeAttribute("transform");
-        el.removeAttribute("filter");
-        el.style.transform = "";
-        el.style.filter = "";
-        el.style.animation = "";
-    });
-}
-
-function kit_stamp_ensure_motion(stamp) {
-    if (!stamp) return null;
-    let existing = stamp.querySelector(":scope > .kit_stamp_motion");
-    if (existing) {
-        let press = existing.querySelector(".kit_stamp_press");
-        if (press) {
-            press.querySelectorAll(":scope > animateTransform.kit_stamp_anim").forEach((el) => {
-                if (el.parentNode) el.parentNode.removeChild(el);
-            });
-            press.appendChild(kit_stamp_press_anim());
-            let art = kit_stamp_art_group(press);
-            if (art) art.classList.add("kit_stamp_art_box");
-        }
-        return existing;
-    }
-    let pt = kit_ear_point(stamp, ".stamp_marker");
-    let motion = kit_ear_el("g", { class: "kit_stamp_motion" });
-    let expr = kit_ear_el("g", { class: "kit_stamp_expr" });
-    let pivot = kit_ear_el("g", {
-        class: "kit_stamp_pivot",
-        transform: "translate(" + pt.x + " " + pt.y + ")"
-    });
-    let press = kit_ear_el("g", { class: "kit_stamp_press" });
-    let unpivot = kit_ear_el("g", {
-        class: "kit_stamp_art_box",
-        transform: "translate(" + (-pt.x) + " " + (-pt.y) + ")"
-    });
-    while (stamp.firstChild) unpivot.appendChild(stamp.firstChild);
-    press.appendChild(unpivot);
-    press.appendChild(kit_stamp_press_anim());
-    pivot.appendChild(press);
-    expr.appendChild(pivot);
-    motion.appendChild(expr);
-    stamp.appendChild(motion);
-    return motion;
-}
-
-function kit_stamp_press_anim() {
-    return kit_ear_el("animateTransform", {
-        class: "kit_stamp_anim",
-        attributeName: "transform",
-        attributeType: "XML",
-        type: "scale",
-        values: "1.32 1.32; 1.26 1.26; 0.9 0.9; 1.04 1.04; 1 1",
-        keyTimes: "0; 0.16; 0.42; 0.7; 1",
-        dur: "0.72s",
-        begin: "indefinite",
-        fill: "freeze",
-        restart: "always",
-        calcMode: "spline",
-        keySplines: "0.2 0.7 0.3 1; 0.3 0 0.5 1; 0.2 0.7 0.3 1; 0.2 0.6 0.3 1"
-    });
-}
-
-function kit_stamp_clear_shadow(motion) {
-    if (!motion) return;
-    if (motion._stampGlimmerTimer) {
-        clearTimeout(motion._stampGlimmerTimer);
-        motion._stampGlimmerTimer = null;
-    }
-    motion.removeAttribute("filter");
-    motion.style.filter = "";
-    motion.style.animation = "";
-    let host = motion.parentNode || motion;
-    host.querySelectorAll(":scope > .kit_stamp_shadow_filter, :scope > defs.kit_stamp_shadow_filter").forEach((el) => {
-        if (el.parentNode) el.parentNode.removeChild(el);
-    });
-    motion.querySelectorAll(".kit_stamp_shadow_filter, .kit_stamp_shadow_blob, .kit_stamp_outline, .kit_stamp_spec").forEach((el) => {
-        if (el.parentNode) el.parentNode.removeChild(el);
-    });
-    if (host && host.querySelectorAll) {
-        host.querySelectorAll(":scope > .kit_stamp_glimmer_defs").forEach((el) => {
-            if (el.parentNode) el.parentNode.removeChild(el);
-        });
-    }
-}
-
-function kit_stamp_art_group(press) {
-    if (!press) return null;
-    return Array.from(press.children).find((el) => {
-        return el.tagName && el.tagName.toLowerCase() === "g"
-            && !el.classList.contains("kit_stamp_outline");
-    }) || null;
-}
-
-function kit_stamp_prepare_stroke_outline(root) {
-    if (!root) return;
-    root.querySelectorAll(".placement_marker, .stamp_marker, animate, animateTransform").forEach((el) => {
-        if (el.parentNode) el.parentNode.removeChild(el);
-    });
-    root.querySelectorAll("path, polygon, polyline, circle, ellipse, rect, line").forEach((el) => {
-        let sw = parseFloat(el.getAttribute("stroke-width") || "0") || 0;
-        el.setAttribute("fill", "none");
-        el.setAttribute("stroke", "#fff6e8");
-        el.setAttribute("stroke-linejoin", "round");
-        el.setAttribute("stroke-linecap", "round");
-        el.setAttribute("opacity", "1");
-        el.setAttribute("stroke-opacity", "0.22");
-        el.setAttribute("stroke-width", String(sw > 4 ? sw + 3.2 : 3.6));
-        el.style.fill = "none";
-        el.removeAttribute("display");
-    });
-}
-
-function kit_stamp_add_outline(motion) {
-    if (!motion) return;
-    let press = motion.querySelector(".kit_stamp_press");
-    let art = kit_stamp_art_group(press);
-    if (!art) return;
-    let wrap = kit_ear_el("g", {
-        class: "kit_stamp_outline kit_stamp_outline_pulse",
-        "pointer-events": "none"
-    });
-    let scaled = kit_ear_el("g", { transform: "scale(1.08)" });
-    let clone = art.cloneNode(true);
-    kit_stamp_prepare_stroke_outline(clone);
-    scaled.appendChild(clone);
-    wrap.appendChild(scaled);
-    press.insertBefore(wrap, art);
-    wrap.querySelectorAll("path, polygon, polyline, circle, ellipse, rect, line").forEach((el, i) => {
-        let begin = (i * 0.08) + "s";
-        el.appendChild(kit_ear_el("animate", {
-            class: "kit_stamp_anim",
-            attributeName: "stroke-opacity",
-            values: "0.1; 0.5; 0.24; 0.1",
-            keyTimes: "0; 0.3; 0.62; 1",
-            dur: "3.2s",
-            repeatCount: "indefinite",
-            begin: begin
-        }));
-        let sw = parseFloat(el.getAttribute("stroke-width") || "3.6") || 3.6;
-        el.appendChild(kit_ear_el("animate", {
-            class: "kit_stamp_anim",
-            attributeName: "stroke-width",
-            values: sw + ";" + (sw * 1.22) + ";" + sw,
-            dur: "3.2s",
-            repeatCount: "indefinite",
-            begin: begin
-        }));
-    });
-}
-
-function kit_stamp_ensure_click_pulse(motion) {
-    if (!motion) return null;
-    let press = motion.querySelector(".kit_stamp_press");
-    let art = kit_stamp_art_group(press);
-    if (!art) return null;
-    let wrap = press.querySelector(":scope > .kit_stamp_outline_click");
-    if (wrap) return wrap;
-    wrap = kit_ear_el("g", {
-        class: "kit_stamp_outline kit_stamp_outline_pulse kit_stamp_outline_click",
-        "pointer-events": "none",
-        opacity: "0"
-    });
-    let scaled = kit_ear_el("g", {
-        class: "kit_stamp_outline_click_scale",
-        transform: "scale(1.08)"
-    });
-    let clone = art.cloneNode(true);
-    kit_stamp_prepare_stroke_outline(clone);
-    clone.querySelectorAll("path, polygon, polyline, circle, ellipse, rect, line").forEach((el) => {
-        el.setAttribute("stroke-opacity", "0.55");
-    });
-    scaled.appendChild(clone);
-    wrap.appendChild(scaled);
-    wrap.appendChild(kit_ear_el("animate", {
-        class: "kit_stamp_anim kit_stamp_click_pulse",
-        attributeName: "opacity",
-        values: "0; 1; 0.4; 0",
-        keyTimes: "0; 0.22; 0.58; 1",
-        dur: "0.82s",
-        begin: "indefinite",
-        fill: "freeze",
-        restart: "always",
-        calcMode: "spline",
-        keySplines: "0.2 0.7 0.3 1; 0.25 0 0.5 1; 0.2 0.6 0.3 1"
-    }));
-    scaled.appendChild(kit_ear_el("animateTransform", {
-        class: "kit_stamp_anim kit_stamp_click_pulse",
-        attributeName: "transform",
-        attributeType: "XML",
-        type: "scale",
-        values: "1.08; 1.22; 1.1; 1.08",
-        keyTimes: "0; 0.28; 0.62; 1",
-        dur: "0.82s",
-        begin: "indefinite",
-        fill: "freeze",
-        restart: "always",
-        calcMode: "spline",
-        keySplines: "0.2 0.7 0.3 1; 0.25 0 0.5 1; 0.2 0.6 0.3 1"
-    }));
-    press.insertBefore(wrap, art);
-    return wrap;
-}
-
-function kit_stamp_fire_click_pulse(wrap) {
-    if (!wrap || !wrap.querySelectorAll) return;
-    wrap.querySelectorAll(".kit_stamp_click_pulse").forEach((anim) => {
-        try { if (typeof anim.beginElement === "function") anim.beginElement(); } catch (err) {}
-    });
-}
-
-function kit_stamp_prepare_outline(root, paint) {
-    if (!root) return;
-    root.querySelectorAll(".placement_marker, .stamp_marker, animate, animateTransform").forEach((el) => {
-        if (el.parentNode) el.parentNode.removeChild(el);
-    });
-    root.querySelectorAll("path, polygon, polyline, circle, ellipse, rect, line").forEach((el) => {
-        let fill = ((el.getAttribute("fill") || "") + "").toLowerCase();
-        let sw = parseFloat(el.getAttribute("stroke-width") || "0") || 0;
-        el.removeAttribute("opacity");
-        el.removeAttribute("display");
-        el.style.opacity = "";
-        if (fill === "none") {
-            el.setAttribute("fill", "none");
-            el.setAttribute("stroke", paint);
-            el.setAttribute("stroke-linejoin", "round");
-            el.setAttribute("stroke-linecap", "round");
-            if (!(sw > 1)) el.setAttribute("stroke-width", "5.5");
-            el.style.fill = "none";
-        } else {
-            el.setAttribute("fill", paint);
-            el.setAttribute("stroke", paint);
-            el.setAttribute("stroke-width", String(Math.max(1.4, sw || 1.4)));
-            el.style.fill = paint;
-        }
-    });
-}
-
-function kit_stamp_glimmer_bbox(art) {
-    try {
-        if (art && typeof art.getBBox === "function") {
-            let bb = art.getBBox();
-            if (bb && bb.width > 2 && bb.height > 2) return bb;
-        }
-    } catch (err) {}
-    return { x: -40, y: -40, width: 80, height: 80 };
-}
-
-function kit_stamp_start_anims(host) {
-    if (!host || !host.querySelectorAll) return;
-    host.querySelectorAll("animate.kit_stamp_anim, animateTransform.kit_stamp_anim").forEach((anim) => {
-        try { if (typeof anim.beginElement === "function") anim.beginElement(); } catch (err) {}
-    });
-}
-
-function kit_stamp_glimmer_band_points(cx, cy, ux, uy, band, span) {
-    let vx = -uy;
-    let vy = ux;
-    let hx = ux * band / 2;
-    let hy = uy * band / 2;
-    let lx = vx * span / 2;
-    let ly = vy * span / 2;
-    return [
-        [cx + hx + lx, cy + hy + ly],
-        [cx + hx - lx, cy + hy - ly],
-        [cx - hx - lx, cy - hy - ly],
-        [cx - hx + lx, cy - hy + ly]
-    ].map(function (p) {
-        return (Math.round(p[0] * 10) / 10) + "," + (Math.round(p[1] * 10) / 10);
-    }).join(" ");
-}
-
-function kit_stamp_clip_shapes(art) {
-    if (!art) return [];
-    return Array.from(art.querySelectorAll("path, polygon, polyline, circle, ellipse, rect")).filter((el) => {
-        let cls = el.getAttribute("class") || "";
-        return cls.indexOf("placement_marker") < 0 && cls.indexOf("stamp_marker") < 0;
-    });
-}
-
-function kit_stamp_add_glimmer(motion) {
-    if (!motion) return;
-    let press = motion.querySelector(".kit_stamp_press");
-    let art = kit_stamp_art_group(press);
-    if (!art) return;
-    let bb = kit_stamp_glimmer_bbox(art);
-    if (!(bb.width > 1 && bb.height > 1)) return;
-    let wrap = kit_ear_el("g", {
-        class: "kit_stamp_outline kit_stamp_glimmer",
-        "pointer-events": "none"
-    });
-    let defs = kit_ear_el("defs", { class: "kit_stamp_glimmer_defs" });
-    let shapes = kit_stamp_clip_shapes(art);
-    let filled = shapes.filter((el) => ((el.getAttribute("fill") || "") + "").toLowerCase() !== "none");
-    let strokeOnly = !filled.length && shapes.length;
-    wrap.appendChild(defs);
-
-    let cx = bb.x + bb.width / 2;
-    let cy = bb.y + bb.height / 2;
-    let diag = Math.sqrt(bb.width * bb.width + bb.height * bb.height);
-    let bandW = Math.max(16, diag * 0.4);
-    let travel = diag * 1.85 + bandW;
-    let ux = 0.7071;
-    let uy = 0.7071;
-    let x0 = ux * travel;
-    let y0 = uy * travel;
-    let x1 = -ux * travel;
-    let y1 = -uy * travel;
-
-    if (strokeOnly) {
-        wrap.classList.add("kit_stamp_glimmer_stroke");
-        let clone = art.cloneNode(true);
-        kit_stamp_prepare_stroke_outline(clone);
-        clone.querySelectorAll("path, polygon, polyline, circle, ellipse, rect, line").forEach((el) => {
-            el.setAttribute("stroke", "#fff");
-            el.setAttribute("stroke-opacity", "1");
-            el.setAttribute("opacity", "1");
-        });
-        wrap.appendChild(clone);
-        if (art.nextSibling) press.insertBefore(wrap, art.nextSibling);
-        else press.appendChild(wrap);
-        return;
-    }
-
-    let clipId = "kit_stamp_glim_clip_" + (++kit_stamp_glimmer_seq);
-    let clip = kit_ear_el("clipPath", {
-        id: clipId,
-        clipPathUnits: "userSpaceOnUse"
-    });
-    if (filled.length) {
-        filled.forEach((el) => {
-            let piece = el.cloneNode(true);
-            piece.removeAttribute("class");
-            piece.removeAttribute("opacity");
-            piece.removeAttribute("display");
-            clip.appendChild(piece);
-        });
-    } else {
-        clip.appendChild(kit_ear_el("circle", {
-            cx: String(bb.x + bb.width / 2),
-            cy: String(bb.y + bb.height / 2),
-            r: String(Math.max(bb.width, bb.height) * 0.62)
-        }));
-    }
-    defs.appendChild(clip);
-    let clipped = kit_ear_el("g", {
-        class: "kit_stamp_glimmer_clip",
-        "clip-path": "url(#" + clipId + ")",
-        "clip-rule": "nonzero",
-        opacity: "0"
-    });
-    clipped.appendChild(kit_ear_el("animate", {
-        class: "kit_stamp_anim",
-        attributeName: "opacity",
-        values: "0.4;0.4;0;0",
-        keyTimes: "0;0.14;0.1401;1",
-        dur: "15.2s",
-        repeatCount: "indefinite",
-        calcMode: "linear"
-    }));
-    let move = kit_ear_el("g", { class: "kit_stamp_glimmer_move" });
-    move.appendChild(kit_ear_el("animateTransform", {
-        class: "kit_stamp_anim",
-        attributeName: "transform",
-        type: "translate",
-        values: x0 + " " + y0 + ";" + x1 + " " + y1 + ";" + x1 + " " + y1,
-        keyTimes: "0;0.14;1",
-        dur: "15.2s",
-        repeatCount: "indefinite",
-        calcMode: "linear"
-    }));
-    move.appendChild(kit_ear_el("rect", {
-        class: "kit_stamp_glimmer_band",
-        x: String(cx - bandW / 2),
-        y: String(cy - diag * 1.2),
-        width: String(bandW),
-        height: String(diag * 2.4),
-        fill: "#fff",
-        transform: "rotate(45 " + cx + " " + cy + ")"
-    }));
-    clipped.appendChild(move);
-    wrap.appendChild(clipped);
-    if (art.nextSibling) press.insertBefore(wrap, art.nextSibling);
-    else press.appendChild(wrap);
-    kit_stamp_start_anims(wrap);
+// Kit overlay motion lives in KitOverlayMotion.js (loaded after this file).
+function prepare_kit_overlay_instance(root) {
+    if (typeof kit_overlay_ensure_static === "function") kit_overlay_ensure_static(root);
 }
 
 // Happy/sad artwork that CSS .is-slumped swaps via opacity. Kit FeatureKit also
@@ -1726,11 +984,13 @@ function kit_stamp_add_glimmer(motion) {
 // restore display or the sad mouth never appears (elephant trunk especially).
 const FENNIMAL_HAPPY_EXPRESSION_CLASSES = [
     "mouth_happy", "eyebrow_happy", "eyelid_happy", "cheek_happy",
-    "whiskers_happy", "moustache_happy", "moustace_happy", "face_happy"
+    "whiskers_happy", "moustache_happy", "moustace_happy", "beard_happy", "face_happy",
+    "meter_happy"
 ];
 const FENNIMAL_SAD_EXPRESSION_CLASSES = [
     "mouth_sad", "eyebrow_sad", "eyelid_sad", "cheek_sad",
-    "whiskers_sad", "moustache_sad", "moustace_sad", "face_sad"
+    "whiskers_sad", "moustache_sad", "moustace_sad", "beard_sad", "face_sad",
+    "meter_sad"
 ];
 
 function set_fennimal_expression_visibility(root, expression) {
@@ -1746,50 +1006,21 @@ function set_fennimal_expression_visibility(root, expression) {
             el.setAttribute("display", sad ? "none" : "inline");
         });
     });
-}
-
-function set_kit_stamp_expression(root, expression) {
-    if (!root || !root.classList) return;
-    root.classList.remove("kit_stamp_mood_happy", "kit_stamp_mood_sad");
-    if (expression === "happy") root.classList.add("kit_stamp_mood_happy");
-    else if (expression === "sad") root.classList.add("kit_stamp_mood_sad");
-}
-
-function apply_kit_stamp_salience(root, options) {
-    if (!root) return;
-    options = options || {};
-    kit_stamp_nodes(root).forEach((stamp) => {
-        let motion = kit_stamp_ensure_motion(stamp);
-        kit_stamp_clear_shadow(motion);
-        if (options.outline) kit_stamp_add_outline(motion);
-        if (options.lighting) kit_stamp_add_glimmer(motion);
-    });
-    root.classList.toggle("kit_stamp_lighting", !!options.lighting);
-    root.classList.toggle("kit_stamp_outline_live", !!options.outline);
-    set_kit_stamp_expression(root, options.expression || null);
-    if (options.lighting || options.outline || options.expression || options.press) {
-        root.classList.add("kit_stamp_live");
-        root.classList.remove("fennimal_pose_frozen");
-    } else {
-        root.classList.remove("kit_stamp_live", "kit_stamp_lighting", "kit_stamp_outline_live");
+    if (typeof kit_candle_set_mood === "function") {
+        kit_candle_set_mood(root, sad ? "sad" : "happy", (typeof kit_ear_is_live === "function" && kit_ear_is_live(root)));
     }
-}
-
-function play_kit_stamp_press(root) {
-    if (!root) return;
-    kit_stamp_nodes(root).forEach((stamp, i) => {
-        let motion = kit_stamp_ensure_motion(stamp);
-        let anim = stamp.querySelector(".kit_stamp_press > animateTransform.kit_stamp_anim");
-        let pulse = kit_stamp_ensure_click_pulse(motion);
-        if (!anim && !pulse) return;
-        let fire = function () {
-            try { if (anim && typeof anim.beginElement === "function") anim.beginElement(); } catch (err) {}
-            kit_stamp_fire_click_pulse(pulse);
-        };
-        if (i === 0) fire();
-        else if (root.classList.contains("kit_ear_live")) kit_ear_schedule(root, i * 45, fire);
-        else setTimeout(fire, i * 45);
-    });
+    if (typeof kit_moustache_set_mood === "function") {
+        kit_moustache_set_mood(root, sad ? "sad" : "happy", (typeof kit_ear_is_live === "function" && kit_ear_is_live(root)));
+    }
+    if (typeof kit_muffin_set_mood === "function") {
+        kit_muffin_set_mood(root, sad ? "sad" : "happy", (typeof kit_ear_is_live === "function" && kit_ear_is_live(root)));
+    }
+    if (typeof kit_clam_set_mood === "function") {
+        kit_clam_set_mood(root, sad ? "sad" : "happy", (typeof kit_ear_is_live === "function" && kit_ear_is_live(root)));
+    }
+    if (typeof kit_sea_nose_set_mood === "function") {
+        kit_sea_nose_set_mood(root, sad ? "sad" : "happy", (typeof kit_ear_is_live === "function" && kit_ear_is_live(root)));
+    }
 }
 
 function create_Fennimal_SVG_object(FenObj, head_scale_factor, outline_only) {
@@ -1963,6 +1194,8 @@ function create_Fennimal_SVG_object(FenObj, head_scale_factor, outline_only) {
     TranslationGroup.classList.add("Fennimal_translation_group");
 
     apply_Fennimal_animation_pivots(TranslationGroup);
+
+    if (!outline_only) prepare_kit_overlay_instance(TranslationGroup);
 
     return TranslationGroup;
 }
@@ -2163,6 +1396,8 @@ function create_Fennimal_SVG_object_head_only(FenObj, outline_only, include_hat)
     TranslationGroup.classList.add("Fennimal_translation_group")
 
     apply_Fennimal_animation_pivots(TranslationGroup);
+
+    if (!outline_only) prepare_kit_overlay_instance(TranslationGroup);
 
     //Returning
     return (TranslationGroup)
@@ -4701,6 +3936,69 @@ class AskFennimalOverlay {
             AudioCont.play_sound_effect("rejected");
             fen.fennimal_errors_made.push(selected);
             Interface.Prompt.show_message("Oops, you picked the wrong Fennimal!");
+            await bar.hide();
+            await wait(1000);
+        }
+    }
+}
+
+/**
+ * Post-photo 3AFC: unlabeled grayscale head portraits (unique roster faces).
+ * Same tiles as FennimalChoiceBar / hat-binding portraits.
+ * Retry until the photographed face is picked. No-ops unless face_match_after_photo.
+ */
+class FaceMatchOverlay {
+    static async run(trial, options = {}) {
+        let fen = trial && trial.FenObj;
+        if (!fen || !fen.face_match_after_photo) return null;
+
+        let basics = trial.basics;
+        if (!basics) {
+            console.warn("face_match: missing trial.basics; skipping question.");
+            return null;
+        }
+
+        let layers = basics.ItemLayers || {};
+        let layer = options.parentLayer || layers.Plus2 || layers.Questions || layers.Main;
+        if (!layer) {
+            console.warn("face_match: no SVG layer to attach choice bar; skipping question.");
+            return null;
+        }
+
+        fen.face_match_errors_made = [];
+
+        let optionObjs = Array.isArray(fen.fennimals_asked_objects)
+            ? fen.fennimals_asked_objects.map((f) => JSON.parse(JSON.stringify(f)))
+            : [];
+        if (!optionObjs.some((f) => f.id === fen.id)) {
+            optionObjs.push(JSON.parse(JSON.stringify(fen)));
+        }
+        optionObjs = AskFennimalOverlay.uniqueOptionsByHead(optionObjs, fen);
+        if (optionObjs.length === 0) {
+            console.warn("face_match: no unique-head options; skipping question.");
+            return null;
+        }
+
+        let bar = new FennimalChoiceBar(layer, basics.W, basics.H, {
+            panel_y_ratio: options.panel_y_ratio != null ? options.panel_y_ratio : 0.72,
+            btn_size: options.btn_size || 156
+        });
+        let prompt = options.prompt || "Which face did you just photograph?";
+
+        while (true) {
+            Interface.Prompt.show_message(prompt);
+            let selected = await bar.waitForSelection(shuffleArray([...optionObjs]));
+            let selectedObj = optionObjs.find((f) => f.id === selected);
+            let headMatches = selectedObj && selectedObj.head === fen.head;
+            if (selected === fen.id || headMatches) {
+                AudioCont.play_sound_effect("positive");
+                await bar.hide();
+                Interface.Prompt.hide();
+                return { correct: true, selected };
+            }
+            AudioCont.play_sound_effect("rejected");
+            fen.face_match_errors_made.push(selected);
+            Interface.Prompt.show_message("Oops, that's not the face you just photographed!");
             await bar.hide();
             await wait(1000);
         }
