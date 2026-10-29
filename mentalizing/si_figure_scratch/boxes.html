@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SI scratch — boxes</title>
+  <style>
+    html, body {
+      height: auto;
+      min-height: 100%;
+      overflow: auto;
+      background: #e8e8e8;
+      color: #222;
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+    body { margin: 0; padding: 28px; }
+    h1 { font-size: 1.25rem; font-weight: 650; margin: 0 0 6px; }
+    p.note { margin: 0 0 16px; max-width: 56rem; line-height: 1.45; color: #444; }
+    button {
+      font: inherit;
+      padding: 6px 12px;
+      border: 1px solid #888;
+      background: #fff;
+      cursor: pointer;
+    }
+    button:hover { background: #f4f4f4; }
+    button:disabled { cursor: progress; opacity: 0.7; }
+    table { border-collapse: separate; border-spacing: 14px 18px; }
+    th { text-align: left; font-size: 0.95rem; vertical-align: bottom; }
+    td { vertical-align: top; }
+    .scheme { vertical-align: middle; white-space: nowrap; padding-right: 8px; }
+    .state { vertical-align: middle; white-space: nowrap; font-weight: 500; color: #333; padding-right: 8px; }
+    figure { margin: 0; }
+    .panel { background: #fff; line-height: 0; }
+    .panel svg { display: block; }
+    figcaption { margin-top: 4px; }
+    figcaption button { padding: 2px 8px; font-size: 0.78rem; }
+    #status { color: #8a1f1f; }
+    #measure-host {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 0;
+      height: 0;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <svg id="Scannimals_Task_SVG" width="1920" height="1080" style="position:absolute;left:-9000px;width:10px;height:10px"></svg>
+  <h1>Boxes</h1>
+  <p class="note" id="intro">Loading the box artwork…</p>
+  <p id="status" hidden></p>
+  <p class="toolbar"><button type="button" id="download-all" hidden>Download all as ZIP</button></p>
+  <div id="root"></div>
+
+  <script src="../../src/1_General_functions.js?v=kit-live-1"></script>
+  <script src="../../src/1_General_Parameters.js?v=head-dropdown-5"></script>
+  <script>
+    const BOXES = [
+      ["container", "Container"],
+      ["chest", "Chest"],
+      ["crate", "Crate"],
+      ["picknick", "Picnic basket"]
+    ];
+    const CELL_PX = 200;
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
+    function crc32(bytes) {
+      if (!crc32.table) {
+        const table = new Uint32Array(256);
+        for (let n = 0; n < 256; n++) {
+          let c = n;
+          for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+          table[n] = c >>> 0;
+        }
+        crc32.table = table;
+      }
+      let crc = 0xffffffff;
+      for (let i = 0; i < bytes.length; i++) {
+        crc = crc32.table[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+      }
+      return (crc ^ 0xffffffff) >>> 0;
+    }
+
+    function zipStore(files) {
+      const encoder = new TextEncoder();
+      const parts = [];
+      const central = [];
+      let offset = 0;
+      files.forEach((file) => {
+        const name = encoder.encode(file.name);
+        const data = file.data;
+        const crc = crc32(data);
+        const local = new Uint8Array(30 + name.length);
+        const view = new DataView(local.buffer);
+        view.setUint32(0, 0x04034b50, true);
+        view.setUint16(4, 20, true);
+        view.setUint16(8, 0, true);
+        view.setUint32(14, crc, true);
+        view.setUint32(18, data.length, true);
+        view.setUint32(22, data.length, true);
+        view.setUint16(26, name.length, true);
+        local.set(name, 30);
+        parts.push(local, data);
+
+        const entry = new Uint8Array(46 + name.length);
+        const centralView = new DataView(entry.buffer);
+        centralView.setUint32(0, 0x02014b50, true);
+        centralView.setUint16(4, 20, true);
+        centralView.setUint16(6, 20, true);
+        centralView.setUint32(16, crc, true);
+        centralView.setUint32(20, data.length, true);
+        centralView.setUint32(24, data.length, true);
+        centralView.setUint16(28, name.length, true);
+        centralView.setUint32(42, offset, true);
+        entry.set(name, 46);
+        central.push(entry);
+        offset += local.length + data.length;
+      });
+      let centralSize = 0;
+      central.forEach((entry) => { centralSize += entry.length; });
+      const end = new Uint8Array(22);
+      const endView = new DataView(end.buffer);
+      endView.setUint32(0, 0x06054b50, true);
+      endView.setUint16(8, files.length, true);
+      endView.setUint16(10, files.length, true);
+      endView.setUint32(12, centralSize, true);
+      endView.setUint32(16, offset, true);
+      return new Blob([...parts, ...central, end], { type: "application/zip" });
+    }
+
+    function prepareBox(box, scheme, decorated) {
+      box.removeAttribute("id");
+      box.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
+      box.style.display = "inline";
+      box.querySelectorAll(".lost_found_tag_loose, .lost_found_tag_attached, .invisible_element, .prep_element_hidden").forEach((el) => {
+        el.style.display = "none";
+      });
+      box.querySelectorAll(".box_decoration").forEach((el) => {
+        el.style.display = decorated ? "inline" : "none";
+        el.style.opacity = "1";
+        el.style.visibility = "visible";
+      });
+      if (scheme) set_box_color_scheme(box, scheme);
+    }
+
+    function renderPng(svg, exportW, exportH) {
+      return new Promise((resolve, reject) => {
+        const clone = svg.cloneNode(true);
+        clone.setAttribute("width", String(exportW));
+        clone.setAttribute("height", String(exportH));
+        const xml = new XMLSerializer().serializeToString(clone);
+        const blob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = exportW;
+          canvas.height = exportH;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, exportW, exportH);
+          ctx.drawImage(img, 0, 0, exportW, exportH);
+          URL.revokeObjectURL(url);
+          resolve(canvas);
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error("Could not draw a box"));
+        };
+        img.src = url;
+      });
+    }
+
+    async function build() {
+      const intro = document.getElementById("intro");
+      const status = document.getElementById("status");
+      try {
+        GenParam = new GENERALPARAM();
+        const response = await fetch("../../SVG/Items.svg");
+        if (!response.ok) throw new Error("Items.svg returned " + response.status);
+        const doc = new DOMParser().parseFromString(await response.text(), "image/svg+xml");
+        const host = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        host.id = "box-templates";
+        host.style.position = "absolute";
+        host.style.left = "-9000px";
+        host.style.width = "10px";
+        host.style.height = "10px";
+        document.body.appendChild(host);
+        BOXES.forEach(([id]) => {
+          const node = doc.getElementById("toybox_" + id);
+          if (!node) throw new Error("Missing toybox_" + id);
+          host.appendChild(document.importNode(node, true));
+        });
+      } catch (err) {
+        status.hidden = false;
+        status.textContent = "Could not load the box artwork. Open this page from the experiment server.";
+        intro.textContent = "";
+        return;
+      }
+
+      const schemes = [{ id: "standard", label: "Standard", scheme: null }];
+      GenParam.BoxSwapPreferredHues.forEach((hue) => {
+        const palette = GenParam.BoxSwapPalettes[hue];
+        schemes.push({
+          id: hue,
+          label: hue.charAt(0).toUpperCase() + hue.slice(1),
+          scheme: {
+            light_color: palette.light_color,
+            dark_color: palette.mid_color,
+            recolor_accents: false
+          }
+        });
+      });
+
+      const measureHost = document.createElement("div");
+      measureHost.id = "measure-host";
+      const measure = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      measure.setAttribute("width", "4000");
+      measure.setAttribute("height", "4000");
+      measure.setAttribute("overflow", "visible");
+      measureHost.appendChild(measure);
+      document.body.appendChild(measureHost);
+
+      const built = [];
+      let maxW = 0;
+      let maxH = 0;
+      schemes.forEach((scheme) => {
+        [true, false].forEach((decorated) => {
+          BOXES.forEach(([boxId]) => {
+            const box = document.getElementById("toybox_" + boxId).cloneNode(true);
+            prepareBox(box, scheme.scheme, decorated);
+            measure.appendChild(box);
+            const bounds = box.getBBox();
+            maxW = Math.max(maxW, bounds.width);
+            maxH = Math.max(maxH, bounds.height);
+            built.push({ boxId, scheme, decorated, box, bounds });
+          });
+        });
+      });
+
+      const pad = Math.max(maxW, maxH) * 0.06;
+      const cellW = maxW + pad * 2;
+      const cellH = maxH + pad * 2;
+      const displayH = CELL_PX;
+      const displayW = Math.round(CELL_PX * (cellW / cellH));
+      const exportH = 840;
+      const exportW = Math.round(exportH * (cellW / cellH));
+
+      intro.textContent = "Each column is one box. The first pair of rows is that box’s usual colors. Each later pair is a recolor the box can receive when those colors clash with the region around it. Within a pair, the first row shows all four decorations and the second row shows the box without them.";
+
+      const table = document.createElement("table");
+      const thead = document.createElement("thead");
+      const headRow = document.createElement("tr");
+      headRow.appendChild(document.createElement("th"));
+      headRow.appendChild(document.createElement("th"));
+      BOXES.forEach(([, label]) => {
+        const th = document.createElement("th");
+        th.textContent = label;
+        headRow.appendChild(th);
+      });
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+      const records = [];
+      const ns = "http://www.w3.org/2000/svg";
+
+      schemes.forEach((scheme) => {
+        [true, false].forEach((decorated, pairIndex) => {
+          const tr = document.createElement("tr");
+          if (pairIndex === 0) {
+            const schemeCell = document.createElement("th");
+            schemeCell.className = "scheme";
+            schemeCell.rowSpan = 2;
+            schemeCell.textContent = scheme.label;
+            tr.appendChild(schemeCell);
+          }
+          const stateCell = document.createElement("th");
+          stateCell.className = "state";
+          stateCell.textContent = decorated ? "With decorations" : "Without decorations";
+          tr.appendChild(stateCell);
+
+          BOXES.forEach(([boxId]) => {
+            const item = built.find((row) => row.boxId === boxId && row.scheme === scheme && row.decorated === decorated);
+            const tx = pad + (maxW - item.bounds.width) / 2 - item.bounds.x;
+            const ty = pad + (maxH - item.bounds.height) / 2 - item.bounds.y;
+            item.box.setAttribute("transform", "translate(" + tx + " " + ty + ")");
+
+            const svg = document.createElementNS(ns, "svg");
+            svg.setAttribute("xmlns", ns);
+            svg.setAttribute("width", String(displayW));
+            svg.setAttribute("height", String(displayH));
+            svg.setAttribute("viewBox", "0 0 " + cellW + " " + cellH);
+            const bg = document.createElementNS(ns, "rect");
+            bg.setAttribute("x", "0");
+            bg.setAttribute("y", "0");
+            bg.setAttribute("width", String(cellW));
+            bg.setAttribute("height", String(cellH));
+            bg.setAttribute("fill", "#ffffff");
+            svg.appendChild(bg);
+            svg.appendChild(item.box);
+
+            const filename = "box_" + boxId + "_" + scheme.id + "_" + (decorated ? "decorated" : "plain") + ".png";
+            const td = document.createElement("td");
+            const figure = document.createElement("figure");
+            const panel = document.createElement("div");
+            panel.className = "panel";
+            panel.style.width = displayW + "px";
+            panel.style.height = displayH + "px";
+            panel.appendChild(svg);
+            const caption = document.createElement("figcaption");
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent = "PNG";
+            button.addEventListener("click", async () => {
+              const canvas = await renderPng(svg, exportW, exportH);
+              canvas.toBlob((blob) => downloadBlob(blob, filename), "image/png");
+            });
+            caption.appendChild(button);
+            figure.appendChild(panel);
+            figure.appendChild(caption);
+            td.appendChild(figure);
+            tr.appendChild(td);
+            records.push({ svg, filename });
+          });
+          tbody.appendChild(tr);
+        });
+      });
+      table.appendChild(tbody);
+      document.getElementById("root").appendChild(table);
+
+      const all = document.getElementById("download-all");
+      all.hidden = false;
+      all.addEventListener("click", async () => {
+        const previous = all.textContent;
+        all.disabled = true;
+        all.textContent = "Preparing zip…";
+        try {
+          const files = [];
+          for (const record of records) {
+            const canvas = await renderPng(record.svg, exportW, exportH);
+            const png = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+            files.push({ name: record.filename, data: new Uint8Array(await png.arrayBuffer()) });
+          }
+          downloadBlob(zipStore(files), "boxes.zip");
+        } finally {
+          all.disabled = false;
+          all.textContent = previous;
+        }
+      });
+    }
+
+    build();
+  </script>
+</body>
+</html>

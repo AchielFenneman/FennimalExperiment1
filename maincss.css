@@ -1923,6 +1923,52 @@ html, body {
     animation: kit-stamp-glimmer-sweep 15.2s linear infinite;
 }
 
+/* Same 45-degree band as the cheek stamps. The Fennimal freezes every CSS
+   animation inside it, so the second rule has to keep this one running. */
+@keyframes question-mark-glimmer {
+    0% {
+        -webkit-mask-position: 145% 145%;
+        mask-position: 145% 145%;
+        opacity: 0;
+    }
+    12% {
+        opacity: 1;
+    }
+    46% {
+        -webkit-mask-position: -45% -45%;
+        mask-position: -45% -45%;
+        opacity: 1;
+    }
+    58%, 100% {
+        -webkit-mask-position: -60% -60%;
+        mask-position: -60% -60%;
+        opacity: 0;
+    }
+}
+
+.question_mark_sheen_wrap {
+    /* Overall strength of the stripe. The sweep still fades in and out inside this. */
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+.question_mark_sheen {
+    pointer-events: none;
+    fill: #ffffff;
+    -webkit-mask-image: linear-gradient(135deg, transparent 34%, #fff 50%, transparent 66%);
+    mask-image: linear-gradient(135deg, transparent 34%, #fff 50%, transparent 66%);
+    -webkit-mask-size: 250% 250%;
+    mask-size: 250% 250%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    animation: question-mark-glimmer 2.4s linear infinite;
+}
+
+.fennimal_pose_frozen .question_mark_sheen {
+    animation: question-mark-glimmer 2.4s linear infinite !important;
+    animation-play-state: running !important;
+}
+
 .kit_stamp_outline_pulse path,
 .kit_stamp_outline_pulse polygon,
 .kit_stamp_outline_pulse polyline,

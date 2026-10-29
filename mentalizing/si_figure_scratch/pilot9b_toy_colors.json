@@ -1,0 +1,1147 @@
+{
+  "source": "Pilots 9 and 9B, 70 completed sessions",
+  "n_sessions": 70,
+  "toys": [
+    {
+      "id": "globe",
+      "label": "Globe",
+      "sessions": 29,
+      "variants": [
+        {
+          "dark": "#4a5e3a",
+          "light": "#d0d0d0",
+          "primary": "green",
+          "secondary": "gray",
+          "n": 5
+        },
+        {
+          "dark": "#666666",
+          "light": "#cbb8d4",
+          "primary": "gray",
+          "secondary": "lavender",
+          "n": 2
+        },
+        {
+          "dark": "#4a7800",
+          "light": "#9aa8c8",
+          "primary": "lime",
+          "secondary": "blue",
+          "n": 2
+        },
+        {
+          "dark": "#3d4f7a",
+          "light": "#b0c49a",
+          "primary": "blue",
+          "secondary": "green",
+          "n": 1
+        },
+        {
+          "dark": "#c02060",
+          "light": "#d0d0d0",
+          "primary": "pink",
+          "secondary": "gray",
+          "n": 1
+        },
+        {
+          "dark": "#7a7538",
+          "light": "#a8c4c0",
+          "primary": "yellow",
+          "secondary": "teal",
+          "n": 1
+        },
+        {
+          "dark": "#007888",
+          "light": "#f0a0e8",
+          "primary": "cyan",
+          "secondary": "magenta",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#b0c49a",
+          "primary": "gray",
+          "secondary": "green",
+          "n": 1
+        },
+        {
+          "dark": "#3d5c58",
+          "light": "#e0d5c5",
+          "primary": "teal",
+          "secondary": "sand",
+          "n": 1
+        },
+        {
+          "dark": "#c02060",
+          "light": "#b0c49a",
+          "primary": "pink",
+          "secondary": "green",
+          "n": 1
+        },
+        {
+          "dark": "#007888",
+          "light": "#d4a4a4",
+          "primary": "cyan",
+          "secondary": "red",
+          "n": 1
+        },
+        {
+          "dark": "#3d5c58",
+          "light": "#c4b5a5",
+          "primary": "teal",
+          "secondary": "brown",
+          "n": 1
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#d4ce8e",
+          "primary": "lavender",
+          "secondary": "yellow",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#ff9a7a",
+          "primary": "gray",
+          "secondary": "coral",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#c8f060",
+          "primary": "gray",
+          "secondary": "lime",
+          "n": 1
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#c8f060",
+          "primary": "lavender",
+          "secondary": "lime",
+          "n": 1
+        },
+        {
+          "dark": "#4a5e3a",
+          "light": "#cbb8d4",
+          "primary": "green",
+          "secondary": "lavender",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#f0a0e8",
+          "primary": "gray",
+          "secondary": "magenta",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#e0d5c5",
+          "primary": "gray",
+          "secondary": "sand",
+          "n": 1
+        },
+        {
+          "dark": "#3d4f7a",
+          "light": "#ffb074",
+          "primary": "blue",
+          "secondary": "orange",
+          "n": 1
+        },
+        {
+          "dark": "#c44e00",
+          "light": "#d0d0d0",
+          "primary": "orange",
+          "secondary": "gray",
+          "n": 1
+        },
+        {
+          "dark": "#7a7538",
+          "light": "#9aa8c8",
+          "primary": "yellow",
+          "secondary": "blue",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#ffb074",
+          "primary": "gray",
+          "secondary": "orange",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "robot",
+      "label": "Robot",
+      "sessions": 28,
+      "variants": [
+        {
+          "dark": "#6a5080",
+          "light": "#9aa8c8",
+          "primary": "lavender",
+          "secondary": "blue",
+          "n": 3
+        },
+        {
+          "dark": "#666666",
+          "light": "#d4a4a4",
+          "primary": "gray",
+          "secondary": "red",
+          "n": 2
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#b0c49a",
+          "primary": "lavender",
+          "secondary": "green",
+          "n": 2
+        },
+        {
+          "dark": "#3d4f7a",
+          "light": "#d4a4a4",
+          "primary": "blue",
+          "secondary": "red",
+          "n": 2
+        },
+        {
+          "dark": "#4a5e3a",
+          "light": "#d0d0d0",
+          "primary": "green",
+          "secondary": "gray",
+          "n": 2
+        },
+        {
+          "dark": "#3d4f7a",
+          "light": "#ffb0c8",
+          "primary": "blue",
+          "secondary": "pink",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#7ee8f0",
+          "primary": "gray",
+          "secondary": "cyan",
+          "n": 1
+        },
+        {
+          "dark": "#5c4535",
+          "light": "#d0d0d0",
+          "primary": "brown",
+          "secondary": "gray",
+          "n": 1
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#d4ce8e",
+          "primary": "lavender",
+          "secondary": "yellow",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#e0d5c5",
+          "primary": "gray",
+          "secondary": "sand",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#f0a0e8",
+          "primary": "gray",
+          "secondary": "magenta",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#c4b5a5",
+          "primary": "gray",
+          "secondary": "brown",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#d4ce8e",
+          "primary": "gray",
+          "secondary": "yellow",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#a8c4c0",
+          "primary": "gray",
+          "secondary": "teal",
+          "n": 1
+        },
+        {
+          "dark": "#3d4f7a",
+          "light": "#ffb074",
+          "primary": "blue",
+          "secondary": "orange",
+          "n": 1
+        },
+        {
+          "dark": "#3d4f7a",
+          "light": "#e0d5c5",
+          "primary": "blue",
+          "secondary": "sand",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#9aa8c8",
+          "primary": "gray",
+          "secondary": "blue",
+          "n": 1
+        },
+        {
+          "dark": "#3d4f7a",
+          "light": "#c4b5a5",
+          "primary": "blue",
+          "secondary": "brown",
+          "n": 1
+        },
+        {
+          "dark": "#c02060",
+          "light": "#d0d0d0",
+          "primary": "pink",
+          "secondary": "gray",
+          "n": 1
+        },
+        {
+          "dark": "#c44e00",
+          "light": "#9aa8c8",
+          "primary": "orange",
+          "secondary": "blue",
+          "n": 1
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#e0d5c5",
+          "primary": "lavender",
+          "secondary": "sand",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#ffb074",
+          "primary": "gray",
+          "secondary": "orange",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "bubblewand",
+      "label": "Bubble wand",
+      "sessions": 33,
+      "variants": [
+        {
+          "dark": "#666666",
+          "light": "#a8c4c0",
+          "primary": "gray",
+          "secondary": "teal",
+          "n": 3
+        },
+        {
+          "dark": "#666666",
+          "light": "#d4a4a4",
+          "primary": "gray",
+          "secondary": "red",
+          "n": 3
+        },
+        {
+          "dark": "#a01080",
+          "light": "#9aa8c8",
+          "primary": "magenta",
+          "secondary": "blue",
+          "n": 2
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#a8c4c0",
+          "primary": "lavender",
+          "secondary": "teal",
+          "n": 2
+        },
+        {
+          "dark": "#666666",
+          "light": "#b0c49a",
+          "primary": "gray",
+          "secondary": "green",
+          "n": 2
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#9aa8c8",
+          "primary": "lavender",
+          "secondary": "blue",
+          "n": 2
+        },
+        {
+          "dark": "#3d5c58",
+          "light": "#c4b5a5",
+          "primary": "teal",
+          "secondary": "brown",
+          "n": 2
+        },
+        {
+          "dark": "#4a5e3a",
+          "light": "#d0d0d0",
+          "primary": "green",
+          "secondary": "gray",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#7ee8f0",
+          "primary": "gray",
+          "secondary": "cyan",
+          "n": 1
+        },
+        {
+          "dark": "#7a7538",
+          "light": "#d0d0d0",
+          "primary": "yellow",
+          "secondary": "gray",
+          "n": 1
+        },
+        {
+          "dark": "#4a5e3a",
+          "light": "#9aa8c8",
+          "primary": "green",
+          "secondary": "blue",
+          "n": 1
+        },
+        {
+          "dark": "#3d4f7a",
+          "light": "#c4b5a5",
+          "primary": "blue",
+          "secondary": "brown",
+          "n": 1
+        },
+        {
+          "dark": "#3d4f7a",
+          "light": "#d4a4a4",
+          "primary": "blue",
+          "secondary": "red",
+          "n": 1
+        },
+        {
+          "dark": "#3d4f7a",
+          "light": "#ffb074",
+          "primary": "blue",
+          "secondary": "orange",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#d4ce8e",
+          "primary": "gray",
+          "secondary": "yellow",
+          "n": 1
+        },
+        {
+          "dark": "#7a7538",
+          "light": "#9aa8c8",
+          "primary": "yellow",
+          "secondary": "blue",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#ffb0c8",
+          "primary": "gray",
+          "secondary": "pink",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#c4b5a5",
+          "primary": "gray",
+          "secondary": "brown",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#e0d5c5",
+          "primary": "gray",
+          "secondary": "sand",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#cbb8d4",
+          "primary": "gray",
+          "secondary": "lavender",
+          "n": 1
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#d4ce8e",
+          "primary": "lavender",
+          "secondary": "yellow",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#ff9a7a",
+          "primary": "gray",
+          "secondary": "coral",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#c8f060",
+          "primary": "gray",
+          "secondary": "lime",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#f0a0e8",
+          "primary": "gray",
+          "secondary": "magenta",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "car",
+      "label": "Car",
+      "sessions": 29,
+      "variants": [
+        {
+          "dark": "#3d4f7a",
+          "light": "#e0d5c5",
+          "primary": "blue",
+          "secondary": "sand",
+          "n": 4
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#9aa8c8",
+          "primary": "lavender",
+          "secondary": "blue",
+          "n": 3
+        },
+        {
+          "dark": "#3d5c58",
+          "light": "#e0d5c5",
+          "primary": "teal",
+          "secondary": "sand",
+          "n": 2
+        },
+        {
+          "dark": "#4a5e3a",
+          "light": "#cbb8d4",
+          "primary": "green",
+          "secondary": "lavender",
+          "n": 2
+        },
+        {
+          "dark": "#4a5e3a",
+          "light": "#d0d0d0",
+          "primary": "green",
+          "secondary": "gray",
+          "n": 2
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#d4ce8e",
+          "primary": "lavender",
+          "secondary": "yellow",
+          "n": 2
+        },
+        {
+          "dark": "#3d5c58",
+          "light": "#c4b5a5",
+          "primary": "teal",
+          "secondary": "brown",
+          "n": 2
+        },
+        {
+          "dark": "#7a7538",
+          "light": "#d0d0d0",
+          "primary": "yellow",
+          "secondary": "gray",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#ffb074",
+          "primary": "gray",
+          "secondary": "orange",
+          "n": 1
+        },
+        {
+          "dark": "#7a7538",
+          "light": "#9aa8c8",
+          "primary": "yellow",
+          "secondary": "blue",
+          "n": 1
+        },
+        {
+          "dark": "#a01080",
+          "light": "#9aa8c8",
+          "primary": "magenta",
+          "secondary": "blue",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#d4a4a4",
+          "primary": "gray",
+          "secondary": "red",
+          "n": 1
+        },
+        {
+          "dark": "#4a7800",
+          "light": "#cbb8d4",
+          "primary": "lime",
+          "secondary": "lavender",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#b0c49a",
+          "primary": "gray",
+          "secondary": "green",
+          "n": 1
+        },
+        {
+          "dark": "#007888",
+          "light": "#c4b5a5",
+          "primary": "cyan",
+          "secondary": "brown",
+          "n": 1
+        },
+        {
+          "dark": "#4a5e3a",
+          "light": "#9aa8c8",
+          "primary": "green",
+          "secondary": "blue",
+          "n": 1
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#e0d5c5",
+          "primary": "lavender",
+          "secondary": "sand",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#c4b5a5",
+          "primary": "gray",
+          "secondary": "brown",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#c8f060",
+          "primary": "gray",
+          "secondary": "lime",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "trumpet",
+      "label": "Trumpet",
+      "sessions": 26,
+      "variants": [
+        {
+          "dark": "#666666",
+          "light": "#b0c49a",
+          "primary": "gray",
+          "secondary": "green",
+          "n": 2
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#d4ce8e",
+          "primary": "lavender",
+          "secondary": "yellow",
+          "n": 2
+        },
+        {
+          "dark": "#666666",
+          "light": "#f0a0e8",
+          "primary": "gray",
+          "secondary": "magenta",
+          "n": 2
+        },
+        {
+          "dark": "#666666",
+          "light": "#ff9a7a",
+          "primary": "gray",
+          "secondary": "coral",
+          "n": 1
+        },
+        {
+          "dark": "#3d5c58",
+          "light": "#d4ce8e",
+          "primary": "teal",
+          "secondary": "yellow",
+          "n": 1
+        },
+        {
+          "dark": "#4a7800",
+          "light": "#d0d0d0",
+          "primary": "lime",
+          "secondary": "gray",
+          "n": 1
+        },
+        {
+          "dark": "#c02060",
+          "light": "#b0c49a",
+          "primary": "pink",
+          "secondary": "green",
+          "n": 1
+        },
+        {
+          "dark": "#4a5e3a",
+          "light": "#9aa8c8",
+          "primary": "green",
+          "secondary": "blue",
+          "n": 1
+        },
+        {
+          "dark": "#3d4f7a",
+          "light": "#ffb074",
+          "primary": "blue",
+          "secondary": "orange",
+          "n": 1
+        },
+        {
+          "dark": "#3d4f7a",
+          "light": "#ffb0c8",
+          "primary": "blue",
+          "secondary": "pink",
+          "n": 1
+        },
+        {
+          "dark": "#4a7800",
+          "light": "#cbb8d4",
+          "primary": "lime",
+          "secondary": "lavender",
+          "n": 1
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#e0d5c5",
+          "primary": "lavender",
+          "secondary": "sand",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#ffb074",
+          "primary": "gray",
+          "secondary": "orange",
+          "n": 1
+        },
+        {
+          "dark": "#a01080",
+          "light": "#d0d0d0",
+          "primary": "magenta",
+          "secondary": "gray",
+          "n": 1
+        },
+        {
+          "dark": "#4a5e3a",
+          "light": "#cbb8d4",
+          "primary": "green",
+          "secondary": "lavender",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#9aa8c8",
+          "primary": "gray",
+          "secondary": "blue",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#7ee8f0",
+          "primary": "gray",
+          "secondary": "cyan",
+          "n": 1
+        },
+        {
+          "dark": "#3d4f7a",
+          "light": "#d4ce8e",
+          "primary": "blue",
+          "secondary": "yellow",
+          "n": 1
+        },
+        {
+          "dark": "#007888",
+          "light": "#ffb0c8",
+          "primary": "cyan",
+          "secondary": "pink",
+          "n": 1
+        },
+        {
+          "dark": "#007888",
+          "light": "#c4b5a5",
+          "primary": "cyan",
+          "secondary": "brown",
+          "n": 1
+        },
+        {
+          "dark": "#007888",
+          "light": "#ffb074",
+          "primary": "cyan",
+          "secondary": "orange",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#d4a4a4",
+          "primary": "gray",
+          "secondary": "red",
+          "n": 1
+        },
+        {
+          "dark": "#4a5e3a",
+          "light": "#d0d0d0",
+          "primary": "green",
+          "secondary": "gray",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "plane",
+      "label": "Plane",
+      "sessions": 32,
+      "variants": [
+        {
+          "dark": "#666666",
+          "light": "#ff9a7a",
+          "primary": "gray",
+          "secondary": "coral",
+          "n": 4
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#9aa8c8",
+          "primary": "lavender",
+          "secondary": "blue",
+          "n": 3
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#d4ce8e",
+          "primary": "lavender",
+          "secondary": "yellow",
+          "n": 3
+        },
+        {
+          "dark": "#5c4535",
+          "light": "#9aa8c8",
+          "primary": "brown",
+          "secondary": "blue",
+          "n": 2
+        },
+        {
+          "dark": "#4a5e3a",
+          "light": "#d0d0d0",
+          "primary": "green",
+          "secondary": "gray",
+          "n": 2
+        },
+        {
+          "dark": "#666666",
+          "light": "#d4ce8e",
+          "primary": "gray",
+          "secondary": "yellow",
+          "n": 2
+        },
+        {
+          "dark": "#666666",
+          "light": "#d4a4a4",
+          "primary": "gray",
+          "secondary": "red",
+          "n": 2
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#c8f060",
+          "primary": "lavender",
+          "secondary": "lime",
+          "n": 2
+        },
+        {
+          "dark": "#3d4f7a",
+          "light": "#ffb074",
+          "primary": "blue",
+          "secondary": "orange",
+          "n": 2
+        },
+        {
+          "dark": "#666666",
+          "light": "#b0c49a",
+          "primary": "gray",
+          "secondary": "green",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#ffb074",
+          "primary": "gray",
+          "secondary": "orange",
+          "n": 1
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#e0d5c5",
+          "primary": "lavender",
+          "secondary": "sand",
+          "n": 1
+        },
+        {
+          "dark": "#7a7538",
+          "light": "#a8c4c0",
+          "primary": "yellow",
+          "secondary": "teal",
+          "n": 1
+        },
+        {
+          "dark": "#4a5e3a",
+          "light": "#d4a4a4",
+          "primary": "green",
+          "secondary": "red",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#a8c4c0",
+          "primary": "gray",
+          "secondary": "teal",
+          "n": 1
+        },
+        {
+          "dark": "#c44e00",
+          "light": "#9aa8c8",
+          "primary": "orange",
+          "secondary": "blue",
+          "n": 1
+        },
+        {
+          "dark": "#7a3838",
+          "light": "#d0d0d0",
+          "primary": "red",
+          "secondary": "gray",
+          "n": 1
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#b0c49a",
+          "primary": "lavender",
+          "secondary": "green",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#c8f060",
+          "primary": "gray",
+          "secondary": "lime",
+          "n": 1
+        }
+      ]
+    },
+    {
+      "id": "jack",
+      "label": "Jack-in-the-box",
+      "sessions": 33,
+      "variants": [
+        {
+          "dark": "#666666",
+          "light": "#d4a4a4",
+          "primary": "gray",
+          "secondary": "red",
+          "n": 2
+        },
+        {
+          "dark": "#666666",
+          "light": "#ffb074",
+          "primary": "gray",
+          "secondary": "orange",
+          "n": 2
+        },
+        {
+          "dark": "#3d5c58",
+          "light": "#c4b5a5",
+          "primary": "teal",
+          "secondary": "brown",
+          "n": 2
+        },
+        {
+          "dark": "#7a7538",
+          "light": "#d0d0d0",
+          "primary": "yellow",
+          "secondary": "gray",
+          "n": 2
+        },
+        {
+          "dark": "#4a5e3a",
+          "light": "#d0d0d0",
+          "primary": "green",
+          "secondary": "gray",
+          "n": 2
+        },
+        {
+          "dark": "#666666",
+          "light": "#ffb0c8",
+          "primary": "gray",
+          "secondary": "pink",
+          "n": 2
+        },
+        {
+          "dark": "#7a7538",
+          "light": "#9aa8c8",
+          "primary": "yellow",
+          "secondary": "blue",
+          "n": 2
+        },
+        {
+          "dark": "#666666",
+          "light": "#c4b5a5",
+          "primary": "gray",
+          "secondary": "brown",
+          "n": 1
+        },
+        {
+          "dark": "#4a7800",
+          "light": "#d0d0d0",
+          "primary": "lime",
+          "secondary": "gray",
+          "n": 1
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#d4ce8e",
+          "primary": "lavender",
+          "secondary": "yellow",
+          "n": 1
+        },
+        {
+          "dark": "#5c4535",
+          "light": "#9aa8c8",
+          "primary": "brown",
+          "secondary": "blue",
+          "n": 1
+        },
+        {
+          "dark": "#007888",
+          "light": "#e0d5c5",
+          "primary": "cyan",
+          "secondary": "sand",
+          "n": 1
+        },
+        {
+          "dark": "#3d4f7a",
+          "light": "#c4b5a5",
+          "primary": "blue",
+          "secondary": "brown",
+          "n": 1
+        },
+        {
+          "dark": "#3d5c58",
+          "light": "#d4ce8e",
+          "primary": "teal",
+          "secondary": "yellow",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#f0a0e8",
+          "primary": "gray",
+          "secondary": "magenta",
+          "n": 1
+        },
+        {
+          "dark": "#4a5e3a",
+          "light": "#ffb0c8",
+          "primary": "green",
+          "secondary": "pink",
+          "n": 1
+        },
+        {
+          "dark": "#4a5e3a",
+          "light": "#9aa8c8",
+          "primary": "green",
+          "secondary": "blue",
+          "n": 1
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#b0c49a",
+          "primary": "lavender",
+          "secondary": "green",
+          "n": 1
+        },
+        {
+          "dark": "#6a5080",
+          "light": "#a8c4c0",
+          "primary": "lavender",
+          "secondary": "teal",
+          "n": 1
+        },
+        {
+          "dark": "#3d5c58",
+          "light": "#e0d5c5",
+          "primary": "teal",
+          "secondary": "sand",
+          "n": 1
+        },
+        {
+          "dark": "#3d4f7a",
+          "light": "#d4ce8e",
+          "primary": "blue",
+          "secondary": "yellow",
+          "n": 1
+        },
+        {
+          "dark": "#3d4f7a",
+          "light": "#ffb074",
+          "primary": "blue",
+          "secondary": "orange",
+          "n": 1
+        },
+        {
+          "dark": "#666666",
+          "light": "#9aa8c8",
+          "primary": "gray",
+          "secondary": "blue",
+          "n": 1
+        },
+        {
+          "dark": "#007888",
+          "light": "#d4ce8e",
+          "primary": "cyan",
+          "secondary": "yellow",
+          "n": 1
+        },
+        {
+          "dark": "#3d4f7a",
+          "light": "#ffb0c8",
+          "primary": "blue",
+          "secondary": "pink",
+          "n": 1
+        },
+        {
+          "dark": "#c44e00",
+          "light": "#9aa8c8",
+          "primary": "orange",
+          "secondary": "blue",
+          "n": 1
+        }
+      ]
+    }
+  ]
+}

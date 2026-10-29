@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SI scratch — toys, pilots 9 and 9B</title>
+  <style>
+    :root { color: #222; font-family: "Segoe UI", system-ui, sans-serif; }
+    body { margin: 28px; background: #e8e8e8; }
+    h1 { font-size: 1.25rem; font-weight: 650; margin: 0 0 6px; }
+    h2 { font-size: 1.05rem; font-weight: 650; margin: 28px 0 10px; }
+    p.note { margin: 0 0 18px; max-width: 54rem; line-height: 1.45; color: #444; }
+    .toolbar { margin: 0 0 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+    button {
+      font: inherit;
+      padding: 6px 12px;
+      border: 1px solid #888;
+      background: #fff;
+      cursor: pointer;
+    }
+    button:hover { background: #f4f4f4; }
+    .grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px 18px;
+      align-items: flex-start;
+    }
+    figure { margin: 0; width: 168px; }
+    .panel {
+      width: 168px;
+      height: 168px;
+      background: #fff;
+      line-height: 0;
+    }
+    .panel svg { width: 168px; height: 168px; display: block; }
+    figcaption {
+      margin-top: 6px;
+      font-size: 0.78rem;
+      line-height: 1.3;
+      color: #333;
+    }
+    figcaption button { margin-top: 4px; padding: 2px 8px; font-size: 0.78rem; }
+    #status { color: #8a1f1f; }
+  </style>
+</head>
+<body>
+  <h1>Toys in pilots 9 and 9B</h1>
+  <p class="note">
+    Each white square is one coloring that toy received among the 70 completed sessions.
+    Darker parts use the first hue; lighter parts use the second. The count is how many of those sessions used that pair.
+    Names and counts sit outside the square.
+  </p>
+  <div class="toolbar">
+    <button type="button" id="download-all">Download all as ZIP</button>
+  </div>
+  <p id="status" hidden></p>
+  <div id="root"></div>
+
+  <script>
+    const PANEL = 168;
+    const EXPORT = 840;
+
+    function makeToyStatic(el, toyId) {
+      el.querySelectorAll(".prep_element_hidden, .invisible_element").forEach((node) => {
+        node.style.display = "none";
+      });
+      if (toyId === "plane") {
+        const propAlt = el.querySelector(".prop_alt");
+        const propSpinning = el.querySelector(".prop_spinning");
+        const propBase = el.querySelector(".prop_base");
+        if (propAlt) propAlt.style.display = "none";
+        if (propSpinning) propSpinning.style.display = "none";
+        if (propBase) {
+          propBase.style.opacity = "1";
+          propBase.style.display = "inline";
+        }
+      } else if (toyId === "globe") {
+        el.querySelectorAll(".arc").forEach((arc) => { arc.style.display = "none"; });
+        el.querySelectorAll(".light_1, .light_2, .light_3, .light_4").forEach((light) => {
+          light.style.fill = "#555555";
+        });
+      } else if (toyId === "robot") {
+        el.querySelectorAll(".eye_light, .antenna").forEach((node) => {
+          node.style.fill = "#444444";
+        });
+        const switchOn = el.querySelector(".switch_toggle_on");
+        const switchOff = el.querySelector(".switch_toggle_off");
+        if (switchOn) switchOn.style.display = "none";
+        if (switchOff) switchOff.style.opacity = "1";
+      } else if (toyId === "bubblewand") {
+        const soap = el.querySelector(".wand_soap");
+        if (soap) soap.style.display = "none";
+      } else if (toyId === "jack") {
+        const crankDown = el.querySelector(".crank_down");
+        const lidClosed = el.querySelector(".box_lid_closed");
+        if (crankDown) crankDown.style.display = "none";
+        if (lidClosed) lidClosed.style.display = "none";
+      }
+    }
+
+    function paintToy(el, light, dark) {
+      el.querySelectorAll(".item_col_light").forEach((node) => { node.style.fill = light; });
+      el.querySelectorAll(".item_col_dark").forEach((node) => { node.style.fill = dark; });
+    }
+
+    function prepareToy(sourceGroup, toyId, light, dark) {
+      const toy = sourceGroup.cloneNode(true);
+      toy.removeAttribute("display");
+      toy.style.display = "inline";
+      paintToy(toy, light, dark);
+      makeToyStatic(toy, toyId);
+      return toy;
+    }
+
+    function fitToy(sourceGroup, toyId, light, dark, defs) {
+      const ns = "http://www.w3.org/2000/svg";
+      const measure = document.createElementNS(ns, "svg");
+      measure.setAttribute("xmlns", ns);
+      measure.style.position = "absolute";
+      measure.style.left = "-9999px";
+      measure.style.width = "600px";
+      measure.style.height = "600px";
+      if (defs) measure.appendChild(defs.cloneNode(true));
+      const toy = prepareToy(sourceGroup, toyId, light, dark);
+      measure.appendChild(toy);
+      document.body.appendChild(measure);
+      const box = toy.getBBox();
+      measure.remove();
+
+      const pad = Math.max(box.width, box.height) * 0.08;
+      const vbX = box.x - pad;
+      const vbY = box.y - pad;
+      const vbW = box.width + pad * 2;
+      const vbH = box.height + pad * 2;
+
+      const svg = document.createElementNS(ns, "svg");
+      svg.setAttribute("xmlns", ns);
+      svg.setAttribute("width", String(PANEL));
+      svg.setAttribute("height", String(PANEL));
+      svg.setAttribute("viewBox", vbX + " " + vbY + " " + vbW + " " + vbH);
+      if (defs) svg.appendChild(defs.cloneNode(true));
+      const bg = document.createElementNS(ns, "rect");
+      bg.setAttribute("x", String(vbX));
+      bg.setAttribute("y", String(vbY));
+      bg.setAttribute("width", String(vbW));
+      bg.setAttribute("height", String(vbH));
+      bg.setAttribute("fill", "#ffffff");
+      svg.appendChild(bg);
+      svg.appendChild(prepareToy(sourceGroup, toyId, light, dark));
+      return svg;
+    }
+
+    function renderPng(svg) {
+      return new Promise((resolve, reject) => {
+        const clone = svg.cloneNode(true);
+        clone.setAttribute("width", String(EXPORT));
+        clone.setAttribute("height", String(EXPORT));
+        const xml = new XMLSerializer().serializeToString(clone);
+        const blob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = EXPORT;
+          canvas.height = EXPORT;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, EXPORT, EXPORT);
+          ctx.drawImage(img, 0, 0, EXPORT, EXPORT);
+          URL.revokeObjectURL(url);
+          resolve(canvas);
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error("Could not rasterize a toy panel"));
+        };
+        img.src = url;
+      });
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
+    function downloadPng(svg, filename) {
+      return renderPng(svg).then((canvas) => new Promise((resolve) => {
+        canvas.toBlob((blob) => {
+          downloadBlob(blob, filename);
+          resolve();
+        }, "image/png");
+      }));
+    }
+
+    function crc32(bytes) {
+      if (!crc32.table) {
+        const table = new Uint32Array(256);
+        for (let n = 0; n < 256; n++) {
+          let c = n;
+          for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+          table[n] = c >>> 0;
+        }
+        crc32.table = table;
+      }
+      let crc = 0xffffffff;
+      for (let i = 0; i < bytes.length; i++) {
+        crc = crc32.table[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+      }
+      return (crc ^ 0xffffffff) >>> 0;
+    }
+
+    function zipStore(files) {
+      const encoder = new TextEncoder();
+      const parts = [];
+      const central = [];
+      let offset = 0;
+      files.forEach((file) => {
+        const name = encoder.encode(file.name);
+        const data = file.data;
+        const crc = crc32(data);
+        const local = new Uint8Array(30 + name.length);
+        const view = new DataView(local.buffer);
+        view.setUint32(0, 0x04034b50, true);
+        view.setUint16(4, 20, true);
+        view.setUint16(8, 0, true);
+        view.setUint32(14, crc, true);
+        view.setUint32(18, data.length, true);
+        view.setUint32(22, data.length, true);
+        view.setUint16(26, name.length, true);
+        local.set(name, 30);
+        parts.push(local, data);
+
+        const entry = new Uint8Array(46 + name.length);
+        const centralView = new DataView(entry.buffer);
+        centralView.setUint32(0, 0x02014b50, true);
+        centralView.setUint16(4, 20, true);
+        centralView.setUint16(6, 20, true);
+        centralView.setUint32(16, crc, true);
+        centralView.setUint32(20, data.length, true);
+        centralView.setUint32(24, data.length, true);
+        centralView.setUint16(28, name.length, true);
+        centralView.setUint32(42, offset, true);
+        entry.set(name, 46);
+        central.push(entry);
+        offset += local.length + data.length;
+      });
+      let centralSize = 0;
+      central.forEach((entry) => { centralSize += entry.length; });
+      const end = new Uint8Array(22);
+      const endView = new DataView(end.buffer);
+      endView.setUint32(0, 0x06054b50, true);
+      endView.setUint16(8, files.length, true);
+      endView.setUint16(10, files.length, true);
+      endView.setUint32(12, centralSize, true);
+      endView.setUint32(16, offset, true);
+      return new Blob([...parts, ...central, end], { type: "application/zip" });
+    }
+
+    function fileName(toyId, variant) {
+      return "toy_" + toyId + "_dark-" + variant.primary + "_light-" + variant.secondary + ".png";
+    }
+
+    const panels = [];
+
+    async function downloadList(list, zipName, button) {
+      const previous = button ? button.textContent : "";
+      if (button) {
+        button.disabled = true;
+        button.textContent = "Preparing zip…";
+      }
+      try {
+        const files = [];
+        for (const panel of list) {
+          const canvas = await renderPng(panel.svg);
+          const png = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+          files.push({ name: panel.filename, data: new Uint8Array(await png.arrayBuffer()) });
+        }
+        downloadBlob(zipStore(files), zipName);
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.textContent = previous;
+        }
+      }
+    }
+
+    async function build() {
+      const status = document.getElementById("status");
+      let svgText;
+      let catalog;
+      try {
+        const [svgResponse, colorResponse] = await Promise.all([
+          fetch("../../SVG/Items.svg"),
+          fetch("pilot9b_toy_colors.json")
+        ]);
+        if (!svgResponse.ok) throw new Error("Items.svg returned " + svgResponse.status);
+        if (!colorResponse.ok) throw new Error("color list returned " + colorResponse.status);
+        svgText = await svgResponse.text();
+        catalog = await colorResponse.json();
+      } catch (err) {
+        status.hidden = false;
+        status.textContent = "Could not load the toy artwork. Open this page from the experiment server (http://127.0.0.1:3000/mentalizing/si_figure_scratch/toys.html).";
+        return;
+      }
+
+      const doc = new DOMParser().parseFromString(svgText, "image/svg+xml");
+      const defs = doc.querySelector("defs");
+      const root = document.getElementById("root");
+
+      catalog.toys.forEach((toy) => {
+        const source = doc.getElementById("toy_" + toy.id);
+        const heading = document.createElement("h2");
+        heading.textContent = toy.label + " — " + toy.variants.length + " colorings, " + toy.sessions + " sessions";
+        root.appendChild(heading);
+
+        const sectionPanels = [];
+        const bar = document.createElement("div");
+        bar.className = "toolbar";
+        const sectionButton = document.createElement("button");
+        sectionButton.type = "button";
+        sectionButton.textContent = "Download " + toy.label + " as ZIP";
+        sectionButton.addEventListener("click", () => downloadList(sectionPanels, "toy_" + toy.id + ".zip", sectionButton));
+        bar.appendChild(sectionButton);
+        root.appendChild(bar);
+
+        const grid = document.createElement("div");
+        grid.className = "grid";
+        toy.variants.forEach((variant) => {
+          const figure = document.createElement("figure");
+          const panel = document.createElement("div");
+          panel.className = "panel";
+          if (!source) {
+            panel.textContent = "Missing toy_" + toy.id;
+            figure.appendChild(panel);
+            grid.appendChild(figure);
+            return;
+          }
+          const svg = fitToy(source, toy.id, variant.light, variant.dark, defs);
+          panel.appendChild(svg);
+          const caption = document.createElement("figcaption");
+          caption.appendChild(document.createTextNode(
+            variant.n + " — dark " + variant.primary + ", light " + variant.secondary
+          ));
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = "PNG";
+          const filename = fileName(toy.id, variant);
+          button.addEventListener("click", () => downloadPng(svg, filename));
+          caption.appendChild(document.createElement("br"));
+          caption.appendChild(button);
+          figure.appendChild(panel);
+          figure.appendChild(caption);
+          grid.appendChild(figure);
+          const record = { svg, filename };
+          sectionPanels.push(record);
+          panels.push(record);
+        });
+        root.appendChild(grid);
+      });
+    }
+
+    document.getElementById("download-all").addEventListener("click", (event) => {
+      downloadList(panels, "toys_pilots_9_9b.zip", event.currentTarget);
+    });
+    build();
+  </script>
+</body>
+</html>
