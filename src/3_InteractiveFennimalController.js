@@ -13610,6 +13610,25 @@ class ParticipantToyBoxTrialController {
         veil.style.pointerEvents = "none";
         this.basics.BackgroundLayer.appendChild(veil);
         this.hideMapLocator();
+        // The locator stays hidden, but the prompt was still painted in the
+        // last map region's colors. This room is home, so the prompt is too.
+        this.useHomePromptColors();
+    }
+
+    useHomePromptColors() {
+        if (typeof Interface === "undefined" || !Interface.Prompt) return;
+        if (Interface.Prompt.change_colors_based_on_region) {
+            Interface.Prompt.change_colors_based_on_region("Home");
+        }
+    }
+
+    restorePromptColorsForMap() {
+        if (typeof Interface === "undefined" || !Interface.Prompt) return;
+        if (!Interface.Prompt.change_colors_based_on_region) return;
+        let region = (typeof topController !== "undefined" && topController.mapCont)
+            ? topController.mapCont.current_region
+            : null;
+        if (region) Interface.Prompt.change_colors_based_on_region(region);
     }
 
     place_table() {
@@ -15135,6 +15154,7 @@ class ParticipantToyBoxTrialController {
         }
         if (typeof Interface !== "undefined" && Interface.Prompt) Interface.Prompt.hide();
         this.restoreMapLocator();
+        this.restorePromptColorsForMap();
         if (this.Backpack && this.Backpack.parentNode) this.Backpack.remove();
         if (this.clearedItem && this.clearedItem.parentNode) this.clearedItem.remove();
         if (this.clearedToy) this.clearedToy.clean_up();
