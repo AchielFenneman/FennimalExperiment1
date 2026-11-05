@@ -14294,10 +14294,6 @@ class ParticipantToyBoxTrialController {
         if (typeof WorldState.set_participant_saw_box_contents === "function") {
             WorldState.set_participant_saw_box_contents(boxId, saw);
         }
-        console.log(
-            "%c leave-variant seed " + boxId + " <- " + previous + " saw=" + saw,
-            "color:teal; font-weight:bold"
-        );
     }
 
     // Same 45-degree sheen as the cheek stamps, painted on a white copy of the

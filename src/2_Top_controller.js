@@ -576,11 +576,6 @@ class DataController {
             this.experimentData.phaseRandomizations[randomizationKey] = JSON.parse(JSON.stringify(record));
             this.storeAllData(false);
             this.writeSessionClaim(false);
-            console.log(
-                "%c Lost-box arm forced: " + forcedLabel +
-                " (Fennimal " + match.Fennimal_finding_box + " decorates the box)",
-                "color:purple; font-weight:bold"
-            );
             return record;
         }
 
@@ -708,11 +703,6 @@ class DataController {
             } else {
                 experimentRandom();
                 let record = pack(match);
-                console.log(
-                    "%c Condition forced: " + record.label +
-                    " (weight " + record.weight + " / " + record.pool_weight_sum + ")",
-                    "color:purple; font-weight:bold"
-                );
                 return persist(record);
             }
         }
@@ -720,11 +710,6 @@ class DataController {
         let picked = pickWeightedIndicesWithoutReplacement(entries.map((entry) => entry.weight), 1);
         let chosen = entries[picked[0]];
         let record = pack(chosen);
-        console.log(
-            "%c Condition drawn: " + record.label +
-            " (weight " + record.weight + " / " + record.pool_weight_sum + ")",
-            "color:purple; font-weight:bold"
-        );
         return persist(record);
     }
 
@@ -2517,10 +2502,6 @@ class TrialGenerator {
             };
         });
 
-        console.log(
-            "%c Workshop toys: " + trials.map((t) => t.toy_code + " → " + t.toy).join(", "),
-            "color:teal"
-        );
         return trials;
     }
 
@@ -2620,14 +2601,6 @@ class TrialGenerator {
                 trial.placement_quiz_fennimals.push(JSON.parse(JSON.stringify(trial)));
             }
 
-            console.log(
-                "%c warehouse_cleanup: " + fenId + " (" + trial.name + ") " + move +
-                " toy " + trial.toy +
-                ", sack " + (subblock.sack || "—") + " → " + (sack || trial.sack || "—") +
-                ", box " + (subblock.box || "—") + " → " + (toybox || "—") +
-                " (quiz: " + trial.placement_quiz_fennimals.map((fen) => fen.id).join(", ") + ")",
-                "color:teal"
-            );
             return trial;
         }
 
@@ -2646,15 +2619,6 @@ class TrialGenerator {
                 if (id && !options.includes(id)) options.push(id);
             });
         }
-
-        console.log(
-            "%c warehouse_cleanup: participant " + move +
-            " toy " + (subblock.toy || "—") + " → " + (toy || "—") +
-            ", sack " + (subblock.sack || "—") + " → " + (sack || "—") +
-            ", box " + (subblock.box || "—") + " → " + (toybox || "—") +
-            " (quiz options: " + options.join(", ") + ")",
-            "color:teal"
-        );
 
         return {
             interaction_type: "warehouse_cleanup",
@@ -3832,7 +3796,6 @@ class ExperimentController {
         this.experimentStartPerf = performance.now();
         this.stimulusSettings = new StimulusSettings();
         this.stimuli = new StimulusTransformer(this.stimulusSettings);
-        console.log(this.stimuli.get_all_Fennimals_objects_in_array());
 
         // Sub-Controllers & Utilities
         this.imageLoader = new ImageLoader(this.stimuli.get_all_locations_visited_during_experiment_with_regions(), document.getElementById("All_Locations"));
@@ -4025,7 +3988,6 @@ class ExperimentController {
             phase && phase.type === "retrieve_lost_box"
         );
         let finderId = "A";
-        let conditionLabel = "boost";
         if (lostPhase && typeof this.dataCont.getOrCreateBoxLocationSelection === "function") {
             let key = lostPhase.randomization_id || "lost_box_manipulation";
             let forced = getUrlSearchParam("CONDITION") || getUrlSearchParam("condition");
@@ -4054,7 +4016,6 @@ class ExperimentController {
             );
             if (selection && selection.entries && selection.entries[0]) {
                 finderId = selection.entries[0].Fennimal_finding_box;
-                conditionLabel = selection.label || finderId;
             }
         }
 
@@ -4070,12 +4031,6 @@ class ExperimentController {
         if (WorldState.change_toybox_decorator) {
             WorldState.change_toybox_decorator(box, finderId);
         }
-
-        console.log(
-            "%c Measurement preview: condition " + conditionLabel +
-            " (Fennimal " + finderId + " decorated the box). Partner belief is toy A; reality is toy B.",
-            "color:purple; font-weight:bold"
-        );
     }
 
     /**
@@ -4098,12 +4053,6 @@ class ExperimentController {
         if (this.dataCont && this.dataCont.storeCustomIconData) {
             this.dataCont.storeCustomIconData(WorldState);
         }
-        let partner = WorldState.get_partner_icon_settings();
-        console.log(
-            "%c Default icons (seed " + window.__EXPERIMENT_SEED__ + "): player " +
-            JSON.stringify(chosen) + "; partner " + partner.name + " / " + partner.type,
-            "color:purple; font-weight:bold"
-        );
     }
 
     startExperiment() {

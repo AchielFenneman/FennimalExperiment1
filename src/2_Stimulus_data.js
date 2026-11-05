@@ -1720,22 +1720,9 @@ let StimulusTransformer = function (StimTemplate) {
         if (GenParam.use_curated_color_sets === true) {
             colorAssignmentOverview = pick_and_apply_curated_color_set(FennimalObjArr);
             paint_all_box_color_templates();
-            console.log(
-                "%c Curated color set assigned: " + colorAssignmentOverview.set_id
-                    + (GenParam.use_color_algorithm_for_toy_colors === true ? " (boxes + toys)" : " (boxes only)"),
-                "color:teal",
-                colorAssignmentOverview
-            );
         } else {
             colorAssignmentOverview = assign_experiment_item_colors(FennimalObjArr);
             paint_all_box_color_templates();
-            let nSwap = Object.keys(GenParam.BoxColorSchemes || {}).length;
-            console.log(
-                "%c Hybrid color assignment: " + nSwap + " box swap(s)"
-                    + (GenParam.use_color_algorithm_for_toy_colors === true ? "; toys recolored" : "; toys keep ToyData defaults"),
-                "color:teal",
-                colorAssignmentOverview
-            );
         }
     }
     paint_all_toy_color_templates();
