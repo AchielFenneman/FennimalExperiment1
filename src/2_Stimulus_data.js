@@ -202,6 +202,8 @@ let StimulusSettings = function () {
             // Trial 1: partner stays and the box is filled.
             // Trial 2: partner is in the room with the new toy, then leaves, then the swap.
             // One condition is drawn per participant (weight defaults to 1; relative weights).
+            // Weight must be a positive number; a zero-weight arm is left out of this array.
+            // This batch: baseline is out, so inference and retrieval are each 1/2.
             // The drawn label is stored on this phase and on both cleanup trials.
             {
                 type: "phone_room",
@@ -211,6 +213,7 @@ let StimulusSettings = function () {
                 skip_instructions: false,
                 randomization_id: "warehouse_manipulation",
                 conditions: [
+                    /*
                     {
                         label: "baseline",
                         weight: 1,
@@ -218,7 +221,9 @@ let StimulusSettings = function () {
                             { interaction_type: "warehouse_cleanup", toy: "A", box: "X" },
                             { interaction_type: "warehouse_cleanup", toy: "B", box: "X", partner_leaves_during_interaction: true }
                         ]
-                    },/*
+                    },
+                    */
+                    /*
                     {
                         label: "enhanced_mentalizing",
                         weight: 1,
