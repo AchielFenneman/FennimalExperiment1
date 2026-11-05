@@ -15909,6 +15909,7 @@ class PartnerBeliefIndividualBoxesController {
 
         this.include_reality_block_at_end = TaskObj.include_reality_block_at_end === true;
         this.include_practice_trial = TaskObj.include_practice_trial === true;
+        this.include_partner_knowledge_trial = TaskObj.include_partner_knowledge_trial === true;
         this.include_empty_box_choice_alternative = TaskObj.include_empty_box_choice_alternative === true;
         this.EMPTY_OPTION_ID = "empty";
         this.memory_probe_isi_ms = (typeof TaskObj.memory_probe_isi_ms === "number" && TaskObj.memory_probe_isi_ms >= 0)
@@ -16355,6 +16356,11 @@ class PartnerBeliefIndividualBoxesController {
             });
         }
 
+        // After the belief question and before the reality block: shape match, then
+        // "does the partner know?". Does not advance the shape/color distractor alternation,
+        // so the reality question is still preceded by a color match.
+        this._appendPartnerKnowledgeSection(queue);
+
         if (this.actionPredictionToys.length > 0) {
             let actionTrials = shuffleArray([...this.actionPredictionToys]);
             actionTrials.forEach((toy, i) => {
@@ -16419,6 +16425,48 @@ class PartnerBeliefIndividualBoxesController {
         }
 
         return queue;
+    }
+
+    _appendPartnerKnowledgeSection(queue) {
+        if (!this.include_partner_knowledge_trial) return;
+
+        let box = this.questions[0];
+        if (!box) {
+            console.error(
+                "PartnerBeliefIndividualBoxes: partner-knowledge trial needs a belief question to choose the box."
+            );
+            return;
+        }
+        if (this.questions.length !== 1) {
+            console.warn(
+                "PartnerBeliefIndividualBoxes: partner-knowledge trial uses the first belief question's box " +
+                `(${box.target_box_code}).`
+            );
+        }
+
+        queue.push(this._makeFeatureMatchTrial({
+            section: "partner_knowledge",
+            trial_kind: "distractor",
+            match_rule: "shape",
+            question_id: "distractor_before_partner_knowledge",
+            trial_instance_id: "distractor_partner_knowledge",
+            block_index: 1,
+            position_in_block: 1,
+            is_practice: false,
+            precedes_question_id: "partner_knowledge"
+        }));
+        queue.push({
+            section: "partner_knowledge",
+            trial_kind: "partner_knowledge",
+            is_practice: false,
+            question_id: "partner_knowledge",
+            trial_instance_id: "partner_knowledge",
+            block_index: 1,
+            position_in_block: 1,
+            target_box_code: box.target_box_code,
+            target_box: box.target_box,
+            correct_option_id: "no"
+        });
     }
 
     _getProbeFennimals() {
@@ -16582,6 +16630,7 @@ class PartnerBeliefIndividualBoxesController {
 
     /**
      * One sack→toy question. Correct toy is whatever is still inside the sack.
+     * Choices are every experiment toy, plus empty when the phase allows it.
      */
     _makeSackContentsProbeTrials(spec, fennimals) {
         let sacks = [...new Set(
@@ -16604,22 +16653,21 @@ class PartnerBeliefIndividualBoxesController {
             );
             return [];
         }
-        let foils = [...new Set(
-            (fennimals || []).map((fen) => fen && fen.toy).filter((toy) => toy && toy !== correctId)
-        )];
-        if (foils.length < 2) {
+        if (!this.experimentToys.includes(correctId)) {
             console.error(
-                `PartnerBeliefIndividualBoxes: need 2 foil toys for the sack-contents probe ` +
-                `(correct=${correctId}, foils=${JSON.stringify(foils)}).`
+                `PartnerBeliefIndividualBoxes: sack "${sack}" toy "${correctId}" is not in the experiment toy set.`
             );
             return [];
         }
-        let foilA = foils[0];
-        let foilB = foils[1];
+
+        let answer_options = [...this.experimentToys];
+        if (this.include_empty_box_choice_alternative) {
+            answer_options.push(this.EMPTY_OPTION_ID);
+        }
         let option_roles = {};
-        option_roles[correctId] = "correct";
-        option_roles[foilA] = "foil";
-        option_roles[foilB] = "foil";
+        answer_options.forEach((id) => {
+            option_roles[id] = (id === correctId) ? "correct" : "foil";
+        });
         let qid = spec.question_id || "probe_sack_toy_contents";
         return [{
             trial_kind: "memory_probe_sack_to_toy",
@@ -16627,7 +16675,7 @@ class PartnerBeliefIndividualBoxesController {
             trial_instance_id: qid,
             target_sack: sack,
             correct_option_id: correctId,
-            answer_options: shuffleArray([correctId, foilA, foilB]),
+            answer_options: shuffleArray(answer_options),
             option_roles
         }];
     }
@@ -17783,8 +17831,6 @@ class PartnerBeliefIndividualBoxesController {
         await wait(1000);
 
         this.set_partner_direction("left");
-        this.show_question_bubble();
-        AudioCont.play_sound_effect("alert_minor");
     }
 
     show_question_bubble() {
@@ -18112,18 +18158,77 @@ class PartnerBeliefIndividualBoxesController {
         return BtnGroup;
     }
 
+    _create_label_choice_button(parent, option, btn_x, btn_y, btn_w, btn_h, onSelect) {
+        let BtnGroup = create_SVG_group(0, 0);
+        parent.appendChild(BtnGroup);
+
+        let btn_bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        btn_bg.setAttribute("x", btn_x);
+        btn_bg.setAttribute("y", btn_y);
+        btn_bg.setAttribute("width", btn_w);
+        btn_bg.setAttribute("height", btn_h);
+        btn_bg.setAttribute("rx", 15);
+        btn_bg.setAttribute("fill", "#d8c381");
+        btn_bg.setAttribute("stroke", "#b89f5d");
+        btn_bg.setAttribute("stroke-width", "3");
+        BtnGroup.appendChild(btn_bg);
+        this._add_focus_outline_to_button(BtnGroup, btn_bg);
+
+        let label = (option && option.label) ? option.label : "";
+        let text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", btn_x + btn_w / 2);
+        text.setAttribute("y", btn_y + btn_h / 2);
+        text.setAttribute("text-anchor", "middle");
+        text.setAttribute("dominant-baseline", "central");
+        text.setAttribute("font-family", "Arial, sans-serif");
+        text.setAttribute("font-weight", "700");
+        text.setAttribute("font-size", label.length > 4 ? "32" : "44");
+        text.setAttribute("fill", "#5d4037");
+        text.style.pointerEvents = "none";
+        text.textContent = label;
+        BtnGroup.appendChild(text);
+
+        let click_catcher = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        click_catcher.setAttribute("x", btn_x);
+        click_catcher.setAttribute("y", btn_y);
+        click_catcher.setAttribute("width", btn_w);
+        click_catcher.setAttribute("height", btn_h);
+        click_catcher.setAttribute("fill", "transparent");
+        click_catcher.style.cursor = "pointer";
+        BtnGroup.appendChild(click_catcher);
+
+        click_catcher.onpointerenter = () => {
+            btn_bg.setAttribute("fill", "#ebd89b");
+            btn_bg.setAttribute("stroke", "gold");
+        };
+        click_catcher.onpointerleave = () => {
+            btn_bg.setAttribute("fill", "#d8c381");
+            btn_bg.setAttribute("stroke", "#b89f5d");
+        };
+        click_catcher.onpointerdown = (evt) => onSelect(option.id, evt, BtnGroup);
+
+        return BtnGroup;
+    }
+
     /**
      * Reveal box/target (optional) + radial options on the same frame; resolve on first pointerdown.
-     * mode: "toys" | "features" | "heads" | "sacks"
+     * mode: "toys" | "features" | "heads" | "sacks" | "labels"
      */
-    show_radial_options_and_wait(options, { mode = "toys", showBox = false, showCentralTarget = false, showQuestionMark = false } = {}) {
+    show_radial_options_and_wait(options, { mode = "toys", showBox = false, showCentralTarget = false, showQuestionMark = false, radius = null, buttonWidth = null, buttonHeight = null, onReveal = null, centerY = null, baseAngles = null, angleJitter = null } = {}) {
         return new Promise(resolve => {
             let n = options.length;
-            let baseAngle = Math.random() * Math.PI * 2;
+            let spin = (Array.isArray(baseAngles))
+                ? ((typeof angleJitter === "number") ? (Math.random() * 2 - 1) * angleJitter : 0)
+                : Math.random() * Math.PI * 2;
+            let ringCenterY = (typeof centerY === "number") ? centerY : this.box_center_y;
             let layout = [];
             let prevRadius = this.radial_radius;
+            let btnW = (typeof buttonWidth === "number") ? buttonWidth : this.btn_size;
+            let btnH = (typeof buttonHeight === "number") ? buttonHeight : this.btn_size;
             // Keep distractor-sized buttons; widen the ring when there are more options.
-            if (n >= 5) {
+            if (typeof radius === "number") {
+                this.radial_radius = radius;
+            } else if (n >= 5) {
                 this.radial_radius = 330;
             } else if (n === 4) {
                 this.radial_radius = 300;
@@ -18160,9 +18265,11 @@ class PartnerBeliefIndividualBoxesController {
             };
 
             options.forEach((opt, i) => {
-                let angle = baseAngle + (i * 2 * Math.PI / n);
-                let bx = this.box_center_x + Math.cos(angle) * this.radial_radius - this.btn_size / 2;
-                let by = this.box_center_y + Math.sin(angle) * this.radial_radius - this.btn_size / 2;
+                let angle = (Array.isArray(baseAngles) && typeof baseAngles[i] === "number")
+                    ? baseAngles[i] + spin
+                    : spin + (i * 2 * Math.PI / n);
+                let bx = this.box_center_x + Math.cos(angle) * this.radial_radius - btnW / 2;
+                let by = ringCenterY + Math.sin(angle) * this.radial_radius - btnH / 2;
                 let option_id = (typeof opt === "string") ? opt : opt.id;
                 layout.push({
                     option_id,
@@ -18176,6 +18283,8 @@ class PartnerBeliefIndividualBoxesController {
                     this._create_head_choice_button(this.radialUIGroup, option_id, bx, by, handleSelect);
                 } else if (mode === "sacks") {
                     this._create_sack_choice_button(this.radialUIGroup, option_id, bx, by, handleSelect);
+                } else if (mode === "labels") {
+                    this._create_label_choice_button(this.radialUIGroup, opt, bx, by, btnW, btnH, handleSelect);
                 } else {
                     this._create_toy_choice_button(this.radialUIGroup, opt, bx, by, handleSelect);
                 }
@@ -18189,6 +18298,7 @@ class PartnerBeliefIndividualBoxesController {
                 if (showBox && this.BoxElement) {
                     this.BoxElement.style.opacity = 1;
                 }
+                if (typeof onReveal === "function") onReveal();
                 if (showCentralTarget && this.CentralTargetGroup) {
                     this.CentralTargetGroup.style.opacity = 1;
                 }
@@ -18218,6 +18328,8 @@ class PartnerBeliefIndividualBoxesController {
             await this.run_gating_trial(trial);
         } else if (trial.trial_kind === "belief") {
             await this.run_belief_trial(trial);
+        } else if (trial.trial_kind === "partner_knowledge") {
+            await this.run_partner_knowledge_trial(trial);
         } else if (trial.trial_kind === "action_prediction") {
             await this.run_action_prediction_trial(trial);
         } else if (trial.trial_kind === "reality") {
@@ -18964,6 +19076,180 @@ class PartnerBeliefIndividualBoxesController {
         });
     }
 
+    _clientTopInViewBox(el) {
+        let svg = el && el.ownerSVGElement;
+        if (!svg) return null;
+        let svgRect = svg.getBoundingClientRect();
+        let rect = el.getBoundingClientRect();
+        if (!svgRect.height || !rect.height) return null;
+        return (rect.top - svgRect.top) * (this.H / svgRect.height);
+    }
+
+    /**
+     * Partner stands behind the target box, hidden until pop_in_partner_behind_box().
+     * Sized so the face clears the box rim and the feet rest on the floor.
+     */
+    prepare_partner_behind_box() {
+        this.PartnerTranslateGroup = create_SVG_group(0, 0);
+        if (this.BoxElement && this.BoxElement.parentNode === this.ItemLayers.Main) {
+            this.ItemLayers.Main.insertBefore(this.PartnerTranslateGroup, this.BoxElement);
+        } else {
+            this.ItemLayers.Main.appendChild(this.PartnerTranslateGroup);
+        }
+
+        this.PartnerScaleGroup = create_SVG_group(0, 0);
+        this.PartnerTranslateGroup.appendChild(this.PartnerScaleGroup);
+
+        for (let dir in this.Icons) {
+            if (!this.Icons[dir]) continue;
+            let icon = this.Icons[dir];
+            icon.style.display = (dir === "front") ? "inherit" : "none";
+            icon.querySelectorAll(".prep_element_hidden").forEach(el => el.remove());
+            icon.style.transform = "";
+            icon.removeAttribute("transform");
+            this.PartnerScaleGroup.appendChild(icon);
+        }
+        this.set_partner_direction("front");
+
+        // Front sprites share an origin near the chest. The neck is about 4 units above it.
+        let metrics = { top: -15, bottom: 15, halfWidth: 6 };
+        if (this.Icons.front) {
+            let bbox = this.Icons.front.getBBox();
+            metrics = {
+                top: bbox.y,
+                bottom: bbox.y + bbox.height,
+                halfWidth: Math.max(Math.abs(bbox.x), Math.abs(bbox.x + bbox.width))
+            };
+        }
+        let neckY = -4;
+        // Table legs end on the warehouse floor; the soles use that same line.
+        let groundY = this.table_center_y + 350;
+        let boxTop = this._clientTopInViewBox(this.BoxElement);
+        if (boxTop == null) boxTop = this.box_center_y - 150;
+        let scale = (groundY - boxTop) / (metrics.bottom - neckY);
+        if (!isFinite(scale) || scale < 16) scale = 24;
+
+        this._partnerBehindBoxScale = scale;
+        this._partnerGroundY = groundY;
+        this._partnerHeadTop = groundY - (metrics.bottom - metrics.top) * scale;
+        this._partnerHalfWidth = metrics.halfWidth * scale;
+        this.partner_x = this.box_center_x;
+        this.partner_y = groundY - metrics.bottom * scale;
+
+        this.PartnerTranslateGroup.style.pointerEvents = "none";
+        this.PartnerTranslateGroup.style.transition = "none";
+        this.PartnerScaleGroup.style.transition = "none";
+        this.PartnerScaleGroup.style.transformOrigin = "0px 0px";
+        this.PartnerTranslateGroup.style.transform = `translate(${this.partner_x}px, ${this.partner_y}px)`;
+        this.PartnerScaleGroup.style.transform = "scale(0)";
+        this.PartnerTranslateGroup.style.opacity = 0;
+        window.getComputedStyle(this.PartnerScaleGroup).transform;
+    }
+
+    /**
+     * Yes / No / I don't know sit on an upright arc: one above the head, two out to the sides.
+     * The bottom of the circle stays open so a button never covers the feet.
+     */
+    _partner_knowledge_answer_ring(buttonWidth, buttonHeight) {
+        let headTop = this._partnerHeadTop;
+        let halfW = this._partnerHalfWidth || 160;
+        let gap = 36;
+        let promptBottom = 78;
+        let topLimit = (typeof headTop === "number") ? headTop - 16 : this.box_center_y - 220;
+        let bandTop = promptBottom + 8;
+        let bandBottom = Math.max(bandTop + buttonHeight, topLimit);
+        let topCenterY = bandTop + (bandBottom - bandTop) / 2;
+        let minR = (halfW + gap + buttonWidth / 2) / Math.cos(Math.PI / 6);
+        let radius = Math.max(340, minR);
+        let centerY = topCenterY + radius;
+        let sideBottom = centerY + 0.5 * radius + buttonHeight / 2;
+        if (sideBottom > this.H - 16) {
+            centerY -= sideBottom - (this.H - 16);
+        }
+        return {
+            radius,
+            centerY,
+            // Up, then lower-right, then lower-left. Labels are shuffled onto these slots.
+            baseAngles: [-Math.PI / 2, Math.PI / 6, (5 * Math.PI) / 6],
+            angleJitter: 0.12
+        };
+    }
+
+    pop_in_partner_behind_box() {
+        if (!this.PartnerScaleGroup || !this.PartnerTranslateGroup) return;
+        let scale = this._partnerBehindBoxScale || 12;
+        this.PartnerTranslateGroup.style.opacity = 1;
+        this.PartnerScaleGroup.style.transition = "none";
+        this.PartnerScaleGroup.style.transform = "scale(0)";
+        window.getComputedStyle(this.PartnerScaleGroup).transform;
+        this.PartnerScaleGroup.style.transition = "transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1)";
+        this.PartnerScaleGroup.style.transform = `scale(${scale})`;
+    }
+
+    async run_partner_knowledge_trial(trial) {
+        this.place_target_box(trial.target_box);
+        this.prepare_partner_behind_box();
+        let revealPromise = this.create_curtain_with_reveal_circle();
+        await this.fade_black(0, 350);
+
+        Interface.Prompt.show_message("Click on the circle to start the question");
+        await revealPromise;
+
+        Interface.Prompt.show_message(
+            `Does ${this.partnername} know which toy is in the box?`
+        );
+
+        let answerOptions = shuffleArray([
+            { id: "yes", label: "Yes" },
+            { id: "no", label: "No" },
+            { id: "dont_know", label: "I don't know" }
+        ]);
+        let optionRoles = { yes: "foil", no: "correct", dont_know: "foil" };
+
+        let buttonWidth = 250;
+        let buttonHeight = 110;
+        let ring = this._partner_knowledge_answer_ring(buttonWidth, buttonHeight);
+        let response = await this.show_radial_options_and_wait(answerOptions, {
+            mode: "labels",
+            showBox: true,
+            radius: ring.radius,
+            centerY: ring.centerY,
+            baseAngles: ring.baseAngles,
+            angleJitter: ring.angleJitter,
+            buttonWidth,
+            buttonHeight,
+            onReveal: () => this.pop_in_partner_behind_box()
+        });
+
+        Interface.Prompt.hide();
+        AudioCont.play_sound_effect("button_click");
+
+        let is_correct = (response.selected_id === "no");
+
+        this.ParticipantAnswers.push({
+            trial_kind: "partner_knowledge",
+            question_id: trial.question_id,
+            block_index: trial.block_index,
+            trial_index: this.overall_presentation_index,
+            target_box: trial.target_box,
+            target_box_code: trial.target_box_code,
+            options: this._buildStoredOptions(
+                response.option_layout,
+                answerOptions.map((opt) => ({
+                    id: opt.id,
+                    label: opt.label,
+                    role: optionRoles[opt.id] || "unknown"
+                }))
+            ),
+            selected: response.selected_id,
+            correct: is_correct,
+            correct_option_id: "no",
+            reaction_time_ms: response.reaction_time_ms
+        });
+
+        await wait(400);
+    }
+
     async run_belief_trial(trial) {
         let choiceSet = this._buildAllToyChoiceSet(trial, "belief");
         if (!choiceSet) {
@@ -18984,6 +19270,10 @@ class PartnerBeliefIndividualBoxesController {
         let printed_box_name = GenParam.get_box_printed_name(trial.target_box);
         Interface.Prompt.show_message("Click on the circle to start the question");
         await this.enable_curtain_reveal();
+
+        // The "?" bubble is the question cue, so it appears only once the occluder is clicked.
+        this.show_question_bubble();
+        AudioCont.play_sound_effect("alert_minor");
 
         Interface.Prompt.show_message(
             `What does ${this.partnername} believe is in the ${printed_box_name}? Answer as accurately as you can.`

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compatible overlay lab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="morph_lab.css">
+    <link rel="stylesheet" href="feature_kit_lab.css?v=overlay-1">
+    <style>
+        .preset-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .overlay-grid {
+            display: grid;
+            grid-template-columns: 92px 1fr;
+            gap: 8px 10px;
+            align-items: center;
+            margin: 10px 0 4px;
+        }
+        .overlay-grid .slot-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #4a5560;
+        }
+        .theme-checks {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 14px;
+        }
+        .theme-checks label {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 14px;
+        }
+        .invisible_element {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .kit_ear_fx,
+        .kit_ear_particle {
+            pointer-events: none;
+        }
+        .kit_ear_spore {
+            filter: drop-shadow(0px 0px 6px #FF3300);
+        }
+        .kit_ear_droplet {
+            filter: drop-shadow(0px 0px 3px #7ec8e3);
+        }
+        .kit_overlay_candle_flame {
+            pointer-events: none;
+            filter:
+                drop-shadow(0px 0px 5px #ffea00)
+                drop-shadow(0px 0px 14px #ff9900)
+                drop-shadow(0px 0px 28px rgba(255, 140, 0, 0.55));
+            animation: kit-candle-glow-pulse 2.8s ease-in-out infinite;
+        }
+        @keyframes kit-candle-glow-pulse {
+            0%, 100% {
+                filter:
+                    drop-shadow(0px 0px 5px #ffea00)
+                    drop-shadow(0px 0px 14px #ff9900)
+                    drop-shadow(0px 0px 28px rgba(255, 140, 0, 0.55));
+            }
+            50% {
+                filter:
+                    drop-shadow(0px 0px 8px #fff6a0)
+                    drop-shadow(0px 0px 20px #ff9900)
+                    drop-shadow(0px 0px 40px rgba(255, 150, 0, 0.7));
+            }
+        }
+        .pearl.kit_pearl_glow,
+        .seashell_pearl.kit_pearl_glow {
+            animation: kit-pearl-glow-pulse 18s linear infinite;
+        }
+        @keyframes kit-pearl-glow-pulse {
+            0%, 11% {
+                filter:
+                    drop-shadow(0px 0px 3px rgba(255, 255, 255, 0.35))
+                    drop-shadow(0px 0px 8px rgba(190, 230, 255, 0.22));
+            }
+            14% {
+                filter:
+                    drop-shadow(0px 0px 8px #ffffff)
+                    drop-shadow(0px 0px 20px rgba(255, 255, 255, 0.9))
+                    drop-shadow(0px 0px 38px rgba(180, 220, 255, 0.65));
+            }
+            20%, 100% {
+                filter:
+                    drop-shadow(0px 0px 2px rgba(255, 255, 255, 0.2))
+                    drop-shadow(0px 0px 6px rgba(190, 230, 255, 0.12));
+            }
+        }
+        .kit_pearl_glimmer {
+            pointer-events: none;
+        }
+        .kit_overlay_candle_spark {
+            pointer-events: none;
+            filter: drop-shadow(0px 0px 5px #ffea00);
+        }
+        .kit_overlay_candle_smoke {
+            pointer-events: none;
+            opacity: 0.9;
+        }
+        .kit-stage svg {
+            overflow: visible;
+        }
+    </style>
+</head>
+<body>
+    <header class="lab-header">
+        <h1>Compatible overlay lab</h1>
+        <p class="lab-sub">
+            Baseline plus mushroom / sea / mechanical / sweet decorations from
+            <code>SVG/Heads features compatible.svg</code>, composed by FeatureKit.
+            Base parts stay on; decorations toggle independently.
+            Hair is unused.
+            Older mix-and-match sheets:
+            <a href="feature_kit_lab.html">Feature kit lab</a>
+            ·
+            <a href="feature_kit_theme_lab.html">Theme lab</a>
+            ·
+            <a href="morph_lab.html">Morph lab</a>
+        </p>
+    </header>
+
+    <p id="statusLine" class="status" aria-live="polite">Loading overlay sheet…</p>
+
+    <div class="kit-layout">
+        <div class="kit-side">
+            <section class="kit-card">
+                <h2>Whole face</h2>
+                <div class="preset-row">
+                    <button id="presetMechanical" type="button">Mechanical</button>
+                    <button id="presetMushroom" type="button">Mushroom</button>
+                    <button id="presetSea" type="button">Sea</button>
+                    <button id="presetSweet" type="button">Sweet</button>
+                    <button id="presetClear" type="button" class="secondary">Base only</button>
+                </div>
+                <p class="lab-note" style="margin:0">Presets turn one family on for every slot and turn the others off. Checkboxes below stay independent after that.</p>
+            </section>
+
+            <section class="kit-card">
+                <h2>Decorations</h2>
+                <div id="overlayControls"></div>
+                <div class="field toggles" style="margin-top:12px">
+                    <label><input id="exprHappy" type="radio" name="expression" value="happy" checked> Happy</label>
+                    <label><input id="exprSad" type="radio" name="expression" value="sad"> Sad</label>
+                    <label><input id="animateInput" type="checkbox" checked> Animate decorations</label>
+                    <label><input id="markersInput" type="checkbox"> Show placement markers</label>
+                    <label><input id="hideHatMouthInput" type="checkbox" checked> Hide hat and mouth points</label>
+                    <label><input id="grayInput" type="checkbox"> Grayscale</label>
+                </div>
+            </section>
+
+            <details class="kit-card">
+                <summary>SVG notes</summary>
+                <ul id="notesList" class="notes-list"></ul>
+            </details>
+        </div>
+
+        <div>
+            <section class="kit-stage-wrap">
+                <div id="mainStage" class="kit-stage kit-hide-hat-mouth"></div>
+                <p id="recipeLine" class="recipe-line"></p>
+            </section>
+        </div>
+    </div>
+
+    <script>window.__FEATURE_KIT_SVG_PATH__ = "../../../SVG/Heads features compatible.svg";</script>
+    <script src="../../../src/1_General_functions.js?v=overlay-16"></script>
+    <script src="../../../src/KitOverlayMotion.js?v=overlay-18"></script>
+    <script src="../../../src/FeatureKit.js?v=overlay-20"></script>
+    <script src="KitOverlayLab.js?v=overlay-4"></script>
+</body>
+</html>

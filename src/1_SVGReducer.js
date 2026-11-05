@@ -166,10 +166,10 @@ SVGREDUCER = function (Stimuli) {
     }
 
     function remove_unused_items(){
-        let Items_in_exp = Stimuli.get_all_x_encountered_during_experiment("item")
+        // Leave every sack template in the document. Unassigned sacks are the
+        // distractors on the sack-into-box quiz and the box→sack memory probe.
+        // Removing them would leave those questions with only the placed sack.
     }
-
-    //TODO: remove unused items
 
     // On initialization
     remove_unused_regions()

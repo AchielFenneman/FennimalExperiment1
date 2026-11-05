@@ -2638,6 +2638,14 @@ class TrialGenerator {
             : [];
         let placed = optionType === "sack" ? sack : toy;
         if (placed && !options.includes(placed)) options.push(placed);
+        // Sack-into-box is often the only assigned sack. The other SVG sacks
+        // stay unassigned (Maps.Free) so the later memory probe can use them,
+        // and they are still offered here as distractors.
+        if (move === "sack_into_box" && typeof this.stimuli.get_all_software_options_of_type === "function") {
+            (this.stimuli.get_all_software_options_of_type("sack") || []).forEach((id) => {
+                if (id && !options.includes(id)) options.push(id);
+            });
+        }
 
         console.log(
             "%c warehouse_cleanup: participant " + move +
@@ -4414,12 +4422,13 @@ class ExperimentController {
                 this.currentPhaseData.answers = this.currentPhaseData.PartnerBeliefAnswers;
                 delete this.currentPhaseData.PartnerBeliefAnswers;
 
-                // All answered trial kinds earn stars (practice, distractors, gating/belief/action/reality, probes).
+                // All answered trial kinds earn stars (practice, distractors, gating/belief/knowledge/action/reality, probes).
                 let starEligibleAnswers = this.currentPhaseData.answers.filter(a =>
                     a.trial_kind === "practice" ||
                     a.trial_kind === "distractor" ||
                     a.trial_kind === "gating" ||
                     a.trial_kind === "belief" ||
+                    a.trial_kind === "partner_knowledge" ||
                     a.trial_kind === "action_prediction" ||
                     a.trial_kind === "reality" ||
                     a.trial_kind === "memory_probe_box_to_fennimal" ||

@@ -12,6 +12,8 @@
 //   neither                 unseeded Math.random; a new draw each load
 //      ?EXP=mentalizing_exp1               (live default is also this code in 2_Stimulus_data.js)
 //      ?EXP=mentalizing_between_subjects   (previous live code; still selectable)
+//      ?EXP=mentalizing_exp2               (3 Fennimals; warehouse sack + box X; lost-box boost|neutral|cost)
+//      ?EXP=mentalizing_exp2&CONDITION=neutral
 //      ?SKIP_INTRO=1    (skip consent / character-creation / overview pages)
 //      ?SKIP_TO_PHASE=morph_task   (drop earlier phases; software QA only)
 //      ?EXP=mentalizing_exp1&SKIP_INTRO=1&SKIP_TO_PHASE=phone_room

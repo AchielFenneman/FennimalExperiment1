@@ -2,7 +2,13 @@ let StimulusSettings = function () {
 
     this.Experiment_Code = ["mentalizing_exp1"];
     // Live default: mentalizing_exp1. Open http://localhost:3000 with no query.
-    // Other codes: mentalizing_between_subjects | test | semantic_learning_star | semantic_learning_kit.
+    // Other codes: mentalizing_exp2 | mentalizing_between_subjects | test | semantic_learning_star | semantic_learning_kit.
+    // mentalizing_exp2: 3 Fennimals. Day 2 is broken toy, workshop X/Y/Z, then play.
+    // Then warehouse (toy A into sack A, sack into box X), lost box, then the swap.
+    // Lost-box arms are equal weight: boost A | neutral C | cost B.
+    //   ?EXP=mentalizing_exp2
+    //   ?EXP=mentalizing_exp2&CONDITION=boost|neutral|cost
+    // The measurement-preview shortcut stays on mentalizing_between_subjects.
     // Override (no file edit): ?EXP=mentalizing_between_subjects&SKIP_INTRO=1
     // mentalizing_exp1 learning phone room (broken toy, then workshop, then play):
     //   ?EXP=mentalizing_exp1&SKIP_INTRO=1&SKIP_TO_PHASE=phone_room
@@ -100,6 +106,7 @@ let StimulusSettings = function () {
         semantic_learning_star: [], //"browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview"
         semantic_learning_kit: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation"],
         mentalizing_between_subjects: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
+        mentalizing_exp2: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
         mentalizing_exp1: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
     };
 
@@ -144,6 +151,13 @@ let StimulusSettings = function () {
           
         },
 
+        // Sack A is Fennimal A's. Box X is the warehouse box, named on the cleanup trials.
+        mentalizing_exp2: {
+            "A": { head: "A", region: "A", toy: "A", sack: "A" },
+            "B": { head: "B", region: "B", toy: "B" },
+            "C": { head: "C", region: "C", toy: "C" },
+        },
+
     };
 
     let All_Experiment_Structures = {
@@ -175,10 +189,7 @@ let StimulusSettings = function () {
                         Fennimals_encountered: ["A", "B"],
                         interaction_type: "broken_toy_no_box"
                     },
-                    {
-                        interaction_type: "broken_toy_workshop",
-                        toys: ["X", "Y", "Z"]
-                    },
+                   
                     {
                         Fennimals_encountered: ["A", "B"],
                         interaction_type: "Fennimal_toy"
@@ -236,15 +247,39 @@ let StimulusSettings = function () {
                 ]
             },
 
-            // BLOCK 4: one partner-belief question about box X, then what is actually
-            // in it, then Fennimal→toy probes.
-            // Shape/color practice opens the block; a shape/color distractor precedes
-            // the belief question and the reality question.
+            // BLOCK 3B: 
+            {
+                type: "phone_room",
+                partner_behavior: "active",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                ask_Fennimal: true,
+                ask_toy: true,
+                ask_box: false,
+                trial_subblocks: [
+                    {
+                        interaction_type: "broken_toy_workshop",
+                        toys: ["X", "Y", "Z"]
+                    },
+                  
+                ]
+            },
+
+
+
+            // BLOCK 4: belief about box X, then whether the partner knows the contents,
+            // then what is actually in the box, then Fennimal→toy probes.
+            // Practice is shape then color. A shape match precedes the belief question,
+            // another shape match precedes the knowledge question, and a color match
+            // precedes the reality question. The knowledge question is before the
+            // "partner has left" screen. Options are Yes / No / I don't know; only No
+            // is correct.
             // Belief and reality options are every experiment toy (A, B, X, Y, Z) plus empty.
             // Fennimal→toy probes use that same toy set, without the empty option.
             {
                 type: "partner_belief_individual_boxes",
                 include_practice_trial: true,
+                include_partner_knowledge_trial: true,
                 num_belief_blocks: 1,
                 include_reality_block_at_end: true,
                 include_empty_box_choice_alternative: true,
@@ -357,6 +392,122 @@ let StimulusSettings = function () {
                     { kind: "memory_probe_fennimal_to_toy" },
                     { kind: "memory_probe_box_to_sack" },
                     { kind: "memory_probe_sack_to_toy" },
+                ]
+            },
+
+        ],
+
+        // 3 Fennimals. Warehouse box X is not a home box.
+        // Lost-box labels are equally likely (weight defaults to 1).
+        mentalizing_exp2: [
+
+            // Day 1: meet Fennimals A, B, and C.
+            {
+                type: "free_exploration",
+                interaction_type: ["Fennimal_toy"],
+                Fennimals_encountered: ["A", "B", "C"],
+                partner_behavior: "active",
+                include_Fennefinder: true,
+                force_climbing_tower_first: true
+            },
+
+            // Day 2: repair each Fennimal's toy, workshop toys X/Y/Z, then play.
+            // Order is shuffled inside each subblock.
+            {
+                type: "phone_room",
+                partner_behavior: "active",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                ask_Fennimal: true,
+                ask_toy: true,
+                ask_box: false,
+                trial_subblocks: [
+                    {
+                        Fennimals_encountered: ["A", "B", "C"],
+                        interaction_type: "broken_toy_no_box"
+                    },
+                    {
+                        interaction_type: "broken_toy_workshop",
+                        toys: ["X", "Y", "Z"]
+                    },
+                    {
+                        Fennimals_encountered: ["A", "B", "C"],
+                        interaction_type: "Fennimal_toy"
+                    }
+                ]
+            },
+
+            // Day 3: warehouse. Partner stays for both moves.
+            // Toy A into sack A, then that sack into box X.
+            {
+                type: "phone_room",
+                partner_behavior: "active",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                skip_instructions: false,
+                trial_subblocks: [
+                    { interaction_type: "warehouse_cleanup", toy: "A", sack: "A" },
+                    { interaction_type: "warehouse_cleanup", sack: "A", box: "X" }
+                ]
+            },
+
+            // Day 4: storm. One finder, equal weights.
+            // boost A, neutral C, cost B. Partner watches the decoration.
+            {
+                type: "retrieve_lost_box",
+                n_trials_to_sample: 1,
+                randomization_id: "lost_box_manipulation",
+                include_decoration: true,
+                box_locations: [
+                    { label: "boost", Fennimal_finding_box: "A", target_box: "X" },
+                    { label: "neutral", Fennimal_finding_box: "C", target_box: "X" },
+                    { label: "cost", Fennimal_finding_box: "B", target_box: "X" }
+                ],
+                partner_behavior: "active"
+            },
+
+            // Day 5: partner is present, then leaves. Toy B replaces the sack in box X.
+            // Partner belief stays toy A.
+            {
+                type: "phone_room",
+                partner_behavior: "active",
+                include_Fennefinder: false,
+                return_to_phone_room_after_final_trial: false,
+                skip_instructions: false,
+                trial_subblocks: [
+                    {
+                        interaction_type: "warehouse_cleanup",
+                        toy: "B",
+                        box: "X",
+                        partner_leaves_during_interaction: true
+                    }
+                ]
+            },
+
+            // Day 6: belief about box X, then whether the partner knows the contents,
+            // then reality. Belief and reality use every toy (A, B, C, X, Y, Z) plus empty.
+            // Practice is shape then color. A shape match precedes belief, another shape
+            // match precedes the knowledge question, and a color match precedes reality.
+            // The knowledge question is before the "partner has left" screen.
+            // Options are Yes / No / I don't know; only No is correct.
+            // Memory probes: who decorated box X, which sack went in it, which toy
+            // is in that sack (every toy plus empty), then Fennimal→toy for A, B,
+            // and C (every toy, no empty).
+            {
+                type: "partner_belief_individual_boxes",
+                include_practice_trial: true,
+                include_partner_knowledge_trial: true,
+                num_belief_blocks: 1,
+                include_reality_block_at_end: true,
+                include_empty_box_choice_alternative: true,
+                bonus_stars_per_correct_answer: 1,
+                memory_probe_isi_ms: 1000,
+                questions: [
+                    { question_id: "belief_X", target_box: "X" },
+                    { kind: "memory_probe_box_decorator", target_box: "X" },
+                    { kind: "memory_probe_box_to_sack", only_if_placed: true, target_box: "X" },
+                    { kind: "memory_probe_sack_to_toy", correct_from: "sack_contents" },
+                    { kind: "memory_probe_fennimal_to_toy", toy_options: "all" }
                 ]
             },
 
@@ -731,6 +882,7 @@ let StimulusSettings = function () {
         semantic_learning_star: ["demographics_questionnaire"],
         semantic_learning_kit: ["demographics_questionnaire"],
         mentalizing_between_subjects: ["demographics_questionnaire"],
+        mentalizing_exp2: ["demographics_questionnaire"],
         mentalizing_exp1: ["demographics_questionnaire"],
     };
 
@@ -750,6 +902,7 @@ let StimulusSettings = function () {
         semantic_learning_star: ["bell", "pig", "bun"],
         semantic_learning_kit: ["bell"],
         mentalizing_between_subjects: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
+        mentalizing_exp2: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
         mentalizing_exp1: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
     };
 
@@ -776,7 +929,7 @@ let StimulusSettings = function () {
     if (!this.Experiment_Structure || !this.Fennimal_Dictionary) {
         throw new Error(
             'Unknown experiment code "' + this.Experiment_Code + '". ' +
-            'Live codes: test, semantic_learning_star, semantic_learning_kit, mentalizing_between_subjects, mentalizing_exp1. ' +
+            'Live codes: test, semantic_learning_star, semantic_learning_kit, mentalizing_between_subjects, mentalizing_exp1, mentalizing_exp2. ' +
             'Archived recipes are in archive/ (see archive/MANIFEST.md).'
         );
     }
@@ -1912,9 +2065,36 @@ let StimulusTransformer = function (StimTemplate) {
         return false;
     };
 
-    /** Memory-probe sack questions only when sacks are templated and practiced via toy_to_sack. */
+    /** True when a warehouse cleanup names a sack (toy into that sack, or that sack into a box). */
+    this.experiment_includes_warehouse_sack = function () {
+        if (!Array.isArray(this.Experiment_Structure)) return false;
+        for (let block of this.Experiment_Structure) {
+            if (!block) continue;
+            let lists = [];
+            if (Array.isArray(block.trial_subblocks)) lists.push(block.trial_subblocks);
+            if (Array.isArray(block.conditions)) {
+                block.conditions.forEach((cond) => {
+                    if (cond && Array.isArray(cond.trial_subblocks)) lists.push(cond.trial_subblocks);
+                });
+            }
+            for (let list of lists) {
+                for (let sb of list) {
+                    if (!sb || sb.interaction_type !== "warehouse_cleanup") continue;
+                    if (typeof sb.sack === "string" && sb.sack.trim() !== "") return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    /**
+     * Sack memory probes after the participant has packed a sack:
+     * toy_to_sack at a Fennimal's home, or a warehouse cleanup that names a sack.
+     */
     this.should_include_sack_memory_probes = function () {
-        return this.fennimal_templates_include_sacks() && this.experiment_includes_interaction_type("toy_to_sack");
+        let practicedAtHome = this.fennimal_templates_include_sacks()
+            && this.experiment_includes_interaction_type("toy_to_sack");
+        return practicedAtHome || this.experiment_includes_warehouse_sack();
     };
 
     this._isPartnerBeliefMemoryProbeKind = function (kind) {
@@ -2015,6 +2195,10 @@ let StimulusTransformer = function (StimTemplate) {
                 let nRealityTrials = (block.include_reality_block_at_end === true) ? nQuestions : 0;
                 // Gating / belief / action / reality each earn stars; each is preceded by a distractor that also earns stars.
                 max_stars += bonus * (nGating + nBeliefTrials + nAction + nRealityTrials) * 2;
+                if (block.include_partner_knowledge_trial === true) {
+                    // Shape match, then the partner-knowledge question. Both earn a star.
+                    max_stars += bonus * 2;
+                }
                 if (block.include_practice_trial === true) {
                     // Shape-match + color-match practice.
                     max_stars += bonus * 2;

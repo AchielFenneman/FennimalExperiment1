@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 520" width="440" height="520" role="img" aria-labelledby="title desc">
+  <title id="title">50/50 morph choices, keep group (join submits at most 7)</title>
+  <desc id="desc">Stacked bar: in-group 55% (lower) and out-of-triad 45% (upper). Chance at 50%. n = 20, subject means, key trials. Expanded Pilot 4.</desc>
+
+  <rect width="440" height="520" fill="#ffffff"/>
+
+  <text x="220" y="36" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="18" font-weight="600" fill="#1a1a1a">50 / 50 � who they picked</text>
+  <text x="220" y="58" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="12" fill="#5c5c5c">submits &lt;= 7 � n = 20 � no correct identity</text>
+
+  <g font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="12" fill="#5c5c5c">
+    <text x="60" y="88" text-anchor="end">100%</text>
+    <text x="60" y="170" text-anchor="end">75%</text>
+    <text x="60" y="252" text-anchor="end">50%</text>
+    <text x="60" y="334" text-anchor="end">25%</text>
+    <text x="60" y="416" text-anchor="end">0%</text>
+  </g>
+
+  <g stroke="#e6e6e6" stroke-width="1" fill="none">
+    <line x1="72" y1="84" x2="360" y2="84"/>
+    <line x1="72" y1="166" x2="360" y2="166"/>
+    <line x1="72" y1="248" x2="360" y2="248"/>
+    <line x1="72" y1="330" x2="360" y2="330"/>
+    <line x1="72" y1="412" x2="360" y2="412"/>
+  </g>
+
+  <!-- in-group 55%: h=180.4 y=231.6; out 45%: h=147.6 y=84 -->
+  <rect x="150" y="231.6" width="132" height="180.4" fill="#2E79B5"/>
+  <rect x="150" y="84" width="132" height="147.6" fill="#B4B4C0"/>
+
+  <text x="216" y="330" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="16" font-weight="600" fill="#ffffff">55%</text>
+  <text x="216" y="164" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="16" font-weight="600" fill="#2a2a2a">45%</text>
+
+  <line x1="72" y1="248" x2="360" y2="248" stroke="#6b6b6b" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <text x="372" y="252" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="12" fill="#6b6b6b">chance</text>
+
+  <line x1="72" y1="84" x2="72" y2="412" stroke="#8a8a8a" stroke-width="1"/>
+  <line x1="72" y1="412" x2="360" y2="412" stroke="#8a8a8a" stroke-width="1"/>
+
+  <text x="216" y="436" text-anchor="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="13" fill="#1a1a1a">50 / 50</text>
+  <text x="18" y="248" text-anchor="middle" transform="rotate(-90 18 248)" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="13" fill="#5c5c5c">Percent of choices</text>
+
+  <g font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="13" fill="#1a1a1a">
+    <rect x="78" y="468" width="14" height="14" fill="#2E79B5"/>
+    <text x="98" y="480">In-group (lower)</text>
+    <rect x="236" y="468" width="14" height="14" fill="#B4B4C0"/>
+    <text x="256" y="480">Out-of-triad (upper)</text>
+  </g>
+</svg>
