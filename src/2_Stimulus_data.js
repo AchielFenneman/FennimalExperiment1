@@ -1,8 +1,8 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["mentalizing_exp1"];
-    // Live default: mentalizing_exp1. Open http://localhost:3000 with no query.
-    // Other codes: mentalizing_exp2 | mentalizing_between_subjects | test | semantic_learning_star | semantic_learning_kit.
+    this.Experiment_Code = ["mentalizing_exp1_retro"];
+    // Live default: mentalizing_exp1_retro. Open http://localhost:3000 with no query.
+    // Other codes: mentalizing_exp1 | mentalizing_exp2 | mentalizing_between_subjects | test | semantic_learning_star | semantic_learning_kit.
     // mentalizing_exp2: 3 Fennimals. Day 2 is broken toy, workshop X/Y/Z, then play.
     // Then warehouse (toy A into sack A, sack into box X), lost box, then the swap.
     // Lost-box arms are equal weight: boost A | neutral C | cost B.
@@ -16,6 +16,20 @@ let StimulusSettings = function () {
     //   baseline | enhanced_mentalizing | enhanced_inference_error | enhanced_retrieval_error
     //   ?EXP=mentalizing_exp1&SKIP_TO_INTERACTION=warehouse_cleanup&CONDITION=baseline
     //   &FENNIMAL=A|B picks that Fennimal's cleanup. &PARTNER_LEAVES=1 picks the swap.
+    // mentalizing_exp1_retro: 3 Fennimals. Block 1 photos hide toys. Blocks 2 and 4
+    // are warehouse_task (no map travel). Each block opens on that task's instructions. Block 2 is Fennimal A
+    // (partner stays) then Fennimal B (partner leaves). Arms, equal weight:
+    // direct-direct | indirect-direct | indirect-indirect. Direct shows the toy.
+    // Indirect keeps the "?" cover, in that Fennimal's color, and calls it their favorite toy.
+    // The same colored "?" comes back out of the box. Each placement then asks what went in.
+    //   ?EXP=mentalizing_exp1_retro
+    //   ?EXP=mentalizing_exp1_retro&SKIP_INTRO=1&SKIP_TO_INTERACTION=warehouse_cleanup&CONDITION=indirect-direct
+    // Postcard day: ?EXP=mentalizing_exp1_retro&SKIP_INTRO=1&SKIP_TO_PHASE=postcard_task
+    // include_full_sequence_at_start plays each Fennimal's recording once before the first postcard.
+    // blocks lists each pass: Fennimals, force_replay_first, postcard_type A|B|C,
+    // optional_distractor_toys, repair_toy_sticker, and show_instructions_bubble.
+    // Warehouse block: ?EXP=mentalizing_exp1_retro&SKIP_INTRO=1&SKIP_TO_PHASE=warehouse_task&CONDITION=indirect-direct
+    // Written memory page: ?EXP=mentalizing_exp1_retro&SKIP_INTRO=1&SKIP_TO_PHASE=written_memory_page
     // One warehouse call is one move. toy+box is the participant placing that toy.
     // Measurement preview (encoding seeded, not played). Set false, or open ?FULL=1, for the full session.
     // Lost-box arm: ?CONDITION=boost | neutral | cost (also on a full or decoration run).
@@ -108,6 +122,7 @@ let StimulusSettings = function () {
         mentalizing_between_subjects: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
         mentalizing_exp2: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
         mentalizing_exp1: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
+        mentalizing_exp1_retro: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
     };
 
     // ----------------------------------------------------
@@ -144,6 +159,14 @@ let StimulusSettings = function () {
             "B": { head: "B", region: "B", toy: "B" },
         },
 
+        // Same assignment style as mentalizing_exp1, plus Fennimal C.
+        // Toys are assigned here but hidden on the block 1 photographs.
+        mentalizing_exp1_retro: {
+            "A": { head: "A", region: "A", toy: "A" },
+            "B": { head: "B", region: "B", toy: "B" },
+            "C": { head: "C", region: "C", toy: "C" },
+        },
+
         mentalizing_between_subjects: {
             "A": { head: "A", region: "A", toy: "A", toybox: "A", sack: "A" },
             "B": { head: "B", region: "B", toy: "B", toybox: "A" },
@@ -159,6 +182,11 @@ let StimulusSettings = function () {
         },
 
     };
+
+    // Indirect belief-formation cover. {fennimal} and {partner} are filled in
+    // when the note is shown. The specific toy is not named.
+    const RETRO_FAVORITE_TOY_NOTE =
+        "This is {fennimal}'s favorite toy. You can't see which toy it is, but {partner} can.";
 
     let All_Experiment_Structures = {
         mentalizing_exp1: [
@@ -294,6 +322,153 @@ let StimulusSettings = function () {
                     { question_id: "belief_X", target_box: "X" },
                     { kind: "memory_probe_fennimal_to_toy", toy_options: "all" }
                 ]
+            },
+
+        ],
+
+        // 3 Fennimals. Warehouse box X is not a home box.
+        // Block 1 hides toys. Block 2 is the belief event: Fennimal A while the
+        // partner stays, then Fennimal B after the partner leaves. Direct trials
+        // show the toy the Fennimal places. Indirect trials keep the "?" cover,
+        // colored for that Fennimal, including when it comes back out of the box.
+        // One arm per participant, equal weight. Fennimal C does not touch the box.
+        mentalizing_exp1_retro: [
+
+            // BLOCK 1: explore and photograph A, B, and C. Partner is present.
+            // The held toy is omitted from the scene and from the polaroid.
+            {
+                type: "free_exploration",
+                interaction_type: ["photo_Fennimal"],
+                Fennimals_encountered: ["A", "B", "C"],
+                partner_behavior: "active",
+                include_Fennefinder: true,
+                force_climbing_tower_first: true,
+                hide_held_toy: true
+            },
+
+            // BLOCK 2: belief formation. Same warehouse sequence as mentalizing_exp1
+            // (partner stays; then partner leaves, backpack, box, prior contents, placement).
+            // The participant drags in the toy the Fennimal is holding. reveal_toy shows the real toy.
+            // No map travel and no phone room. The block opens with the cleaning-day
+            // card. Each trial then announces that Fennimal over the room, and they walk in.
+            {
+                type: "warehouse_task",
+                partner_behavior: "active",
+                randomization_id: "belief_formation",
+                conditions: [
+                    {
+                        label: "direct-direct",
+                        weight: 1,
+                        trial_subblocks: [
+                            { interaction_type: "warehouse_cleanup", Fennimal: "A", box: "X", reveal_toy: true },
+                            { interaction_type: "warehouse_cleanup", Fennimal: "B", box: "X", reveal_toy: true, partner_leaves_during_interaction: true }
+                        ]
+                    },
+                    {
+                        label: "indirect-direct",
+                        weight: 1,
+                        trial_subblocks: [
+                            { interaction_type: "warehouse_cleanup", Fennimal: "A", box: "X", mystery_note: RETRO_FAVORITE_TOY_NOTE },
+                            { interaction_type: "warehouse_cleanup", Fennimal: "B", box: "X", reveal_toy: true, partner_leaves_during_interaction: true }
+                        ]
+                    },
+                    {
+                        label: "indirect-indirect",
+                        weight: 1,
+                        trial_subblocks: [
+                            { interaction_type: "warehouse_cleanup", Fennimal: "A", box: "X", mystery_note: RETRO_FAVORITE_TOY_NOTE },
+                            { interaction_type: "warehouse_cleanup", Fennimal: "B", box: "X", mystery_note: RETRO_FAVORITE_TOY_NOTE, partner_leaves_during_interaction: true }
+                        ]
+                    }
+                ]
+            },
+
+            // BLOCK 3: one postcard trial per Fennimal, back to back at the desk.
+            // Trial order inside this subblock is shuffled.
+            {
+                type: "postcard_task",
+                partner_behavior: "active",
+                skip_instructions: false,
+                // True: each Fennimal's recording plays once before the first postcard.
+                // False: the day starts on the first postcard.
+                include_full_sequence_at_start: false,
+                // Each entry is one pass. Fennimals are shuffled, and the same one
+                // is never placed next to itself, including across the join.
+                // force_replay_first requires that trial's video before the stickers.
+                // postcard_type picks card A, B, or C. optional_distractor_toys are
+                // extra sticker choices (feature-map toy codes).
+                // repair_toy_sticker breaks the correct sticker into parts. False skips that.
+                // show_instructions_bubble shows the desk prompts. False uses a shadow
+                // on the photos and, when the video is required, on the play button.
+                blocks: [
+                    {
+                        Fennimals: ["A", "B", "C"],
+                        force_replay_first: true,
+                        postcard_type: "A",
+                        optional_distractor_toys: ["X", "Y", "Z"],
+                        repair_toy_sticker: true,
+                        show_instructions_bubble: true
+                    },
+                    {
+                        Fennimals: ["A", "B", "C"],
+                        force_replay_first: true,
+                        postcard_type: "B",
+                        optional_distractor_toys: ["X", "Y", "Z"],
+                        repair_toy_sticker: false,
+                        show_instructions_bubble: false
+                    },
+                    {
+                        Fennimals: ["A", "B", "C"],
+                        force_replay_first: false,
+                        postcard_type: "C",
+                        optional_distractor_toys: ["X", "Y", "Z"],
+                        repair_toy_sticker: false,
+                        show_instructions_bubble: false
+                    }
+                ]
+            },
+
+            // BLOCK 4: workshop repair of toys X, Y, and Z. Same memory foil as mentalizing_exp1.
+            // The trial ends when the pieces match the picture. No charging step.
+            // No map travel. The block opens with the workshop instructions, then the first toy.
+            {
+                type: "warehouse_task",
+                partner_behavior: "active",
+                ask_Fennimal: true,
+                ask_toy: true,
+                ask_box: false,
+                trial_subblocks: [
+                    {
+                        interaction_type: "broken_toy_workshop",
+                        toys: ["X", "Y", "Z"],
+                        include_charging_action: false
+                    }
+                ]
+            },
+
+            // BLOCK 5: radial belief block. Practice, belief, partner knowledge, reality.
+            // Memory questions moved to the written page in block 6.
+            {
+                type: "partner_belief_individual_boxes",
+                include_practice_trial: true,
+                include_partner_knowledge_trial: true,
+                num_belief_blocks: 1,
+                include_reality_block_at_end: true,
+                include_empty_box_choice_alternative: true,
+                bonus_stars_per_correct_answer: 1,
+                questions: [
+                    { question_id: "belief_X", target_box: "X" }
+                ]
+            },
+
+            // BLOCK 6: written memory page. Each question pays its own stars.
+            // Five questions at these rates pay at most 5 stars.
+            {
+                type: "written_memory_page",
+                target_box: "X",
+                bonus_stars_per_correct: 1,
+                bonus_stars_per_dont_remember: 0.5,
+                bonus_stars_per_incorrect: 0
             },
 
         ],
@@ -889,6 +1064,7 @@ let StimulusSettings = function () {
         mentalizing_between_subjects: ["demographics_questionnaire"],
         mentalizing_exp2: ["demographics_questionnaire"],
         mentalizing_exp1: ["demographics_questionnaire"],
+        mentalizing_exp1_retro: ["demographics_questionnaire"],
     };
 
     const All_Allowed_Head_Lists = {};
@@ -909,6 +1085,7 @@ let StimulusSettings = function () {
         mentalizing_between_subjects: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
         mentalizing_exp2: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
         mentalizing_exp1: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
+        mentalizing_exp1_retro: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
     };
 
     const All_Allowed_Head_Groups_List = {};
@@ -934,7 +1111,7 @@ let StimulusSettings = function () {
     if (!this.Experiment_Structure || !this.Fennimal_Dictionary) {
         throw new Error(
             'Unknown experiment code "' + this.Experiment_Code + '". ' +
-            'Live codes: test, semantic_learning_star, semantic_learning_kit, mentalizing_between_subjects, mentalizing_exp1, mentalizing_exp2. ' +
+            'Live codes: test, semantic_learning_star, semantic_learning_kit, mentalizing_between_subjects, mentalizing_exp1, mentalizing_exp1_retro, mentalizing_exp2. ' +
             'Archived recipes are in archive/ (see archive/MANIFEST.md).'
         );
     }
@@ -999,6 +1176,23 @@ let StimulusTransformer = function (StimTemplate) {
             if (!sb || sb.interaction_type !== "broken_toy_workshop" || !Array.isArray(sb.toys)) return;
             sb.toys.forEach((code) => {
                 if (typeof code === "string" && code && !codes.includes(code)) codes.push(code);
+            });
+        });
+        return codes;
+    }
+
+    // Toy codes offered as extra postcard stickers. Shared codes keep the
+    // workshop or Fennimal toy; any other code is filled from a leftover SVG toy.
+    function list_postcard_distractor_toy_codes() {
+        let codes = [];
+        let structure = StimTemplate.Experiment_Structure || [];
+        structure.forEach((phase) => {
+            if (!phase || !Array.isArray(phase.blocks)) return;
+            phase.blocks.forEach((block) => {
+                if (!block || !Array.isArray(block.optional_distractor_toys)) return;
+                block.optional_distractor_toys.forEach((code) => {
+                    if (typeof code === "string" && code && !codes.includes(code)) codes.push(code);
+                });
             });
         });
         return codes;
@@ -1413,7 +1607,7 @@ let StimulusTransformer = function (StimTemplate) {
                 Variable_Features[key] = Array.from(Counts[key]); // Convert Set to Array of unique requests
             }
 
-            list_broken_toy_workshop_codes().forEach((code) => {
+            list_broken_toy_workshop_codes().concat(list_postcard_distractor_toy_codes()).forEach((code) => {
                 if (!Variable_Features.toy) Variable_Features.toy = [];
                 if (!Variable_Features.toy.includes(code)) Variable_Features.toy.push(code);
             });
@@ -1817,7 +2011,7 @@ let StimulusTransformer = function (StimTemplate) {
     // A restored FeatureMap predates workshop codes. Keep the saved Fennimal
     // toys, and give any missing workshop code an SVG toy that map does not use.
     this.fill_missing_workshop_toy_codes = function () {
-        let codes = list_broken_toy_workshop_codes();
+        let codes = list_broken_toy_workshop_codes().concat(list_postcard_distractor_toy_codes());
         if (!codes.length) return;
         if (!FeatureMap.toy) FeatureMap.toy = {};
 
@@ -2196,6 +2390,18 @@ let StimulusTransformer = function (StimTemplate) {
                     max_stars += bonus * 2;
                 }
                 max_stars += bonus * this._countPartnerBeliefMemoryProbeTrials(memoryProbeSpecs);
+            }
+
+            if (block.type === "written_memory_page") {
+                let perCorrect = (typeof block.bonus_stars_per_correct === "number")
+                    ? block.bonus_stars_per_correct
+                    : 1;
+                let questions = 2;
+                if (typeof this.get_all_Fennimals_objects_in_array === "function") {
+                    questions += (this.get_all_Fennimals_objects_in_array() || [])
+                        .filter((fen) => fen && fen.id).length;
+                }
+                max_stars += perCorrect * questions;
             }
 
             if (block.type === "name_recall_task" && typeof block.bonus_stars_per_correct_answer === "number") {

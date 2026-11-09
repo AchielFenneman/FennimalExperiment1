@@ -441,7 +441,7 @@ WorldStateObject = function () {
     }
 
     // Same record for a sack that is out on its own. A Fennimal's hidden toy
-    // leaves this false, so a later opening shows a black "?" rather than the toy.
+    // leaves this false, so a later opening shows a "?" in that Fennimal's color.
     let ParticipantSawSackContents = {}
 
     this.set_participant_saw_sack_contents = function(sacktype, saw){

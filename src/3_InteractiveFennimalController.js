@@ -278,9 +278,10 @@ class BasicElementsModule {
      * Stop breathing / gaze / sway and all body CSS flair (snow, spores, heat, tails, …).
      * Used when the Fennimal should appear frozen (e.g. in a photo).
      */
-    freeze_character_pose() {
+    freeze_character_pose(options) {
         // Flag first so an in-flight RAF callback cannot re-schedule the loop.
         this.character_animation_frozen = true;
+        let keepGaze = !!(options && options.keepGaze);
 
         if (this.animation_frame_id) {
             cancelAnimationFrame(this.animation_frame_id);
@@ -291,11 +292,13 @@ class BasicElementsModule {
             this.gaze_tracker = null;
         }
 
-        this.targetGazeX = 0;
-        this.targetGazeY = 0;
-        this.currentGazeX = 0;
-        this.currentGazeY = 0;
-        this.gaze_target_element = null;
+        if (!keepGaze) {
+            this.targetGazeX = 0;
+            this.targetGazeY = 0;
+            this.currentGazeX = 0;
+            this.currentGazeY = 0;
+            this.gaze_target_element = null;
+        }
 
         if (this.FennimalScaleGroup) {
             this.FennimalScaleGroup.style.transform = `scale(${this.baseScale != null ? this.baseScale : 1})`;
@@ -303,10 +306,10 @@ class BasicElementsModule {
         if (this.FennimalBody) {
             this.FennimalBody.style.transform = "translate(0px, 0px) scale(1, 1)";
         }
-        if (this.FennimalHead) {
+        if (!keepGaze && this.FennimalHead) {
             this.FennimalHead.style.transform = "translate(0px, 0px) rotate(0deg)";
         }
-        if (this.FennimalEyes) {
+        if (!keepGaze && this.FennimalEyes) {
             this.FennimalEyes.forEach((eye) => {
                 eye.style.transform = "translate(0px, 0px) scale(1.15)";
             });
@@ -2149,7 +2152,7 @@ class BaseToyModule {
                     this.animate_play_bubblewand(ToyAnimationRotationGroup, ToyAnimationTranslationGroup, ToyParent, basics);
                     break;
                 case "jack":
-                    this.animate_play_jack(ToyAnimationRotationGroup, ToyAnimationTranslationGroup, ToyParent, basics);
+                    this._jackPlay = this.animate_play_jack(ToyAnimationRotationGroup, ToyAnimationTranslationGroup, ToyParent, basics);
                     break;
                 default:
                     this.animate_play_generic(ToyAnimationRotationGroup, ToyAnimationTranslationGroup, ToyParent);
@@ -2166,23 +2169,30 @@ class BaseToyModule {
 
             // 4. RETURN TRIPS (3.5 seconds)
             setTimeout(() => {
-                // NEW: Added the robot to the smooth return array!
-                if (["trumpet", "globe", "robot", "bubblewand", "jack"].includes(this.FenObj.toy)) {
+                // Jack finishes its own return once the pop is done. Snapping it
+                // back here cuts the spring off mid-wobble.
+                if (["trumpet", "globe", "robot", "bubblewand"].includes(this.FenObj.toy)) {
                     ToyAnimationTranslationGroup.style.transform = "translate(0px, 0px)";
                 }
             }, 3500);
 
-            // 5. UNIVERSAL CLEANUP (4.0 seconds)
-            setTimeout(() => {
+            // 5. UNIVERSAL CLEANUP (4.0 seconds, or after the jack pop finishes)
+            let jackDone = (this.FenObj.toy === "jack" && this._jackPlay) ? this._jackPlay : Promise.resolve();
+            Promise.all([wait(4000), jackDone]).then(() => {
+                clearInterval(HeartGenerator);
+                if (!this.ToyElement || !this.ToyElement.isConnected) {
+                    resolve();
+                    return;
+                }
                 ToyParent.appendChild(this.ToyElement);
                 ToyAnimationTranslationGroup.remove();
-                clearInterval(HeartGenerator);
 
                 this.cleanup_play_state(); // Cleans up toy-specific opacity toggles (like the plane)
 
-                if (basics) basics.clear_gaze_target();
+                // A recording keeps looking at the on-screen toy instead of the cursor.
+                if (basics && !this._recordingPlayback) basics.clear_gaze_target();
                 resolve();
-            }, 4000);
+            });
         });
     }
 
@@ -2191,14 +2201,26 @@ class BaseToyModule {
     // ----------------------------------------------------
 
     animate_play_trumpet(rotGroup, transGroup, parent, basics) {
-        if (!this.recorded_notes) return;
+        let notes = Array.isArray(this.recorded_notes) ? this.recorded_notes.filter(Boolean) : [];
+        if (notes.length === 0) {
+            // A recording never charges the valves, so there is no pressed-note list.
+            // Play the three notes in a random order. Math.random stays off the experiment seed.
+            if (!this._recordingPlayback) return;
+            notes = ["trumpet_note_A", "trumpet_note_B", "trumpet_note_C"];
+            for (let i = notes.length - 1; i > 0; i--) {
+                let j = Math.floor(Math.random() * (i + 1));
+                let swap = notes[i];
+                notes[i] = notes[j];
+                notes[j] = swap;
+            }
+        }
 
         // Sequence Playback
         rotGroup.style.transition = "transform 150ms ease-in-out";
         const playSequence = async () => {
             await wait(400);
-            for (let i = 0; i < this.recorded_notes.length; i++) {
-                let note = this.recorded_notes[i];
+            for (let i = 0; i < notes.length; i++) {
+                let note = notes[i];
                 AudioCont.play_sound_effect(note);
                 rotGroup.style.transform = "rotate(-25deg)";
                 await wait(300);
@@ -2557,6 +2579,20 @@ class BaseToyModule {
         if (wand_assembly) playSequence();
     }
 
+    pose_jack_boxed() {
+        if (!this.ToyElement || this.FenObj.toy !== "jack") return;
+        let box_lid_open = this.ToyElement.querySelector(".box_lid_open");
+        let box_lid_closed = this.ToyElement.querySelector(".box_lid_closed");
+        let jack_assembly = this.ToyElement.querySelector(".jack_assembly");
+        let spring = this.ToyElement.querySelector(".spring");
+        let jack_head = this.ToyElement.querySelector(".jack");
+        if (box_lid_open) box_lid_open.style.opacity = 0;
+        if (box_lid_closed) box_lid_closed.style.opacity = 1;
+        if (jack_assembly) jack_assembly.style.opacity = 0;
+        if (spring) spring.style.transform = "";
+        if (jack_head) jack_head.style.transform = "";
+    }
+
     animate_play_jack(rotGroup, transGroup, parent, basics) {
         let activeFennimal = basics ? basics.Fennimal : null;
         let box_lid_open = this.ToyElement.querySelector(".box_lid_open");
@@ -2568,6 +2604,20 @@ class BaseToyModule {
         let pivot = jack_assembly ? jack_assembly.querySelector(".toy_pivot_point") : null;
 
         let spring_height = spring ? spring.getBBox().height : 100;
+
+        // Scale the spring from its base. The crank phase normally does this;
+        // the recording plays the pop without that phase.
+        if (pivot && spring) {
+            let pBox = pivot.getBBox();
+            let sBox = spring.getBBox();
+            if (sBox.width > 0 && sBox.height > 0) {
+                let originX = ((pBox.x + (pBox.width / 2) - sBox.x) / sBox.width) * 100;
+                let originY = ((pBox.y + (pBox.height / 2) - sBox.y) / sBox.height) * 100;
+                spring.style.transformBox = "fill-box";
+                spring.style.transformOrigin = originX + "% " + originY + "%";
+                spring_height = sBox.height;
+            }
+        }
 
         // 1. Establish the Wobble Pivot (100% immune to screen movement!)
         if (pivot && jack_assembly) {
@@ -2582,6 +2632,8 @@ class BaseToyModule {
             jack_assembly.style.transformOrigin = `${pivotX_pct}% ${pivotY_pct}%`;
         }
 
+        this.pose_jack_boxed();
+
         // 2. Move the Toy to the floor (Using pure, scalable SVG Math!)
         let dx = 0, dy = 0;
         let mouthPoint = activeFennimal
@@ -2590,7 +2642,7 @@ class BaseToyModule {
                 : activeFennimal.querySelector(".Fennimal_head_mouth_point"))
             : null;
 
-        if (mouthPoint && pivot) {
+        if (!this._recordingPlayback && mouthPoint && pivot) {
             let screenMouth = (typeof svg_screen_point_from_element === "function")
                 ? svg_screen_point_from_element(mouthPoint)
                 : null;
@@ -2675,13 +2727,17 @@ class BaseToyModule {
 
                 await wait(400);
 
-                // The Happy Jumps (now using the centralized function to trigger sounds!)
-                for (let i = 0; i < 3; i++) {
-                    await basics.Fennimal_jump(100);
+                if (activeFennimal.isConnected && basics && basics.Fennimal_jump) {
+                    for (let i = 0; i < 3; i++) {
+                        if (!activeFennimal.isConnected) break;
+                        await basics.Fennimal_jump(100);
+                    }
                 }
             }
 
             await wait(1000);
+
+            if (!this.ToyElement || !this.ToyElement.isConnected) return;
 
             if (box_lid_closed) box_lid_closed.style.opacity = 0;
             if (box_lid_open) box_lid_open.style.opacity = 1;
@@ -2694,9 +2750,13 @@ class BaseToyModule {
             let crank_down = this.ToyElement.querySelector(".crank_down");
             if (crank_up) crank_up.style.opacity = 1;
             if (crank_down) crank_down.style.opacity = 0;
+
+            transGroup.style.transition = "transform 400ms ease-in-out";
+            transGroup.style.transform = "translate(0px, 0px)";
+            await wait(420);
         };
 
-        playSequence();
+        return playSequence().catch((err) => { console.warn("jack play", err); });
     }
 
     animate_play_generic(rotGroup, transGroup, parent) {
@@ -8140,8 +8200,8 @@ class PhotoTrialController {
             freeze_fennimal_decorative_animations(fenIcon);
             groupScale.appendChild(fenIcon);
 
-            // Always print the Fennimal's toy on the polaroid when they have one.
-            if (AskToyOverlay.hasToy(this.FenObj)) {
+            // Print the Fennimal's toy on the polaroid unless this phase hides it.
+            if (AskToyOverlay.hasToy(this.FenObj) && this.FenObj.hide_held_toy !== true) {
                 let bodyGroup = fenIcon.getElementsByClassName("Fennimal_body")[0];
                 let bodyScaleGroup = bodyGroup && bodyGroup.firstElementChild;
                 let bodySvg = bodyScaleGroup && bodyScaleGroup.firstElementChild;
@@ -8690,14 +8750,14 @@ class PhotoTrialController {
             AskHatOverlay.attachIfMissing(this);
             let wornHat = AskHatOverlay.getWornHat(this);
             if (wornHat) AskHatOverlay.showWornHat(wornHat);
-            // Held toy is always shown when the Fennimal has one: after ask_toy
-            // (quiz → place), or immediately if there is no ask_toy quiz.
-            if (this.FenObj.ask_toy) {
+            // Held toy is shown when the Fennimal has one, unless the phase hides it:
+            // after ask_toy (quiz → place), or immediately if there is no ask_toy quiz.
+            if (this.FenObj.hide_held_toy !== true && this.FenObj.ask_toy) {
                 await AskToyOverlay.run(this, {
                     placement: this.isHeadshot() ? "feet" : "held",
                     fallToFloor: this.isHeadshot()
                 });
-            } else if (!this.isHeadshot()) {
+            } else if (this.FenObj.hide_held_toy !== true && !this.isHeadshot()) {
                 this.askToyElement = AskToyOverlay.attachHeldToy(this);
             }
         }
@@ -12384,7 +12444,8 @@ class HatLaundryTrialController {
 }
 
 
-// Assemble leftover (or Fennimal) toys on the machine-room table, then charge each one.
+// Assemble leftover (or Fennimal) toys on the machine-room table.
+// Charging follows when the trial's include_charging_action is not false.
 // One controller stays up for a whole workshop run; begin_toy swaps the toy.
 class BrokenToyWorkshopTrialController {
     constructor(partnerIsPresent) {
@@ -12791,6 +12852,11 @@ class BrokenToyWorkshopTrialController {
         return trial.workshop_index >= trial.workshop_count - 1;
     }
 
+    // Missing flag keeps the original charge-after-assembly sequence.
+    includeChargingAction() {
+        return !this.trial || this.trial.include_charging_action !== false;
+    }
+
     incomingToyNodes() {
         let nodes = [];
         if (this.ToyElement) nodes.push(this.ToyElement);
@@ -12921,10 +12987,14 @@ class BrokenToyWorkshopTrialController {
     }
 
     async sayWorkshopDoneLine() {
-        await this.sayToPartner(
-            "Great work! All the toys are now back together. Let's return to the phone room!",
-            "Okay!"
-        );
+        // warehouse_task stays in the room. Phone-room days still walk back.
+        let stayHere = typeof topController !== "undefined"
+            && topController
+            && topController.currentPhaseType === "warehouse_task";
+        let text = stayHere
+            ? "Great work! All the toys are now back together."
+            : "Great work! All the toys are now back together. Let's return to the phone room!";
+        await this.sayToPartner(text, "Okay!");
     }
 
     tableCssScale() {
@@ -13283,40 +13353,42 @@ class BrokenToyWorkshopTrialController {
         await this.toyLib.play_repair_celebration(this.scene.ItemLayers.Plus2);
         if (!this.isAlive(token)) return;
 
-        if (this.partner.is_present) {
-            Interface.Prompt.hide();
-            await this.stepTowardTable("front", 420);
+        if (this.includeChargingAction()) {
+            if (this.partner.is_present) {
+                Interface.Prompt.hide();
+                await this.stepTowardTable("front", 420);
+                if (!this.isAlive(token)) return;
+                await this.sayTryItLine();
+                if (!this.isAlive(token)) return;
+                await this.partner.animate_home({ ms: 420 });
+                if (!this.isAlive(token)) return;
+                this.partner.set_direction("back");
+            }
+
+            this.poseToy(this.layout.chargeBottomX, this.layout.chargeBottomY, this.zoomFactor, 700);
+            await wait(740);
             if (!this.isAlive(token)) return;
-            await this.sayTryItLine();
+
+            // Snapped pieces keep pointer-events off so they cannot be dragged again.
+            // The plane propeller and trumpet valves are those pieces, so charging
+            // has to turn clicks back on.
+            this.enableChargingPointers();
+            await this.toyLib.charge_toy(
+                this.scene.ItemLayers.Plus2,
+                this.layout.chargeBottomX,
+                this.layout.chargeBottomY,
+                null
+            );
             if (!this.isAlive(token)) return;
-            await this.partner.animate_home({ ms: 420 });
+
+            this.toyLib.pulse_success_highlight();
+            let center = getSVGInternalCenter(this.ToyElement);
+            await spawn_confetti_burst(this.scene.ItemLayers.Plus2, center.x, center.y, {
+                insertBefore: this.ToyElement,
+                awaitPopMs: 2800
+            });
             if (!this.isAlive(token)) return;
-            this.partner.set_direction("back");
         }
-
-        this.poseToy(this.layout.chargeBottomX, this.layout.chargeBottomY, this.zoomFactor, 700);
-        await wait(740);
-        if (!this.isAlive(token)) return;
-
-        // Snapped pieces keep pointer-events off so they cannot be dragged again.
-        // The plane propeller and trumpet valves are those pieces, so charging
-        // has to turn clicks back on.
-        this.enableChargingPointers();
-        await this.toyLib.charge_toy(
-            this.scene.ItemLayers.Plus2,
-            this.layout.chargeBottomX,
-            this.layout.chargeBottomY,
-            null
-        );
-        if (!this.isAlive(token)) return;
-
-        this.toyLib.pulse_success_highlight();
-        let center = getSVGInternalCenter(this.ToyElement);
-        await spawn_confetti_burst(this.scene.ItemLayers.Plus2, center.x, center.y, {
-            insertBefore: this.ToyElement,
-            awaitPopMs: 2800
-        });
-        if (!this.isAlive(token)) return;
 
         this.poseToy(this.layout.restBottomX, this.layout.restBottomY, this.tableCssScale(), 500);
         await wait(560);
@@ -14138,6 +14210,15 @@ class ParticipantToyBoxTrialController {
         return (data && data.darker_color) || "#111111";
     }
 
+    // Retro belief trials ask what went in. Direct trials set reveal_toy.
+    // Indirect trials set mystery_note. Other warehouse placements do not.
+    asksWhatWasPlaced() {
+        if (this.placementMove() !== "toy_into_box") return false;
+        if (this.FenObj.reveal_toy === true) return true;
+        let note = this.FenObj && this.FenObj.mystery_note;
+        return typeof note === "string" && note.trim() !== "";
+    }
+
     partnerDisplayName() {
         let settings = (typeof WorldState !== "undefined" && WorldState.get_partner_icon_settings)
             ? WorldState.get_partner_icon_settings()
@@ -14145,20 +14226,32 @@ class ParticipantToyBoxTrialController {
         return (settings && settings.name) || "your partner";
     }
 
-    // Each toy belongs to one Fennimal, so the owner name comes from that toy.
-    fennimalNameForToy(toyId) {
+    // Each toy belongs to one Fennimal. The live list is first; the quiz copies
+    // still carry region and name if that list is not ready.
+    fennimalForToy(toyId) {
         if (!toyId) return null;
-        let list = [];
+        let lists = [];
         if (typeof topController !== "undefined"
             && topController.stimuli
             && typeof topController.stimuli.get_all_Fennimals_objects_in_array === "function") {
-            list = topController.stimuli.get_all_Fennimals_objects_in_array() || [];
+            lists.push(topController.stimuli.get_all_Fennimals_objects_in_array() || []);
         }
-        for (let i = 0; i < list.length; i++) {
-            let fen = list[i];
-            if (fen && fen.toy === toyId) return fen.name || fen.id || null;
+        if (this.FenObj && Array.isArray(this.FenObj.placement_quiz_fennimals)) {
+            lists.push(this.FenObj.placement_quiz_fennimals);
+        }
+        for (let n = 0; n < lists.length; n++) {
+            let list = lists[n];
+            for (let i = 0; i < list.length; i++) {
+                let fen = list[i];
+                if (fen && fen.toy === toyId) return fen;
+            }
         }
         return null;
+    }
+
+    fennimalNameForToy(toyId) {
+        let fen = this.fennimalForToy(toyId);
+        return fen ? (fen.name || fen.id || null) : null;
     }
 
     // System note pointing at a "?" mark. Not the partner's speech bubble.
@@ -14296,54 +14389,18 @@ class ParticipantToyBoxTrialController {
         }
     }
 
-    // Same 45-degree sheen as the cheek stamps, painted on a white copy of the
-    // rounded rectangle. A CSS mask moves the band; an SVG clip disappeared
-    // once the mark sat inside the Fennimal's transformed body.
-    addQuestionMarkGlimmer(rect) {
-        if (!rect || !rect.parentNode) return;
-        let sheen = rect.cloneNode(false);
-        sheen.removeAttribute("id");
-        sheen.removeAttribute("style");
-        sheen.removeAttribute("class");
-        sheen.setAttribute("class", "question_mark_sheen");
-        sheen.setAttribute("fill", "#ffffff");
-        sheen.style.pointerEvents = "none";
-        let wrap = document.createElementNS(rect.namespaceURI, "g");
-        wrap.setAttribute("class", "question_mark_sheen_wrap");
-        wrap.appendChild(sheen);
-        rect.parentNode.insertBefore(wrap, rect.nextSibling);
-    }
-
     createLooseQuestionMark(fill) {
-        let ns = "http://www.w3.org/2000/svg";
-        let group = document.createElementNS(ns, "g");
-        let size = 78;
-        let rect = create_SVG_rect(-size / 2, -size / 2, size, size);
-        rect.setAttribute("rx", 14);
-        rect.setAttribute("fill", fill || "#111111");
-        rect.style.pointerEvents = "all";
-        let label = create_SVG_text_elem(0, 0, "?");
-        label.setAttribute("text-anchor", "middle");
-        label.setAttribute("dominant-baseline", "central");
-        label.setAttribute("fill", "#ffffff");
-        label.setAttribute("font-size", "64");
-        label.setAttribute("font-family", "Arial, sans-serif");
-        label.setAttribute("font-weight", "700");
-        label.style.pointerEvents = "none";
-        group.appendChild(rect);
-        group.appendChild(label);
-        this.addQuestionMarkGlimmer(rect);
-        group.style.pointerEvents = "none";
-        return group;
+        return createQuestionMarkGraphic(fill || "#111111", 78);
     }
 
     // Outer group carries a single translate, so a later move cannot restart at the origin.
-    spawnMysteryAt(x, y, scale) {
-        let mark = this.createLooseQuestionMark("#111111");
+    // elementId keeps a second mark (the quiz reminder) off the one already on the table.
+    spawnMysteryAt(x, y, scale, fill, elementId) {
+        let mark = this.createLooseQuestionMark(fill);
         let zero = create_SVG_group(0, 0, "zero_translate_group");
         let scaleGroup = create_SVG_group(0, 0, "scale_group");
         let main = create_SVG_group(0, 0, "main_translate_group");
-        main.id = "box_contents_mystery";
+        main.id = elementId || "box_contents_mystery";
         zero.appendChild(mark);
         scaleGroup.appendChild(zero);
         main.appendChild(scaleGroup);
@@ -14583,13 +14640,20 @@ class ParticipantToyBoxTrialController {
         let label = "this";
         let unseenNote = null;
 
+        let ownerFen = hasToy ? this.fennimalForToy(entry.toy) : null;
+        let ownerName = ownerFen ? (ownerFen.name || ownerFen.id || null) : null;
+
         if (!saw) {
-            dragEl = this.spawnMysteryAt(inside.x, inside.y, 2.4);
+            dragEl = this.spawnMysteryAt(inside.x, inside.y, 2.4, this.mysteryFillForFennimal(ownerFen));
             this.clearedItem = dragEl;
-            let owner = this.fennimalNameForToy(entry.toy);
-            unseenNote = owner
-                ? "This is the toy " + owner + " put in this box earlier."
-                : "This is the toy that was already in this box.";
+            this.clearedOwnerName = ownerName;
+            if (ownerName && this.asksWhatWasPlaced()) {
+                unseenNote = "This is " + ownerName + "'s favorite toy.";
+            } else if (ownerName) {
+                unseenNote = "This is the toy " + ownerName + " put in this box earlier.";
+            } else {
+                unseenNote = "This is the toy that was already in this box.";
+            }
         } else if (hasSack) {
             this.clearedSack = new SackModule({ sack: entry.sack });
             await this.clearedSack.create_and_appear_closed_sack_item(
@@ -14613,6 +14677,7 @@ class ParticipantToyBoxTrialController {
             );
             dragEl = this.clearedToy.ToyElement;
             label = entry.toy;
+            this.clearedOwnerName = ownerName;
         }
         if (!dragEl) return;
 
@@ -14641,7 +14706,8 @@ class ParticipantToyBoxTrialController {
         let unseenNote = null;
 
         if (!saw) {
-            dragEl = this.spawnMysteryAt(inside.x, inside.y, 2.4);
+            let ownerFen = this.fennimalForToy(toyId);
+            dragEl = this.spawnMysteryAt(inside.x, inside.y, 2.4, this.mysteryFillForFennimal(ownerFen));
             this.clearedItem = dragEl;
             let owner = this.fennimalNameForToy(toyId);
             unseenNote = owner
@@ -14722,6 +14788,7 @@ class ParticipantToyBoxTrialController {
     // On the table and clear of the box: keep that horizontal spot and sit it down.
     // Anywhere else: sit it at the nearer end of the table.
     async snap_cleared_item_onto_table(el) {
+        let growth = this.previewClearedItemAtTableSize(el);
         let here = getSVGInternalCenter(el);
         let table = this.tableElement ? this.svgBounds(this.tableElement) : null;
         let item = this.svgBounds(el);
@@ -14753,7 +14820,30 @@ class ParticipantToyBoxTrialController {
         if (seatBottom != null && itemBottom != null) {
             targetY += this.screenDeltaToSvgY(seatBottom - itemBottom);
         }
+        if (growth) {
+            growth.scaleGroup.style.transition = "none";
+            growth.scaleGroup.style.transform = "scale(" + growth.from + ")";
+            void growth.scaleGroup.getBoundingClientRect();
+            growth.scaleGroup.style.transition = "transform 380ms ease-out";
+            growth.scaleGroup.style.transform = "scale(" + growth.to + ")";
+        }
         await this.moveTranslatedRoot(el, targetX, targetY, 380);
+    }
+
+    // Measure the cleared item at table size, then the caller animates back up to it.
+    // In-box scale stays put until the item is set down.
+    previewClearedItemAtTableSize(el) {
+        let scaleGroup = el && el.getElementsByClassName("scale_group")[0];
+        if (!scaleGroup) return null;
+        let match = (scaleGroup.style.transform || "").match(/scale\(([^)]+)\)/);
+        let from = match ? parseFloat(match[1]) : 1;
+        if (!isFinite(from) || from <= 0) from = 1;
+        let to = this.itemScale || from;
+        if (to <= from + 0.05) return null;
+        scaleGroup.style.transition = "none";
+        scaleGroup.style.transform = "scale(" + to + ")";
+        void el.getBoundingClientRect();
+        return { scaleGroup: scaleGroup, from: from, to: to };
     }
 
     async stow_box_and_close_backpack() {
@@ -15165,8 +15255,9 @@ class ParticipantToyBoxTrialController {
 }
 
 
-// The owner Fennimal walks in holding a hidden toy (a black "?" mark), puts it
-// in the warehouse box, and the player is asked which Fennimal did it.
+// The owner Fennimal walks in holding a toy (visible, or a "?" cover).
+// The participant pats them, hears whose favorite toy it is, then drags it in.
+// Retro trials then ask whose toy that was, and then what went in.
 class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
     async start_sequence() {
         if (typeof Interface !== "undefined" && Interface.Prompt) Interface.Prompt.hide();
@@ -15191,10 +15282,9 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
             await this.open_the_sack();
             this.sack.set_pointer_events_enabled(false);
             await this.place_existing_sack_contents_on_table();
-            await this.fennimal_places_toy();
+            await this.participant_places_held_item();
             await this.close_sack_hiding_token();
-            await this.walk_off_left();
-            await this.run_fennimal_quiz();
+            await this.leave_and_ask();
             return;
         }
         let boxReady = this.box.create_and_appear_box(
@@ -15216,10 +15306,10 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
         await this.open_the_box();
         this.box.set_pointer_events_enabled(false);
         await this.place_existing_contents_on_table();
-        await this.fennimal_places_toy();
+        await this.note_the_swap();
+        await this.participant_places_held_item();
         await this.close_box_for_reveal();
-        await this.walk_off_left();
-        await this.run_fennimal_quiz();
+        await this.leave_and_ask();
     }
 
     // The Fennimal is already waiting with the hidden toy before the partner
@@ -15242,10 +15332,9 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
             await this.open_the_sack();
             this.sack.set_pointer_events_enabled(false);
             await this.place_existing_sack_contents_on_table();
-            await this.fennimal_places_toy();
+            await this.participant_places_held_item();
             await this.close_sack_hiding_token();
-            await this.walk_off_left();
-            await this.run_fennimal_quiz();
+            await this.leave_and_ask();
             return;
         }
 
@@ -15260,13 +15349,86 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
         await this.open_the_box();
         this.box.set_pointer_events_enabled(false);
         await this.place_existing_contents_on_table();
-        await this.fennimal_places_toy();
+        await this.note_the_swap();
+        await this.participant_places_held_item();
         await this.close_box_for_reveal();
-        await this.walk_off_left();
-        await this.run_fennimal_quiz();
+        await this.leave_and_ask();
+    }
+
+    // The room is already up (partner and table). Announce this Fennimal, then they walk in.
+    // Phone-room warehouse trials already showed a call card, so they skip this.
+    announcesArrivalOnScene() {
+        if (!this.FenObj || this.FenObj.placed_by_fennimal !== true) return false;
+        return typeof topController !== "undefined"
+            && topController
+            && topController.currentPhaseType === "warehouse_task";
+    }
+
+    announce_arrival() {
+        if (!this.announcesArrivalOnScene()) return null;
+        let layer = this.basics && this.basics.ItemLayers && this.basics.ItemLayers.Questions;
+        if (!layer) return null;
+        let name = this.FenObj.name || this.FenObj.id;
+        let template = (GenParam.WarehouseTask && GenParam.WarehouseTask.arrivalLine)
+            || "{name} is coming to store a favorite toy.";
+        let line = String(template).replace("{name}", name);
+
+        return new Promise((resolve) => {
+            let group = create_SVG_group(0, 0, undefined, "fennimal_arrival_overlay");
+            layer.appendChild(group);
+
+            let cover = create_SVG_rect(0, 0, this.basics.W, this.basics.H, "instructions_element_cover", "arrival_overlay_veil");
+            cover.style.pointerEvents = "all";
+            group.appendChild(cover);
+
+            let margin = 30;
+            let panel = create_SVG_rect(
+                margin,
+                margin,
+                this.basics.W - 2 * margin,
+                this.basics.H - 2 * margin,
+                "instructions_element_background",
+                "arrival_overlay_panel"
+            );
+            panel.style.pointerEvents = "none";
+            group.appendChild(panel);
+
+            let icon = create_Fennimal_SVG_object(this.FenObj, GenParam.Fennimal_head_size, false);
+            icon.style.pointerEvents = "none";
+            group.appendChild(icon);
+            moveSVGCenterTo(icon, this.basics.W / 2, this.basics.H / 2 - 150);
+
+            let text = create_SVG_text_elem(this.basics.W / 2, this.basics.H / 2 + 210, line, undefined, "arrival_overlay_line");
+            text.style.fontSize = "48px";
+            text.style.fontWeight = "700";
+            text.style.fill = "#2c3e50";
+            text.style.textAnchor = "middle";
+            text.style.dominantBaseline = "middle";
+            text.style.pointerEvents = "none";
+            group.appendChild(text);
+
+            let button = create_SVG_buttonElement(this.basics.W / 2, 0.88 * this.basics.H, 400, 75, "Continue", 40);
+            group.appendChild(button);
+            let closed = false;
+            button.onpointerdown = () => {
+                if (closed) return;
+                closed = true;
+                if (typeof AudioCont !== "undefined" && AudioCont.play_sound_effect) {
+                    AudioCont.play_sound_effect("close_menu");
+                }
+                group.remove();
+                resolve();
+            };
+            if (typeof AudioCont !== "undefined" && AudioCont.play_sound_effect) {
+                AudioCont.play_sound_effect("alert_minimal");
+            }
+        });
     }
 
     async enter_fennimal() {
+        // Hold on the empty room before the arrival card.
+        if (this.announcesArrivalOnScene()) await wait(750);
+        await this.announce_arrival();
         this.standX = 0.16 * this.basics.W;
         // Above the box front (Plus2). Main sits under that front, which clipped the body.
         await this.basics.create_and_appear_Fennimal(
@@ -15280,8 +15442,129 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
                 else this.attachMysteryToken();
             }
         );
+        let name = this.FenObj.name || this.FenObj.id;
+        this.showPatHighlight();
+        Interface.Prompt.show_message(name + " has come to store its favorite toy");
+        AudioCont.play_sound_effect("alert_minor");
         await this.walkFennimalToX(this.standX, 820);
+        await wait(900);
+        await this.pat_fennimal();
         await this.explainHeldMystery();
+    }
+
+    // White edge plus a warm halo, on from the walk-in until the pat.
+    showPatHighlight() {
+        let fen = this.basics && this.basics.Fennimal;
+        if (!fen) return;
+        fen.classList.add("fennimal_pat_target");
+    }
+
+    clearPatHighlight() {
+        let fen = this.basics && this.basics.Fennimal;
+        if (!fen) return;
+        fen.classList.remove("fennimal_pat_target");
+        fen.style.filter = "none";
+    }
+
+    // One click, a short jump, and a few hearts. Same beat on both trials,
+    // as soon as this Fennimal has arrived and before anything else they do.
+    async pat_fennimal() {
+        let fen = this.basics.Fennimal;
+        if (!fen) return;
+        let name = this.FenObj.name || this.FenObj.id;
+        Interface.Prompt.show_message("Give " + name + " a pat");
+        AudioCont.play_sound_effect("alert_minor");
+        this.showPatHighlight();
+        fen.style.cursor = "pointer";
+        fen.style.pointerEvents = "auto";
+        // The toy sits in the hand, outside the body. A click there should count too.
+        this.enableHeldTokenHits(this.mysteryToken);
+        await new Promise((resolve) => {
+            fen.onpointerdown = () => {
+                fen.onpointerdown = null;
+                fen.style.cursor = "auto";
+                this.clearPatHighlight();
+                fen.style.pointerEvents = "none";
+                fen.querySelectorAll("*").forEach((el) => {
+                    el.style.pointerEvents = "none";
+                });
+                AudioCont.play_sound_effect("positive");
+                this.basics.Fennimal_jump(60).then(() => {
+                    for (let i = 0; i < 3; i++) {
+                        setTimeout(() => {
+                            let mouth = this.basics.TargetPoints && this.basics.TargetPoints.Fennimal_mouth;
+                            let start = mouth ? getSVGInternalCenter(mouth) : getSVGInternalCenter(fen);
+                            this.basics.spawn_happy_heart(start.x, start.y - 40, fen.parentNode);
+                        }, i * 150);
+                    }
+                    setTimeout(resolve, 600);
+                });
+            };
+        });
+        Interface.Prompt.hide();
+    }
+
+    // The held toy (or "?" cover) leaves the Fennimal's hand and the participant
+    // drags it into the open container. World state stays with commitFennimalPlacement
+    // so a cover still counts as unseen.
+    async participant_places_held_item() {
+        let token = this.mysteryToken;
+        if (!token) {
+            await this.fennimal_places_toy();
+            return;
+        }
+        let hand = this.visualCenterClient(token);
+        let handWidth = token.getBoundingClientRect().width;
+        this.detachTokenForDrop(token, this.basics.ItemLayers.Plus2, hand, handWidth);
+        this.enableHeldTokenHits(token);
+
+        let intoSack = this.placementMove() === "toy_into_sack";
+        let containerEl = intoSack ? this.sack.SackBase : this.box.BoxBase;
+        let containerName = intoSack ? this.sack.sackname : this.box.boxname;
+        let itemWord = this.placementMove() === "sack_into_box" ? "sack" : "toy";
+        let name = this.FenObj.name || this.FenObj.id;
+        let prompt = "Drag " + name + "'s " + itemWord + " into the " + containerName;
+        Interface.Prompt.show_message(prompt);
+        AudioCont.play_sound_effect("alert_minor");
+
+        await new Promise((resolve) => {
+            this.dragController = new MakeObjectDraggableObject(
+                this.basics.ItemLayers.Plus2,
+                this.basics.ItemLayers.Plus2,
+                token,
+                containerEl,
+                220,
+                async () => {
+                    if (this.dragController && this.dragController.destroy) this.dragController.destroy();
+                    this.dragController = null;
+                    Interface.Prompt.hide();
+                    await this.dropMysteryIntoBox();
+                    resolve();
+                },
+                {
+                    onMiss: () => {
+                        Interface.Prompt.show_message("Drop it in the " + containerName);
+                        if (this.dragController && this.dragController.enable) this.dragController.enable();
+                    }
+                }
+            );
+        });
+    }
+
+    enableHeldTokenHits(token) {
+        if (!token) return;
+        token.style.pointerEvents = "auto";
+        token.querySelectorAll("*").forEach((el) => {
+            el.style.pointerEvents = "auto";
+        });
+    }
+
+    disableHeldTokenHits(token) {
+        if (!token) return;
+        token.style.pointerEvents = "none";
+        token.querySelectorAll("*").forEach((el) => {
+            el.style.pointerEvents = "none";
+        });
     }
 
     async appearFennimalSack(layout) {
@@ -15303,23 +15586,34 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
 
     // The partner is still in the room when the Fennimal arrives, including the
     // swap trial (they leave only after this note). Nothing else starts until Got it.
-    // A real sack already hides the toy, so that move has no "?" note.
+    // A real sack already hides the toy, so that move has no note.
+    // reveal_toy names it as that Fennimal's favorite toy, and shows the toy.
+    // mystery_note replaces the default hidden-toy sentence. {fennimal} and {partner} are filled in.
     // The swap trial still does not update the partner's stored belief: they leave
     // before the toy goes into the box.
     async explainHeldMystery() {
         if (this.placementMove() === "sack_into_box") return;
-        if (!this.partner.is_present || !this.mysteryToken) return;
+        if (!this.mysteryToken) return;
         let fenName = this.FenObj.name || this.FenObj.id;
+        if (this.FenObj.reveal_toy === true) {
+            await this.showMysteryNote(
+                this.mysteryToken,
+                "This is " + fenName + "'s favorite toy.",
+                "right"
+            );
+            return;
+        }
+        if (!this.partner.is_present) return;
         let partnerName = this.partnerDisplayName();
-        await this.showMysteryNote(
-            this.mysteryToken,
-            "This is " + fenName + "'s toy. You can't see which toy it is, but " + partnerName + " can.",
-            "right"
-        );
+        let note = (typeof this.FenObj.mystery_note === "string" && this.FenObj.mystery_note.trim() !== "")
+            ? this.FenObj.mystery_note.trim()
+            : "This is {fennimal}'s toy. You can't see which toy it is, but {partner} can.";
+        note = note.replaceAll("{fennimal}", fenName).replaceAll("{partner}", partnerName);
+        await this.showMysteryNote(this.mysteryToken, note, "right");
     }
 
     // Same body point and scale as a toy on a regular trial. The real toy
-    // graphic is removed before the Fennimal fades in.
+    // graphic is removed before the Fennimal fades in, unless reveal_toy is set.
     attachMysteryToken() {
         let fennimal = this.basics.Fennimal;
         let bodyGroup = fennimal.getElementsByClassName("Fennimal_body")[0];
@@ -15328,28 +15622,22 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
         let scaleParent = fennimal.getElementsByClassName("Fennimal_scale_group")[0] || bodyScaleGroup;
         let group = attach_toy_to_fennimal_body(scaleParent, bodySvg, this.FenObj, 2.2);
         if (!group) return;
+        if (this.FenObj.reveal_toy === true) {
+            group.id = "fennimal_toy_box_visible";
+            group.style.pointerEvents = "none";
+            this.mysteryToken = group;
+            return;
+        }
         let scaleGroup = group.firstChild;
         let toyNode = scaleGroup && scaleGroup.firstChild;
         let center = (toyNode && _local_bbox_center(toyNode)) || { x: 0, y: 0 };
         while (scaleGroup.firstChild) scaleGroup.removeChild(scaleGroup.firstChild);
         scaleGroup.classList.add("scale_group");
 
-        let size = 72;
-        let mark = create_SVG_rect(center.x - size / 2, center.y - size / 2, size, size);
-        mark.setAttribute("rx", 12);
-        mark.setAttribute("fill", this.mysteryFillForFennimal(this.FenObj));
-        mark.style.pointerEvents = "none";
-        let label = create_SVG_text_elem(center.x, center.y, "?");
-        label.setAttribute("text-anchor", "middle");
-        label.setAttribute("dominant-baseline", "central");
-        label.setAttribute("fill", "#ffffff");
-        label.setAttribute("font-size", "58");
-        label.setAttribute("font-family", "Arial, sans-serif");
-        label.setAttribute("font-weight", "700");
-        label.style.pointerEvents = "none";
-        scaleGroup.appendChild(mark);
-        scaleGroup.appendChild(label);
-        this.addQuestionMarkGlimmer(mark);
+        let graphic = createQuestionMarkGraphic(this.mysteryFillForFennimal(this.FenObj), 72);
+        graphic.style.transform = "translate(" + center.x + "px, " + center.y + "px)";
+        graphic.style.pointerEvents = "none";
+        scaleGroup.appendChild(graphic);
 
         group.id = "fennimal_toy_box_mystery";
         group.style.pointerEvents = "none";
@@ -15490,7 +15778,7 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
         }
         WorldState.change_toybox_contents(this.FenObj.toybox, this.FenObj.toy);
         if (typeof WorldState.set_participant_saw_box_contents === "function") {
-            WorldState.set_participant_saw_box_contents(this.FenObj.toybox, false);
+            WorldState.set_participant_saw_box_contents(this.FenObj.toybox, this.FenObj.reveal_toy === true);
         }
         if (this.partner.is_present && this.FenObj.partner_leaves_during_interaction !== true) {
             WorldState.change_partner_belief_in_box_contents(this.FenObj.toybox, this.FenObj.toy);
@@ -15536,8 +15824,22 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
     }
 
     // Leave the Fennimal without snapping back to the graphic's own coordinates.
-    detachTokenForDrop(token, layer, keepClient, matchWidth) {
+    // Held toys scale their first child and do not use the scale_group class,
+    // so that child has to be found or the detach drops the Fennimal's scale.
+    heldTokenScaleGroup(token) {
+        if (!token) return null;
         let scaleGroup = token.getElementsByClassName("scale_group")[0];
+        if (scaleGroup) return scaleGroup;
+        let child = token.firstElementChild;
+        if (child && /scale\(/.test(child.style.transform || "")) {
+            child.classList.add("scale_group");
+            return child;
+        }
+        return null;
+    }
+
+    detachTokenForDrop(token, layer, keepClient, matchWidth) {
+        let scaleGroup = this.heldTokenScaleGroup(token);
         let own = 1;
         if (scaleGroup) {
             let match = (scaleGroup.style.transform || "").match(/scale\(([^)]+)\)/);
@@ -15619,6 +15921,166 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
         await this.walkFennimalToX(-680, 780);
     }
 
+    async leave_and_ask() {
+        // Hold after the box shuts, before they walk off.
+        if (this.announcesArrivalOnScene()) await wait(750);
+        await this.walk_off_left();
+        let asked = await this.run_fennimal_quiz();
+        if (!asked) return;
+        await this.run_object_quiz();
+        await this.finish_after_placement_quizzes();
+    }
+
+    async finish_after_placement_quizzes() {
+        let burstRoot = (this.box && this.box.BoxBase) || (this.sack && this.sack.SackBase);
+        let burstCenter = getSVGInternalCenter(burstRoot);
+        await spawn_confetti_burst(
+            this.basics.ItemLayers.Plus2,
+            burstCenter.x,
+            burstCenter.y,
+            { awaitPopMs: 650 }
+        );
+        await wait(350);
+        if (this.FenObj.partner_leaves_during_interaction) {
+            await this.stow_box_and_close_backpack();
+        }
+        this.finish_trial();
+    }
+
+    // Trial 2, once the old toy is on the table and the new one is still in hand.
+    async note_the_swap() {
+        if (!this.asksWhatWasPlaced()) return;
+        if (this.clearedSack && !this.clearedItem && !this.clearedToy) return;
+        if (!this.clearedItem && !this.clearedToy) return;
+        if (!this.mysteryToken) return;
+        let newName = this.FenObj.name || this.FenObj.id;
+        let boxName = (this.box && this.box.boxname) || "box";
+        let text = "Now that there's space, let's put " + newName + "'s favorite toy in the " + boxName + ".";
+        await this.showMysteryNote(this.mysteryToken, text, "up");
+    }
+
+    objectQuizToyIds() {
+        let ids = [];
+        this.getQuizFennimals().forEach((fen) => {
+            if (fen && fen.toy && !ids.includes(fen.toy)) ids.push(fen.toy);
+        });
+        if (this.FenObj.toy && !ids.includes(this.FenObj.toy)) ids.push(this.FenObj.toy);
+        return ids;
+    }
+
+    objectQuizMarks() {
+        let marks = [];
+        let seen = {};
+        this.getQuizFennimals().forEach((fen) => {
+            if (!fen || !fen.id || seen[fen.id]) return;
+            seen[fen.id] = true;
+            marks.push({ id: fen.id, fill: this.mysteryFillForFennimal(fen) });
+        });
+        return marks;
+    }
+
+    async run_object_quiz() {
+        if (!this.asksWhatWasPlaced()) return;
+        let hidden = this.FenObj.reveal_toy !== true;
+        let options = hidden ? this.objectQuizMarks() : this.objectQuizToyIds();
+        if (!options.length) {
+            console.warn("Fennimal_toy_box: no choices for the object quiz; skipping.");
+            return;
+        }
+        let correct = hidden ? this.FenObj.id : this.FenObj.toy;
+        this.FenObj.object_quiz = hidden ? "mark" : "toy";
+        this.FenObj.object_placement_correct = correct;
+        this.FenObj.object_placement_errors = [];
+
+        let barOptions = this.quizBarOptions(options.length);
+        let makeBar = () => hidden
+            ? new QuestionMarkChoiceBar(
+                this.basics.ItemLayers.Questions,
+                this.basics.W,
+                this.basics.H,
+                barOptions
+            )
+            : new ToyChoiceBar(
+                this.basics.ItemLayers.Questions,
+                this.basics.W,
+                this.basics.H,
+                barOptions
+            );
+        let bar = makeBar();
+
+        while (true) {
+            Interface.Prompt.show_message("What did you just place in the box?");
+            let selected = await bar.waitForSelection(shuffleArray(options.slice()));
+            if (selected === correct) {
+                AudioCont.play_sound_effect("positive");
+                await bar.hide();
+                Interface.Prompt.hide();
+                return;
+            }
+            AudioCont.play_sound_effect("rejected");
+            this.FenObj.object_placement_errors.push(selected);
+            await bar.hide();
+            Interface.Prompt.hide();
+            await this.show_placed_object_again();
+            bar = makeBar();
+        }
+    }
+
+    // A miss brings the same object back out: the toy, or the same colored "?".
+    async show_placed_object_again() {
+        if (!this.box || !this.box.BoxBase) return;
+        let preview = null;
+        let toyModule = null;
+        let opened = false;
+        try {
+            await this.open_box_for_reveal();
+            opened = true;
+            let inside = this.boxInteriorPoint();
+            if (this.FenObj.reveal_toy === true) {
+                toyModule = new StandardToyModule({ toy: this.FenObj.toy });
+                await toyModule.create_and_appear_toy(
+                    this.basics.ItemLayers.Plus1,
+                    "object_quiz_reveal",
+                    inside.x,
+                    inside.y,
+                    2.6,
+                    80
+                );
+                preview = toyModule.ToyElement;
+            } else {
+                preview = this.spawnMysteryAt(
+                    inside.x,
+                    inside.y,
+                    2.4,
+                    this.mysteryFillForFennimal(this.FenObj),
+                    "placed_object_reminder"
+                );
+            }
+            if (preview) {
+                preview.style.pointerEvents = "none";
+                await this.riseOutOfBox(preview);
+                await wait(1100);
+                let cur = getSVGInternalCenter(preview);
+                await this.moveTranslatedRoot(preview, cur.x, inside.y, 420);
+                await wait(200);
+            }
+            if (opened) {
+                await this.close_box_for_reveal();
+                opened = false;
+            }
+        } finally {
+            if (toyModule && typeof toyModule.clean_up === "function") toyModule.clean_up();
+            else if (preview && preview.parentNode) preview.remove();
+            if (opened) {
+                try {
+                    await this.close_box_for_reveal();
+                } catch (err) {
+                    console.warn("object quiz close", err);
+                }
+            }
+        }
+    }
+
     getQuizFennimals() {
         let list = Array.isArray(this.FenObj.placement_quiz_fennimals)
             ? this.FenObj.placement_quiz_fennimals.filter((fen) => fen && fen.id)
@@ -15631,8 +16093,8 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
         return list;
     }
 
-    quizBarOptions() {
-        let count = Math.max(1, this.getQuizFennimals().length);
+    quizBarOptions(optionCount) {
+        let count = Math.max(1, optionCount || this.getQuizFennimals().length);
         let spacing = count > 7 ? 14 : 20;
         let gutter = 24;
         let spanRight = this.partner.is_present
@@ -15654,9 +16116,9 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
     }
 
     fennimalQuizPrompt() {
-        if (this.placementMove() === "sack_into_box") return "Which Fennimal just placed its sack in the box?";
-        if (this.placementMove() === "toy_into_sack") return "Which Fennimal just placed its toy in the sack?";
-        return "Which Fennimal just placed its toy in the box?";
+        if (this.placementMove() === "sack_into_box") return "Whose sack did you just put in the box?";
+        if (this.placementMove() === "toy_into_sack") return "Whose toy did you just put in the sack?";
+        return "Whose toy did you just put in the box?";
     }
 
     async run_fennimal_quiz() {
@@ -15688,20 +16150,7 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
                 AudioCont.play_sound_effect("positive");
                 await bar.hide();
                 Interface.Prompt.hide();
-                let burstRoot = (this.box && this.box.BoxBase) || (this.sack && this.sack.SackBase);
-                let burstCenter = getSVGInternalCenter(burstRoot);
-                await spawn_confetti_burst(
-                    this.basics.ItemLayers.Plus2,
-                    burstCenter.x,
-                    burstCenter.y,
-                    { awaitPopMs: 650 }
-                );
-                await wait(350);
-                if (this.FenObj.partner_leaves_during_interaction) {
-                    await this.stow_box_and_close_backpack();
-                }
-                this.finish_trial();
-                return;
+                return true;
             }
 
             AudioCont.play_sound_effect("rejected");
@@ -15718,6 +16167,2555 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
                 barOptions
             );
         }
+    }
+}
+
+
+// Postcard task. include_full_sequence_at_start plays each Fennimal's recording
+// once before any postcard. blocks then runs each pass: the card is type A, B,
+// or C, the video is required when force_replay_first is set, and any listed
+// distractor toys join the sticker tray. A correct sticker breaks into its
+// parts; once those parts are back on the frame, the toy lands on the postcard.
+class PostcardFromRecordingTrialController {
+    constructor(FenObj, partner_is_present, returnfunc) {
+        this.FenObj = FenObj;
+        this.returnfunc = returnfunc;
+        this.basics = new BasicElementsModule(FenObj);
+        this.partner = new PartnerModule(partner_is_present);
+        this.playButton = null;
+        this.continueButton = null;
+        this.rec = null;
+        this.toy = null;
+        this.screenSvg = null;
+        this.screenHost = null;
+        this.viewfinder = null;
+        this.recPartnerBeat = null;
+        this._toyHome = null;
+        this._playing = false;
+        this._playToken = 0;
+        this._finished = false;
+        this._savedLocatorName = null;
+        this._postcardShown = false;
+        this._postcardSolved = false;
+        this._photoPlaced = false;
+        this._drag = null;
+        this.stickers = [];
+        this.polaroids = [];
+    }
+
+    async start_sequence() {
+        let layout = GenParam.PostcardRecording;
+        this.basics.create_svg_sublayers();
+        this.coverLocationWithBackdrop();
+        this.useHomePromptColors();
+        this.hideMapLocator();
+
+        let desk = this.placeDesk(layout);
+        this.drawMonitor(layout, desk);
+
+        if (this.partner.is_present && this.partner.PartnerBaseGroup) {
+            this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        }
+
+        this.FenObj.placement_errors = [];
+        this.FenObj.video_played = false;
+        this.FenObj.sticker_mistakes = 0;
+        this._suppressReplayButton = false;
+        this.setPlayButtonVisible(false);
+        this.setScreenDim(false);
+        await this.presentPostcard();
+    }
+
+    // Study pass. The desk stays up and each Fennimal's recording plays once.
+    async playStudyLineup(lineup) {
+        let layout = GenParam.PostcardRecording;
+        this.basics.create_svg_sublayers();
+        this.coverLocationWithBackdrop();
+        this.useHomePromptColors();
+        this.hideMapLocator();
+        let desk = this.placeDesk(layout);
+        this.drawMonitor(layout, desk);
+        if (this.partner.is_present && this.partner.PartnerBaseGroup) {
+            this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
+        }
+        this._suppressReplayButton = true;
+        this.setPlayButtonVisible(false);
+        this.setScreenDim(false);
+        if (typeof Interface !== "undefined" && Interface.Prompt) {
+            let copy = (typeof GenParam !== "undefined" && GenParam.PostcardTask) || {};
+            Interface.Prompt.show_message(copy.studyPrompt || "Watch the recordings. You'll need them for the postcards.");
+        }
+        await wait(1100);
+        for (let i = 0; i < lineup.length; i++) {
+            if (this._finished) return;
+            this.FenObj = lineup[i];
+            await this.runRecording();
+            if (this._finished) return;
+            await wait(700);
+        }
+    }
+
+    coverLocationWithBackdrop() {
+        let map = document.getElementById("Map");
+        if (map) map.style.display = "none";
+        let iface = document.getElementById("Interface");
+        if (iface) iface.style.display = "inherit";
+
+        let base = create_SVG_rect(0, 0, this.basics.W, this.basics.H);
+        base.style.fill = "#ffffff";
+        base.style.pointerEvents = "none";
+        this.basics.BackgroundLayer.appendChild(base);
+
+        let wall = document.createElementNS("http://www.w3.org/2000/svg", "image");
+        wall.setAttribute("href", "./Locations/Home_woodwall.png");
+        wall.setAttribute("x", "0");
+        wall.setAttribute("y", "0");
+        wall.setAttribute("width", this.basics.W);
+        wall.setAttribute("height", this.basics.H);
+        wall.setAttribute("preserveAspectRatio", "xMidYMid slice");
+        wall.style.pointerEvents = "none";
+        this.basics.BackgroundLayer.appendChild(wall);
+
+        // Wash between the wood wall and the desk, monitor, and partner.
+        let wash = create_SVG_rect(0, 0, this.basics.W, this.basics.H);
+        wash.style.fill = "#ffffff";
+        wash.style.opacity = "0.5";
+        wash.style.pointerEvents = "none";
+        this.basics.BackgroundLayer.appendChild(wash);
+    }
+
+    placeDesk(layout) {
+        let template = document.getElementById("table");
+        if (!template) return null;
+        let raw = template.getBBox();
+        let targetW = layout.deskWidth * this.basics.W;
+        let scale = targetW / Math.max(raw.width, 1);
+        let group = copy_scale_and_move_object_to_position(
+            template,
+            this.basics.ItemLayers.Neg1,
+            layout.deskCenterX * this.basics.W,
+            layout.deskCenterY * this.basics.H,
+            scale,
+            "postcard_desk"
+        );
+        group.style.pointerEvents = "none";
+        return group;
+    }
+
+    drawMonitor(layout, deskGroup) {
+        let W = this.basics.W;
+        let H = this.basics.H;
+        let bezelX = layout.monitorX * W;
+        let bezelY = layout.monitorY * H;
+        let bezelW = layout.monitorWidth * W;
+        let bezelH = layout.monitorHeight * H;
+        let bezel = layout.bezel;
+        let screenX = bezelX + bezel;
+        let screenY = bezelY + bezel;
+        let screenW = bezelW - 2 * bezel;
+        let screenH = bezelH - 2 * bezel;
+        let standTop = bezelY + bezelH;
+        let baseY = standTop + layout.standHeight;
+
+        let g = create_SVG_group(0, 0);
+        this.monitorGroup = g;
+        this.basics.ItemLayers.Main.appendChild(g);
+
+        let base = create_SVG_rect(bezelX + 0.28 * bezelW, baseY - 16, 0.44 * bezelW, 18);
+        base.style.fill = "#3a4048";
+        base.setAttribute("rx", "6");
+        let neck = create_SVG_rect(bezelX + 0.44 * bezelW, standTop, 0.12 * bezelW, layout.standHeight);
+        neck.style.fill = "#4a515b";
+        let frame = create_SVG_rect(bezelX, bezelY, bezelW, bezelH);
+        frame.style.fill = "#2c3138";
+        frame.setAttribute("rx", "18");
+        let lip = create_SVG_rect(bezelX + 10, bezelY + 10, bezelW - 20, bezelH - 20);
+        lip.style.fill = "#121418";
+        lip.setAttribute("rx", "8");
+        let screen = create_SVG_rect(screenX, screenY, screenW, screenH);
+        screen.style.fill = "#14181f";
+        [base, neck, frame, lip, screen].forEach((shape) => {
+            shape.style.pointerEvents = "none";
+        });
+
+        g.appendChild(base);
+        g.appendChild(neck);
+        g.appendChild(frame);
+        g.appendChild(lip);
+        g.appendChild(screen);
+
+        // The recording is its own 1920×1080 picture, scaled into the screen.
+        this.screenSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        this.screenSvg.setAttribute("x", screenX);
+        this.screenSvg.setAttribute("y", screenY);
+        this.screenSvg.setAttribute("width", screenW);
+        this.screenSvg.setAttribute("height", screenH);
+        this.screenSvg.setAttribute("viewBox", "0 0 " + W + " " + H);
+        this.screenSvg.setAttribute("preserveAspectRatio", "xMidYMid slice");
+        this.screenSvg.setAttribute("overflow", "hidden");
+        this.screenSvg.style.pointerEvents = "none";
+        g.appendChild(this.screenSvg);
+        this.screenHost = create_SVG_group(0, 0);
+        this.screenSvg.appendChild(this.screenHost);
+
+        // Veil under the play button. Hidden while the recording plays.
+        this.screenDim = create_SVG_rect(screenX, screenY, screenW, screenH);
+        this.screenDim.style.fill = "#ffffff";
+        this.screenDim.style.opacity = "0.45";
+        this.screenDim.style.pointerEvents = "none";
+        g.appendChild(this.screenDim);
+
+        let screenMidX = screenX + 0.5 * screenW;
+        let screenMidY = screenY + 0.5 * screenH;
+        this.monitorTip = create_SVG_circle(screenMidX, screenMidY, 8);
+        this.monitorTip.style.opacity = "0";
+        this.monitorTip.style.pointerEvents = "none";
+        g.appendChild(this.monitorTip);
+
+        this.playButton = this.drawPlayButton(
+            g,
+            screenMidX,
+            screenMidY,
+            layout.playRadius
+        );
+
+        if (deskGroup) this.seatDeskUnderMonitor(deskGroup, baseY);
+    }
+
+    onPlay() {
+        if (this._finished || this._playing || this._playLocked) return;
+        this.runRecording();
+    }
+
+    setPlayButtonVisible(show) {
+        if (!this.playButton) return;
+        this.playButton.style.display = show ? "inline" : "none";
+        this.applyPlayButtonState();
+    }
+
+    // Polaroids cover the replay control. Leave it where it is and ignore clicks
+    // until the matching photo is on the postcard.
+    setPlayLocked(locked) {
+        this._playLocked = !!locked;
+        this.applyPlayButtonState();
+    }
+
+    applyPlayButtonState() {
+        if (!this.playButton) return;
+        let hidden = this.playButton.style.display === "none";
+        let locked = !!this._playLocked;
+        this.playButton.style.transform = "none";
+        this.playButton.style.pointerEvents = (!hidden && !locked) ? "auto" : "none";
+        this.playButton.style.cursor = locked ? "default" : "pointer";
+        this.playButton.style.opacity = locked ? "0.4" : "1";
+        this.refreshPlayHighlight();
+    }
+
+    // Without the prompt bubbles, the required play button carries the cue itself.
+    playClickIsCued() {
+        if (this.showsInstructionBubbles()) return false;
+        if (!this.playButton || this.playButton.style.display === "none") return false;
+        if (this._playLocked || this._playing || this._postcardSolved || this._assembling) return false;
+        if (!this._photoPlaced || this.rewatchOptional()) return false;
+        if (this.FenObj && this.FenObj.video_played) return false;
+        return true;
+    }
+
+    refreshPlayHighlight() {
+        if (!this.playCircle) return;
+        this.playCircle.style.filter = this.playClickIsCued()
+            ? "drop-shadow(0px 0px 5px #ffe14a) drop-shadow(0px 0px 18px rgba(255,196,0,0.95))"
+            : "drop-shadow(0px 6px 10px rgba(0,0,0,0.35))";
+    }
+
+    async runRecording() {
+        if (this._finished || this._playing || this._playLocked) return;
+        this._playing = true;
+        this._playToken += 1;
+        if (this._drag) {
+            let held = this._drag;
+            this._drag = null;
+            if (held._fenId) this.returnPolaroid(held);
+            else this.returnSticker(held);
+        }
+        let token = this._playToken;
+        let alive = () => token === this._playToken && !this._finished;
+        let completed = false;
+        this.setPlayButtonVisible(false);
+        this.setScreenDim(false);
+        this.hidePointingNote();
+        if (typeof Interface !== "undefined" && Interface.Prompt) Interface.Prompt.hide();
+
+        try {
+            let titleShownAt = performance.now();
+            this.setTitleCard(true, 0);
+            await this.buildRecordingScene();
+            if (!alive()) return;
+            let titleLeft = 750 - (performance.now() - titleShownAt);
+            if (titleLeft > 0) await wait(titleLeft);
+            if (!alive()) return;
+            this.showViewfinder();
+            this.setRecordingLight(true);
+            await this.setTitleCard(false, 280);
+            if (!alive()) return;
+            await wait(650);
+            if (!alive()) return;
+            await this.handToyToFennimal(token);
+            if (!alive()) return;
+            await this.partnerBeat(token);
+            if (!alive()) return;
+            await this.playWithoutPrompt();
+            if (!alive()) return;
+            await this.repeatToySignature();
+            if (!alive()) return;
+            await this.lowerToyALittle();
+            if (!alive()) return;
+            await wait(280);
+            if (!alive()) return;
+            await this.jumpWithHearts();
+            if (!alive()) return;
+            if (this.rec) this.rec.freeze_character_pose({ keepGaze: true });
+            await wait(2000);
+            if (!alive()) return;
+            this.setRecordingLight(false);
+            await this.setTitleCard(true, 450);
+            if (!alive()) return;
+            completed = true;
+            if (!this._suppressReplayButton && this.FenObj) this.FenObj.video_played = true;
+        } catch (err) {
+            console.error("postcard recording", err);
+        } finally {
+            if (alive()) {
+                this._playing = false;
+                this.setRecordingLight(false);
+                this.setScreenDim(false);
+                if (!this._suppressReplayButton && !this._assembling && !this._postcardSolved) {
+                    this.setPlayButtonVisible(true);
+                }
+                // The first full play of this postcard unlocks the toy choice.
+                // A later replay leaves the stickers, or the piece puzzle, where they are.
+                if (completed && !this._stickersReady && !this._suppressReplayButton && this._photoPlaced && !this._assembling) {
+                    await this.revealStickerTray();
+                } else if (this._assembling && !this._assemblyPromptDismissed) {
+                    this.showAssemblyPrompt();
+                } else if (this._stickersReady && !this._postcardSolved && !this._assembling) {
+                    this.showStickerPrompt();
+                }
+            }
+        }
+    }
+
+    async buildRecordingScene() {
+        if (this.rec) {
+            try { this.rec.clean_up(); } catch (err) { console.warn(err); }
+            this.rec = null;
+        }
+        this.toy = null;
+        this._toyHome = null;
+        this.recPartnerBeat = null;
+        if (this.screenHost) this.screenHost.style.display = "inherit";
+
+        let W = this.basics.W;
+        let H = this.basics.H;
+        let pos = this.scenePositions();
+        this.rec = new BasicElementsModule(this.FenObj);
+        this.rec.ParentLayer = this.screenHost;
+        this.rec.create_svg_sublayers();
+        this.placeRecordingBackdrop(W, H);
+
+        let wash = create_SVG_rect(0, 0, W, H);
+        wash.style.fill = "#ffffff";
+        wash.style.opacity = "0.8";
+        wash.style.pointerEvents = "none";
+        this.rec.ItemLayers.Neg1.appendChild(wash);
+
+        await this.rec.create_and_appear_Fennimal(
+            this.rec.ItemLayers.Main,
+            pos.fennimalX,
+            pos.groundY,
+            1.75,
+            260
+        );
+
+        let partnerHeight = this.placeRecordingPartner(pos);
+        let bodyPoint = this.rec.TargetPoints.Fennimal_body_center;
+        let body = bodyPoint
+            ? getSVGInternalCenter(bodyPoint)
+            : { x: pos.fennimalX, y: pos.groundY - 180 };
+        this._toyHome = { x: body.x, y: body.y, scale: 4 };
+
+        let toward = Math.sign(pos.fennimalX - pos.partnerX) || 1;
+        this._toyStart = {
+            x: pos.partnerX + toward * partnerHeight * 0.16,
+            y: pos.groundY - partnerHeight * 0.48,
+            scale: 4
+        };
+        this.recToyLayer = create_SVG_group(0, 0);
+        this.rec.ItemLayers.Partner.appendChild(this.recToyLayer);
+        this.toy = new StandardToyModule(this.FenObj);
+        await this.toy.create_and_appear_toy(
+            this.recToyLayer,
+            "recording",
+            this._toyStart.x,
+            this._toyStart.y,
+            4,
+            180
+        );
+        if (this.toy && this.toy.pose_jack_boxed) this.toy.pose_jack_boxed();
+        this.lockRecordingGaze();
+    }
+
+    lockRecordingGaze() {
+        if (!this.rec || !this.toy || !this.toy.ToyElement) return;
+        this.rec.set_gaze_target(this.toy.ToyElement);
+    }
+
+    // Same sky the map uses behind a location. The location PNG leaves the sky transparent.
+    cloneRegionSky(region) {
+        let ns = "http://www.w3.org/2000/svg";
+        let skyWrap = document.createElementNS(ns, "g");
+        skyWrap.setAttribute("transform", "translate(-1048 -2414)");
+        skyWrap.style.pointerEvents = "none";
+        let source = document.getElementById("sky_" + (region || "basic")) || document.getElementById("sky_basic");
+        if (!source) return null;
+        let sky = source.cloneNode(true);
+        sky.removeAttribute("id");
+        sky.setAttribute("display", "inline");
+        sky.style.display = "inline";
+        sky.style.pointerEvents = "none";
+        sky.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
+        sky.querySelectorAll("*").forEach((el) => { el.style.pointerEvents = "none"; });
+        skyWrap.appendChild(sky);
+        return skyWrap;
+    }
+
+    placeRecordingBackdrop(W, H) {
+        let skyWrap = this.cloneRegionSky((this.FenObj && this.FenObj.region) || "basic");
+        if (skyWrap) this.rec.BackgroundLayer.appendChild(skyWrap);
+
+        let bg = document.createElementNS("http://www.w3.org/2000/svg", "image");
+        bg.setAttribute("x", "0");
+        bg.setAttribute("y", "0");
+        bg.setAttribute("width", W);
+        bg.setAttribute("height", H);
+        bg.setAttribute("preserveAspectRatio", "xMidYMid slice");
+        bg.style.pointerEvents = "none";
+        if (typeof set_location_background_image === "function") {
+            set_location_background_image(bg, this.FenObj.region, this.FenObj.location);
+        }
+        this.rec.BackgroundLayer.appendChild(bg);
+    }
+
+    visibleFrame() {
+        let W = this.basics.W;
+        let H = this.basics.H;
+        let vw = this.screenSvg ? parseFloat(this.screenSvg.getAttribute("width")) : W;
+        let vh = this.screenSvg ? parseFloat(this.screenSvg.getAttribute("height")) : H;
+        if (!vw) vw = W;
+        if (!vh) vh = H;
+        let fit = Math.max(vw / W, vh / H);
+        let insetX = Math.max(0, (W - vw / fit) / 2);
+        let insetY = Math.max(0, (H - vh / fit) / 2);
+        return {
+            insetX: insetX,
+            insetY: insetY,
+            left: insetX,
+            right: W - insetX,
+            top: insetY,
+            bottom: H - insetY,
+            width: W - 2 * insetX,
+            height: H - 2 * insetY
+        };
+    }
+
+    scenePositions() {
+        let frame = this.visibleFrame();
+        return {
+            frame: frame,
+            groundY: frame.bottom - 140,
+            // Partner waits at the left edge. The Fennimal stands nearer the middle,
+            // so the right side of the picture is not left empty.
+            fennimalX: frame.left + 0.50 * frame.width,
+            partnerX: frame.left + 0.11 * frame.width
+        };
+    }
+
+    setScreenDim(show) {
+        if (!this.screenDim) return;
+        this.screenDim.style.transition = "opacity 220ms ease";
+        this.screenDim.style.opacity = show ? "0.45" : "0";
+    }
+
+    setRecordingLight(playing) {
+        if (!this.recDot) return;
+        if (this._recDotAnim) {
+            this._recDotAnim.cancel();
+            this._recDotAnim = null;
+        }
+        if (playing) {
+            this.recDot.style.opacity = "1";
+            this._recDotAnim = this.recDot.animate(
+                [{ opacity: 1 }, { opacity: 0.2 }, { opacity: 1 }],
+                { duration: 900, iterations: Infinity }
+            );
+        } else {
+            this.recDot.style.opacity = "1";
+        }
+    }
+
+    setPartnerFeet(x, y, ms) {
+        if (!this.recPartnerMove) return;
+        this.recPartnerMove.style.transition = ms ? ("transform " + ms + "ms ease-in-out") : "none";
+        if (ms) void this.recPartnerMove.getBoundingClientRect();
+        this.recPartnerMove.style.transform = "translate(" + x + "px, " + y + "px)";
+        this._partnerX = x;
+        this._partnerY = y;
+    }
+
+    placeRecordingPartner(pos) {
+        if (!this.rec || typeof WorldState === "undefined" || !WorldState.get_person_icon) return 280;
+        let facing = pos.partnerX < pos.fennimalX ? "right" : "left";
+        let icon = WorldState.get_person_icon("partner", facing);
+        if (!icon) return 280;
+        icon.style.pointerEvents = "none";
+
+        this.recPartnerMove = create_SVG_group(0, 0);
+        this.recPartnerMove.style.pointerEvents = "none";
+        let rig = create_SVG_group(0, 0);
+        rig.style.pointerEvents = "none";
+        rig.appendChild(icon);
+        this.recPartnerMove.appendChild(rig);
+        this.rec.ItemLayers.Partner.appendChild(this.recPartnerMove);
+
+        let box = icon.getBBox();
+        let fenBox = this.rec.Fennimal ? this.rec.Fennimal.getBBox() : null;
+        let fenHeight = fenBox && fenBox.height > 20 ? fenBox.height : 520;
+        let scale = (fenHeight * 1.16) / Math.max(box.height, 1);
+        rig.style.transform =
+            "scale(" + scale + ") " +
+            "translate(" + (-(box.x + 0.5 * box.width)) + "px, " + (-(box.y + box.height)) + "px)";
+        this._partnerHomeX = pos.partnerX;
+        this._partnerHomeY = pos.groundY;
+        this.setPartnerFeet(pos.partnerX, pos.groundY, 0);
+        return box.height * scale;
+    }
+
+    ensureTitleCard() {
+        if (this.titleCard || !this.screenSvg) return;
+        let W = this.basics.W;
+        let H = this.basics.H;
+        let g = create_SVG_group(0, 0);
+        g.style.pointerEvents = "none";
+        g.style.opacity = "0";
+
+        let bg = create_SVG_rect(0, 0, W, H);
+        bg.style.fill = "#000000";
+
+        let name = (this.FenObj && this.FenObj.name) ? this.FenObj.name : "Fennimal";
+        let text = create_SVG_text_elem(0.5 * W, 0.34 * H, name + "'s favorite toy!");
+        text.setAttribute("text-anchor", "middle");
+        text.setAttribute("dominant-baseline", "middle");
+        text.style.fontFamily = "PT Sans, sans-serif";
+        text.style.fontSize = "72px";
+        text.style.fontWeight = "700";
+        text.style.fill = "#ffffff";
+
+        g.appendChild(bg);
+        g.appendChild(text);
+        this.screenSvg.appendChild(g);
+        this.titleCard = g;
+    }
+
+    async setTitleCard(show, ms) {
+        this.ensureTitleCard();
+        if (!this.titleCard) return;
+        if (show) {
+            let name = (this.FenObj && this.FenObj.name) ? this.FenObj.name : "Fennimal";
+            let text = this.titleCard.querySelector("text");
+            let span = text && (text.querySelector("tspan") || text);
+            if (span) span.textContent = name + "'s favorite toy!";
+        }
+        if (this.titleCard.parentNode) this.titleCard.parentNode.appendChild(this.titleCard);
+        this.titleCard.style.transition = ms ? ("opacity " + ms + "ms ease") : "none";
+        if (ms) void this.titleCard.getBoundingClientRect();
+        this.titleCard.style.opacity = show ? "1" : "0";
+        if (ms) await wait(ms);
+    }
+
+    showViewfinder() {
+        if (this.viewfinder || !this.screenSvg) return;
+        let W = this.basics.W;
+        let H = this.basics.H;
+        // The screen crops the sides of the 16:9 picture. Keep the chrome
+        // inside the part that actually shows.
+        let vw = parseFloat(this.screenSvg.getAttribute("width")) || W;
+        let vh = parseFloat(this.screenSvg.getAttribute("height")) || H;
+        let fit = Math.max(vw / W, vh / H);
+        let insetX = Math.max(0, (W - vw / fit) / 2);
+        let insetY = Math.max(0, (H - vh / fit) / 2);
+        let g = create_SVG_group(0, 0);
+        g.style.pointerEvents = "none";
+
+        let chip = create_SVG_rect(insetX + 22, insetY + 28, 268, 56);
+        chip.setAttribute("rx", "28");
+        chip.style.fill = "rgba(0,0,0,0.5)";
+
+        let dot = create_SVG_circle(insetX + 48, insetY + 56, 16);
+        dot.style.fill = "#e11d48";
+        dot.style.opacity = "1";
+        this.recDot = dot;
+
+        let label = create_SVG_text_elem(insetX + 78, insetY + 68, "recording");
+        label.style.fontFamily = "PT Sans, sans-serif";
+        label.style.fontSize = "40px";
+        label.style.fontWeight = "700";
+        label.style.fill = "#ffffff";
+
+        let shade = create_SVG_rect(insetX, H - insetY - 78, W - 2 * insetX, 78);
+        shade.style.fill = "rgba(0,0,0,0.45)";
+        let caption = create_SVG_text_elem(0.5 * W, H - insetY - 30, "Recorded previously");
+        caption.setAttribute("text-anchor", "middle");
+        caption.style.fontFamily = "PT Sans, sans-serif";
+        caption.style.fontSize = "36px";
+        caption.style.fill = "#ffffff";
+
+        g.appendChild(shade);
+        g.appendChild(chip);
+        g.appendChild(dot);
+        g.appendChild(label);
+        g.appendChild(caption);
+        this.screenSvg.appendChild(g);
+        this.viewfinder = g;
+    }
+
+    async moveToy(x, y, scale, ms) {
+        let group = this.toy && this.toy.ToyElement;
+        if (!group) return;
+        let scaleGroup = group.firstElementChild;
+        group.style.transition = "transform " + ms + "ms ease-in-out";
+        if (scaleGroup) scaleGroup.style.transition = "transform " + ms + "ms ease-in-out";
+        group.style.transform = "translate(" + x + "px, " + y + "px)";
+        if (scaleGroup) scaleGroup.style.transform = "scale(" + scale + ")";
+        await wait(ms);
+    }
+
+    // Partner carries the toy over to the Fennimal, lets go, and steps back.
+    async handToyToFennimal(token) {
+        let alive = () => token === this._playToken && !this._finished;
+        if (!this._toyStart || !this._toyHome || !this.recPartnerMove) {
+            await wait(400);
+            return;
+        }
+        let dx = this._toyHome.x - this._toyStart.x;
+        let ms = 1100;
+        this.setPartnerFeet(this._partnerHomeX + dx, this._partnerHomeY, ms);
+        await this.moveToy(this._toyHome.x, this._toyStart.y, this._toyStart.scale, ms);
+        if (!alive()) return;
+        await this.moveToy(this._toyHome.x, this._toyHome.y, this._toyHome.scale, 280);
+        if (!alive()) return;
+        await wait(180);
+        if (!alive()) return;
+        this.setPartnerFeet(this._partnerHomeX, this._partnerHomeY, 700);
+        await wait(740);
+    }
+
+    async partnerBeat(token) {
+        if (token !== this._playToken || this._finished) return;
+        if (!this.recPartnerMove) {
+            await wait(250);
+            return;
+        }
+        let x = this._partnerHomeX;
+        let y = this._partnerHomeY;
+        this.setPartnerFeet(x, y - 36, 140);
+        await wait(160);
+        if (token !== this._playToken || this._finished) return;
+        this.setPartnerFeet(x, y, 160);
+        await wait(180);
+    }
+
+    async repeatToySignature() {
+        let toy = this.toy && this.toy.ToyElement;
+        if (!toy || !this.FenObj) return;
+        let kind = this.FenObj.toy;
+        let base = toy.style.transform || "";
+        const go = async (extra, ms) => {
+            toy.style.transition = "transform " + ms + "ms ease-in-out";
+            toy.style.transform = base + (extra || "");
+            await wait(ms + 30);
+        };
+        try {
+            if (kind === "car") {
+                for (let i = 0; i < 2; i++) {
+                    if (typeof AudioCont !== "undefined" && AudioCont.play_sound_effect) {
+                        AudioCont.play_sound_effect("toy_car_move");
+                    }
+                    await go(" translate(-90px, 0px)", 260);
+                    await go(" translate(80px, 0px)", 300);
+                    await go("", 240);
+                }
+            } else if (kind === "plane") {
+                this.setPlaneProp(true);
+                if (typeof AudioCont !== "undefined" && AudioCont.start_looping_sound_effect) {
+                    AudioCont.start_looping_sound_effect("plane_buzz");
+                }
+                await go(" translate(50px, -46px) rotate(-12deg)", 280);
+                await go(" translate(-36px, 14px) rotate(8deg)", 280);
+                await go(" translate(44px, -36px) rotate(-10deg)", 260);
+                await go("", 240);
+            } else if (kind === "trumpet") {
+                let note = this.toy.recorded_notes && this.toy.recorded_notes[0];
+                for (let i = 0; i < 2; i++) {
+                    if (note && typeof AudioCont !== "undefined" && AudioCont.play_sound_effect) {
+                        AudioCont.play_sound_effect(note);
+                    }
+                    await go(" rotate(-22deg)", 180);
+                    await go("", 180);
+                }
+            } else if (kind === "robot") {
+                await this.waveRobotArms(2);
+            } else if (kind === "globe") {
+                await go(" rotate(-28deg)", 220);
+                await go(" rotate(28deg)", 260);
+                await go("", 200);
+            } else if (kind === "bubblewand") {
+                await go(" rotate(-26deg)", 200);
+                await go(" rotate(22deg)", 220);
+                await go(" rotate(-16deg)", 180);
+                await go("", 180);
+            } else if (kind === "jack") {
+                await go(" translate(0px, -24px)", 160);
+                await go("", 170);
+                await go(" translate(0px, -16px)", 140);
+                await go("", 160);
+            } else {
+                await go(" translate(0px, -28px)", 180);
+                await go("", 170);
+                await go(" translate(0px, -18px)", 150);
+                await go("", 150);
+            }
+        } catch (err) {
+            console.warn("toy signature", err);
+        } finally {
+            if (kind === "plane") {
+                if (typeof AudioCont !== "undefined" && AudioCont.stop_looping_sound_effect) {
+                    AudioCont.stop_looping_sound_effect("plane_buzz");
+                }
+                this.setPlaneProp(false);
+            }
+            toy.style.transition = "transform 180ms ease";
+            toy.style.transform = base;
+            await wait(200);
+        }
+    }
+
+    setPlaneProp(spinning) {
+        let toy = this.toy && this.toy.ToyElement;
+        if (!toy) return;
+        let propBase = toy.querySelector(".prop_base");
+        let propAlt = toy.querySelector(".prop_alt");
+        let propSpin = toy.querySelector(".prop_spinning");
+        if (propBase) propBase.style.opacity = spinning ? "0" : "1";
+        if (propAlt) propAlt.style.opacity = "0";
+        if (propSpin) propSpin.style.opacity = spinning ? "1" : "0";
+    }
+
+    async waveRobotArms(times) {
+        let toy = this.toy && this.toy.ToyElement;
+        if (!toy) return;
+        let arms = Array.from(toy.getElementsByClassName("arm"));
+        if (!arms.length) return;
+        arms.forEach((arm) => {
+            arm.style.transformBox = "fill-box";
+            arm.style.transformOrigin = "center";
+            arm.style.transition = "transform 220ms ease-in-out";
+        });
+        for (let i = 0; i < times; i++) {
+            arms.forEach((arm) => {
+                arm.style.transform = arm.classList.contains("arm_left") ? "rotate(36deg)" : "rotate(-36deg)";
+            });
+            await wait(260);
+            arms.forEach((arm) => { arm.style.transform = "rotate(0deg)"; });
+            await wait(220);
+        }
+    }
+
+    async playWithoutPrompt() {
+        if (!this.toy || !this.rec) return;
+        let prompt = (typeof Interface !== "undefined") ? Interface.Prompt : null;
+        let original = prompt && prompt.show_message;
+        if (prompt && original) prompt.show_message = function () {};
+        if (this.toy) this.toy._recordingPlayback = true;
+        try {
+            await this.toy.play_with_toy(this.rec);
+        } finally {
+            if (prompt && original) prompt.show_message = original;
+        }
+    }
+
+    async lowerToyALittle() {
+        let toy = this.toy && this.toy.ToyElement;
+        if (!toy) return;
+        let dy = 36;
+        try {
+            let center = getSVGInternalCenter(toy);
+            let box = toy.getBBox();
+            let frame = this.visibleFrame();
+            let lowestBottom = frame.bottom - 120;
+            if (center.y + box.height / 2 + dy > lowestBottom) {
+                dy = Math.max(12, lowestBottom - center.y - box.height / 2);
+            }
+        } catch (err) { /* keep the small drop */ }
+        toy.style.transition = "transform 420ms ease-in";
+        toy.style.transform += " translate(0px, " + dy + "px)";
+        await wait(450);
+    }
+
+    async jumpWithHearts() {
+        if (!this.rec || !this.rec.Fennimal) return;
+        let parent = this.rec.ItemLayers.Plus2;
+        let burst = () => {
+            let mouth = this.rec.TargetPoints && this.rec.TargetPoints.Fennimal_mouth;
+            let start = { x: 0.5 * this.basics.W, y: 0.4 * this.basics.H };
+            try {
+                if (mouth) start = getSVGInternalCenter(mouth);
+            } catch (err) { /* fall back to the screen center */ }
+            for (let i = 0; i < 6; i++) {
+                setTimeout(() => {
+                    if (this.rec && this.rec.spawn_happy_heart) {
+                        this.rec.spawn_happy_heart(start.x, start.y - 30, parent);
+                    }
+                }, i * 80);
+            }
+        };
+        await this.rec.Fennimal_jump(110, { ms: 160, resolveMs: 340 });
+        burst();
+        await wait(180);
+        await this.rec.Fennimal_jump(80, { ms: 150, resolveMs: 300 });
+    }
+
+    regionInk() {
+        let region = this.FenObj && this.FenObj.region;
+        let data = (region && GenParam.RegionData && GenParam.RegionData[region]) || {};
+        return {
+            paper: data.lighter_color || "#f4f1ea",
+            band: data.color || "#8a6a45",
+            ink: data.darker_color || "#1c2430"
+        };
+    }
+
+    postcardType() {
+        let type = this.FenObj && this.FenObj.postcard_type ? String(this.FenObj.postcard_type).toUpperCase() : "A";
+        if (type !== "B" && type !== "C") type = "A";
+        return type;
+    }
+
+    postcardNameLine() {
+        let name = (this.FenObj && this.FenObj.name) || "Fennimal";
+        if (this.postcardType() === "B") return "Meet " + name;
+        return name;
+    }
+
+    postcardToyLine() {
+        let toy = this.toyLabel(this.FenObj && this.FenObj.toy);
+        let type = this.postcardType();
+        if (type === "B") return "Loves " + toy;
+        if (type === "C") return "Favorite pastime: " + toy;
+        return "Favorite toy: " + toy;
+    }
+
+    // Type A is plain. Type B gets a white shadow. Type C gets the sticker outline.
+    applyPostcardFigureStyle(el) {
+        if (!el) return;
+        let type = this.postcardType();
+        if (type === "B") {
+            el.style.filter = "drop-shadow(0px 0px 3px #ffffff) drop-shadow(0px 8px 6px rgba(255,255,255,0.95))";
+            return;
+        }
+        if (type === "C") {
+            this.ensurePostcardFigureOutline(this.postcardFigureOutlineRadius());
+            el.style.filter = "url(#postcard_figure_outline)";
+            return;
+        }
+        el.style.filter = "none";
+    }
+
+    // Same on-screen thickness as the broken-sticker border, in the page's units.
+    postcardFigureOutlineRadius() {
+        let svg = GenParam.SVGObject;
+        let vb = svg && svg.viewBox && svg.viewBox.baseVal;
+        let px = svg && vb && vb.width ? svg.getBoundingClientRect().width / vb.width : 0;
+        if (!px) return 8;
+        return Math.max(1.4, 12 / px);
+    }
+
+    ensurePostcardFigureOutline(radius) {
+        let svg = GenParam.SVGObject;
+        if (!svg) return;
+        let ns = "http://www.w3.org/2000/svg";
+        let filter = document.getElementById("postcard_figure_outline");
+        if (!filter) {
+            let defs = svg.querySelector("defs");
+            if (!defs) {
+                defs = document.createElementNS(ns, "defs");
+                svg.insertBefore(defs, svg.firstChild);
+            }
+            filter = document.createElementNS(ns, "filter");
+            filter.setAttribute("id", "postcard_figure_outline");
+            filter.setAttribute("filterUnits", "userSpaceOnUse");
+            filter.setAttribute("primitiveUnits", "userSpaceOnUse");
+            filter.setAttribute("color-interpolation-filters", "sRGB");
+            filter.innerHTML =
+                '<feMorphology in="SourceAlpha" operator="dilate" radius="8" result="dilated"/>' +
+                '<feFlood flood-color="#ffffff" result="flood"/>' +
+                '<feComposite in="flood" in2="dilated" operator="in" result="outline"/>' +
+                '<feMerge>' +
+                '<feMergeNode in="outline"/>' +
+                '<feMergeNode in="SourceGraphic"/>' +
+                "</feMerge>";
+            defs.appendChild(filter);
+        }
+        let margin = Math.ceil(Math.abs(radius) * 4 + 80);
+        filter.setAttribute("x", String(-2000));
+        filter.setAttribute("y", String(-2000));
+        filter.setAttribute("width", String(6000 + margin));
+        filter.setAttribute("height", String(4000 + margin));
+        let morph = filter.querySelector("feMorphology");
+        if (morph) morph.setAttribute("radius", String(radius));
+    }
+
+    toyLabel(toyId) {
+        let names = {
+            car: "car",
+            plane: "plane",
+            trumpet: "trumpet",
+            robot: "robot",
+            globe: "globe",
+            bubblewand: "bubble wand",
+            jack: "Jack-in-the-Box"
+        };
+        let label = names[toyId] || toyId || "toy";
+        return label.charAt(0).toUpperCase() + label.slice(1);
+    }
+
+    stickerToys() {
+        let list = [];
+        if (typeof topController !== "undefined"
+            && topController.stimuli
+            && typeof topController.stimuli.get_all_Fennimals_objects_in_array === "function") {
+            list = topController.stimuli.get_all_Fennimals_objects_in_array() || [];
+        }
+        let toys = [];
+        let ids = (this.FenObj && this.FenObj.block_fennimal_ids) || [];
+        ids.forEach((id) => {
+            let fen = list.find((item) => item && String(item.id) === String(id));
+            if (fen && fen.toy && !toys.some((toy) => toy.toy === fen.toy)) {
+                toys.push({ toy: fen.toy, owner: fen.id });
+            }
+        });
+        let extras = (this.FenObj && this.FenObj.distractor_toy_ids) || [];
+        extras.forEach((toyId) => {
+            if (toyId && !toys.some((toy) => toy.toy === toyId)) toys.push({ toy: toyId, owner: null });
+        });
+        if (!toys.length && this.FenObj && this.FenObj.toy) {
+            toys.push({ toy: this.FenObj.toy, owner: this.FenObj.id });
+        }
+        return shuffleArray(toys);
+    }
+
+    choiceFennimals() {
+        let list = [];
+        if (typeof topController !== "undefined"
+            && topController.stimuli
+            && typeof topController.stimuli.get_all_Fennimals_objects_in_array === "function") {
+            list = topController.stimuli.get_all_Fennimals_objects_in_array() || [];
+        }
+        let ids = (this.FenObj && this.FenObj.block_fennimal_ids) || [];
+        let found = ids.map((id) => list.find((item) => item && String(item.id) === String(id))).filter(Boolean);
+        if (!found.length && this.FenObj) found = [this.FenObj];
+        return shuffleArray(found);
+    }
+
+    async presentPostcard() {
+        if (this._postcardShown || this._finished) return;
+        this._postcardShown = true;
+        let box = this.buildPostcard();
+        if (!this.postcard || !box) return;
+        this._stickerBox = box;
+        this.posePostcardOnTable(box);
+        await wait(780);
+        if (this._finished) return;
+        await this.liftPostcardIntoPlace();
+        if (this._finished) return;
+
+        this.buildPolaroidChoices();
+        if (this.polaroidRow) {
+            this.polaroidRow.style.opacity = "0";
+            void this.polaroidRow.getBoundingClientRect();
+            this.polaroidRow.style.transition = "opacity 450ms ease";
+            this.polaroidRow.style.opacity = "1";
+            await wait(460);
+        }
+        if (this._finished) return;
+        if (!this.polaroids.length) {
+            this._photoPlaced = true;
+            let bg = this.postcard.querySelector(".postcard_background");
+            if (bg) bg.style.fill = this.regionInk().paper;
+            await this.placePostcardFennimal();
+        } else {
+            this.showPhotoPrompt();
+            await new Promise((resolve) => { this._resolvePhoto = resolve; });
+        }
+        if (this._finished) return;
+
+        // The first pass keeps the stickers hidden until this video has played.
+        // A replay block leaves the video optional, so the stickers come up now.
+        this.setPlayLocked(false);
+        if (this.rewatchOptional()) {
+            await this.revealStickerTray();
+        } else {
+            this.setPlayButtonVisible(true);
+            if (!this._finished) this.showWatchAgainPrompt();
+        }
+    }
+
+    rewatchOptional() {
+        return !!(this.FenObj && (this.FenObj.rewatch_optional || this.FenObj.replay_block));
+    }
+
+    repairsToySticker() {
+        return !(this.FenObj && this.FenObj.repair_toy_sticker === false);
+    }
+
+    showsInstructionBubbles() {
+        return !(this.FenObj && this.FenObj.show_instructions_bubble === false);
+    }
+
+    fullSequenceAtStart() {
+        return !!(typeof topController !== "undefined"
+            && topController.currentPhaseData
+            && topController.currentPhaseData.include_full_sequence_at_start === true);
+    }
+
+    showWatchAgainPrompt() {
+        if (this._finished || this._stickersReady || this._playing || this._watchPromptDismissed) return;
+        let name = this.FenObj.name || "the Fennimal";
+        let copy = (typeof GenParam !== "undefined" && GenParam.PostcardTask) || {};
+        let template = this.fullSequenceAtStart()
+            ? (copy.watchAgainPrompt || "Play the video again before adding {name}'s favorite toy.")
+            : (copy.watchFirstPrompt || "Play the video before adding {name}'s favorite toy.");
+        this.showPointingNote(
+            this.monitorGroup || this.playButton,
+            template.replace(/\{name\}/g, name),
+            "down",
+            false,
+            {
+                hideButton: false,
+                buttonLabel: "Got it",
+                rememberDismiss: false,
+                onDismiss: () => { this._watchPromptDismissed = true; }
+            }
+        );
+    }
+
+    async revealStickerTray() {
+        if (this._stickersReady || this._finished || !this._stickerBox) return;
+        this.buildStickerTray(this._stickerBox);
+        if (!this.stickerTray) return;
+        this.stickerTray.style.opacity = "0";
+        this._stickersReady = true;
+        this.setPlayLocked(false);
+        this.setPlayButtonVisible(true);
+        void this.stickerTray.getBoundingClientRect();
+        this.stickerTray.style.transition = "opacity 450ms ease";
+        this.stickerTray.style.opacity = "1";
+        await wait(460);
+        if (!this._finished && !this._postcardSolved && !this._playing) this.showStickerPrompt();
+    }
+
+    posePostcardOnTable(box) {
+        let small = 0.34;
+        let tableTop = this._tableTopY || this.basics.H * 0.75;
+        let tx = box.cx;
+        // The table's center point sits on the back edge of the top. Drop the
+        // card a little further so it rests on the wooden surface.
+        let ty = tableTop - (box.cardH * small) / 2 + 40;
+        this._postcardHome = "translate(" + box.cx + "px, " + box.cy + "px) rotate(0deg) scale(1)";
+        this.postcard.style.transition = "none";
+        this.postcard.style.transform =
+            "translate(" + tx + "px, " + ty + "px) rotate(-8deg) scale(" + small + ")";
+    }
+
+    async liftPostcardIntoPlace() {
+        if (!this.postcard) return;
+        this.postcard.style.transition = "transform 980ms cubic-bezier(0.16, 0.84, 0.28, 1)";
+        void this.postcard.getBoundingClientRect();
+        this.postcard.style.transform = this._postcardHome;
+        await wait(1040);
+    }
+
+    buildPostcard() {
+        let type = this.FenObj && this.FenObj.postcard_type ? String(this.FenObj.postcard_type).toUpperCase() : "A";
+        let template = document.getElementById("postcard_type_" + type) || document.getElementById("postcard_type_A");
+        if (!template) {
+            console.error("postcard template missing");
+            return null;
+        }
+        let marked = template.cloneNode(true);
+        marked.removeAttribute("id");
+        marked.style.display = "inline";
+        marked.removeAttribute("display");
+        let nameSource = marked.querySelector(".postcard_Fennimal_name_text");
+        let toySource = marked.querySelector(".postcard_toy_text");
+        let fenSource = marked.querySelector(".postcard_Fennimal_placeholder");
+        let toySlotSource = marked.querySelector(".postcard_toy_placeholder");
+        if (nameSource) nameSource.classList.add("postcard_name");
+        if (toySource) toySource.classList.add("postcard_favorite");
+        if (fenSource) fenSource.classList.add("postcard_fen_slot");
+        if (toySlotSource) toySlotSource.classList.add("postcard_toy_slot");
+        [nameSource, toySource, fenSource, toySlotSource].forEach((node) => {
+            if (node) node.removeAttribute("id");
+        });
+
+        let layer = this.basics.ItemLayers.Questions;
+        this.postcardStage = create_SVG_group(0, 0, undefined, "postcard_stage");
+        this.postcardStage.style.pointerEvents = "none";
+        this.postcardStage.style.transformBox = "fill-box";
+        this.postcardStage.style.transformOrigin = "center";
+        this.postcardStage.style.transform = "translate(0px, 0px) scale(1)";
+        layer.appendChild(this.postcardStage);
+        let wrap = copy_scale_and_move_object_to_position(marked, this.postcardStage, 0, 0, 1, "postcard_card");
+        wrap.style.pointerEvents = "none";
+        this.postcard = wrap;
+
+        let bg = wrap.querySelector(".postcard_background");
+        if (bg) {
+            bg.style.fill = "#e3dfd6";
+            bg.style.transition = "fill 700ms ease";
+        }
+        this.placePostcardLocation(wrap);
+
+        let nameEl = wrap.querySelector(".postcard_name");
+        if (nameEl) {
+            nameEl.style.fontFamily = "'Myriad Pro', 'PT Sans', sans-serif";
+            let span = nameEl.querySelector("tspan") || nameEl;
+            span.textContent = this.postcardNameLine();
+        }
+
+        this.favoriteLine = wrap.querySelector(".postcard_favorite");
+        if (this.favoriteLine && bg) {
+            let bb = bg.getBBox();
+            let mid = bb.x + bb.width / 2;
+            this.favoriteLine.setAttribute("text-anchor", "middle");
+            this.favoriteLine.setAttribute("x", mid);
+            this.favoriteLine.style.fontFamily = "'Myriad Pro', 'PT Sans', sans-serif";
+            let span = this.favoriteLine.querySelector("tspan") || this.favoriteLine;
+            span.setAttribute("text-anchor", "middle");
+            span.setAttribute("x", mid);
+            span.textContent = this.postcardToyLine();
+            this.favoriteLine.style.opacity = "0";
+            this.favoriteLine.style.transition = "opacity 400ms ease";
+        }
+
+        let fenSlot = wrap.querySelector(".postcard_fen_slot");
+        let toySlot = wrap.querySelector(".postcard_toy_slot");
+        [fenSlot, toySlot].forEach((slot) => {
+            if (!slot) return;
+            slot.style.opacity = "0";
+            slot.style.pointerEvents = "none";
+        });
+
+        let art = wrap.querySelector(".scale_group");
+        // The location picture includes the full sky, so the group bbox is huge.
+        // Size the card from the paper itself.
+        let bounds = bg ? bg.getBBox() : (art ? art.getBBox() : wrap.getBBox());
+        let targetW = 470;
+        let scale = targetW / Math.max(bounds.width, 1);
+        if (art) {
+            art.style.transformBox = "fill-box";
+            art.style.transformOrigin = "center";
+            art.style.transform = "scale(" + scale + ")";
+        }
+        let cardH = bounds.height * scale;
+        let layout = GenParam.PostcardRecording;
+        let x = (layout.monitorX + layout.monitorWidth) * this.basics.W + 36;
+        let y = 16;
+        let cx = x + targetW / 2;
+        let cy = y + cardH / 2;
+        wrap.style.transformBox = "fill-box";
+        wrap.style.transformOrigin = "center";
+        wrap.style.transform = "translate(" + cx + "px, " + cy + "px) rotate(0deg) scale(1)";
+
+        this._photo = this.svgClientBox(fenSlot);
+        this._toySlot = this.svgClientBox(toySlot);
+        this._cardRect = this.svgClientBox(bg);
+        this.photoHost = create_SVG_group(0, 0);
+        this.photoHost.style.pointerEvents = "none";
+        this.postcardStage.appendChild(this.photoHost);
+
+        return Object.assign(this.stickerTrayBox(), {
+            cx: cx,
+            cy: cy,
+            cardH: cardH
+        });
+    }
+
+    // Wide, low, and centered. Taller than the first pass so the sticker buttons can grow with it.
+    stickerTrayBox() {
+        let W = this.basics.W;
+        let H = this.basics.H;
+        let trayW = Math.round(Math.min(W * 0.72, 1240));
+        let trayH = Math.round(156 * 1.3);
+        let trayBottom = Math.round(H * 0.755) + 156;
+        return {
+            trayX: Math.round((W - trayW) / 2),
+            trayY: trayBottom - trayH,
+            trayW: trayW,
+            trayH: trayH
+        };
+    }
+
+    // Types B and C have a location window. The picture and its sky are on the card from the start.
+    placePostcardLocation(wrap) {
+        let slot = wrap && wrap.querySelector(".postcard_location_placeholder");
+        if (!slot) return;
+        let region = this.FenObj && this.FenObj.region;
+        let location = this.FenObj && this.FenObj.location;
+        if (region && location) {
+            let ns = "http://www.w3.org/2000/svg";
+            let x = parseFloat(slot.getAttribute("x")) || 0;
+            let y = parseFloat(slot.getAttribute("y")) || 0;
+            let w = parseFloat(slot.getAttribute("width")) || 0;
+            let h = parseFloat(slot.getAttribute("height")) || 0;
+            let sceneW = this.basics.W;
+            let sceneH = this.basics.H;
+            let fit = Math.max(w / Math.max(sceneW, 1), h / Math.max(sceneH, 1));
+            let viewW = w / fit;
+            let viewH = h / fit;
+            let viewX = (sceneW - viewW) / 2;
+            let viewY = (sceneH - viewH) / 2;
+            // A nested svg keeps the sky's large coordinates inside this window,
+            // so they do not change the card's size.
+            let frame = document.createElementNS(ns, "svg");
+            frame.setAttribute("x", x);
+            frame.setAttribute("y", y);
+            frame.setAttribute("width", w);
+            frame.setAttribute("height", h);
+            frame.setAttribute("viewBox", viewX + " " + viewY + " " + viewW + " " + viewH);
+            frame.setAttribute("preserveAspectRatio", "xMidYMid slice");
+            frame.setAttribute("overflow", "hidden");
+            frame.style.pointerEvents = "none";
+            let ry = parseFloat(slot.getAttribute("ry"));
+            if (ry) frame.setAttribute("rx", ry);
+            let sky = this.cloneRegionSky(region);
+            if (sky) frame.appendChild(sky);
+            let img = document.createElementNS(ns, "image");
+            img.setAttribute("x", "0");
+            img.setAttribute("y", "0");
+            img.setAttribute("width", String(sceneW));
+            img.setAttribute("height", String(sceneH));
+            img.setAttribute("preserveAspectRatio", "xMidYMid slice");
+            img.style.pointerEvents = "none";
+            if (typeof set_location_background_image === "function") {
+                set_location_background_image(img, region, location);
+            }
+            frame.appendChild(img);
+            slot.parentNode.insertBefore(frame, slot);
+        }
+        slot.style.display = "none";
+        slot.setAttribute("display", "none");
+    }
+
+    svgClientBox(el) {
+        if (!el) return null;
+        let svg = GenParam.SVGObject;
+        let rect = el.getBoundingClientRect();
+        if (!svg || !svg.createSVGPoint || !svg.getScreenCTM) return null;
+        let ctm = svg.getScreenCTM();
+        if (!ctm) return null;
+        let inv = ctm.inverse();
+        let a = svg.createSVGPoint();
+        a.x = rect.left;
+        a.y = rect.top;
+        let b = svg.createSVGPoint();
+        b.x = rect.right;
+        b.y = rect.bottom;
+        let p1 = a.matrixTransform(inv);
+        let p2 = b.matrixTransform(inv);
+        return { x: p1.x, y: p1.y, w: p2.x - p1.x, h: p2.y - p1.y };
+    }
+
+    buildPolaroidChoices() {
+        let template = document.getElementById("polaroid_frame");
+        if (!template) return;
+        let layer = this.basics.ItemLayers.Questions;
+        this.polaroidRow = create_SVG_group(0, 0, undefined, "postcard_polaroids");
+        this.polaroidRow.style.pointerEvents = "none";
+        layer.appendChild(this.polaroidRow);
+        let angles = [-5, 4, -2.5];
+        this.choiceFennimals().forEach((fen, index) => {
+            let polaroid = this.makePolaroid(template, fen, angles[index % angles.length]);
+            if (!polaroid) return;
+            this.polaroids.push(polaroid);
+            this.bindPolaroid(polaroid);
+        });
+        this.layoutPolaroids();
+    }
+
+    makePolaroid(template, fenObj, angle) {
+        let outer = create_SVG_group(0, 0);
+        outer._fenId = fenObj.id;
+        outer._angle = angle;
+        outer.style.pointerEvents = "auto";
+        outer.style.cursor = "grab";
+        outer.style.filter = this.showsInstructionBubbles()
+            ? "drop-shadow(0px 10px 12px rgba(0,0,0,0.32))"
+            : "drop-shadow(0px 0px 5px #ffe14a) drop-shadow(0px 0px 16px rgba(255,196,0,0.95))";
+        outer.style.transformBox = "fill-box";
+        outer.style.transformOrigin = "center";
+        this.polaroidRow.appendChild(outer);
+
+        let inner = create_SVG_group(0, 0);
+        inner.style.pointerEvents = "auto";
+        inner.style.transformBox = "fill-box";
+        inner.style.transformOrigin = "center";
+        outer.appendChild(inner);
+        outer._inner = inner;
+
+        let frame = copy_scale_and_move_object_to_position(template, inner, 0, 0, 1);
+        frame.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
+        frame.removeAttribute("id");
+        frame.style.cursor = "grab";
+        frame.querySelectorAll("path, rect, text, tspan").forEach((el) => {
+            el.style.pointerEvents = "auto";
+        });
+
+        let bgRect = frame.getElementsByTagName("rect")[0];
+        if (bgRect) {
+            let region = GenParam.RegionData && GenParam.RegionData[fenObj.region];
+            bgRect.removeAttribute("display");
+            bgRect.style.display = "inline";
+            bgRect.style.fill = (region && region.surrounding_color) || "#e8e8e8";
+        }
+        let nameNode = frame.getElementsByTagName("text")[0];
+        if (nameNode) {
+            nameNode.removeAttribute("id");
+            let span = nameNode.querySelector("tspan") || nameNode;
+            span.textContent = "???";
+        }
+
+        let circle = frame.getElementsByTagName("circle")[0];
+        let target = { x: 0, y: -40 };
+        if (circle && typeof getSVGInternalCenter === "function") {
+            try { target = getSVGInternalCenter(circle); } catch (err) { /* keep fallback */ }
+        }
+        this.placeFennimalInPolaroid(fenObj, inner, target);
+        return outer;
+    }
+
+    placeFennimalInPolaroid(fenObj, host, target) {
+        if (typeof create_Fennimal_SVG_object !== "function") return;
+        let fenIcon = create_Fennimal_SVG_object(fenObj, GenParam.Fennimal_head_size, false);
+        fenIcon.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
+        fenIcon.removeAttribute("id");
+        fenIcon.querySelectorAll(".prep_element_hidden").forEach((el) => el.remove());
+        fenIcon.style.display = "inherit";
+        fenIcon.style.pointerEvents = "none";
+        let body = fenIcon.getElementsByClassName("Fennimal_body")[0];
+        let head = fenIcon.getElementsByClassName("Fennimal_head")[0];
+        if (body) body.style.transform = "translate(0px, 0px) scale(1, 1)";
+        if (head) head.style.transform = "translate(0px, 0px) rotate(0deg)";
+        fenIcon.querySelectorAll(".eye_gaze").forEach((eye) => {
+            eye.style.transform = "translate(0px, 0px) scale(1.15)";
+            eye.style.pointerEvents = "none";
+        });
+        if (typeof freeze_fennimal_decorative_animations === "function") {
+            freeze_fennimal_decorative_animations(fenIcon);
+        }
+        host.appendChild(fenIcon);
+
+        let fenBox = fenIcon.getBBox();
+        let bgRect = host.getElementsByTagName("rect")[0];
+        let frameBox = bgRect ? bgRect.getBBox() : { width: 500, height: 600 };
+        let fenScale = Math.min(
+            (frameBox.width * 0.82) / Math.max(fenBox.width, 1),
+            (frameBox.height * 0.78) / Math.max(fenBox.height, 1)
+        );
+        let fenCx = fenBox.x + fenBox.width / 2;
+        let fenCy = fenBox.y + fenBox.height / 2;
+        let scaleGroup = fenIcon.getElementsByClassName("Fennimal_scale_group")[0];
+        if (scaleGroup) scaleGroup.style.transform = "";
+        fenIcon.setAttribute(
+            "transform",
+            "translate(" + target.x + "," + target.y + ") scale(" + fenScale + ") translate(" + (-fenCx) + "," + (-fenCy) + ")"
+        );
+        fenIcon.querySelectorAll("*").forEach((el) => { el.style.pointerEvents = "none"; });
+    }
+
+    layoutPolaroids() {
+        if (!this.polaroids.length) return;
+        let layout = GenParam.PostcardRecording;
+        let W = this.basics.W;
+        let H = this.basics.H;
+        let monitorLeft = layout.monitorX * W;
+        let monitorRight = monitorLeft + layout.monitorWidth * W;
+        let top = 12;
+        let maxH = 0.46 * H;
+        let cardLeft = this._cardRect ? this._cardRect.x : monitorRight + 36;
+        let rightLimit = Math.min(monitorRight - 8, cardLeft - 18);
+        let leftLimit = monitorLeft + 4;
+        let availW = Math.max(240, rightLimit - leftLimit);
+        let gap = 30;
+
+        let natural = this.polaroids.map((polaroid) => {
+            let b = polaroid.getBBox();
+            polaroid._anchorX = b.x + b.width / 2;
+            polaroid._anchorY = b.y + b.height / 2;
+            return { w: Math.max(b.width, 1), h: Math.max(b.height, 1) };
+        });
+        let sumW = natural.reduce((sum, box) => sum + box.w, 0);
+        let tallest = Math.max.apply(null, natural.map((box) => box.h));
+        let scale = Math.min(
+            maxH / tallest,
+            (availW - gap * (natural.length - 1)) / sumW
+        );
+        scale = Math.max(scale, 0.36);
+        this.polaroids.forEach((polaroid) => {
+            polaroid._inner.style.transform = "scale(" + scale + ")";
+        });
+
+        let widths = natural.map((box) => box.w * scale);
+        let heights = natural.map((box) => box.h * scale);
+        let total = widths.reduce((sum, w) => sum + w, 0) + gap * (widths.length - 1);
+        let x = leftLimit + Math.max(0, (availW - total) / 2);
+        this.polaroids.forEach((polaroid, index) => {
+            let cx = x + widths[index] / 2;
+            let cy = top + heights[index] / 2;
+            polaroid._homeTx = cx - polaroid._anchorX;
+            polaroid._homeTy = cy - polaroid._anchorY;
+            this.placePolaroid(polaroid, polaroid._homeTx, polaroid._homeTy, false);
+            x += widths[index] + gap;
+        });
+        this.setPlayLocked(true);
+    }
+
+    placePolaroid(polaroid, tx, ty, animate) {
+        polaroid.style.transition = animate ? "transform 280ms ease-in-out" : "none";
+        polaroid.style.transform = "translate(" + tx + "px, " + ty + "px) rotate(" + polaroid._angle + "deg)";
+    }
+
+    bindPolaroid(polaroid) {
+        polaroid.addEventListener("pointerdown", (event) => {
+            if (this._finished || this._photoPlaced || this._playing || this._drag) return;
+            event.preventDefault();
+            event.stopPropagation();
+            this.hidePointingNote();
+            this._drag = polaroid;
+            polaroid.style.cursor = "grabbing";
+            if (this.polaroidRow) this.polaroidRow.appendChild(polaroid);
+            this.movePolaroidToPointer(polaroid, event);
+            try { polaroid.setPointerCapture(event.pointerId); } catch (err) { /* synthetic events */ }
+            let move = (ev) => {
+                if (this._drag !== polaroid) return;
+                this.movePolaroidToPointer(polaroid, ev);
+            };
+            let up = (ev) => {
+                window.removeEventListener("pointermove", move);
+                window.removeEventListener("pointerup", up);
+                window.removeEventListener("pointercancel", up);
+                if (this._drag !== polaroid) return;
+                this._drag = null;
+                polaroid.style.cursor = "grab";
+                this.finishPolaroidDrag(polaroid, ev);
+            };
+            window.addEventListener("pointermove", move);
+            window.addEventListener("pointerup", up);
+            window.addEventListener("pointercancel", up);
+        });
+    }
+
+    movePolaroidToPointer(polaroid, event) {
+        let p = this.svgPoint(event);
+        this.placePolaroid(polaroid, p.x - polaroid._anchorX, p.y - polaroid._anchorY, false);
+    }
+
+    finishPolaroidDrag(polaroid, event) {
+        if (this._finished || this._photoPlaced || this._playing) {
+            this.returnPolaroid(polaroid);
+            return;
+        }
+        let p = this.svgPoint(event);
+        let onCard = this.pointInRect(p.x, p.y, this._cardRect, 28);
+        if (!onCard || polaroid._fenId !== this.FenObj.id) {
+            this.returnPolaroid(polaroid);
+            return;
+        }
+        this.acceptPolaroid();
+    }
+
+    returnPolaroid(polaroid) {
+        if (!polaroid) return;
+        this.placePolaroid(polaroid, polaroid._homeTx, polaroid._homeTy, true);
+    }
+
+    async acceptPolaroid() {
+        if (this._photoPlaced) return;
+        this._photoPlaced = true;
+        this.setPlayLocked(false);
+        this.hidePointingNote();
+        if (typeof AudioCont !== "undefined" && AudioCont.play_sound_effect) {
+            AudioCont.play_sound_effect("positive");
+        }
+        this.polaroids.forEach((polaroid) => {
+            polaroid.style.pointerEvents = "none";
+            polaroid.style.transition = "opacity 320ms ease";
+            polaroid.style.opacity = "0";
+        });
+        let bg = this.postcard && this.postcard.querySelector(".postcard_background");
+        if (bg) bg.style.fill = this.regionInk().paper;
+        await wait(340);
+        this.polaroids.forEach((polaroid) => polaroid.remove());
+        this.polaroids = [];
+        if (this.polaroidRow) {
+            this.polaroidRow.remove();
+            this.polaroidRow = null;
+        }
+        await this.placePostcardFennimal();
+        if (this._resolvePhoto) {
+            let done = this._resolvePhoto;
+            this._resolvePhoto = null;
+            done();
+        }
+    }
+
+    async placePostcardFennimal() {
+        let photo = this._photo;
+        if (!photo) return;
+        let feetX = photo.x + photo.w * 0.5;
+        let feetY = photo.y + photo.h;
+        this.cardFen = new BasicElementsModule(this.FenObj);
+        this.cardFen.ParentLayer = this.photoHost;
+        this.cardFen.create_svg_sublayers();
+        await this.cardFen.create_and_appear_Fennimal(
+            this.cardFen.ItemLayers.Main,
+            feetX,
+            feetY,
+            1.15,
+            400
+        );
+        let fen = this.cardFen.Fennimal;
+        if (!fen) return;
+        fen.id = "postcard_fennimal";
+        fen.style.pointerEvents = "none";
+        this.applyPostcardFigureStyle(fen);
+        let b = fen.getBBox();
+        if (b.height > 0 && photo.h > 0) {
+            let fitted = this.cardFen.baseScale * ((photo.h * 0.96) / b.height);
+            this.cardFen.baseScale = fitted;
+            if (this.cardFen.FennimalScaleGroup) {
+                this.cardFen.FennimalScaleGroup.style.transform = "scale(" + fitted + ")";
+            }
+            b = fen.getBBox();
+            let dx = feetX - (b.x + b.width / 2);
+            let dy = feetY - (b.y + b.height);
+            fen.style.transform = "translate(" + dx + "px, " + dy + "px)";
+        }
+        this.cardFen.freeze_character_pose();
+        this.raisePostcardName();
+    }
+
+    // The name is drawn in the card, and on some cards it sits on the figure.
+    // The Fennimal is added afterwards, so the name has to move above it.
+    raisePostcardName() {
+        let stage = this.postcardStage;
+        let name = this.postcard && this.postcard.querySelector(".postcard_name");
+        if (!stage || !name || !name.getScreenCTM || !stage.getScreenCTM) return;
+        let from = name.getScreenCTM();
+        stage.appendChild(name);
+        let to = stage.getScreenCTM();
+        if (!from || !to) return;
+        let m = to.inverse().multiply(from);
+        name.setAttribute(
+            "transform",
+            "matrix(" + [m.a, m.b, m.c, m.d, m.e, m.f].join(" ") + ")"
+        );
+    }
+
+    buildStickerTray(box) {
+        let tray = create_SVG_group(0, 0, undefined, "postcard_sticker_tray");
+        this.basics.ItemLayers.Questions.appendChild(tray);
+        this.stickerTray = tray;
+
+        let back = create_SVG_rect(box.trayX, box.trayY, box.trayW, box.trayH);
+        back.setAttribute("rx", "22");
+        back.style.fill = "#efe6d6";
+        back.style.stroke = "#8a6a45";
+        back.style.strokeWidth = "4px";
+        back.style.pointerEvents = "none";
+        tray.appendChild(back);
+
+        let toys = this.stickerToys();
+        let gap = 8;
+        let count = Math.max(toys.length, 1);
+        let slot = (box.trayW - 32 - gap * (count - 1)) / count;
+        slot = Math.min(slot, box.trayH - 36);
+        let total = toys.length * slot + Math.max(0, toys.length - 1) * gap;
+        let startX = box.trayX + (box.trayW - total) / 2 + slot / 2;
+        let cy = box.trayY + box.trayH / 2;
+        toys.forEach((entry, index) => {
+            let sticker = this.makeSticker(tray, entry.toy, startX + index * (slot + gap), cy, slot);
+            this.stickers.push(sticker);
+            this.bindSticker(sticker);
+        });
+    }
+
+    makeSticker(parent, toyId, cx, cy, slot) {
+        let g = create_SVG_group(0, 0);
+        g._toyId = toyId;
+        g._homeX = cx;
+        g._homeY = cy;
+        g.style.transform = "translate(" + cx + "px, " + cy + "px)";
+        g.style.cursor = "pointer";
+        g.style.pointerEvents = "auto";
+        parent.appendChild(g);
+
+        let pad = create_SVG_rect(-slot / 2 + 6, -slot / 2 + 6, slot - 12, slot - 12);
+        pad.setAttribute("rx", "16");
+        pad.style.fill = "#fffdf8";
+        pad.style.stroke = "#d9c7a6";
+        pad.style.strokeWidth = "3px";
+        pad.style.filter = "drop-shadow(0px 4px 6px rgba(0,0,0,0.18))";
+        // The toy icon is drawn with pointer-events none. The pad is the hit target.
+        pad.style.pointerEvents = "auto";
+        g.appendChild(pad);
+
+        this.placeToyIcon(g, toyId, 0, 0, slot - 36);
+        return g;
+    }
+
+    // Centers a toy on (cx, cy) in the parent's coordinates. The parent's
+    // own transform is not part of the measurement, so a sticker can sit
+    // anywhere on the page without the icon sliding off its square.
+    placeToyIcon(parent, toyId, cx, cy, size) {
+        let template = document.getElementById("toy_" + toyId);
+        if (!template || !parent) return null;
+        let root = create_SVG_group(0, 0);
+        root.style.transform = "translate(" + cx + "px, " + cy + "px)";
+        root.style.pointerEvents = "none";
+        parent.appendChild(root);
+
+        let node = template.cloneNode(true);
+        if (typeof strip_svg_ids_from_subtree === "function") strip_svg_ids_from_subtree(node);
+        node.style.display = "inherit";
+        node.style.pointerEvents = "none";
+        node.querySelectorAll("*").forEach((el) => {
+            el.style.pointerEvents = "none";
+        });
+        node.querySelectorAll(".prep_element_hidden").forEach((el) => {
+            el.style.opacity = "0";
+        });
+        if (typeof set_toy_color_scheme === "function") set_toy_color_scheme(node, toyId, false);
+
+        let inner = create_SVG_group(0, 0);
+        inner.style.pointerEvents = "none";
+        inner.appendChild(node);
+        root.appendChild(inner);
+        let b = node.getBBox();
+        inner.style.transform = "translate(" + (-(b.x + b.width / 2)) + "px, " + (-(b.y + b.height / 2)) + "px)";
+
+        let longest = Math.max(b.width, b.height, 1);
+        let outer = create_SVG_group(0, 0);
+        outer.style.pointerEvents = "none";
+        outer.style.transformBox = "fill-box";
+        outer.style.transformOrigin = "center";
+        outer.style.transform = "scale(" + (size / longest) + ")";
+        root.replaceChild(outer, inner);
+        outer.appendChild(inner);
+        return root;
+    }
+
+    bindSticker(sticker) {
+        sticker.addEventListener("pointerdown", (event) => {
+            if (this._finished || this._postcardSolved || this._assembling || this._drag) return;
+            event.preventDefault();
+            event.stopPropagation();
+            this.hidePointingNote();
+            this._drag = sticker;
+            sticker.style.transition = "none";
+            if (this.stickerTray) this.stickerTray.appendChild(sticker);
+            this.moveStickerToPointer(sticker, event);
+            try { sticker.setPointerCapture(event.pointerId); } catch (err) { /* synthetic events */ }
+            let move = (ev) => {
+                if (this._drag !== sticker) return;
+                this.moveStickerToPointer(sticker, ev);
+            };
+            let up = (ev) => {
+                window.removeEventListener("pointermove", move);
+                window.removeEventListener("pointerup", up);
+                window.removeEventListener("pointercancel", up);
+                if (this._drag !== sticker) return;
+                this._drag = null;
+                this.finishStickerDrag(sticker, ev);
+            };
+            window.addEventListener("pointermove", move);
+            window.addEventListener("pointerup", up);
+            window.addEventListener("pointercancel", up);
+        });
+    }
+
+    svgPoint(event) {
+        let svg = GenParam.SVGObject;
+        if (!svg || !svg.createSVGPoint || !svg.getScreenCTM) {
+            return { x: 0, y: 0 };
+        }
+        let pt = svg.createSVGPoint();
+        pt.x = event.clientX;
+        pt.y = event.clientY;
+        let ctm = svg.getScreenCTM();
+        if (!ctm) return { x: 0, y: 0 };
+        let local = pt.matrixTransform(ctm.inverse());
+        return { x: local.x, y: local.y };
+    }
+
+    moveStickerToPointer(sticker, event) {
+        let p = this.svgPoint(event);
+        sticker.style.transform = "translate(" + p.x + "px, " + p.y + "px)";
+    }
+
+    pointInRect(x, y, rect, pad) {
+        if (!rect) return false;
+        return x >= rect.x - pad && x <= rect.x + rect.w + pad
+            && y >= rect.y - pad && y <= rect.y + rect.h + pad;
+    }
+
+    pointNearFennimal(x, y) {
+        return this.pointInRect(x, y, this._photo, 20) || this.pointInRect(x, y, this._toySlot, 16);
+    }
+
+    finishStickerDrag(sticker, event) {
+        if (this._finished || this._postcardSolved || this._assembling) {
+            this.returnSticker(sticker);
+            return;
+        }
+        let p = this.svgPoint(event);
+        if (!this.pointNearFennimal(p.x, p.y)) {
+            this.returnSticker(sticker);
+            return;
+        }
+        if (sticker._toyId === this.FenObj.toy) {
+            this.acceptSticker(sticker);
+            return;
+        }
+        this.rejectSticker(sticker);
+    }
+
+    returnSticker(sticker) {
+        sticker.style.transition = "transform 280ms ease-in-out";
+        sticker.style.transform = "translate(" + sticker._homeX + "px, " + sticker._homeY + "px)";
+    }
+
+    rejectSticker(sticker) {
+        if (typeof AudioCont !== "undefined" && AudioCont.play_sound_effect) {
+            AudioCont.play_sound_effect("rejected");
+        }
+        if (!Array.isArray(this.FenObj.placement_errors)) this.FenObj.placement_errors = [];
+        this.FenObj.placement_errors.push(sticker._toyId);
+        this.FenObj.sticker_mistakes = (this.FenObj.sticker_mistakes || 0) + 1;
+        this.returnSticker(sticker);
+        this.showOops();
+    }
+
+    async acceptSticker(sticker) {
+        if (this._postcardSolved || this._assembling) return;
+        this._assembling = true;
+        this.hidePointingNote();
+        if (typeof AudioCont !== "undefined" && AudioCont.play_sound_effect) {
+            AudioCont.play_sound_effect("positive");
+        }
+        this.stickers.forEach((item) => {
+            item.style.pointerEvents = "none";
+        });
+        this.setPlayButtonVisible(false);
+        if (this.stickerTray) this.stickerTray.style.pointerEvents = "none";
+        if (!this.repairsToySticker()) {
+            if (sticker) {
+                sticker.style.transition = "opacity 280ms ease";
+                sticker.style.opacity = "0";
+            }
+            this.fadeStickerTray();
+            await this.finishPostcardToy();
+            return;
+        }
+        await this.runToyAssembly(sticker);
+    }
+
+    async runToyAssembly(sticker) {
+        let from = null;
+        if (sticker) from = this.elementCenter(sticker.lastElementChild || sticker);
+        let built = this.buildAssembly();
+        if (this._finished) return;
+        if (!built || !built.pieces.length) {
+            this.fadeStickerTray();
+            await this.finishPostcardToy();
+            return;
+        }
+        this.parkAssembly(built, from);
+        if (sticker) sticker.style.opacity = "0";
+        this.fadeStickerTray();
+        await this.zoomAssembly(built);
+        if (this._finished) return;
+        await this.scatterAssemblyPieces(built);
+        if (this._finished) return;
+        this.showAssemblyPrompt();
+        await new Promise((resolve) => { this._resolveAssembly = resolve; });
+        this._resolveAssembly = null;
+        if (this._finished) return;
+        this.hidePointingNote();
+        await this.flyAssemblyToSlot(built);
+        if (this._finished) return;
+        await this.finishPostcardToy();
+    }
+
+    fadeStickerTray() {
+        if (!this.stickerTray) return;
+        this.stickerTray.style.transition = "opacity 400ms ease";
+        this.stickerTray.style.opacity = "0";
+        this.stickerTray.style.pointerEvents = "none";
+    }
+
+    buildAssembly() {
+        let layer = this.basics.ItemLayers.Questions;
+        if (!layer || !this.FenObj || !this.FenObj.toy) return null;
+        let stage = create_SVG_group(0, 0, undefined, "postcard_assembly");
+        stage.style.pointerEvents = "auto";
+        layer.appendChild(stage);
+        this.assemblyStage = stage;
+
+        let wash = create_SVG_rect(0, 0, this.basics.W, this.basics.H);
+        wash.style.fill = "#ffffff";
+        wash.style.opacity = "0";
+        wash.style.pointerEvents = "none";
+        wash.style.transition = "opacity 400ms ease";
+        stage.appendChild(wash);
+
+        let holder = create_SVG_group(0, 0);
+        holder.style.pointerEvents = "auto";
+        holder.style.transformOrigin = "0px 0px";
+        stage.appendChild(holder);
+
+        let anchor = create_SVG_circle(this.basics.W * 0.5, this.basics.H * 0.46, 12);
+        anchor.style.opacity = "0";
+        anchor.style.pointerEvents = "none";
+        stage.appendChild(anchor);
+        this.assemblyAnchor = anchor;
+
+        let size = Math.min(this.basics.W, this.basics.H) * 0.46;
+        let icon = this.placeToyIcon(holder, this.FenObj.toy, 0, 0, size);
+        if (!icon) {
+            stage.remove();
+            this.assemblyStage = null;
+            return null;
+        }
+        // The icon scales around its live bounding box. Moving one part would
+        // shift that box and shove every other part the opposite way.
+        this.freezeAssemblyScale(icon);
+        let toy = icon.querySelector(".toy") || icon;
+        let pieces = this.collectAssemblyPieces(toy);
+        this.applyStickerOutlines(toy, pieces);
+        this._assemblyPieces = pieces;
+        this._assemblySize = size;
+        return { stage: stage, holder: holder, wash: wash, icon: icon, toy: toy, pieces: pieces, size: size };
+    }
+
+    // Replace the CSS scale (which pivots on the current bounds) with an SVG
+    // scale around the toy's own center, which does not move when a part does.
+    // CSS transform: none would also cancel the attribute, so the property is cleared.
+    freezeAssemblyScale(icon) {
+        let outer = icon && icon.firstElementChild;
+        if (!outer) return;
+        let match = /scale\(\s*([-\d.]+)\s*\)/.exec(outer.style.transform || "");
+        if (!match) return;
+        outer.style.removeProperty("transform");
+        outer.style.removeProperty("transform-origin");
+        outer.style.removeProperty("transform-box");
+        outer.setAttribute("transform", "scale(" + match[1] + ")");
+    }
+
+    // About 12 screen pixels, expressed in the toy's local units so every toy
+    // gets the same sticker thickness after it has been scaled up.
+    stickerOutlineRadius(toy) {
+        let scale = 1;
+        let node = toy;
+        while (node && node.getAttribute) {
+            let match = /scale\(\s*([-\d.]+)\s*\)/.exec(node.getAttribute("transform") || "");
+            if (match) {
+                scale = parseFloat(match[1]) || 1;
+                break;
+            }
+            node = node.parentNode;
+        }
+        let svg = GenParam.SVGObject;
+        let vb = svg && svg.viewBox && svg.viewBox.baseVal;
+        let px = svg && vb && vb.width ? svg.getBoundingClientRect().width / vb.width : 0;
+        let perLocal = Math.abs(scale) * px;
+        if (!perLocal) return 2.6;
+        return Math.max(1.4, 12 / perLocal);
+    }
+
+    ensureStickerOutlineFilter(radius) {
+        let svg = GenParam.SVGObject;
+        if (!svg) return;
+        let ns = "http://www.w3.org/2000/svg";
+        let filter = document.getElementById("postcard_sticker_outline");
+        if (!filter) {
+            let defs = svg.querySelector("defs");
+            if (!defs) {
+                defs = document.createElementNS(ns, "defs");
+                svg.insertBefore(defs, svg.firstChild);
+            }
+            filter = document.createElementNS(ns, "filter");
+            filter.setAttribute("id", "postcard_sticker_outline");
+            filter.setAttribute("filterUnits", "userSpaceOnUse");
+            filter.setAttribute("primitiveUnits", "userSpaceOnUse");
+            filter.setAttribute("color-interpolation-filters", "sRGB");
+            filter.innerHTML =
+                '<feMorphology in="SourceAlpha" operator="dilate" radius="2.6" result="dilated"/>' +
+                '<feFlood flood-color="#ffffff" result="flood"/>' +
+                '<feComposite in="flood" in2="dilated" operator="in" result="outline"/>' +
+                '<feMerge>' +
+                '<feMergeNode in="outline"/>' +
+                '<feMergeNode in="SourceGraphic"/>' +
+                "</feMerge>";
+            defs.appendChild(filter);
+        }
+        let margin = Math.ceil(Math.abs(radius) * 4 + 48);
+        filter.setAttribute("x", String(-margin));
+        filter.setAttribute("y", String(-margin));
+        filter.setAttribute("width", String(margin * 2 + 1920));
+        filter.setAttribute("height", String(margin * 2 + 1080));
+        let morph = filter.querySelector("feMorphology");
+        if (morph) morph.setAttribute("radius", String(radius));
+    }
+
+    applyStickerOutlines(toy, pieces) {
+        this.ensureStickerOutlineFilter(this.stickerOutlineRadius(toy));
+        let outline = "url(#postcard_sticker_outline)";
+        let holdsPiece = (el) => pieces.some((piece) => piece.part && el.contains(piece.part));
+        toy.querySelectorAll(".toy_frame").forEach((el) => {
+            if (!holdsPiece(el) && this.assemblyPartIsShown(el, toy)) el.style.filter = outline;
+        });
+        Array.from(toy.children).forEach((el) => {
+            if (el.classList.contains("toy_part") || el.classList.contains("toy_frame")) return;
+            if (el.classList.contains("toy_pivot_point") || el.classList.contains("invisible_element")) return;
+            if (holdsPiece(el) || !this.assemblyPartIsShown(el, toy)) return;
+            el.style.filter = outline;
+        });
+        pieces.forEach((piece) => {
+            if (piece.part) piece.part.style.filter = outline;
+        });
+    }
+
+    collectAssemblyPieces(toy) {
+        let raw = Array.from(toy.querySelectorAll(".toy_part")).filter((el) => {
+            return !(el.parentNode && el.parentNode.closest && el.parentNode.closest(".toy_part"));
+        });
+        toy.querySelectorAll("*").forEach((el) => {
+            el.style.pointerEvents = "none";
+        });
+        let pieces = [];
+        raw.forEach((el) => {
+            if (!this.assemblyPartIsShown(el, toy)) return;
+            let box = el.getBBox();
+            if (!box || (box.width < 0.5 && box.height < 0.5)) return;
+            let parent = el.parentNode;
+            let home = this.pointInNode(parent, el, box.x + box.width / 2, box.y + box.height / 2);
+            let wrap = create_SVG_group(0, 0);
+            wrap.style.pointerEvents = "auto";
+            wrap.style.cursor = "pointer";
+            parent.insertBefore(wrap, el);
+            wrap.appendChild(el);
+            let pad = Math.max(box.width, box.height, 8) * 0.12 + 6;
+            let hit = create_SVG_rect(box.x - pad, box.y - pad, Math.max(box.width, 4) + pad * 2, Math.max(box.height, 4) + pad * 2);
+            // fill none, not transparent: a transparent rect still has a box the
+            // sticker filter would dilate into a white card.
+            hit.style.fill = "none";
+            hit.style.stroke = "none";
+            hit.setAttribute("fill", "none");
+            hit.setAttribute("stroke", "none");
+            hit.style.pointerEvents = "all";
+            if (!el.getAttribute("transform")) wrap.insertBefore(hit, el);
+            el.style.pointerEvents = "auto";
+            el.querySelectorAll("*").forEach((node) => {
+                if (node !== hit) node.style.pointerEvents = "auto";
+            });
+            hit.style.pointerEvents = "all";
+            let node = wrap;
+            while (node && node.id !== "postcard_assembly") {
+                node.style.pointerEvents = "auto";
+                node = node.parentNode;
+            }
+            if (node) node.style.pointerEvents = "auto";
+            let span = this.spanInNode(parent, toy);
+            let piece = {
+                wrap: wrap,
+                part: el,
+                parent: parent,
+                home: home,
+                dx: 0,
+                dy: 0,
+                placed: false,
+                snap: Math.max(span * 0.28, 12)
+            };
+            this.bindAssemblyPiece(piece);
+            pieces.push(piece);
+        });
+        return pieces;
+    }
+
+    assemblyPartIsShown(el, root) {
+        let node = el;
+        while (node && node !== root.parentNode) {
+            if (node.classList && (node.classList.contains("prep_element_hidden") || node.classList.contains("invisible_element"))) {
+                return false;
+            }
+            let shown = node.style.display || node.getAttribute("display");
+            if (shown === "none") return false;
+            node = node.parentNode;
+        }
+        return true;
+    }
+
+    bindAssemblyPiece(piece) {
+        piece.wrap.addEventListener("pointerdown", (event) => {
+            if (piece.placed || this._finished || this._assemblyDrag) return;
+            event.preventDefault();
+            event.stopPropagation();
+            this.hidePointingNote();
+            this._assemblyDrag = piece;
+            piece.wrap.style.transition = "none";
+            try { piece.wrap.setPointerCapture(event.pointerId); } catch (err) { /* synthetic events */ }
+            let start = this.pointerInNode(piece.parent, event);
+            let grabX = start.x - (piece.home.x + piece.dx);
+            let grabY = start.y - (piece.home.y + piece.dy);
+            let move = (ev) => {
+                if (this._assemblyDrag !== piece) return;
+                let p = this.pointerInNode(piece.parent, ev);
+                piece.dx = p.x - grabX - piece.home.x;
+                piece.dy = p.y - grabY - piece.home.y;
+                piece.wrap.style.transform = "translate(" + piece.dx + "px, " + piece.dy + "px)";
+            };
+            let up = () => {
+                window.removeEventListener("pointermove", move);
+                window.removeEventListener("pointerup", up);
+                window.removeEventListener("pointercancel", up);
+                if (this._assemblyDrag === piece) this._assemblyDrag = null;
+                this.dropAssemblyPiece(piece);
+            };
+            window.addEventListener("pointermove", move);
+            window.addEventListener("pointerup", up);
+            window.addEventListener("pointercancel", up);
+        });
+    }
+
+    dropAssemblyPiece(piece) {
+        if (piece.placed || this._finished) return;
+        if (Math.hypot(piece.dx, piece.dy) <= piece.snap) {
+            piece.placed = true;
+            piece.dx = 0;
+            piece.dy = 0;
+            piece.wrap.style.pointerEvents = "none";
+            piece.wrap.style.cursor = "default";
+            piece.wrap.style.transition = "transform 180ms ease-out";
+            piece.wrap.style.transform = "translate(0px, 0px)";
+            if (typeof AudioCont !== "undefined" && AudioCont.play_sound_effect) {
+                AudioCont.play_sound_effect("positive");
+            }
+            let pieces = this._assemblyPieces || [];
+            if (pieces.length && pieces.every((item) => item.placed) && this._resolveAssembly) {
+                let done = this._resolveAssembly;
+                this._resolveAssembly = null;
+                done();
+            }
+            return;
+        }
+        piece.dx = piece.scatterX || 0;
+        piece.dy = piece.scatterY || 0;
+        piece.wrap.style.transition = "transform 280ms ease-in-out";
+        piece.wrap.style.transform = "translate(" + piece.dx + "px, " + piece.dy + "px)";
+    }
+
+    parkAssembly(built, from) {
+        let iconBox = built.icon.getBoundingClientRect();
+        let startScale = from && from.width && iconBox.width ? Math.max(0.08, from.width / iconBox.width) : 0.22;
+        let start = from || { x: this.basics.W * 0.5, y: this.basics.H * 0.46 };
+        built.holder.style.transition = "none";
+        built.holder.style.transform = "translate(" + start.x + "px, " + start.y + "px) scale(" + startScale + ")";
+        built._startScale = startScale;
+    }
+
+    async zoomAssembly(built) {
+        void built.holder.getBoundingClientRect();
+        built.holder.style.transition = "transform 720ms cubic-bezier(0.16, 0.84, 0.28, 1)";
+        built.wash.style.opacity = "0.55";
+        built.holder.style.transform = "translate(" + (this.basics.W * 0.5) + "px, " + (this.basics.H * 0.46) + "px) scale(1)";
+        await wait(760);
+    }
+
+    async scatterAssemblyPieces(built) {
+        let toyBox = built.toy.getBBox();
+        built.pieces.forEach((piece, index) => {
+            let center = this.pointInNode(
+                piece.parent,
+                built.toy,
+                toyBox.x + toyBox.width / 2,
+                toyBox.y + toyBox.height / 2
+            );
+            let vx = piece.home.x - center.x;
+            let vy = piece.home.y - center.y;
+            let dist = Math.hypot(vx, vy);
+            let ang = Math.atan2(vy, vx);
+            if (!isFinite(ang) || dist < 1) {
+                ang = (index / built.pieces.length) * Math.PI * 2 - Math.PI / 2;
+            }
+            piece.ang = ang;
+            piece.center = center;
+            piece.span = Math.max(this.spanInNode(piece.parent, built.toy), 36);
+        });
+        let ranked = built.pieces.slice().sort((a, b) => a.ang - b.ang);
+        let minGap = (Math.PI * 2) / Math.max(ranked.length, 1) * 0.72;
+        if (ranked.length > 1) {
+            for (let pass = 0; pass < ranked.length; pass++) {
+                for (let i = 0; i < ranked.length; i++) {
+                    let next = ranked[(i + 1) % ranked.length];
+                    let gap = next.ang - ranked[i].ang;
+                    if (i === ranked.length - 1) gap = next.ang + Math.PI * 2 - ranked[i].ang;
+                    if (gap < minGap) {
+                        let push = (minGap - gap) / 2;
+                        ranked[i].ang -= push;
+                        next.ang += push;
+                    }
+                }
+            }
+        }
+        built.pieces.forEach((piece) => {
+            let reach = piece.span * 0.42;
+            let minReach = piece.span * 0.62;
+            let current = Math.hypot(piece.home.x - piece.center.x, piece.home.y - piece.center.y);
+            let travel = Math.max(minReach - current, reach);
+            piece.scatterX = piece.home.x + Math.cos(piece.ang) * travel - piece.home.x;
+            piece.scatterY = piece.home.y + Math.sin(piece.ang) * travel - piece.home.y;
+            this.keepPieceOnScreen(piece);
+            piece.dx = piece.scatterX;
+            piece.dy = piece.scatterY;
+            piece.wrap.style.transition = "transform 520ms cubic-bezier(0.16, 0.84, 0.28, 1)";
+            piece.wrap.style.transform = "translate(" + piece.scatterX + "px, " + piece.scatterY + "px)";
+        });
+        await wait(560);
+    }
+
+    // The break should clear the frame and still leave every piece inside the screen.
+    keepPieceOnScreen(piece) {
+        let svg = GenParam.SVGObject;
+        if (!svg || !piece.parent.getScreenCTM || !svg.getScreenCTM) return;
+        let toSvg = (x, y) => {
+            let pt = svg.createSVGPoint();
+            pt.x = x;
+            pt.y = y;
+            let screen = pt.matrixTransform(piece.parent.getScreenCTM());
+            return screen.matrixTransform(svg.getScreenCTM().inverse());
+        };
+        let fromSvg = (x, y) => {
+            let pt = svg.createSVGPoint();
+            pt.x = x;
+            pt.y = y;
+            let screen = pt.matrixTransform(svg.getScreenCTM());
+            return screen.matrixTransform(piece.parent.getScreenCTM().inverse());
+        };
+        let spot = toSvg(piece.home.x + piece.scatterX, piece.home.y + piece.scatterY);
+        let marginX = this.basics.W * 0.12;
+        let marginY = this.basics.H * 0.12;
+        spot.x = Math.min(this.basics.W - marginX, Math.max(marginX, spot.x));
+        spot.y = Math.min(this.basics.H - marginY, Math.max(marginY, spot.y));
+        let local = fromSvg(spot.x, spot.y);
+        piece.scatterX = local.x - piece.home.x;
+        piece.scatterY = local.y - piece.home.y;
+    }
+
+    async flyAssemblyToSlot(built) {
+        let slot = this._toySlot;
+        if (!slot || !built) return;
+        built.pieces.forEach((piece) => {
+            piece.wrap.style.pointerEvents = "none";
+        });
+        let target = Math.min(slot.w, slot.h) * 1.12 / Math.max(built.size, 1);
+        built.holder.style.transition = "transform 640ms cubic-bezier(0.16, 0.84, 0.28, 1)";
+        built.wash.style.opacity = "0";
+        built.holder.style.transform =
+            "translate(" + (slot.x + slot.w / 2) + "px, " + (slot.y + slot.h / 2) + "px) scale(" + target + ")";
+        await wait(680);
+    }
+
+    async finishPostcardToy() {
+        if (this._postcardSolved) return;
+        this._postcardSolved = true;
+        this._assembling = false;
+        await this.fadeInPrintedToy();
+        if (this.assemblyStage && this.assemblyStage.parentNode) this.assemblyStage.remove();
+        this.assemblyStage = null;
+        if (this._finished) return;
+        if (this.favoriteLine) this.favoriteLine.style.opacity = "1";
+        let photo = this._photo;
+        let cx = photo ? photo.x + photo.w / 2 : this.basics.W * 0.75;
+        let cy = photo ? photo.y + photo.h / 2 : this.basics.H * 0.4;
+        if (typeof spawn_confetti_burst === "function") {
+            await spawn_confetti_burst(this.basics.ItemLayers.Questions, cx, cy, { awaitPopMs: 650 });
+        }
+        if (this._finished) return;
+        await this.focusFinishedPostcard();
+        if (this._finished) return;
+        this.showContinue();
+    }
+
+    showAssemblyPrompt() {
+        if (this._finished || this._postcardSolved || this._assemblyPromptDismissed || !this.assemblyStage) return;
+        let copy = (typeof GenParam !== "undefined" && GenParam.PostcardTask) || {};
+        this.showPointingNote(
+            this.assemblyAnchor || this.assemblyStage,
+            copy.assemblyPrompt || "Oops, the sticker broke! Please put the sticker back together",
+            "down",
+            false,
+            {
+                hideButton: false,
+                buttonLabel: "Got it",
+                rememberDismiss: false,
+                onDismiss: () => { this._assemblyPromptDismissed = true; }
+            }
+        );
+    }
+
+    elementCenter(el) {
+        if (!el) return null;
+        let rect = el.getBoundingClientRect();
+        let point = this.clientToSvg(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        point.width = rect.width;
+        point.height = rect.height;
+        return point;
+    }
+
+    clientToSvg(x, y) {
+        let svg = GenParam.SVGObject;
+        if (!svg || !svg.createSVGPoint || !svg.getScreenCTM) return { x: x, y: y };
+        let pt = svg.createSVGPoint();
+        pt.x = x;
+        pt.y = y;
+        let ctm = svg.getScreenCTM();
+        if (!ctm) return { x: x, y: y };
+        let local = pt.matrixTransform(ctm.inverse());
+        return { x: local.x, y: local.y };
+    }
+
+    pointerInNode(node, event) {
+        let svg = GenParam.SVGObject;
+        if (!node || !svg || !svg.createSVGPoint || !node.getScreenCTM) return { x: 0, y: 0 };
+        let pt = svg.createSVGPoint();
+        pt.x = event.clientX;
+        pt.y = event.clientY;
+        let ctm = node.getScreenCTM();
+        if (!ctm) return { x: 0, y: 0 };
+        let local = pt.matrixTransform(ctm.inverse());
+        return { x: local.x, y: local.y };
+    }
+
+    pointInNode(target, el, x, y) {
+        let svg = GenParam.SVGObject;
+        if (!target || !el || !svg || !svg.createSVGPoint || !el.getScreenCTM || !target.getScreenCTM) {
+            return { x: x, y: y };
+        }
+        let pt = svg.createSVGPoint();
+        pt.x = x;
+        pt.y = y;
+        let from = el.getScreenCTM();
+        let to = target.getScreenCTM();
+        if (!from || !to) return { x: x, y: y };
+        let local = pt.matrixTransform(from).matrixTransform(to.inverse());
+        return { x: local.x, y: local.y };
+    }
+
+    spanInNode(target, el) {
+        if (!el || !el.getBBox) return 80;
+        let box = el.getBBox();
+        let a = this.pointInNode(target, el, box.x, box.y);
+        let b = this.pointInNode(target, el, box.x + box.width, box.y + box.height);
+        return Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y), 1);
+    }
+
+    async focusFinishedPostcard() {
+        let stage = this.postcardStage;
+        let questions = this.basics.ItemLayers.Questions;
+        if (!stage || !questions) return;
+
+        let mask = create_SVG_rect(0, 0, this.basics.W, this.basics.H);
+        mask.style.fill = "#ffffff";
+        mask.style.opacity = "0";
+        mask.style.pointerEvents = "none";
+        mask.style.transition = "opacity 450ms ease";
+        questions.insertBefore(mask, stage);
+        void mask.getBoundingClientRect();
+        mask.style.opacity = "0.78";
+        await wait(500);
+        if (this._finished) return;
+
+        let box = stage.getBBox();
+        let cx = box.x + box.width / 2;
+        let cy = box.y + box.height / 2;
+        let dx = this.basics.W * 0.5 - cx;
+        let dy = this.basics.H * 0.44 - cy;
+        stage.style.transition = "transform 780ms cubic-bezier(0.22, 0.8, 0.24, 1)";
+        void stage.getBoundingClientRect();
+        stage.style.transform = "translate(" + dx + "px, " + dy + "px) scale(1.38)";
+        await wait(840);
+        if (this._finished) return;
+        await wait(380);
+    }
+
+    async fadeInPrintedToy() {
+        let slot = this._toySlot;
+        if (!slot || !this.FenObj.toy) return;
+        let size = Math.min(slot.w, slot.h) * 1.12;
+        let icon = this.placeToyIcon(
+            this.postcardStage || this.basics.ItemLayers.Questions,
+            this.FenObj.toy,
+            slot.x + slot.w / 2,
+            slot.y + slot.h / 2,
+            size
+        );
+        if (!icon) return;
+        this.applyPostcardFigureStyle(icon);
+        icon.style.opacity = "0";
+        void icon.getBoundingClientRect();
+        icon.style.transition = "opacity 400ms ease";
+        icon.style.opacity = "1";
+        await wait(400);
+    }
+
+    showPhotoPrompt() {
+        if (this._finished || this._photoPlaced || this._playing || this._photoPromptDismissed) return;
+        if (!this.polaroidRow) return;
+        let name = this.FenObj.name || "the Fennimal";
+        this.showPointingNote(
+            this.polaroidRow,
+            "Drag " + name + "'s photo onto the postcard.",
+            "down",
+            false,
+            {
+                hideButton: false,
+                buttonLabel: "Got it",
+                rememberDismiss: false,
+                onDismiss: () => { this._photoPromptDismissed = true; }
+            }
+        );
+    }
+
+    showStickerPrompt() {
+        if (this._finished || this._postcardSolved || this._playing || this._assembling || !this.stickerTray) return;
+        if (this._instructionDismissed) return;
+        this.showPointingNote(
+            this.stickerTray,
+            "Complete the postcard adding " + (this.FenObj.name || "the Fennimal") + "'s favorite toy",
+            "left",
+            false,
+            { hideButton: false, buttonLabel: "Got it" }
+        );
+    }
+
+    showOops() {
+        if (this._finished || this._postcardSolved) return;
+        let target = this.monitorGroup || this.monitorTip;
+        this.showPointingNote(
+            target,
+            "Oops, that's not the correct sticker. You can watch the video again to refresh your memory.",
+            "down",
+            true,
+            { hideButton: true, passThrough: true }
+        );
+    }
+
+    showPointingNote(target, text, preferredSide, highlight, opts) {
+        if (!this.showsInstructionBubbles()) return;
+        opts = opts || {};
+        let hideButton = opts.hideButton !== false;
+        if (typeof Interface === "undefined" || typeof Interface.showPartnerSpeechBubble !== "function") {
+            if (typeof Interface !== "undefined" && Interface.Prompt) Interface.Prompt.show_message(text);
+            return;
+        }
+        if (Interface.Prompt) Interface.Prompt.hide();
+        let shown = Interface.showPartnerSpeechBubble({
+            target: target,
+            context: "object",
+            text: text,
+            hideButton: hideButton,
+            buttonLabel: opts.buttonLabel || "Got it",
+            passThrough: !!opts.passThrough,
+            dimOpacity: hideButton ? 0 : null,
+            preferredSide: preferredSide,
+            tipGap: 28
+        });
+        if (!hideButton && shown && typeof shown.then === "function") {
+            shown.then(() => {
+                if (opts.rememberDismiss !== false) this._instructionDismissed = true;
+                if (typeof opts.onDismiss === "function") opts.onDismiss();
+            });
+        }
+        let bubble = Interface.PartnerSpeechBubble;
+        if (!highlight && bubble && bubble.targetElement) {
+            bubble.targetElement.style.filter = bubble.targetPrevFilter || "";
+        }
+    }
+
+    hidePointingNote() {
+        if (typeof Interface !== "undefined" && Interface.PartnerSpeechBubble) {
+            Interface.PartnerSpeechBubble.hide(true);
+        }
+    }
+
+    showContinue() {
+        if (this.continueButton || this._finished) return;
+        this.continueButton = create_SVG_buttonElement(
+            0.5 * this.basics.W,
+            0.93 * this.basics.H,
+            360,
+            74,
+            "Continue",
+            36
+        );
+        this.continueButton.style.cursor = "pointer";
+        this.basics.ItemLayers.Questions.appendChild(this.continueButton);
+        this.continueButton.addEventListener("pointerdown", () => this.finish());
+    }
+
+    seatDeskUnderMonitor(deskGroup, standBaseY) {
+        let point = deskGroup.querySelector(".centerpoint");
+        if (!point) return;
+        let surface;
+        try {
+            surface = getSVGInternalCenter(point);
+        } catch (err) {
+            return;
+        }
+        let match = /translate\(\s*([-\d.]+)px,\s*([-\d.]+)px\s*\)/.exec(deskGroup.style.transform || "");
+        if (!match) return;
+        let shift = standBaseY - surface.y;
+        this._tableTopY = standBaseY;
+        deskGroup.style.transform =
+            "translate(" + match[1] + "px, " + (parseFloat(match[2]) + shift) + "px)";
+    }
+
+    drawPlayButton(parent, cx, cy, radius) {
+        let g = create_SVG_group(0, 0);
+        g.style.pointerEvents = "auto";
+        g.style.cursor = "pointer";
+        g.style.transformBox = "fill-box";
+        g.style.transformOrigin = "center";
+
+        let circle = create_SVG_circle(cx, cy, radius);
+        circle.style.fill = "#f4f1ea";
+        circle.style.filter = "drop-shadow(0px 6px 10px rgba(0,0,0,0.35))";
+        this.playCircle = circle;
+
+        let tri = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+        let reach = radius * 0.42;
+        tri.setAttribute("points", [
+            (cx - reach * 0.55) + "," + (cy - reach),
+            (cx - reach * 0.55) + "," + (cy + reach),
+            (cx + reach) + "," + cy
+        ].join(" "));
+        tri.style.fill = "#1c2430";
+
+        g.appendChild(circle);
+        g.appendChild(tri);
+        parent.appendChild(g);
+        g.addEventListener("pointerdown", (event) => {
+            event.stopPropagation();
+            this.onPlay();
+        });
+        return g;
+    }
+
+    finish() {
+        if (this._finished) return;
+        this._finished = true;
+        this._playToken += 1;
+        this._playing = false;
+        this._drag = null;
+        if (this.continueButton) this.continueButton.style.pointerEvents = "none";
+        if (this.playButton) this.playButton.style.pointerEvents = "none";
+        this.hidePointingNote();
+        if (typeof Interface !== "undefined" && Interface.Prompt) Interface.Prompt.hide();
+        if (this._resolvePhoto) {
+            let done = this._resolvePhoto;
+            this._resolvePhoto = null;
+            done();
+        }
+        if (typeof this.returnfunc === "function") this.returnfunc();
+    }
+
+    useHomePromptColors() {
+        if (typeof Interface === "undefined" || !Interface.Prompt) return;
+        if (Interface.Prompt.change_colors_based_on_region) {
+            Interface.Prompt.change_colors_based_on_region("Home");
+        }
+    }
+
+    restorePromptColorsForMap() {
+        if (typeof Interface === "undefined" || !Interface.Prompt) return;
+        if (!Interface.Prompt.change_colors_based_on_region) return;
+        let region = (typeof topController !== "undefined" && topController.mapCont)
+            ? topController.mapCont.current_region
+            : null;
+        if (region) Interface.Prompt.change_colors_based_on_region(region);
+    }
+
+    hideMapLocator() {
+        if (typeof Interface === "undefined" || !Interface.Locator) return;
+        let locator = Interface.Locator;
+        let name = locator._currentName;
+        if (!name && locator.Text) name = (locator.Text.textContent || "").trim();
+        this._savedLocatorName = name || null;
+        locator.change_locator_name(null);
+    }
+
+    restoreMapLocator() {
+        if (typeof Interface === "undefined" || !Interface.Locator) return;
+        let name = this._savedLocatorName;
+        this._savedLocatorName = null;
+        if (name) Interface.Locator.change_locator_name(name);
+    }
+
+    clean_up() {
+        this._finished = true;
+        this._playToken += 1;
+        this._playing = false;
+        this._drag = null;
+        this._assembling = false;
+        if (this._resolveAssembly) {
+            let done = this._resolveAssembly;
+            this._resolveAssembly = null;
+            done();
+        }
+        this.hidePointingNote();
+        if (this.cardFen) {
+            try { this.cardFen.clean_up(); } catch (err) { console.warn(err); }
+            this.cardFen = null;
+        }
+        if (typeof Interface !== "undefined" && Interface.Prompt) Interface.Prompt.hide();
+        this.restoreMapLocator();
+        this.restorePromptColorsForMap();
+        if (this.rec) {
+            try { this.rec.clean_up(); } catch (err) { console.warn(err); }
+            this.rec = null;
+        }
+        if (this.partner && this.partner.PartnerBaseGroup) this.partner.PartnerBaseGroup.remove();
+        if (this.basics) this.basics.clean_up();
     }
 }
 
@@ -15820,6 +18818,9 @@ class TrialFactory {
 
             case "photo_Fennimal":
                 return new PhotoTrialController(FenObj, partner_is_present, returnfunc, "fennimal");
+
+            case "postcard_from_recording":
+                return new PostcardFromRecordingTrialController(FenObj, partner_is_present, returnfunc);
 
             case "scan_box_home":
             case "scan_box_in_situ":
@@ -17304,6 +20305,33 @@ class PartnerBeliefIndividualBoxesController {
             }
         });
         return Array.from(byCode.values());
+    }
+
+    _contentCode(contentId) {
+        if (contentId == null) return null;
+        if (contentId === this.EMPTY_OPTION_ID) return "empty";
+        return this._codeForAssignedName("toy", contentId);
+    }
+
+    _storedToyOption(toyId, choiceSet) {
+        return {
+            id: toyId,
+            role: (choiceSet.option_roles && choiceSet.option_roles[toyId]) || "unknown",
+            toy_code: this._contentCode(toyId)
+        };
+    }
+
+    _storedBeliefRealityFields(trial, choiceSet) {
+        return {
+            target_box: trial.target_box,
+            target_box_code: trial.target_box_code || null,
+            belief_answer: choiceSet.belief_answer,
+            belief_answer_code: this._contentCode(choiceSet.belief_answer),
+            reality_answer: choiceSet.reality_answer,
+            reality_answer_code: this._contentCode(choiceSet.reality_answer),
+            correct_option_id: choiceSet.correct_option_id,
+            correct_option_code: this._contentCode(choiceSet.correct_option_id)
+        };
     }
 
     _buildAllToyChoiceSet(trial, trialKind) {
@@ -19310,13 +22338,10 @@ class PartnerBeliefIndividualBoxesController {
             question_id: trial.question_id,
             block_index: trial.block_index,
             trial_index: this.overall_presentation_index,
-            target_box: trial.target_box,
+            ...this._storedBeliefRealityFields(trial, choiceSet),
             options: this._buildStoredOptions(
                 response.option_layout,
-                choiceSet.answer_options.map((toyId) => ({
-                    id: toyId,
-                    role: choiceSet.option_roles[toyId] || "unknown"
-                }))
+                choiceSet.answer_options.map((toyId) => this._storedToyOption(toyId, choiceSet))
             ),
             selected: response.selected_id,
             correct: is_correct,
@@ -19364,13 +22389,10 @@ class PartnerBeliefIndividualBoxesController {
             question_id: trial.question_id,
             block_index: trial.block_index,
             trial_index: this.overall_presentation_index,
-            target_box: trial.target_box,
+            ...this._storedBeliefRealityFields(trial, choiceSet),
             options: this._buildStoredOptions(
                 response.option_layout,
-                choiceSet.answer_options.map((toyId) => ({
-                    id: toyId,
-                    role: choiceSet.option_roles[toyId] || "unknown"
-                }))
+                choiceSet.answer_options.map((toyId) => this._storedToyOption(toyId, choiceSet))
             ),
             selected: response.selected_id,
             correct: is_correct,

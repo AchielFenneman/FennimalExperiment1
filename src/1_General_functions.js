@@ -21,10 +21,15 @@
 //      ?EXP=mentalizing_exp1&SKIP_TO_INTERACTION=warehouse_cleanup&CONDITION=baseline
 //          (warehouse arm: baseline | enhanced_mentalizing | enhanced_inference_error | enhanced_retrieval_error)
 //          &FENNIMAL=A|B picks that Fennimal's cleanup. &PARTNER_LEAVES=1 picks the swap.
+//      ?EXP=mentalizing_exp1_retro
+//          (3 Fennimals; photos hide toys; belief arms direct-direct | indirect-direct | indirect-indirect)
+//      ?EXP=mentalizing_exp1_retro&SKIP_INTRO=1&SKIP_TO_INTERACTION=warehouse_cleanup&CONDITION=indirect-direct
+//      ?EXP=mentalizing_exp1_retro&SKIP_INTRO=1&SKIP_TO_PHASE=warehouse_task&CONDITION=indirect-direct
 //      ?SKIP_TO_DECORATION=1       (seeded figure capture: skip intro, open the lost-box decoration sequence)
 //      ?CONDITION=...  (force a between-subjects arm; still consumes its one random draw)
 //          lost-box: boost | neutral | cost
 //          mentalizing_exp1 warehouse: baseline | enhanced_mentalizing | enhanced_inference_error | enhanced_retrieval_error
+//          mentalizing_exp1_retro belief formation: direct-direct | indirect-direct | indirect-indirect
 //      ?FORCE_NEW_SESSION=1
 // ----------------------------------------------------
 let _experimentRandomFn = Math.random.bind(Math);
@@ -3148,6 +3153,42 @@ function spawn_confetti_burst(ParentLayer, centerX, centerY, options = {}) {
     return wait(awaitPopMs);
 }
 
+// Rounded "?" tile. Same drawing in a Fennimal's hand, coming back out of a
+// box, and on the hidden-toy choice bar. fill is that Fennimal's region color.
+function createQuestionMarkGraphic(fill, size) {
+    let group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    let markSize = size || 78;
+    let rect = create_SVG_rect(-markSize / 2, -markSize / 2, markSize, markSize);
+    rect.setAttribute("rx", Math.max(8, Math.round(markSize * 0.17)));
+    rect.setAttribute("fill", fill || "#111111");
+    rect.style.pointerEvents = "all";
+    let label = create_SVG_text_elem(0, 0, "?");
+    label.setAttribute("text-anchor", "middle");
+    label.setAttribute("dominant-baseline", "central");
+    label.setAttribute("fill", "#ffffff");
+    label.setAttribute("font-size", String(Math.round(markSize * 0.82)));
+    label.setAttribute("font-family", "Arial, sans-serif");
+    label.setAttribute("font-weight", "700");
+    label.style.pointerEvents = "none";
+    group.appendChild(rect);
+    group.appendChild(label);
+
+    // Same 45-degree sheen as the cheek stamps. A CSS mask moves the band.
+    let sheen = rect.cloneNode(false);
+    sheen.removeAttribute("id");
+    sheen.removeAttribute("style");
+    sheen.removeAttribute("class");
+    sheen.setAttribute("class", "question_mark_sheen");
+    sheen.setAttribute("fill", "#ffffff");
+    sheen.style.pointerEvents = "none";
+    let wrap = document.createElementNS(rect.namespaceURI, "g");
+    wrap.setAttribute("class", "question_mark_sheen_wrap");
+    wrap.appendChild(sheen);
+    group.appendChild(wrap);
+    group.style.pointerEvents = "none";
+    return group;
+}
+
 /**
  * Reusable bottom toy-choice panel (PartnerBelief / ask_toy).
  * Options are resolved SVG toy ids (e.g. "plane"), not stimulus codes.
@@ -3850,6 +3891,142 @@ class FennimalChoiceBar {
                 : `You can earn ${this.bonus_stars} bonus stars for a correct answer!`;
             this.UIGroup.appendChild(bonus_text);
         }
+
+        this.UIGroup.style.transformOrigin = `${this.W / 2}px ${panel_y + (btn_size / 2)}px`;
+        this.UIGroup.style.transform = "scale(0.8)";
+        this.UIGroup.style.opacity = 0;
+        this.UIGroup.style.transition = "all 300ms cubic-bezier(0.34, 1.56, 0.64, 1)";
+        window.getComputedStyle(this.UIGroup).opacity;
+        this.UIGroup.style.transform = "scale(1)";
+        this.UIGroup.style.opacity = 1;
+    }
+}
+
+// Hidden-toy check. Each option is { id, fill }: a "?" in that Fennimal's color.
+class QuestionMarkChoiceBar {
+    constructor(parentLayer, W, H, options = {}) {
+        this.parentLayer = parentLayer;
+        this.W = W;
+        this.H = H;
+        this.panel_y_ratio = options.panel_y_ratio != null ? options.panel_y_ratio : 0.76;
+        this.btn_size = options.btn_size || 170;
+        this.spacing = options.spacing || 25;
+        this.left_margin = options.left_margin || 0;
+        this.right_margin = options.right_margin || 0;
+        this.UIGroup = null;
+        this._selectionHandler = null;
+        this._disabled = false;
+    }
+
+    destroy() {
+        this._disabled = true;
+        this._selectionHandler = null;
+        if (this.UIGroup && this.UIGroup.parentNode) this.UIGroup.remove();
+        this.UIGroup = null;
+    }
+
+    async hide(fade_ms = 200) {
+        this._disabled = true;
+        this._selectionHandler = null;
+        if (!this.UIGroup) return;
+        this.UIGroup.style.transition = `all ${fade_ms}ms ease-in`;
+        this.UIGroup.style.opacity = 0;
+        this.UIGroup.style.transform = "scale(0.8)";
+        await wait(fade_ms);
+        this.destroy();
+    }
+
+    waitForSelection(items) {
+        return new Promise(resolve => {
+            this.show(items, (itemId) => resolve(itemId));
+        });
+    }
+
+    show(items, onSelect) {
+        this.destroy();
+        this._disabled = false;
+        this._selectionHandler = onSelect;
+
+        this.UIGroup = create_SVG_group(0, 0);
+        this.parentLayer.appendChild(this.UIGroup);
+
+        const btn_size = this.btn_size;
+        const spacing = this.spacing;
+        const total_width = (items.length * btn_size) + ((items.length - 1) * spacing);
+        const available = this.W - this.left_margin - this.right_margin;
+        const start_x = this.left_margin + Math.max(0, (available - total_width) / 2);
+        const panel_y = this.panel_y_ratio * this.H;
+
+        let panel = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        panel.setAttribute("x", start_x - 30);
+        panel.setAttribute("y", panel_y - 20);
+        panel.setAttribute("width", total_width + 60);
+        panel.setAttribute("height", btn_size + 40);
+        panel.setAttribute("rx", 20);
+        panel.setAttribute("fill", "rgba(255, 215, 0, 0.45)");
+        panel.setAttribute("stroke", "#d4af37");
+        panel.setAttribute("stroke-width", "4");
+        this.UIGroup.appendChild(panel);
+
+        items.forEach((item, index) => {
+            let btn_x = start_x + (index * (btn_size + spacing));
+            let btn_y = panel_y;
+            let itemId = item && item.id;
+
+            let BtnGroup = create_SVG_group(0, 0);
+            this.UIGroup.appendChild(BtnGroup);
+
+            let btn_bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            btn_bg.setAttribute("x", btn_x);
+            btn_bg.setAttribute("y", btn_y);
+            btn_bg.setAttribute("width", btn_size);
+            btn_bg.setAttribute("height", btn_size);
+            btn_bg.setAttribute("rx", 15);
+            btn_bg.setAttribute("fill", "#d8c381");
+            btn_bg.setAttribute("stroke", "#b89f5d");
+            btn_bg.setAttribute("stroke-width", "3");
+            btn_bg.style.transition = "all 150ms ease";
+            BtnGroup.appendChild(btn_bg);
+
+            let graphic = createQuestionMarkGraphic(item && item.fill, 78);
+            BtnGroup.appendChild(graphic);
+            let TBox = graphic.getBBox();
+            let max_dim = Math.max(TBox.width, TBox.height) || 78;
+            let scale = (btn_size * 0.62) / max_dim;
+            let raw_cx = TBox.x + (TBox.width / 2);
+            let raw_cy = TBox.y + (TBox.height / 2);
+            let target_cx = btn_x + (btn_size / 2);
+            let target_cy = btn_y + (btn_size / 2);
+            graphic.style.transformOrigin = raw_cx + "px " + raw_cy + "px";
+            graphic.style.transform = "translate(" + (target_cx - raw_cx) + "px, " + (target_cy - raw_cy) + "px) scale(" + scale + ")";
+
+            let click_catcher = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            click_catcher.setAttribute("x", btn_x);
+            click_catcher.setAttribute("y", btn_y);
+            click_catcher.setAttribute("width", btn_size);
+            click_catcher.setAttribute("height", btn_size);
+            click_catcher.setAttribute("fill", "transparent");
+            click_catcher.style.cursor = "pointer";
+            BtnGroup.appendChild(click_catcher);
+
+            click_catcher.onpointerenter = () => {
+                if (this._disabled) return;
+                btn_bg.setAttribute("fill", "#ebd89b");
+                btn_bg.setAttribute("stroke", "gold");
+            };
+            click_catcher.onpointerleave = () => {
+                btn_bg.setAttribute("fill", "#d8c381");
+                btn_bg.setAttribute("stroke", "#b89f5d");
+            };
+            click_catcher.onpointerdown = () => {
+                if (this._disabled) return;
+                this._disabled = true;
+                AudioCont.play_sound_effect("button_click");
+                let handler = this._selectionHandler;
+                this._selectionHandler = null;
+                if (handler) handler(itemId);
+            };
+        });
 
         this.UIGroup.style.transformOrigin = `${this.W / 2}px ${panel_y + (btn_size / 2)}px`;
         this.UIGroup.style.transform = "scale(0.8)";

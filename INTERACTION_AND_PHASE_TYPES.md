@@ -34,7 +34,7 @@ Some phases are **not** location trials (`partner_belief_multiple` / `partner_be
 
 ### Trial queue: default vs `trial_subblocks`
 
-Map phases that use `TrialGenerator` (`phone_room`, `free_exploration`, `hint_and_search`, `jump_to_trial`, `on_call`, …) build their trial list in one of two ways:
+Map phases that use `TrialGenerator` (`phone_room`, `warehouse_task`, `free_exploration`, `hint_and_search`, `jump_to_trial`, `on_call`, …) build their trial list in one of two ways:
 
 **Default (cartesian)** — omit `trial_subblocks`:
 
@@ -134,6 +134,13 @@ Sequential trials from a phone UI at Home: ring → hint → auto-travel to loca
 | `skip_instructions` | If `true`, skip the phase-start instructions page (default: show instructions) |
 
 Tunables: `GenParam.PhoneRoom`, `PhoneRoomFlair`, `AutoTravel`.
+
+#### `warehouse_task`
+Indoor trials with no map travel. The trial list is built the same way as `phone_room` (`trial_subblocks`, `conditions`, and the ask stamps). The block opens with instructions for the task in that block. A workshop block uses the workshop card (“put the pieces back together so they match the picture”). A cleanup block uses the warehouse card. `skip_instructions: true` skips that card.
+
+`warehouse_cleanup` then opens on the phone hint, then the warehouse scene. `broken_toy_workshop` starts on the workshop table. The phase ends after the last trial.
+
+Phone-room-only fields are not used: `include_Fennefinder`, `return_to_phone_room_after_final_trial`, `skip_instructions`.
 
 #### `free_exploration`
 All phase Fennimals on the map; participant explores until all are visited.

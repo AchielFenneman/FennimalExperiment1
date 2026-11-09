@@ -17,6 +17,9 @@ class PromptController {
         this.make_click_through();
 
         this.hide();
+        // The SVG ships with a leftover fill. Before the player enters a region
+        // they are at the center of the island, so the prompt uses home colors.
+        this.change_colors_based_on_region("Home");
     }
 
     make_click_through() {
@@ -573,9 +576,10 @@ class PartnerSpeechBubbleController {
      * @param {"left"|"right"|"up"|"down"} [opts.preferredSide] Prefer this side if it fits. "up" = bubble above, pointing down at the target.
      * @param {number} [opts.tipGap] Override GenParam tipGap for this bubble.
      * @param {"partner"|"note"} [opts.variant] "note" is a system caption, not the partner speaking.
+     * @param {boolean} [opts.passThrough] When true, the dim and the bubble text do not catch clicks.
      * @returns {Promise<void>}
      */
-    show({ target, text, buttonLabel = "Continue", context = "location", dimOpacity = null, onConfirm = null, preferredSide = null, tipGap = null, hideButton = false, variant = "partner" } = {}) {
+    show({ target, text, buttonLabel = "Continue", context = "location", dimOpacity = null, onConfirm = null, preferredSide = null, tipGap = null, hideButton = false, variant = "partner", passThrough = false } = {}) {
         this.hide(true);
 
         return new Promise((resolve) => {
@@ -631,19 +635,23 @@ class PartnerSpeechBubbleController {
                 layout = this.computeCenteredLayout(text, hideButton ? "" : buttonLabel, p, { hideButton });
             }
 
+            let blockInput = !hideButton && !passThrough;
             this.root = create_SVG_group(0, 0, "partner_speech_bubble_root", "PartnerSpeechBubbleRoot");
             this.root.style.opacity = 0;
             this.root.style.transition = `opacity ${p.fadeTime || 280}ms ease-in-out`;
-            this.root.style.pointerEvents = hideButton ? "none" : "auto";
+            this.root.style.pointerEvents = blockInput ? "auto" : "none";
+            this.root.setAttribute("pointer-events", blockInput ? "auto" : "none");
 
             let dim = create_SVG_rect(0, 0, GenParam.SVG_width, GenParam.SVG_height, "partner_speech_bubble_dim", undefined);
             let dimAmt = dimOpacity != null ? dimOpacity : (p.dimOpacity != null ? p.dimOpacity : 0.2);
             dim.style.fill = `rgba(0,0,0,${dimAmt})`;
-            dim.style.pointerEvents = hideButton ? "none" : "all";
+            dim.style.pointerEvents = blockInput ? "all" : "none";
+            dim.setAttribute("pointer-events", blockInput ? "all" : "none");
             this.root.appendChild(dim);
 
             let bubbleGroup = create_SVG_group(0, 0, "partner_speech_bubble_group", undefined);
-            bubbleGroup.style.pointerEvents = hideButton ? "none" : "auto";
+            bubbleGroup.style.pointerEvents = blockInput ? "auto" : "none";
+            bubbleGroup.setAttribute("pointer-events", blockInput ? "auto" : "none");
 
             let body = create_SVG_rect(
                 layout.bubbleX,
@@ -696,9 +704,12 @@ class PartnerSpeechBubbleController {
             textDiv.style.justifyContent = "center";
             textDiv.style.height = "100%";
             textDiv.style.width = "100%";
+            textDiv.style.pointerEvents = "none";
             // One flex child so spaces around <b>names</b> are not stripped.
             textDiv.innerHTML = "<span>" + text + "</span>";
             fo.appendChild(textDiv);
+            fo.style.pointerEvents = blockInput ? "auto" : "none";
+            fo.setAttribute("pointer-events", blockInput ? "auto" : "none");
             bubbleGroup.appendChild(fo);
 
             this.root.appendChild(bubbleGroup);

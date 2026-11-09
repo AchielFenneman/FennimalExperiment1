@@ -584,6 +584,13 @@ html, body {
 }
 
 /* General focus functions */
+/* Soft halo on a Fennimal who is waiting to be patted. */
+.fennimal_pat_target {
+    filter: drop-shadow(0px 0px 2px #ffffff)
+            drop-shadow(0px 0px 6px #ffffff)
+            drop-shadow(0px 0px 14px rgba(255, 196, 60, 0.95));
+}
+
 .focus_on_SVG_outline  {
     animation: focus_on_SVG_outline 900ms ease-in-out infinite;
     stroke-width: 15px;
@@ -2218,4 +2225,17 @@ html, body {
 
 .hat_drop_key.is-pressed .hat_drop_key_glyph {
     fill: #f2f2f2;
+}
+
+.written_memory_answer_cue {
+    animation: written_memory_answer_cue 1.5s ease-in-out infinite;
+}
+
+@keyframes written_memory_answer_cue {
+    0%, 100% {
+        filter: drop-shadow(0px 0px 5px rgba(198, 40, 40, 0.85));
+    }
+    50% {
+        filter: drop-shadow(0px 0px 16px rgba(229, 57, 53, 0.95));
+    }
 }

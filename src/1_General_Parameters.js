@@ -922,6 +922,46 @@ GENERALPARAM = function () {
         closeButtonSize: 72
     }
 
+    // Postcard-from-recording. Phase 1 is the desk and monitor only.
+    this.PostcardRecording = {
+        deskWidth: 0.78,
+        deskCenterX: 0.51,
+        deskCenterY: 0.84,
+        monitorX: 0.025,
+        monitorY: 0.035,
+        monitorWidth: 0.5,
+        monitorHeight: 0.64,
+        bezel: 28,
+        standHeight: 78,
+        playRadius: 62
+    }
+
+    // Opening card for warehouse_task when the block is warehouse cleanup.
+    // Toy repair uses the workshop card instead. Neither card uses the phone-room day.
+    this.WarehouseTask = {
+        cleanupTitle: "cleaning day",
+        cleanupBody:
+            "Today is a cleaning day.<br><br>" +
+            "Some of the Fennimals will come to the center of the island so we can safely store their favorite toys. Let's store them in boxes to keep them safe!",
+        arrivalLine: "{name} is coming to store a favorite toy."
+    }
+
+    // Copy for the postcard_task day card and the lines spoken at the desk.
+    // The phase spec picks the day card with include_full_sequence_at_start.
+    this.PostcardTask = {
+        dayTitle: "design some postcards!",
+        dayBodyWithSequence:
+            "Today you are tasked with creating some postcards.<br><br>" +
+            "First you will watch a video of each Fennimal with their favorite toy. Then you will design a postcard for each Fennimal.",
+        dayBodyWithoutSequence:
+            "Today you are tasked with creating some postcards.<br><br>" +
+            "For each Fennimal, you will watch a video of them with their favorite toy, then design their postcard.",
+        studyPrompt: "Watch the recordings. You'll need them for the postcards.",
+        watchAgainPrompt: "Play the video again before adding {name}'s favorite toy.",
+        watchFirstPrompt: "Play the video before adding {name}'s favorite toy.",
+        assemblyPrompt: "Oops, the sticker broke! Please put the sticker back together"
+    }
+
     // Feed Fennimal trial
     this.FeedTrial = {
         fennimalX: 0.38,

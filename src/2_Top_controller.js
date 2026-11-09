@@ -366,6 +366,7 @@ class DataController {
             trial_subblock_index: row.trial_subblock_index,
             time_since_start: row.time_since_start,
             placed_by_fennimal: placedByFennimal,
+            reveal_toy: row.reveal_toy === true,
             fennimal_id: fennimalId,
             fennimal_name: placedByFennimal ? (row.name || null) : null,
             partner_leaves_during_interaction: row.partner_leaves_during_interaction === true,
@@ -377,7 +378,12 @@ class DataController {
             toy_code: toyCode,
             toy: toy,
             placement_correct_answer: correct || null,
-            placement_errors: Array.isArray(row.placement_errors) ? row.placement_errors.slice() : []
+            placement_errors: Array.isArray(row.placement_errors) ? row.placement_errors.slice() : [],
+            object_quiz: row.object_quiz || null,
+            object_placement_correct: row.object_placement_correct || null,
+            object_placement_errors: Array.isArray(row.object_placement_errors)
+                ? row.object_placement_errors.slice()
+                : null
         };
     }
 
@@ -387,6 +393,12 @@ class DataController {
      */
     annotateAnswerForExport(answer) {
         if (!answer || typeof answer !== "object") return;
+        if (answer.selected == null && answer.selected_option_id != null) {
+            answer.selected = answer.selected_option_id;
+        }
+        if (!answer.correct_answer && answer.correct_option_id) {
+            answer.correct_answer = answer.correct_option_id;
+        }
         if (!answer.correct_answer && Array.isArray(answer.options)) {
             let correct = answer.options.find((opt) => opt && opt.role === "correct" && opt.id && !String(opt.id).startsWith("opt_"));
             if (correct) answer.correct_answer = correct.id;
@@ -1057,7 +1069,9 @@ class TrialGenerator {
         let mainTrials;
         let orthogonalTrials = [];
 
-        if (Array.isArray(phaseData.trial_subblocks)) {
+        if (phaseData.type === "postcard_task" && Array.isArray(phaseData.blocks)) {
+            mainTrials = this.generatePostcardBlockTrials(phaseData);
+        } else if (Array.isArray(phaseData.trial_subblocks)) {
             // Ordered subblocks: shuffle within each, then concatenate (preserves subblock order).
             mainTrials = this.generateTrialsFromSubblocks(phaseData);
         } else if (phaseData.type === "retrieve_lost_box"
@@ -1099,6 +1113,8 @@ class TrialGenerator {
         orthogonalTrials = this.applyIntroduceNameOnPolaroidToTrials(orthogonalTrials, phaseData);
         mainTrials = this.applyPhotoHeadshotSettingsToTrials(mainTrials, phaseData);
         orthogonalTrials = this.applyPhotoHeadshotSettingsToTrials(orthogonalTrials, phaseData);
+        mainTrials = this.applyHideHeldToyToTrials(mainTrials, phaseData);
+        orthogonalTrials = this.applyHideHeldToyToTrials(orthogonalTrials, phaseData);
         mainTrials = this.stripAskFlagsForSpecialRoles(mainTrials);
         orthogonalTrials = this.stripAskFlagsForSpecialRoles(orthogonalTrials);
         mainTrials = this.applyPlacementQuizOptionsToTrials(mainTrials, phaseData);
@@ -1130,6 +1146,10 @@ class TrialGenerator {
             });
         }
 
+        if (phaseData.type === "postcard_task" && Array.isArray(phaseData.blocks)) {
+            return mainTrials;
+        }
+
         if (Array.isArray(phaseData.trial_subblocks)) {
             // Subblock order is intentional; do not re-shuffle across subblock boundaries.
             return mainTrials;
@@ -1157,6 +1177,11 @@ class TrialGenerator {
                 `TrialGenerator: phase type "${phaseData.type}" sets box_locations, which is only allowed ` +
                 `on retrieve_lost_box phases.`
             );
+        }
+
+        if (phaseData.type === "postcard_task") {
+            this.validatePostcardBlocks(phaseData);
+            return;
         }
 
         if (Array.isArray(phaseData.conditions) && !phaseData._conditions_resolved) {
@@ -2092,12 +2117,15 @@ class TrialGenerator {
     getKnownPhaseTypes() {
         return new Set([
             "partner_belief_individual_boxes",
+            "written_memory_page",
             "free_exploration",
             "retrieve_lost_box",
             "jump_to_trial",
             "hint_and_search",
             "on_call",
             "phone_room",
+            "warehouse_task",
+            "postcard_task",
             "auto_travel",
             "name_recall_task",
             "Fennimal_attribute_sorting_task",
@@ -2115,6 +2143,8 @@ class TrialGenerator {
             "hint_and_search",
             "on_call",
             "phone_room",
+            "warehouse_task",
+            "postcard_task",
             "auto_travel"
         ]);
     }
@@ -2138,6 +2168,7 @@ class TrialGenerator {
             "partner_belief_in_situ",
             "photo_box",
             "photo_Fennimal",
+            "postcard_from_recording",
             "scan_box_home",
             "scan_box_in_situ",
             "check_box_contents",
@@ -2314,7 +2345,10 @@ class TrialGenerator {
 
         if (Array.isArray(phase.blocks)) {
             phase.blocks.forEach((block, bi) => {
-                if (block) addList(block.retraining_fennimals, `blocks[${bi}].retraining_fennimals`);
+                if (block) {
+                addList(block.retraining_fennimals, `blocks[${bi}].retraining_fennimals`);
+                addList(block.Fennimals, `blocks[${bi}].Fennimals`);
+            }
             });
         }
 
@@ -2341,6 +2375,12 @@ class TrialGenerator {
         if (Array.isArray(phase.box_locations)) {
             phase.box_locations.forEach((entry, i) => {
                 if (entry) add("toybox", entry.target_box, `box_locations[${i}].target_box`);
+            });
+        }
+
+        if (Array.isArray(phase.blocks)) {
+            phase.blocks.forEach((block, bi) => {
+                if (block) addList("toy", block.optional_distractor_toys, `blocks[${bi}].optional_distractor_toys`);
             });
         }
 
@@ -2412,6 +2452,117 @@ class TrialGenerator {
             if (!cond) return;
             walk(cond.trial_subblocks, `conditions[${ci}].trial_subblocks`);
         });
+    }
+
+    validatePostcardBlocks(phaseData) {
+        let where = `phase type "postcard_task"`;
+        if (Array.isArray(phaseData.trial_subblocks)) {
+            throw new Error(`${where} uses blocks, not trial_subblocks.`);
+        }
+        if (!Array.isArray(phaseData.blocks) || phaseData.blocks.length === 0) {
+            throw new Error(`${where} needs a non-empty blocks array.`);
+        }
+        phaseData.blocks.forEach((block, index) => {
+            if (!block || typeof block !== "object") {
+                throw new Error(`${where} blocks[${index}] must be an object.`);
+            }
+            if (!Array.isArray(block.Fennimals) || block.Fennimals.length === 0) {
+                throw new Error(`${where} blocks[${index}].Fennimals must list at least one Fennimal.`);
+            }
+            block.Fennimals.forEach((id, i) => {
+                if (typeof id !== "string" || !id) {
+                    throw new Error(`${where} blocks[${index}].Fennimals[${i}] must be a Fennimal id.`);
+                }
+            });
+            if (block.force_replay_first !== undefined && typeof block.force_replay_first !== "boolean") {
+                throw new Error(`${where} blocks[${index}].force_replay_first must be true or false.`);
+            }
+            let type = block.postcard_type == null || block.postcard_type === ""
+                ? "A"
+                : String(block.postcard_type).toUpperCase();
+            if (type !== "A" && type !== "B" && type !== "C") {
+                throw new Error(`${where} blocks[${index}].postcard_type must be A, B, or C.`);
+            }
+            if (block.optional_distractor_toys !== undefined && !Array.isArray(block.optional_distractor_toys)) {
+                throw new Error(`${where} blocks[${index}].optional_distractor_toys must be an array of toy codes.`);
+            }
+            if (block.repair_toy_sticker !== undefined && typeof block.repair_toy_sticker !== "boolean") {
+                throw new Error(`${where} blocks[${index}].repair_toy_sticker must be true or false.`);
+            }
+            if (block.show_instructions_bubble !== undefined && typeof block.show_instructions_bubble !== "boolean") {
+                throw new Error(`${where} blocks[${index}].show_instructions_bubble must be true or false.`);
+            }
+        });
+    }
+
+    // One shuffled pass per block. The same Fennimal is not placed next to
+    // itself, including across the join with the previous block.
+    generatePostcardBlockTrials(phaseData) {
+        let sequence = [];
+        phaseData.blocks.forEach((block, index) => {
+            let found = this.stimuli.get_Fennimals_in_array(block.Fennimals) || [];
+            let byId = {};
+            found.forEach((fen) => {
+                if (fen && fen.id != null) byId[String(fen.id)] = fen;
+            });
+            let codes = Array.isArray(block.optional_distractor_toys) ? block.optional_distractor_toys : [];
+            let mapped = codes.length ? this.stimuli.get_assigned_names_of_code_array("toy", codes) : [];
+            if (codes.length && (!mapped || mapped.some((name) => !name))) {
+                throw new Error(
+                    `TrialGenerator: postcard blocks[${index}] lists a distractor toy code with no SVG toy.`
+                );
+            }
+            let type = block.postcard_type == null || block.postcard_type === ""
+                ? "A"
+                : String(block.postcard_type).toUpperCase();
+            let trials = block.Fennimals.map((id) => {
+                let source = byId[String(id)];
+                if (!source) {
+                    throw new Error(
+                        `TrialGenerator: postcard blocks[${index}] names unknown Fennimal "${id}".`
+                    );
+                }
+                let trial = JSON.parse(JSON.stringify(source));
+                trial.interaction_type = "postcard_from_recording";
+                trial.postcard_block_index = index;
+                trial.postcard_type = type;
+                trial.force_replay_first = block.force_replay_first !== false;
+                trial.rewatch_optional = !trial.force_replay_first;
+                trial.repair_toy_sticker = block.repair_toy_sticker !== false;
+                trial.show_instructions_bubble = block.show_instructions_bubble !== false;
+                trial.block_fennimal_ids = block.Fennimals.slice();
+                trial.distractor_toy_ids = mapped ? mapped.slice() : [];
+                delete trial.visited;
+                delete trial.search_status;
+                delete trial.placement_errors;
+                delete trial.num_in_phase;
+                return trial;
+            });
+            let previous = sequence.length ? sequence[sequence.length - 1] : null;
+            sequence.push(...this.orderPostcardReplayBlock(trials, previous));
+        });
+        return sequence;
+    }
+
+    samePostcardFennimal(a, b) {
+        if (!a || !b) return false;
+        if (a.id != null && b.id != null) return String(a.id) === String(b.id);
+        return !!(a.name && a.name === b.name);
+    }
+
+    orderPostcardReplayBlock(clones, previous) {
+        if (!clones || clones.length <= 1) return clones || [];
+        let shuffled = shuffleArray(clones.slice());
+        let remaining = shuffled.slice();
+        let sequence = [];
+        let last = previous || null;
+        while (remaining.length > 0) {
+            let nextIndex = remaining.findIndex((item) => !this.samePostcardFennimal(item, last));
+            if (nextIndex === -1) nextIndex = 0;
+            last = remaining.splice(nextIndex, 1)[0];
+            sequence.push(last);
+        }
+        return sequence;
     }
 
     generateTrialsFromSubblocks(phaseData) {
@@ -2498,7 +2649,9 @@ class TrialGenerator {
                 toy: toy,
                 toy_code: code,
                 workshop_run_id: subblockIndex,
-                skip_phone_room_autotravel: true
+                skip_phone_room_autotravel: true,
+                // Omitted on the subblock means the participant still charges the toy.
+                include_charging_action: subblock.include_charging_action !== false
             };
         });
 
@@ -2594,6 +2747,10 @@ class TrialGenerator {
             }
             trial.skip_phone_room_autotravel = true;
             trial.partner_leaves_during_interaction = subblock.partner_leaves_during_interaction === true;
+            trial.reveal_toy = subblock.reveal_toy === true;
+            if (typeof subblock.mystery_note === "string" && subblock.mystery_note.trim() !== "") {
+                trial.mystery_note = subblock.mystery_note.trim();
+            }
 
             let all = this.stimuli.get_all_Fennimals_objects_in_array() || [];
             trial.placement_quiz_fennimals = all.map((fen) => JSON.parse(JSON.stringify(fen)));
@@ -3526,6 +3683,17 @@ class TrialGenerator {
     }
 
     /**
+     * Photo trials: do not put the Fennimal's toy in the scene or on the polaroid.
+     */
+    applyHideHeldToyToTrials(trials, phaseData) {
+        if (!trials || trials.length === 0 || !phaseData || phaseData.hide_held_toy !== true) return trials;
+        trials.forEach((trial) => {
+            if (trial && trial.interaction_type === "photo_Fennimal") trial.hide_held_toy = true;
+        });
+        return trials;
+    }
+
+    /**
      * Stamp ask_name onto all trials. names_asked defaults to unique names of Fennimals in the phase.
      * Singleton sets widen to all experiment Fennimal names.
      */
@@ -3616,6 +3784,14 @@ class TrialGenerator {
 
     collectFennimalIdsInPhase(phaseData) {
         let idSet = new Set();
+
+        if (Array.isArray(phaseData.blocks)) {
+            phaseData.blocks.forEach((block) => {
+                if (block && Array.isArray(block.Fennimals)) {
+                    block.Fennimals.forEach((id) => idSet.add(id));
+                }
+            });
+        }
 
         if (Array.isArray(phaseData.trial_subblocks)) {
             phaseData.trial_subblocks.forEach((subblock) => {
@@ -3827,10 +4003,15 @@ class ExperimentController {
                 );
             }
         }
+        let skippedDays = 0;
         if (window.__SKIP_TO_PHASE__) {
             let want = String(window.__SKIP_TO_PHASE__);
-            let idx = this.remainingExperimentPhases.findIndex((p) => p && p.type === want);
+            let idx = this.remainingExperimentPhases.findIndex((p) =>
+                p && (p.type === want || p.phase_id === want)
+            );
             if (idx >= 0) {
+                skippedDays = this.remainingExperimentPhases.slice(0, idx)
+                    .filter((p) => p && p.type !== "pseudoday").length;
                 this.remainingExperimentPhases = this.remainingExperimentPhases.slice(idx);
                 console.log(
                     "%c SKIP_TO_PHASE: starting at " + want + " (dropped " + idx + " earlier phase(s))",
@@ -3845,7 +4026,7 @@ class ExperimentController {
         this.currentPhaseType = null;
 
         this.currentPhaseNum = 0;
-        this.currentDayNum = 0;
+        this.currentDayNum = skippedDays;
         this.currentTrialNumInDay = 0;
         this.currentInteractionNumInPhase = 0;
 
@@ -4114,6 +4295,14 @@ class ExperimentController {
                     this.currentDayNum
                 );
                 break;
+            case "written_memory_page":
+                this.flagWrittenMemoryInstructionsShown = false;
+                this.instrCont.initializeWrittenMemoryPageInstructions(
+                    this.currentDayNum,
+                    WrittenMemoryPageController.bonusFromPhase(this.currentPhaseData),
+                    WrittenMemoryPageController.questionCountFromStimuli(this.stimuli)
+                );
+                break;
             case "free_exploration":
                 this.setupTrialBasedPhase();
                 this.flagExplorationPhaseCompleted = false;
@@ -4185,6 +4374,48 @@ class ExperimentController {
                 } else {
                     this.flagPhoneRoomInstructionsShown = false;
                     this.instrCont.initializePhoneRoomPhaseGeneralInstructions(this.currentDayNum, this.currentPhaseData);
+                }
+                break;
+            case "warehouse_task":
+                // Indoor trials. The opening card is the cleaning day, not a phone room.
+                this.workshopInstructionShownForRun = null;
+                this.waitingForWorkshopInstruction = false;
+                if (this.workshopController) {
+                    try { this.workshopController.clean_up(); } catch (err) { console.warn(err); }
+                    this.workshopController = null;
+                }
+                this.setupTrialBasedPhase();
+                {
+                    let map = document.getElementById("Map");
+                    if (map) map.style.display = "none";
+                }
+                if (typeof Interface !== "undefined" && Interface.FenneFinder && Interface.FenneFinder.hide) {
+                    Interface.FenneFinder.hide();
+                }
+                if (this.currentPhaseData.skip_instructions === true) {
+                    this.flagWarehouseTaskInstructionsShown = true;
+                    this.markWarehouseWorkshopInstructed();
+                    this.startNextTrialInPhoneRoomPhase();
+                } else {
+                    this.flagWarehouseTaskInstructionsShown = false;
+                    this.showWarehouseTaskInstructions();
+                }
+                break;
+            case "postcard_task":
+                this.setupTrialBasedPhase();
+                if (typeof Interface !== "undefined" && Interface.FenneFinder && Interface.FenneFinder.hide) {
+                    Interface.FenneFinder.hide();
+                }
+                this._postcardStudyPlayed = false;
+                if (this.currentPhaseData.skip_instructions === true || this.openedOnSkippedInteraction) {
+                    this.flagPostcardInstructionsShown = true;
+                    this.beginPostcardPhaseTrials();
+                } else {
+                    this.flagPostcardInstructionsShown = false;
+                    this.instrCont.initializePostcardDayInstructions(
+                        this.currentDayNum,
+                        this.postcardFullSequenceAtStart()
+                    );
                 }
                 break;
             case "auto_travel":
@@ -4260,6 +4491,10 @@ class ExperimentController {
             return Array.isArray(value) && value.indexOf(interactionType) !== -1;
         };
         if (matches(phase.interaction_type)) return true;
+        if (phase.type === "postcard_task" && Array.isArray(phase.blocks) && phase.blocks.length
+            && interactionType === "postcard_from_recording") {
+            return true;
+        }
         return this.phaseSubblockList(phase).some((sb) => {
             if (!sb) return false;
             if (matches(sb.interaction_type)) return true;
@@ -4395,6 +4630,39 @@ class ExperimentController {
                 this.currentPhaseData.bonus_stars_earned = earned;
                 this.dataCont.recordStarsEarned(this.currentDayNum, "partner_belief_individual_boxes", earned, maxPossible);
 
+                currentTask.clean_up();
+                clear_Fennimals_interaction_layer();
+                document.getElementById("Map").style.display = "inherit";
+                this.phaseCompleted();
+            },
+            this
+        );
+        currentTask.start_sequence();
+    }
+
+    setupWrittenMemoryPagePhase() {
+        this.mapCont.disable_map_interactions();
+        if (this.mapCont.hide_request_instructions_button) this.mapCont.hide_request_instructions_button();
+        document.getElementById("Map").style.display = "none";
+        let iface = document.getElementById("Interface");
+        if (iface) iface.style.display = "inherit";
+        if (typeof Interface !== "undefined" && Interface.FenneFinder && Interface.FenneFinder.hide) {
+            Interface.FenneFinder.hide();
+        }
+
+        let pLayer = document.getElementById("Fennimals_Layer");
+        if (pLayer) pLayer.style.display = "inherit";
+        if (this.mapCont && this.mapCont.Map_Layer) this.mapCont.Map_Layer.style.display = "none";
+        this.mapCont.hide_all_locations();
+        this.mapCont.currently_in_location = false;
+
+        let currentTask = new WrittenMemoryPageController(
+            pLayer,
+            this.currentPhaseData,
+            () => {
+                let earned = this.currentPhaseData.bonus_stars_earned || 0;
+                let possible = this.currentPhaseData.bonus_stars_possible || 0;
+                this.dataCont.recordStarsEarned(this.currentDayNum, "written_memory_page", earned, possible);
                 currentTask.clean_up();
                 clear_Fennimals_interaction_layer();
                 document.getElementById("Map").style.display = "inherit";
@@ -4690,6 +4958,185 @@ class ExperimentController {
         if (this.currentFennimal) this.currentFennimal.start_sequence();
     }
 
+    // Postcard trials stay on the desk. No phone, no map travel, next trial
+    // starts as soon as the previous one fades out.
+    startPostcardRecordingTrial() {
+        let fenObj = this.currentTrial;
+        if (!fenObj) return;
+        this.clearLingeringTaskPrompt();
+
+        let map = document.getElementById("Map");
+        if (map) map.style.display = "none";
+        let iface = document.getElementById("Interface");
+        if (iface) iface.style.display = "inherit";
+
+        this.mapCont.disable_map_interactions();
+        this.mapCont.hide_request_instructions_button();
+        if (typeof Interface !== "undefined" && Interface.FenneFinder && Interface.FenneFinder.hide) {
+            Interface.FenneFinder.hide();
+        }
+
+        if (fenObj.visited === false || fenObj.visited === undefined) {
+            this.currentInteractionNumInPhase++;
+            fenObj.num_in_phase = this.currentInteractionNumInPhase;
+        }
+
+        if (this.currentFennimal) {
+            try { this.currentFennimal.clean_up(); } catch (err) { console.warn(err); }
+            this.currentFennimal = null;
+        }
+        clear_Fennimals_interaction_layer();
+
+        let interactionLayer = document.getElementById("Fennimals_Layer");
+        if (interactionLayer) interactionLayer.style.display = "inherit";
+
+        let partnerPresent = false;
+        let role = WorldState.get_current_partner_role();
+        if (role && role !== "absent") partnerPresent = true;
+
+        fenObj.time_since_start = Math.round(
+            (Date.now() - this.experimentStartTime) / 1000
+        );
+
+        this.currentFennimal = TrialFactory.build(
+            fenObj.interaction_type,
+            fenObj,
+            partnerPresent,
+            () => this.fennimalInteractionCompleted(fenObj)
+        );
+        if (this.currentFennimal) this.currentFennimal.start_sequence();
+    }
+
+    startNextPostcardTrial() {
+        if (this.executionQueue.length === 0) {
+            this.phaseCompleted();
+            return;
+        }
+        this.currentTrialNumInDay++;
+        this.currentTrial = this.executionQueue.shift();
+        this.startPostcardRecordingTrial();
+    }
+
+    postcardFullSequenceAtStart() {
+        // Only an explicit true starts the opening tapes. false, and a missing flag, skip them.
+        let phase = this.currentPhaseData;
+        return !!(phase && phase.include_full_sequence_at_start === true);
+    }
+
+    // When the phase asks for it, the recordings play through once before any postcard.
+    beginPostcardPhaseTrials() {
+        if (this._postcardStudyPlayed) {
+            this.startNextPostcardTrial();
+            return;
+        }
+        this._postcardStudyPlayed = true;
+        let include = this.postcardFullSequenceAtStart();
+        console.log(
+            "%c Postcard day: include_full_sequence_at_start = " + include,
+            "color:purple; font-weight:bold"
+        );
+        if (include) {
+            this.playPostcardStudyRecordings();
+            return;
+        }
+        this.startNextPostcardTrial();
+    }
+
+    async playPostcardStudyRecordings() {
+        // The opening tapes are each Fennimal once, in the order they first appear.
+        let seen = new Set();
+        let lineup = [];
+        (this.executionQueue || []).forEach((trial) => {
+            if (!trial || trial.id == null || seen.has(String(trial.id))) return;
+            seen.add(String(trial.id));
+            lineup.push(trial);
+        });
+        if (!lineup.length) {
+            this.startNextPostcardTrial();
+            return;
+        }
+        this.clearLingeringTaskPrompt();
+        let map = document.getElementById("Map");
+        if (map) map.style.display = "none";
+        let iface = document.getElementById("Interface");
+        if (iface) iface.style.display = "inherit";
+        this.mapCont.disable_map_interactions();
+        this.mapCont.hide_request_instructions_button();
+        if (typeof Interface !== "undefined" && Interface.FenneFinder && Interface.FenneFinder.hide) {
+            Interface.FenneFinder.hide();
+        }
+
+        let partnerPresent = false;
+        let role = WorldState.get_current_partner_role();
+        if (role && role !== "absent") partnerPresent = true;
+        let study = new PostcardFromRecordingTrialController(lineup[0], partnerPresent, null);
+        this.currentFennimal = study;
+        try {
+            await study.playStudyLineup(lineup);
+            await this.fadeTaskToBlack(400);
+        } catch (err) {
+            console.error("postcard study", err);
+            await this.fadeTaskToBlack(200);
+        } finally {
+            try { study.clean_up(); } catch (err) { console.warn(err); }
+            if (this.currentFennimal === study) this.currentFennimal = null;
+            if (typeof clear_Fennimals_interaction_layer === "function") clear_Fennimals_interaction_layer();
+        }
+        this.startNextPostcardTrial();
+        this.fadeTaskFromBlack(400);
+    }
+
+    compactPostcardTrialRecord(fenObj) {
+        let mistakes = fenObj && Number.isFinite(fenObj.sticker_mistakes)
+            ? fenObj.sticker_mistakes
+            : (fenObj && Array.isArray(fenObj.placement_errors) ? fenObj.placement_errors.length : 0);
+        return {
+            interaction_type: "postcard_from_recording",
+            postcard_block_index: fenObj ? fenObj.postcard_block_index : null,
+            postcard_type: fenObj ? fenObj.postcard_type : null,
+            fennimal_id: fenObj ? fenObj.id : null,
+            fennimal_name: fenObj ? (fenObj.name || null) : null,
+            video_played: !!(fenObj && fenObj.video_played),
+            sticker_mistakes: mistakes
+        };
+    }
+
+    completePostcardRecordingTrial(fenObj) {
+        WorldState.Fennimal_encounter_finshed(fenObj.name);
+        fenObj.visited = true;
+        fenObj.search_status = "searched_Fennimal_visited";
+        if (GenParam.DisplayFoundFennimalIconsOnMap.show) {
+            this.mapCont.add_Fennimal_icon_on_map(fenObj);
+        }
+        this.currentPhaseData.Data.push(this.compactPostcardTrialRecord(fenObj));
+        if (this.currentPhaseData.number_interactions_in_phase) {
+            this.instrCont.updateProgressWithinDay(
+                (this.currentInteractionNumInPhase / this.currentPhaseData.number_interactions_in_phase) * 100
+            );
+        }
+
+        this.fadeTaskToBlack(400).then(() => {
+            if (this.currentFennimal) {
+                try { this.currentFennimal.clean_up(); } catch (err) { console.warn(err); }
+                this.currentFennimal = null;
+            }
+            clear_Fennimals_interaction_layer();
+
+            this.startNextPostcardTrial();
+            this.fadeTaskFromBlack(400);
+        });
+    }
+
+    // warehouse_task never walks back to a phone room. A later trial opens
+    // straight away; the last trial ends the phase.
+    advanceAfterIndoorTrial() {
+        if (this.currentPhaseType === "warehouse_task" || this.shouldReturnToPhoneRoomAfterCurrentTrial()) {
+            this.phoneRoomReturnCompleted();
+            return;
+        }
+        this.phaseCompleted();
+    }
+
     shouldReturnToPhoneRoomAfterCurrentTrial() {
         let phaseSetting = this.currentPhaseData.return_to_phone_room_after_final_trial;
         let shouldReturnAfterFinalTrial = phaseSetting !== undefined
@@ -4764,6 +5211,26 @@ class ExperimentController {
     }
 
 
+    showWarehouseTaskInstructions() {
+        let trials = (this.executionQueue || []).filter(Boolean);
+        let workshop = trials.length > 0
+            && trials.every((trial) => trial.interaction_type === "broken_toy_workshop");
+        if (workshop) {
+            let charges = trials.some((trial) => trial.include_charging_action !== false);
+            this.instrCont.initializeBrokenToyWorkshopInstructions(this.currentDayNum, charges);
+            return;
+        }
+        this.instrCont.initializeWarehouseCleanupInstructions(this.currentDayNum);
+    }
+
+    // The phase card already explained this workshop run.
+    markWarehouseWorkshopInstructed() {
+        let first = this.executionQueue && this.executionQueue[0];
+        if (first && first.interaction_type === "broken_toy_workshop") {
+            this.workshopInstructionShownForRun = first.workshop_run_id;
+        }
+    }
+
     startNextTrialInPhoneRoomPhase() {
         this.mapCont.disable_map_interactions();
         this.mapCont.hide_request_instructions_button();
@@ -4778,9 +5245,16 @@ class ExperimentController {
         this.currentTrial = this.executionQueue.shift();
 
         if (this.currentTrial && this.currentTrial.interaction_type === "broken_toy_workshop") {
-            if (this.workshopInstructionShownForRun !== this.currentTrial.workshop_run_id) {
+            // The warehouse_task opening card already covered this run.
+            // Phone-room workshop blocks still show "Day N: the workshop" once per run.
+            let showWorkshopDayCard = this.currentPhaseType !== "warehouse_task"
+                && this.workshopInstructionShownForRun !== this.currentTrial.workshop_run_id;
+            if (showWorkshopDayCard) {
                 this.waitingForWorkshopInstruction = true;
-                this.instrCont.initializeBrokenToyWorkshopInstructions(this.currentDayNum);
+                this.instrCont.initializeBrokenToyWorkshopInstructions(
+                    this.currentDayNum,
+                    this.currentTrial && this.currentTrial.include_charging_action
+                );
                 return;
             }
             this.startBrokenToyWorkshopTrial();
@@ -4792,6 +5266,12 @@ class ExperimentController {
         if (!warehouseTrial) {
             WorldState.rebuild_state_from_available_locations([]);
             WorldState.populate_map_with_array_of_Fennimals([this.currentTrial], false);
+        }
+
+        // Cleaning day: the room is the trial. No call, no phone-room card.
+        if (warehouseTrial && this.currentPhaseType === "warehouse_task") {
+            this.startPhoneRoomHomeOverlayTrial();
+            return;
         }
 
         this.phoneRoomCont.showRoom(this.currentTrial, () => this.phoneRoomAnswered());
@@ -4819,6 +5299,7 @@ class ExperimentController {
         if (typeof Interface !== "undefined" && Interface.FenneFinder && Interface.FenneFinder.hide) {
             Interface.FenneFinder.hide();
         }
+        if (this.instrCont) this.instrCont.currentInstructionType = "broken_toy_workshop";
 
         if (trial.visited !== true) {
             this.currentInteractionNumInPhase++;
@@ -4878,11 +5359,7 @@ class ExperimentController {
             this.currentFennimal = null;
             clear_Fennimals_interaction_layer();
 
-            if (this.shouldReturnToPhoneRoomAfterCurrentTrial()) {
-                this.phoneRoomReturnCompleted();
-            } else {
-                this.phaseCompleted();
-            }
+            this.advanceAfterIndoorTrial();
         }, sameRun ? 80 : 400);
     }
 
@@ -4947,29 +5424,31 @@ class ExperimentController {
                 this.currentFennimal = null;
             }
             clear_Fennimals_interaction_layer();
-            if (this.shouldReturnToPhoneRoomAfterCurrentTrial()) {
-                this.phoneRoomReturnCompleted();
-            } else {
-                this.phaseCompleted();
-            }
+            this.advanceAfterIndoorTrial();
             this.fadeTaskFromBlack();
         });
     }
 
     showPartnerLeavesReminder(fenObj) {
         this.waitingForPartnerLeavesReminder = true;
-        let partnerName = WorldState.get_partner_icon_settings().name || "your partner";
+        let partner = WorldState.get_partner_icon_settings() || {};
+        let partnerName = partner.name || "your partner";
         let boxName = fenObj.placement_move === "toy_into_sack"
             ? GenParam.get_sack_printed_name(fenObj.sack)
             : GenParam.get_box_printed_name(fenObj.toybox);
-        let replaced = fenObj.placed_by_fennimal
-            ? `that the contents of the ${boxName} were replaced`
-            : `that you replaced the contents of the ${boxName}`;
+        let text;
+        if (this.currentPhaseType === "warehouse_task") {
+            let objectPronoun = partner.type === "female" ? "her" : "him";
+            text = `After ${partnerName} returned, you forgot to tell ${objectPronoun} that you switched the contents of the ${boxName}.`;
+        } else {
+            let replaced = fenObj.placed_by_fennimal
+                ? `that the contents of the ${boxName} were replaced`
+                : `that you replaced the contents of the ${boxName}`;
+            text = `After returning back to the phone room, you forgot to tell ${partnerName} ${replaced}.`;
+        }
         this.instrCont.showSimpleInformationPage({
             title: "One more thing...",
-            text:
-                `After returning back to the phone room, you forgot to tell ${partnerName} ` +
-                `${replaced}.`
+            text: text
         });
     }
 
@@ -4980,11 +5459,7 @@ class ExperimentController {
                 this.currentFennimal = null;
             }
             clear_Fennimals_interaction_layer();
-            if (this.shouldReturnToPhoneRoomAfterCurrentTrial()) {
-                this.phoneRoomReturnCompleted();
-            } else {
-                this.phaseCompleted();
-            }
+            this.advanceAfterIndoorTrial();
             this.fadeTaskFromBlack();
         });
     }
@@ -5132,6 +5607,12 @@ class ExperimentController {
                     this.setupPartnerBeliefIndividualBoxesPhase();
                 }
                 break;
+            case "written_memory_page":
+                if (!this.flagWrittenMemoryInstructionsShown) {
+                    this.flagWrittenMemoryInstructionsShown = true;
+                    this.setupWrittenMemoryPagePhase();
+                }
+                break;
             case "hat_binding_task":
                 if (!this.flagHatBindingInstructionsShown) {
                     this.flagHatBindingInstructionsShown = true;
@@ -5151,6 +5632,44 @@ class ExperimentController {
                 if (!this.flagAutoTravelInstructionsShown) {
                     this.flagAutoTravelInstructionsShown = true;
                     this.beginAutoTravelPhase();
+                }
+                break;
+            case "postcard_task":
+                if (!this.flagPostcardInstructionsShown) {
+                    this.flagPostcardInstructionsShown = true;
+                    this.beginPostcardPhaseTrials();
+                }
+                break;
+            case "warehouse_task":
+                if (!this.flagWarehouseTaskInstructionsShown) {
+                    this.flagWarehouseTaskInstructionsShown = true;
+                    this.markWarehouseWorkshopInstructed();
+                    if (this.instrCont) this.instrCont.clearInstructions();
+                    if (this.instrCont && this.instrCont.parentElem) this.instrCont.parentElem.style.display = "none";
+                    this.startNextTrialInPhoneRoomPhase();
+                    return;
+                }
+                if (this.waitingForPartnerLeavesReminder) {
+                    this.waitingForPartnerLeavesReminder = false;
+                    this.instrCont.clearInstructions();
+                    if (this.instrCont.parentElem) this.instrCont.parentElem.style.display = "none";
+                    this.finishPartnerLeavesWarehouseTrial();
+                    return;
+                }
+                if (this.waitingForWorkshopInstruction) {
+                    this.waitingForWorkshopInstruction = false;
+                    this.workshopInstructionShownForRun = this.currentTrial && this.currentTrial.workshop_run_id;
+                    if (this.instrCont) this.instrCont.clearInstructions();
+                    this.startBrokenToyWorkshopTrial();
+                    return;
+                }
+                if (this.waitingForPhoneRoomHintToClose) {
+                    this.waitingForPhoneRoomHintToClose = false;
+                    this.phoneRoomHintClosed();
+                    return;
+                }
+                if (this.instrCont.helpReopenActive) {
+                    this.instrCont.helpReopenActive = false;
                 }
                 break;
             case "phone_room":
@@ -5347,6 +5866,11 @@ class ExperimentController {
 
         if (fenObj && fenObj.interaction_type === "warehouse_cleanup") {
             this.completeParticipantToyBoxTrial(fenObj);
+            return;
+        }
+
+        if (this.currentPhaseType === "postcard_task") {
+            this.completePostcardRecordingTrial(fenObj);
             return;
         }
 

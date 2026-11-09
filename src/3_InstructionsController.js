@@ -253,6 +253,12 @@ class InstructionsController {
             case "broken_toy_workshop":
                 Interface.Prompt.show_message("Put the pieces together so the toy matches the picture.", 2500);
                 break;
+            case "warehouse_task":
+                Interface.Prompt.show_message("Help each Fennimal store a favorite toy.", 2500);
+                break;
+            case "postcard_task":
+                Interface.Prompt.show_message("No additional instructions right now.", 2500);
+                break;
             case "phone_room":
                 // Reopen the last call hint if it is still in the DOM; never leave movement disabled.
                 if (this.currentInstructionsSVG && this.currentInstructionsSVG.parentNode) {
@@ -1659,7 +1665,120 @@ class InstructionsController {
         this.addClosingButtonToParent("bottom-center", false, undefined, 500);
     }
 
-    initializeBrokenToyWorkshopInstructions(currentBlockNum) {
+    initializePostcardDayInstructions(currentBlockNum, includeFullSequence) {
+        this.currentInstructionType = "postcard_task";
+
+        this.clearInstructions();
+        this.currentInstructionsSVG = this.createBasicInstructionElements();
+        this.parentElem.appendChild(this.currentInstructionsSVG);
+        this.parentElem.style.display = "inherit";
+
+        let copy = (typeof GenParam !== "undefined" && GenParam.PostcardTask) || {};
+        let title = copy.dayTitle || "design some postcards!";
+        document.getElementById("Instructions_Title").innerHTML = `Day ${currentBlockNum}: ${title}`;
+        this.updateProgressNewDay(currentBlockNum);
+        this.updateProgressWithinDay(false);
+
+        let instructionText = includeFullSequence
+            ? (copy.dayBodyWithSequence ||
+                "Today you are tasked with creating some postcards.<br><br>" +
+                "First you will watch a video of each Fennimal with their favorite toy. Then you will design a postcard for each Fennimal.")
+            : (copy.dayBodyWithoutSequence ||
+                "Today you are tasked with creating some postcards.<br><br>" +
+                "For each Fennimal, you will watch a video of them with their favorite toy, then design their postcard.");
+
+        let iconBox = create_SVG_rect(0.08 * GenParam.SVG_width, 0.22 * GenParam.SVG_height, 420, 560, undefined, undefined);
+        iconBox.style.rx = "30";
+        iconBox.style.fill = "transparent";
+        this.currentInstructionsSVG.appendChild(iconBox);
+
+        let type = "A";
+        if (typeof topController !== "undefined"
+            && topController.currentPhaseData
+            && Array.isArray(topController.currentPhaseData.blocks)
+            && topController.currentPhaseData.blocks[0]
+            && topController.currentPhaseData.blocks[0].postcard_type) {
+            type = String(topController.currentPhaseData.blocks[0].postcard_type).toUpperCase();
+        }
+        let template = document.getElementById("postcard_type_" + type) || document.getElementById("postcard_type_A");
+        if (template) {
+            let marked = template.cloneNode(true);
+            marked.removeAttribute("id");
+            marked.style.display = "inline";
+            marked.removeAttribute("display");
+            marked.querySelectorAll(
+                ".postcard_Fennimal_name_text, .postcard_toy_text, .postcard_Fennimal_placeholder, .postcard_toy_placeholder, .postcard_location_placeholder"
+            ).forEach((node) => {
+                node.style.opacity = "0";
+                node.removeAttribute("id");
+            });
+            let background = marked.querySelector(".postcard_background");
+            if (background) background.style.fill = "#f4efe4";
+            // The photo slot sits left of the paper. On a blank card the mark
+            // belongs in the middle of the postcard itself.
+            let qx = 80;
+            let qy = 80;
+            if (background && typeof background.getBBox === "function") {
+                let paper = background.getBBox();
+                if (paper.width > 0 && paper.height > 0) {
+                    qx = paper.x + paper.width / 2;
+                    qy = paper.y + paper.height / 2;
+                }
+            }
+            let blankMark = create_SVG_text_elem(qx, qy, "?");
+            blankMark.setAttribute("class", "postcard_blank_mark");
+            blankMark.setAttribute("text-anchor", "middle");
+            blankMark.setAttribute("dominant-baseline", "central");
+            blankMark.style.fontFamily = "'PT Sans', sans-serif";
+            blankMark.style.fontSize = "54px";
+            blankMark.style.fontWeight = "700";
+            blankMark.style.fill = "#2c3138";
+            blankMark.style.opacity = "0.38";
+            blankMark.style.pointerEvents = "none";
+            marked.appendChild(blankMark);
+            let box = iconBox.getBBox();
+            let card = copy_scale_and_move_object_to_position(
+                marked,
+                this.currentInstructionsSVG,
+                box.x + box.width / 2,
+                box.y + box.height / 2,
+                2.7
+            );
+            card.classList.add("instruction_element_nonbackground");
+            card.style.pointerEvents = "none";
+            this.centerPostcardBlankMark(card);
+        }
+
+        this.textElemMainInstructions = create_SVG_text_in_foreign_element(
+            instructionText,
+            0.36 * GenParam.SVG_width, 250,
+            0.52 * GenParam.SVG_width,
+            520,
+            "instruction_element_text"
+        );
+        this.textElemMainInstructions.classList.add("instruction_element_nonbackground");
+        this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0].style.fontSize = "38px";
+        this.currentInstructionsSVG.appendChild(this.textElemMainInstructions);
+
+        this.addClosingButtonToParent("bottom-center", false, undefined, 500);
+    }
+
+    // The "?" glyph's ink is not centered on its anchor. Nudge it onto the paper.
+    centerPostcardBlankMark(card) {
+        let mark = card && card.querySelector(".postcard_blank_mark");
+        let paper = card && card.querySelector(".postcard_background");
+        if (!mark || !paper || typeof mark.getBBox !== "function") return;
+        let markBox = mark.getBBox();
+        let paperBox = paper.getBBox();
+        if (!(markBox.width > 0) || !(paperBox.width > 0)) return;
+        let dx = (paperBox.x + paperBox.width / 2) - (markBox.x + markBox.width / 2);
+        let dy = (paperBox.y + paperBox.height / 2) - (markBox.y + markBox.height / 2);
+        if (Math.abs(dx) < 0.4 && Math.abs(dy) < 0.4) return;
+        mark.setAttribute("x", (parseFloat(mark.getAttribute("x")) || 0) + dx);
+        mark.setAttribute("y", (parseFloat(mark.getAttribute("y")) || 0) + dy);
+    }
+
+    initializeBrokenToyWorkshopInstructions(currentBlockNum, includeChargingAction) {
         this.currentInstructionType = "broken_toy_workshop";
         this.clearInstructions();
         this.currentInstructionsSVG = this.createBasicInstructionElements();
@@ -1670,8 +1789,40 @@ class InstructionsController {
         this.updateProgressNewDay(currentBlockNum);
         this.updateProgressWithinDay(false);
 
-        let instructionText =
-            "Some toys in the workshop have come apart. For each toy, put the pieces back together so they match the picture, then charge the toy to check that it works.";
+        let chargeTheToy = includeChargingAction !== false;
+        let instructionText = chargeTheToy
+            ? "Some toys in the workshop have come apart. For each toy, put the pieces back together so they match the picture, then charge the toy to check that it works."
+            : "Today we will do some maintenance to the toys. Some of the toys have fallen apart. Let's go to the workshop and put them back together.";
+
+        this.textElemMainInstructions = create_SVG_text_in_foreign_element(
+            instructionText,
+            0.14 * GenParam.SVG_width, 280,
+            0.72 * GenParam.SVG_width,
+            420,
+            "instruction_element_text"
+        );
+        this.textElemMainInstructions.classList.add("instruction_element_nonbackground");
+        this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0].style.fontSize = "38px";
+        this.currentInstructionsSVG.appendChild(this.textElemMainInstructions);
+
+        this.addClosingButtonToParent("bottom-center", false, undefined, 400);
+    }
+
+    initializeWarehouseCleanupInstructions(currentBlockNum) {
+        this.currentInstructionType = "warehouse_task";
+        this.clearInstructions();
+        this.currentInstructionsSVG = this.createBasicInstructionElements();
+        this.parentElem.appendChild(this.currentInstructionsSVG);
+        this.parentElem.style.display = "inherit";
+
+        let copy = (typeof GenParam !== "undefined" && GenParam.WarehouseTask) || {};
+        let title = copy.cleanupTitle || "the warehouse";
+        document.getElementById("Instructions_Title").innerHTML = `Day ${currentBlockNum}: ${title}`;
+        this.updateProgressNewDay(currentBlockNum);
+        this.updateProgressWithinDay(false);
+
+        let instructionText = copy.cleanupBody ||
+            "Please tidy the warehouse.<br><br>A Fennimal will come to put a toy away. Help them when you are asked.";
 
         this.textElemMainInstructions = create_SVG_text_in_foreign_element(
             instructionText,
@@ -1891,6 +2042,72 @@ class InstructionsController {
         );
         this.textElemMainInstructions.classList.add("instruction_element_nonbackground");
         this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0].style.fontSize = "34px";
+        this.currentInstructionsSVG.appendChild(this.textElemMainInstructions);
+
+        this.updateProgressNewDay(currentBlockNum);
+        this.updateProgressWithinDay(false);
+
+        const deleteBonusStarIcons = () => {
+            Array.from(document.getElementsByClassName("deletable_bonus_star")).forEach(s => s.remove());
+        };
+        this.addClosingButtonToParent("bottom-center", false, deleteBonusStarIcons, continueButtonTime);
+    }
+
+    initializeWrittenMemoryPageInstructions(currentBlockNum, bonus, questionCount) {
+        this.currentInstructionType = "written_memory_page";
+        let continueButtonTime = 500;
+        bonus = bonus || { correct: 1, dontRemember: 0.5, incorrect: 0 };
+        questionCount = questionCount || 5;
+        let maximum = WrittenMemoryPageController.maximumStars(bonus, questionCount);
+
+        this.clearInstructions();
+        this.currentInstructionsSVG = this.createBasicInstructionElements();
+        this.parentElem.appendChild(this.currentInstructionsSVG);
+        this.parentElem.style.display = "inherit";
+
+        document.getElementById("Instructions_Title").innerHTML =
+            `Day ${currentBlockNum}: A few more questions`;
+
+        let instructionText =
+            `On the next page you will be asked several questions. Please answer each question, and then click continue. Please consider your answer carefully. After you click continue, you will not be able to return to the question later. Take as much time as you need.<br><br>` +
+            `${WrittenMemoryPageController.bonusParagraph(bonus, maximum)}<br><br>` +
+            `You will only learn how many stars you've earned at the end of the experiment.`;
+
+        if (maximum > 0) {
+            document.getElementsByClassName("instructions_element_background")[0].style.fill =
+                GenParam.background_fill_for_instructions_where_stars_can_be_earned;
+            let starCount = Math.min(5, Math.round(maximum));
+            continueButtonTime += starCount * 250;
+            let center = 0.5 * GenParam.SVG_width;
+            let spacing = 188;
+            let startX = center - 0.5 * (starCount - 1) * spacing;
+            let starY = 0.64 * GenParam.SVG_height;
+            for (let i = 0; i < starCount; i++) {
+                setTimeout(() => {
+                    showBonusStarOnScreen(this.parentElem, startX + i * spacing, starY, true, "deletable_bonus_star", 0.9, undefined);
+                }, (i + 1) * 220);
+            }
+            let caption = create_SVG_text_elem(center, starY + 118, "(if every answer is right)", undefined, undefined);
+            caption.style.textAnchor = "middle";
+            caption.style.fontSize = "28px";
+            caption.style.fontWeight = "700";
+            caption.style.fill = "navy";
+            caption.classList.add("instruction_element_nonbackground");
+            this.currentInstructionsSVG.appendChild(caption);
+        }
+
+        this.textElemMainInstructions = create_SVG_text_in_foreign_element(
+            instructionText,
+            0.12 * GenParam.SVG_width, 145,
+            0.76 * GenParam.SVG_width,
+            470,
+            "instruction_element_text"
+        );
+        this.textElemMainInstructions.classList.add("instruction_element_nonbackground");
+        let instructionParagraph = this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0];
+        instructionParagraph.style.fontSize = "34px";
+        instructionParagraph.style.lineHeight = "1.38";
+        instructionParagraph.style.margin = "0";
         this.currentInstructionsSVG.appendChild(this.textElemMainInstructions);
 
         this.updateProgressNewDay(currentBlockNum);
@@ -2349,11 +2566,13 @@ class InstructionsController {
 
             case "warehouse_cleanup": {
                 if (trialObj.placed_by_fennimal) {
-                    let locationText = `${displayName} will put a toy away`;
+                    let locationText = trialObj.reveal_toy === true
+                        ? `Help ${displayName} put its toy away`
+                        : `Help ${displayName} put a toy away`;
                     if (trialObj.placement_move === "toy_into_sack") {
-                        locationText = `${displayName} will put its toy in a sack`;
+                        locationText = `Help ${displayName} put its toy in a sack`;
                     } else if (trialObj.placement_move === "sack_into_box") {
-                        locationText = `${displayName} will put a sack away`;
+                        locationText = `Help ${displayName} put a sack away`;
                     }
                     return {
                         ...baseConfig,
@@ -4542,7 +4761,7 @@ class PaymentCard {
 
         setTimeout(() => {
             // FIX: Updated from dayData.stars_earned to dayData.starsEarned
-            let amountText = create_SVG_text_elem(0.5 * paymentCardWidth, 0.8 * paymentCardHeight, "×" + dayData.starsEarned, "instruction_element_text");
+            let amountText = create_SVG_text_elem(0.5 * paymentCardWidth, 0.8 * paymentCardHeight, "×" + formatStarAmount(dayData.starsEarned), "instruction_element_text");
             amountText.style.textAnchor = "middle";
             amountText.style.fontSize = "90px";
             amountText.style.fontWeight = 700;
@@ -4552,7 +4771,7 @@ class PaymentCard {
 
         setTimeout(() => {
             // FIX: Updated from dayData.maximum_possible_stars to dayData.maximumPossibleStars
-            let totalText = create_SVG_text_elem(0.4 * paymentCardWidth, 0.95 * paymentCardHeight, "(out of " + dayData.maximumPossibleStars + ")", "instruction_element_text");
+            let totalText = create_SVG_text_elem(0.4 * paymentCardWidth, 0.95 * paymentCardHeight, "(out of " + formatStarAmount(dayData.maximumPossibleStars) + ")", "instruction_element_text");
             totalText.style.textAnchor = "middle";
             totalText.style.fontSize = "35px";
             totalText.style.fontStyle = "italic";
@@ -4580,6 +4799,12 @@ class AnimatedStarburstStar {
 
         setTimeout(() => icon.remove(), timeOnScreen + 200);
     }
+}
+
+function formatStarAmount(value) {
+    if (typeof value !== "number" || !isFinite(value)) return String(value);
+    let half = Math.round(value * 2) / 2;
+    return String(half);
 }
 
 function showBonusStarOnScreen(parent, centerX, centerY, showAnimatedStars, optionalClassName, optionalResizeFactor, optionalId) {
