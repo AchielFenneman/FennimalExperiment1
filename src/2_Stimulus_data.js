@@ -372,14 +372,14 @@ let StimulusSettings = function () {
                             { interaction_type: "warehouse_cleanup", Fennimal: "B", box: "X", reveal_toy: true, partner_leaves_during_interaction: true }
                         ]
                     },
-                    {
+                    /*{
                         label: "indirect-indirect",
-                        weight: 0,
+                        weight: 1,
                         trial_subblocks: [
                             { interaction_type: "warehouse_cleanup", Fennimal: "A", box: "X", mystery_note: RETRO_FAVORITE_TOY_NOTE },
                             { interaction_type: "warehouse_cleanup", Fennimal: "B", box: "X", mystery_note: RETRO_FAVORITE_TOY_NOTE, partner_leaves_during_interaction: true }
                         ]
-                    }
+                    }*/
                 ]
             },
 
