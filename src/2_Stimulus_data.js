@@ -387,7 +387,7 @@ let StimulusSettings = function () {
                     },
                     {
                         label: "indirect-direct",
-                        weight: 1,
+                        weight: 2,
                         trial_subblocks: [
                             { interaction_type: "warehouse_cleanup", Fennimal: "A", box: "X", mystery_note: RETRO_FAVORITE_TOY_NOTE },
                             { interaction_type: "warehouse_cleanup", Fennimal: "B", box: "X", reveal_toy: true, partner_leaves_during_interaction: true }
