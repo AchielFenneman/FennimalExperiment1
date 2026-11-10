@@ -1751,6 +1751,18 @@ class TrialGenerator {
                 );
             }
 
+            if (phase.type === "guided_tour") {
+                let role = phase.partner_behavior;
+                if (role === "present" || role === true) role = "active";
+                if (role === "absent" || role === false) role = null;
+                if (role !== "active" && role !== "passive") {
+                    errors.push(
+                        `${label} requires partner_behavior "active". ` +
+                        `The participant follows the partner from Fennimal to Fennimal.`
+                    );
+                }
+            }
+
             if (phase.box_locations !== undefined && phase.type !== "retrieve_lost_box") {
                 errors.push(`${label} sets box_locations, which is only allowed on retrieve_lost_box.`);
             }
@@ -2127,6 +2139,7 @@ class TrialGenerator {
             "warehouse_task",
             "postcard_task",
             "auto_travel",
+            "guided_tour",
             "name_recall_task",
             "Fennimal_attribute_sorting_task",
             "hat_binding_task",
@@ -2145,7 +2158,8 @@ class TrialGenerator {
             "phone_room",
             "warehouse_task",
             "postcard_task",
-            "auto_travel"
+            "auto_travel",
+            "guided_tour"
         ]);
     }
 
@@ -4419,13 +4433,18 @@ class ExperimentController {
                 }
                 break;
             case "auto_travel":
+            case "guided_tour":
                 this.setupTrialBasedPhase();
                 if (this.currentPhaseData.skip_instructions === true) {
                     this.flagAutoTravelInstructionsShown = true;
                     this.beginAutoTravelPhase();
                 } else {
                     this.flagAutoTravelInstructionsShown = false;
-                    this.instrCont.initializeAutoTravelPhaseGeneralInstructions(this.currentDayNum, this.currentPhaseData);
+                    if (this.currentPhaseType === "guided_tour") {
+                        this.instrCont.initializeGuidedTourInstructions(this.currentDayNum, this.currentPhaseData);
+                    } else {
+                        this.instrCont.initializeAutoTravelPhaseGeneralInstructions(this.currentDayNum, this.currentPhaseData);
+                    }
                 }
                 break;
             case "name_recall_task":
@@ -5171,6 +5190,16 @@ class ExperimentController {
     }
 
     beginAutoTravelPhase() {
+        if (this.currentPhaseType === "guided_tour") {
+            let role = WorldState.get_current_partner_role();
+            if (role !== "active" && role !== "passive") {
+                throw new Error(
+                    'guided_tour requires a present partner (partner_behavior: "active"). ' +
+                    "The participant follows the partner between Fennimals."
+                );
+            }
+        }
+        // Island center. No watchtower. Home is the hub the first walk leaves from.
         this.mapCont.reset_map_to_player_in_center();
         if (this.mapCont.forceAutoTravelRegion) this.mapCont.forceAutoTravelRegion("Home");
         this.mapCont.disable_map_interactions();
@@ -5202,10 +5231,15 @@ class ExperimentController {
         WorldState.rebuild_state_from_available_locations([]);
         WorldState.populate_map_with_array_of_Fennimals([this.currentTrial], false);
 
+        // auto_travel: the player walks the arranged route.
+        // guided_tour: the partner leads and the participant trails, as in the phone room.
+        // null statusLabel lets the map use "Following {partner}" instead of "Travelling...".
+        let partnerLeads = this.currentPhaseType === "guided_tour";
         this.mapCont.autoTravelFromCurrentToLocation(this.currentTrial, () => {
             this.mapCont.enter_location(this.currentTrial.location, this.currentTrial.region);
         }, {
-            leader: "player",
+            leader: partnerLeads ? "partner" : "player",
+            statusLabel: partnerLeads ? null : undefined,
             straightIfSameRegion: true
         });
     }
@@ -5480,7 +5514,7 @@ class ExperimentController {
         // Legacy star logic for trial-based phases
         let totalBonusStarsEarned = 0, maxBonusStars = 0;
         if (this.currentPhaseData.bonus_stars_per_correct_answer) {
-            if (["jump_to_trial", "hint_and_search", "free_exploration", "retrieve_lost_box", "phone_room", "auto_travel"].includes(this.currentPhaseData.type)) {
+            if (["jump_to_trial", "hint_and_search", "free_exploration", "retrieve_lost_box", "phone_room", "auto_travel", "guided_tour"].includes(this.currentPhaseData.type)) {
                 for (let trialNum = 0; trialNum < this.currentPhaseData.Data.length; trialNum++) {
                     if (this.currentPhaseData.Data[trialNum].bonus_stars_earned !== undefined) {
                         totalBonusStarsEarned += this.currentPhaseData.Data[trialNum].bonus_stars_earned === true ? 1 : this.currentPhaseData.Data[trialNum].bonus_stars_earned;
@@ -5629,6 +5663,7 @@ class ExperimentController {
                 this.startNextExperimentPhase();
                 break;
             case "auto_travel":
+            case "guided_tour":
                 if (!this.flagAutoTravelInstructionsShown) {
                     this.flagAutoTravelInstructionsShown = true;
                     this.beginAutoTravelPhase();
@@ -5923,6 +5958,7 @@ class ExperimentController {
                 this.mapCont.allow_participant_to_leave_location(true);
                 break;
             case "auto_travel":
+            case "guided_tour":
                 this.instrCont.updateProgressWithinDay(
                     (this.currentInteractionNumInPhase / this.currentPhaseData.number_interactions_in_phase) * 100
                 );

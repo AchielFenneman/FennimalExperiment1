@@ -798,7 +798,8 @@ class MapController {
             }, 0.5 * GenParam.map_to_location_transition_speed);
             // phone_room / auto_travel use autotravel — help reopen is not a map affordance there.
             if (this.ExpCont.currentPhaseType === "phone_room"
-                || this.ExpCont.currentPhaseType === "auto_travel") {
+                || this.ExpCont.currentPhaseType === "auto_travel"
+                || this.ExpCont.currentPhaseType === "guided_tour") {
                 this.hide_request_instructions_button();
             } else {
                 this.show_request_instructions_button();

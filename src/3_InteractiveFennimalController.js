@@ -3950,9 +3950,9 @@ class ToyToBoxTrialController {
     }
 
     create_toy_bin() {
-        let template = document.getElementById("toy_bin");
+        let template = document.getElementById("toy_bin_A");
         if (!template) {
-            console.error("toy_to_box: #toy_bin not found in SVG assets");
+            console.error("toy_to_box: #toy_bin_A not found in SVG assets");
             return;
         }
 
@@ -5377,9 +5377,9 @@ class ToyToSackTrialController {
     }
 
     create_toy_bin() {
-        let template = document.getElementById("toy_bin");
+        let template = document.getElementById("toy_bin_A");
         if (!template) {
-            console.error("toy_to_sack: #toy_bin not found in SVG assets");
+            console.error("toy_to_sack: #toy_bin_A not found in SVG assets");
             return;
         }
 
@@ -5842,9 +5842,9 @@ class SackToBoxTrialController {
     }
 
     create_toy_bin() {
-        let template = document.getElementById("toy_bin");
+        let template = document.getElementById("toy_bin_A");
         if (!template) {
-            console.error("sack_to_box: #toy_bin not found in SVG assets");
+            console.error("sack_to_box: #toy_bin_A not found in SVG assets");
             return;
         }
 
@@ -13623,6 +13623,7 @@ class ParticipantToyBoxTrialController {
     // Partner steps away first. The box is in the backpack, not on the table.
     // The toy that will replace the contents is already waiting on the table.
     async start_leave_sequence(layout) {
+        this.create_swap_bin();
         if (this.placementMove() === "toy_into_sack") {
             await this.play_toy_into_sack(layout, true);
             return;
@@ -14294,12 +14295,13 @@ class ParticipantToyBoxTrialController {
             console.error("participant_toy_box: #backpack not found");
             return;
         }
+        let home = this.leaveBackpackHome();
         this.Backpack = copy_scale_and_move_object_to_position(
             template,
             this.basics.ItemLayers.Plus1,
-            0.86 * this.basics.W,
-            0.84 * this.basics.H,
-            2.8
+            home.x,
+            home.y,
+            home.scale
         );
         this.Backpack.id = "participant_leave_backpack";
         this.Backpack.style.opacity = 0;
@@ -14744,7 +14746,176 @@ class ParticipantToyBoxTrialController {
         return getSVGInternalCenter(this.sack.SackBase);
     }
 
-    // Old contents rise out of the container, then the participant sets them on the table.
+    // Same spot the leave sequence uses when the partner sets the backpack down.
+    leaveBackpackHome() {
+        return {
+            x: 0.86 * this.basics.W,
+            y: 0.84 * this.basics.H,
+            scale: 2.8
+        };
+    }
+
+    // Swap trial only. The bin is already in the room when the trial opens.
+    usesSwapBin() {
+        return !!(this.FenObj && this.FenObj.partner_leaves_during_interaction === true);
+    }
+
+    create_swap_bin() {
+        if (this.binBack || !this.usesSwapBin()) return;
+        let template = document.getElementById("toy_bin_B");
+        if (!template) {
+            console.error("warehouse swap: #toy_bin_B not found in SVG assets");
+            return;
+        }
+        let spot = this.swapBinSpot(template);
+        this.binBack = copy_scale_and_move_object_to_position(
+            template,
+            this.basics.ItemLayers.Main,
+            spot.x,
+            spot.y,
+            spot.scale,
+            "warehouse_swap_bin_back"
+        );
+        this.stripBinHalf(this.binBack, ".toy_bin_front");
+        this.binFront = copy_scale_and_move_object_to_position(
+            template,
+            this.basics.ItemLayers.Plus1,
+            spot.x,
+            spot.y,
+            spot.scale,
+            "warehouse_swap_bin_front"
+        );
+        this.stripBinHalf(this.binFront, ".toy_bin_back");
+        this.binTarget = this.attachBinTarget(this.binBack);
+        this.binCenter = this.binTarget
+            ? getSVGInternalCenter(this.binTarget)
+            : { x: spot.x, y: spot.y };
+    }
+
+    remove_swap_bin() {
+        if (this.binBack && this.binBack.parentNode) this.binBack.remove();
+        if (this.binFront && this.binFront.parentNode) this.binFront.remove();
+        this.binBack = null;
+        this.binFront = null;
+        this.binTarget = null;
+        this.binCenter = null;
+    }
+
+    stripBinHalf(root, selector) {
+        if (!root) return;
+        let piece = root.querySelector(selector);
+        if (piece) piece.remove();
+        root.style.pointerEvents = "none";
+        root.querySelectorAll("*").forEach((el) => {
+            el.style.pointerEvents = "none";
+        });
+    }
+
+    // Magnetic target at the mouth of bin B. The drop itself continues lower.
+    attachBinTarget(binBack) {
+        let art = binBack && binBack.querySelector(".toy_bin_back");
+        let template = document.getElementById("toy_bin_B");
+        if (!art || !template) return null;
+        let box = template.getBBox();
+        let circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("class", "bin_target_centerpoint");
+        circle.setAttribute("cx", String(box.x + box.width / 2));
+        circle.setAttribute("cy", String(box.y + box.height * 0.30));
+        circle.setAttribute("r", "6");
+        circle.style.fill = "none";
+        circle.style.stroke = "none";
+        circle.style.pointerEvents = "none";
+        art.appendChild(circle);
+        return circle;
+    }
+
+    // Right side of the floor, as far into the corner as the partner and the
+    // backpack (which appears when they leave) will allow.
+    swapBinSpot(template) {
+        let scale = 2.05;
+        let box = template.getBBox();
+        let svg = document.getElementById("Scannimals_Task_SVG");
+        let ctm = svg && svg.getScreenCTM && svg.getScreenCTM();
+        if (!svg || !ctm || !box.width || !box.height) {
+            return { x: 0.72 * this.basics.W, y: 0.82 * this.basics.H, scale: scale };
+        }
+        let screenW = box.width * scale * ctm.a;
+        let screenH = box.height * scale * ctm.d;
+        let svgRect = svg.getBoundingClientRect();
+
+        let limitRight = svgRect.right - 10;
+        let partner = this.partner && this.partner.PartnerBaseGroup;
+        if (partner) {
+            let rect = partner.getBoundingClientRect();
+            if (rect.width > 2) {
+                // partner_steps_away slides them left by 180 before the speech,
+                // which is when they face the room and are widest.
+                let steppedLeft = rect.left - 180 * ctm.a;
+                limitRight = Math.min(limitRight, steppedLeft - 22);
+            }
+        }
+        let backpack = this.predictedBackpackScreenRect(ctm);
+        if (backpack) limitRight = Math.min(limitRight, backpack.left - 22);
+
+        let contentBottom = svgRect.top + ctm.f + this.basics.H * ctm.d;
+        let bottom = contentBottom - 16;
+        let table = this.tableElement && this.tableElement.getBoundingClientRect();
+        if (table && table.height > 2) bottom = Math.min(bottom, table.bottom + 28);
+
+        let centerX = limitRight - screenW / 2;
+        let centerY = bottom - screenH / 2;
+        let minLeft = svgRect.left + 12;
+        if (centerX - screenW / 2 < minLeft) centerX = minLeft + screenW / 2;
+
+        let pt = this.screenToSvg(centerX, centerY);
+        return { x: pt.x, y: pt.y, scale: scale };
+    }
+
+    predictedBackpackScreenRect(ctm) {
+        let template = document.getElementById("backpack");
+        if (!template || !ctm) return null;
+        let box = template.getBBox();
+        if (!box.width || !box.height) return null;
+        let home = this.leaveBackpackHome();
+        let center = this.svgToScreen(home.x, home.y);
+        let w = box.width * home.scale * ctm.a;
+        let h = box.height * home.scale * ctm.d;
+        return {
+            left: center.x - w / 2,
+            right: center.x + w / 2,
+            top: center.y - h / 2,
+            bottom: center.y + h / 2
+        };
+    }
+
+    screenToSvg(screenX, screenY) {
+        let svg = document.getElementById("Scannimals_Task_SVG");
+        let ctm = svg && svg.getScreenCTM && svg.getScreenCTM();
+        if (!svg || !ctm) return { x: screenX, y: screenY };
+        let pt = svg.createSVGPoint();
+        pt.x = screenX;
+        pt.y = screenY;
+        let local = pt.matrixTransform(ctm.inverse());
+        return { x: local.x, y: local.y };
+    }
+
+    svgToScreen(x, y) {
+        let svg = document.getElementById("Scannimals_Task_SVG");
+        let ctm = svg && svg.getScreenCTM && svg.getScreenCTM();
+        if (!svg || !ctm) return { x: x, y: y };
+        let pt = svg.createSVGPoint();
+        pt.x = x;
+        pt.y = y;
+        let screen = pt.matrixTransform(ctm);
+        return { x: screen.x, y: screen.y };
+    }
+
+    binDropDistance() {
+        return 240;
+    }
+
+    // Old contents rise out of the container. On the swap trial they go in the
+    // bin. Other cleanups still set them on the table.
     async offerClearedItem(dragEl, label, unseenNote) {
         if (!dragEl) return;
         dragEl.style.pointerEvents = "none";
@@ -14755,6 +14926,11 @@ class ParticipantToyBoxTrialController {
         if (unseenNote) {
             if (typeof Interface !== "undefined" && Interface.Prompt) Interface.Prompt.hide();
             await this.showMysteryNote(dragEl, unseenNote, "right");
+        }
+
+        if (this.binTarget) {
+            await this.dragClearedItemIntoBin(dragEl, label, unseenNote);
+            return;
         }
 
         Interface.Prompt.show_message(unseenNote
@@ -14783,6 +14959,97 @@ class ParticipantToyBoxTrialController {
                 { validateDrop: () => true }
             );
         });
+    }
+
+    async dragClearedItemIntoBin(dragEl, label, unseenNote) {
+        let prompt = unseenNote ? "Put this in the bin" : "Put the " + label + " in the bin";
+        Interface.Prompt.show_message(prompt);
+        AudioCont.play_sound_effect("alert_minor");
+
+        await new Promise((resolve) => {
+            dragEl.style.pointerEvents = "auto";
+            this.clearDragController = new MakeObjectDraggableObject(
+                this.basics.ItemLayers.Plus2,
+                this.basics.ItemLayers.Plus2,
+                dragEl,
+                this.binTarget,
+                this.binDropDistance(),
+                async (dropped) => {
+                    if (this.clearDragController && this.clearDragController.destroy) {
+                        this.clearDragController.destroy();
+                    }
+                    this.clearDragController = null;
+                    dropped.style.pointerEvents = "none";
+                    await this.lowerToyIntoBin(dropped);
+                    Interface.Prompt.hide();
+                    resolve();
+                },
+                {
+                    validateDrop: (dist) => dist < this.binDropDistance(),
+                    onMiss: () => {
+                        Interface.Prompt.show_message("Drop it in the bin");
+                        if (this.clearDragController && this.clearDragController.enable) {
+                            this.clearDragController.enable();
+                        }
+                    }
+                }
+            );
+        });
+    }
+
+    // Bin B's cavity sits lower than the old mesh basket. Drop the toy down
+    // behind the front, shrink it, then take it off the screen.
+    async lowerToyIntoBin(el) {
+        if (!el) return;
+        let middle = this.basics.ItemLayers.Main;
+        if (middle) middle.appendChild(el);
+        el.style.pointerEvents = "none";
+
+        let dest = this.binSinkScreenPoint();
+        if (dest) await this.playBinDrop(el, dest);
+        if (el.parentNode) el.remove();
+    }
+
+    binSinkScreenPoint() {
+        let front = this.binFront;
+        if (!front) return null;
+        let bin = front.getBoundingClientRect();
+        if (bin.height < 2) return null;
+        return {
+            x: bin.left + bin.width / 2,
+            y: bin.top + bin.height * 0.72
+        };
+    }
+
+    async playBinDrop(el, screenPt) {
+        let parent = el.parentNode;
+        let svg = el.ownerSVGElement;
+        if (!parent || !svg || !parent.getScreenCTM()) return;
+        let pt = svg.createSVGPoint();
+        pt.x = screenPt.x;
+        pt.y = screenPt.y;
+        let local = pt.matrixTransform(parent.getScreenCTM().inverse());
+        let box = el.getBBox();
+        let cx = box.x + box.width / 2;
+        let cy = box.y + box.height / 2;
+
+        // Fade before the descent finishes, so a tall toy never shows under the bin.
+        el.style.transition = "none";
+        if (!el.style.opacity) el.style.opacity = "1";
+        void el.getBoundingClientRect();
+        el.style.transition = "transform 420ms ease-in, opacity 160ms ease-in 210ms";
+        el.style.opacity = "0";
+        el.style.transform = "translate(" + (local.x - cx) + "px, " + (local.y - cy) + "px)";
+        await wait(440);
+
+        let scaleGroup = el.getElementsByClassName("scale_group")[0];
+        if (!scaleGroup) return;
+        let match = (scaleGroup.style.transform || "").match(/scale\(([^)]+)\)/);
+        let base = match ? parseFloat(match[1]) : 1;
+        if (!isFinite(base) || base <= 0) base = 1;
+        scaleGroup.style.transition = "transform 260ms ease-in";
+        scaleGroup.style.transform = "scale(" + (base * 0.22) + ")";
+        await wait(280);
     }
 
     // On the table and clear of the box: keep that horizontal spot and sit it down.
@@ -15242,6 +15509,7 @@ class ParticipantToyBoxTrialController {
         this.restoreMapLocator();
         this.restorePromptColorsForMap();
         if (this.Backpack && this.Backpack.parentNode) this.Backpack.remove();
+        this.remove_swap_bin();
         if (this.clearedItem && this.clearedItem.parentNode) this.clearedItem.remove();
         if (this.clearedToy) this.clearedToy.clean_up();
         if (this.clearedSack) this.clearedSack.clean_up();
@@ -15309,6 +15577,7 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
         await this.note_the_swap();
         await this.participant_places_held_item();
         await this.close_box_for_reveal();
+        await this.celebrateClosedBox();
         await this.leave_and_ask();
     }
 
@@ -15324,6 +15593,8 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
         if (this.partner.is_present) {
             this.basics.ItemLayers.Partner.appendChild(this.partner.PartnerBaseGroup);
         }
+        // On screen for the whole swap trial, including the empty room before anyone walks in.
+        this.create_swap_bin();
 
         if (this.placementMove() === "toy_into_sack") {
             await this.appearFennimalSack(this.tableLayout);
@@ -15351,7 +15622,9 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
         await this.place_existing_contents_on_table();
         await this.note_the_swap();
         await this.participant_places_held_item();
+        if (this.wantsWiggleSeat()) await this.seatToyByClicking();
         await this.close_box_for_reveal();
+        await this.celebrateClosedBox();
         await this.leave_and_ask();
     }
 
@@ -15375,6 +15648,7 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
 
         return new Promise((resolve) => {
             let group = create_SVG_group(0, 0, undefined, "fennimal_arrival_overlay");
+            group.style.opacity = "0";
             layer.appendChild(group);
 
             let cover = create_SVG_rect(0, 0, this.basics.W, this.basics.H, "instructions_element_cover", "arrival_overlay_veil");
@@ -15416,12 +15690,20 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
                 if (typeof AudioCont !== "undefined" && AudioCont.play_sound_effect) {
                     AudioCont.play_sound_effect("close_menu");
                 }
-                group.remove();
-                resolve();
+                group.style.transition = "opacity 420ms ease-in";
+                group.style.opacity = "0";
+                setTimeout(() => {
+                    if (group.parentNode) group.remove();
+                    resolve();
+                }, 440);
             };
             if (typeof AudioCont !== "undefined" && AudioCont.play_sound_effect) {
                 AudioCont.play_sound_effect("alert_minimal");
             }
+            // Land at full opacity only after layout, so the card eases in instead of popping.
+            void group.getBoundingClientRect();
+            group.style.transition = "opacity 500ms ease-out";
+            group.style.opacity = "1";
         });
     }
 
@@ -15443,19 +15725,21 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
             }
         );
         let name = this.FenObj.name || this.FenObj.id;
-        this.showPatHighlight();
         Interface.Prompt.show_message(name + " has come to store its favorite toy");
         AudioCont.play_sound_effect("alert_minor");
         await this.walkFennimalToX(this.standX, 820);
-        await wait(900);
+        // A short pause after they arrive, before the pat prompt and its glow.
+        await wait(550);
         await this.pat_fennimal();
         await this.explainHeldMystery();
     }
 
-    // White edge plus a warm halo, on from the walk-in until the pat.
+    // White edge plus a warm halo. On only while a pat prompt is up.
     showPatHighlight() {
         let fen = this.basics && this.basics.Fennimal;
         if (!fen) return;
+        // An inline filter from the previous pat would hide this halo.
+        fen.style.filter = "";
         fen.classList.add("fennimal_pat_target");
     }
 
@@ -15466,8 +15750,8 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
         fen.style.filter = "none";
     }
 
-    // One click, a short jump, and a few hearts. Same beat on both trials,
-    // as soon as this Fennimal has arrived and before anything else they do.
+    // One click as soon as this Fennimal has arrived, before anything else they do.
+    // The shared trial answers with three small hops. The swap trial tosses the toy.
     async pat_fennimal() {
         let fen = this.basics.Fennimal;
         if (!fen) return;
@@ -15480,7 +15764,7 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
         // The toy sits in the hand, outside the body. A click there should count too.
         this.enableHeldTokenHits(this.mysteryToken);
         await new Promise((resolve) => {
-            fen.onpointerdown = () => {
+            fen.onpointerdown = async () => {
                 fen.onpointerdown = null;
                 fen.style.cursor = "auto";
                 this.clearPatHighlight();
@@ -15489,19 +15773,214 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
                     el.style.pointerEvents = "none";
                 });
                 AudioCont.play_sound_effect("positive");
-                this.basics.Fennimal_jump(60).then(() => {
-                    for (let i = 0; i < 3; i++) {
-                        setTimeout(() => {
-                            let mouth = this.basics.TargetPoints && this.basics.TargetPoints.Fennimal_mouth;
-                            let start = mouth ? getSVGInternalCenter(mouth) : getSVGInternalCenter(fen);
-                            this.basics.spawn_happy_heart(start.x, start.y - 40, fen.parentNode);
-                        }, i * 150);
+                try {
+                    if (this.FenObj && this.FenObj.partner_leaves_during_interaction === true) {
+                        await this.tossHeldToy();
+                    } else {
+                        await this.patWithHops(fen);
                     }
-                    setTimeout(resolve, 600);
-                });
+                } finally {
+                    resolve();
+                }
             };
         });
         Interface.Prompt.hide();
+    }
+
+    async patWithHops(fen) {
+        for (let hop = 0; hop < 3; hop++) {
+            this.spawnPatHearts(fen, 2);
+            await this.basics.Fennimal_jump(48, { ms: 150, resolveMs: 320 });
+        }
+    }
+
+    // After the lid shuts, before they leave. Two jumps, then a pat.
+    // The shared trial answers that pat with a sway. The private trial does not.
+    async celebrateClosedBox() {
+        let fen = this.basics && this.basics.Fennimal;
+        if (!fen) return;
+        for (let hop = 0; hop < 2; hop++) {
+            this.spawnPatHearts(fen, 2);
+            await this.basics.Fennimal_jump(78, { ms: 170, resolveMs: 360 });
+        }
+        await this.waitForClosingPat(fen);
+        if (!this.usesSwapBin()) await this.swayDance(fen);
+    }
+
+    // Pivot just under the soles, in the scale group's own box, so a lean
+    // swings the head and leaves the feet nearly where they are.
+    swayPivot(scaleGroup, body) {
+        try {
+            let svg = scaleGroup.ownerSVGElement;
+            let bodyBox = body.getBBox();
+            let scaleBox = scaleGroup.getBBox();
+            let sole = svg.createSVGPoint();
+            sole.x = bodyBox.x + bodyBox.width / 2;
+            sole.y = bodyBox.y + bodyBox.height;
+            let above = svg.createSVGPoint();
+            above.x = sole.x;
+            above.y = bodyBox.y;
+            let toLocal = scaleGroup.getScreenCTM().inverse();
+            let soleLocal = sole.matrixTransform(body.getScreenCTM()).matrixTransform(toLocal);
+            let aboveLocal = above.matrixTransform(body.getScreenCTM()).matrixTransform(toLocal);
+            let bodyHeight = Math.abs(soleLocal.y - aboveLocal.y) || scaleBox.height;
+            let x = soleLocal.x - scaleBox.x;
+            let y = (soleLocal.y - scaleBox.y) + bodyHeight * 0.16;
+            return x + "px " + y + "px";
+        } catch (err) {
+            return "50% 118%";
+        }
+    }
+
+    // Side-to-side lean. Shared trial only, after the closing pat.
+    async swayDance(fen) {
+        let basics = this.basics;
+        let scaleGroup = basics && basics.FennimalScaleGroup;
+        let body = basics && basics.FennimalBody;
+        if (!fen || !scaleGroup || !body) return;
+        basics.character_animation_frozen = true;
+        if (basics.animation_frame_id) {
+            cancelAnimationFrame(basics.animation_frame_id);
+            basics.animation_frame_id = null;
+        }
+        let baseScale = basics.baseScale != null ? basics.baseScale : 1;
+        let savedOrigin = scaleGroup.style.transformOrigin;
+        let savedBox = scaleGroup.style.transformBox;
+        scaleGroup.style.transition = "none";
+        scaleGroup.style.transform = "scale(" + baseScale + ")";
+        scaleGroup.style.transformBox = "fill-box";
+        scaleGroup.style.transformOrigin = this.swayPivot(scaleGroup, body);
+        void scaleGroup.getBoundingClientRect();
+        this.spawnPatHearts(fen, 2);
+        let leans = [-10, 12, -11, 9, -5, 0];
+        try {
+            for (let i = 0; i < leans.length; i++) {
+                if (i === 2) this.spawnPatHearts(fen, 2);
+                scaleGroup.style.transition = "transform 150ms ease-in-out";
+                scaleGroup.style.transform = "scale(" + baseScale + ") rotate(" + leans[i] + "deg)";
+                await wait(160);
+            }
+        } finally {
+            scaleGroup.style.transition = "";
+            scaleGroup.style.transform = "scale(" + baseScale + ")";
+            scaleGroup.style.transformOrigin = savedOrigin || "50% 100%";
+            scaleGroup.style.transformBox = savedBox || "fill-box";
+            basics.character_animation_frozen = false;
+            basics.animation_frame_id = requestAnimationFrame((t) => basics.render_character_frame(t));
+        }
+    }
+
+    // The same pat as the greeting, without the hops or the toy toss.
+    // On the shared trial a sway follows. The private trial walks off after this.
+    async waitForClosingPat(fen) {
+        let name = (this.FenObj && (this.FenObj.name || this.FenObj.id)) || "them";
+        Interface.Prompt.show_message("Give " + name + " a pat");
+        if (typeof AudioCont !== "undefined" && AudioCont.play_sound_effect) {
+            AudioCont.play_sound_effect("alert_minor");
+        }
+        this.showPatHighlight();
+        fen.style.cursor = "pointer";
+        fen.style.pointerEvents = "auto";
+        fen.querySelectorAll("*").forEach((el) => {
+            el.style.pointerEvents = "auto";
+        });
+        await new Promise((resolve) => {
+            fen.onpointerdown = () => {
+                fen.onpointerdown = null;
+                resolve();
+            };
+        });
+        fen.style.cursor = "auto";
+        this.clearPatHighlight();
+        fen.style.pointerEvents = "none";
+        fen.querySelectorAll("*").forEach((el) => {
+            el.style.pointerEvents = "none";
+        });
+        if (typeof AudioCont !== "undefined" && AudioCont.play_sound_effect) {
+            AudioCont.play_sound_effect("positive");
+        }
+        Interface.Prompt.hide();
+    }
+
+    spawnPatHearts(fen, count) {
+        for (let i = 0; i < count; i++) {
+            setTimeout(() => {
+                if (!fen || !fen.parentNode) return;
+                let mouth = this.basics.TargetPoints && this.basics.TargetPoints.Fennimal_mouth;
+                let start = mouth ? getSVGInternalCenter(mouth) : getSVGInternalCenter(fen);
+                this.basics.spawn_happy_heart(start.x + (i - 0.5) * 36, start.y - 30, fen.parentNode);
+            }, i * 80);
+        }
+    }
+
+    // The body stays put. The held toy leaves the hand and comes back, three times.
+    // It is taken off the doll first: the doll scales from the bottom of its own
+    // bounds, so a toy moving inside that group drags the whole Fennimal down.
+    async tossHeldToy() {
+        let token = this.mysteryToken;
+        if (!token || !token.parentNode) {
+            await this.patWithHops(this.basics.Fennimal);
+            return;
+        }
+        let home = {
+            parent: token.parentNode,
+            next: token.nextSibling,
+            transform: token.style.transform,
+            transition: token.style.transition,
+            origin: token.style.transformOrigin,
+            box: token.style.transformBox
+        };
+        let scaleGroup = this.heldTokenScaleGroup(token);
+        if (scaleGroup) {
+            home.scale = scaleGroup.style.transform;
+            home.scaleOrigin = scaleGroup.style.transformOrigin;
+            home.scaleTransition = scaleGroup.style.transition;
+        }
+        let hand = this.visualCenterClient(token);
+        let handWidth = token.getBoundingClientRect().width;
+        let savedPark = this._tokenParkedClient;
+        let layer = this.basics.ItemLayers.Plus2 || home.parent;
+        this.detachTokenForDrop(token, layer, hand, handWidth);
+        try {
+            let match = (token.style.transform || "").match(/translate\(\s*([-\d.]+)px,\s*([-\d.]+)px\)/);
+            let x = match ? parseFloat(match[1]) : 0;
+            let y = match ? parseFloat(match[2]) : 0;
+            let ctm = layer.getScreenCTM && layer.getScreenCTM();
+            let svg = document.getElementById("Scannimals_Task_SVG");
+            let liftScreen = (svg ? svg.getBoundingClientRect().height : 400) * 0.2;
+            let lift = ctm && ctm.d ? liftScreen / Math.abs(ctm.d) : liftScreen;
+            let fen = this.basics.Fennimal;
+            for (let i = 0; i < 3; i++) {
+                this.spawnPatHearts(fen, 2);
+                if (typeof AudioCont !== "undefined" && AudioCont.play_sound_effect) {
+                    AudioCont.play_sound_effect("jump");
+                }
+                token.style.transition = "transform 240ms cubic-bezier(0.2, 0.8, 0.3, 1)";
+                token.style.transform = "translate(" + x + "px, " + (y - lift) + "px)";
+                await wait(260);
+                token.style.transition = "transform 280ms cubic-bezier(0.45, 0, 0.85, 0.45)";
+                token.style.transform = "translate(" + x + "px, " + y + "px)";
+                await wait(300);
+                if (typeof AudioCont !== "undefined" && AudioCont.play_sound_effect) {
+                    AudioCont.play_sound_effect("thud");
+                }
+            }
+        } finally {
+            token.style.transition = "none";
+            if (scaleGroup) {
+                scaleGroup.style.transition = "none";
+                scaleGroup.style.transform = home.scale;
+                scaleGroup.style.transformOrigin = home.scaleOrigin;
+            }
+            token.style.transform = home.transform;
+            token.style.transformOrigin = home.origin;
+            token.style.transformBox = home.box;
+            if (home.next && home.next.parentNode === home.parent) home.parent.insertBefore(token, home.next);
+            else home.parent.appendChild(token);
+            this._tokenParkedClient = savedPark;
+            token.style.transition = home.transition || "";
+            if (scaleGroup) scaleGroup.style.transition = home.scaleTransition || "";
+        }
     }
 
     // The held toy (or "?" cover) leaves the Fennimal's hand and the participant
@@ -15705,6 +16184,199 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
         Interface.Prompt.hide();
     }
 
+    // Swap trial only. The toy stays proud of the rim until three clicks seat it.
+    wantsWiggleSeat() {
+        return !!(this.FenObj
+            && this.FenObj.partner_leaves_during_interaction === true
+            && this.placementMove() === "toy_into_box"
+            && this.mysteryToken
+            && this.box);
+    }
+
+    async seatToyByClicking() {
+        let token = this.mysteryToken;
+        if (!token || !this.box || !this.box.BoxBase) return;
+        let homeX = this.standX;
+        let boxCenter = getSVGInternalCenter(this.box.BoxBase);
+        let closerX = boxCenter.x - 380;
+        if (!(closerX > homeX + 40)) closerX = homeX + 140;
+
+        await this.walkFennimalToX(closerX, 680);
+        await this.zoomSceneTo(this.box.BoxBase, 1.75);
+        try {
+            await this.clickToyIntoPlace(token);
+        } finally {
+            this.clearToyClickGlow(token);
+            await this.zoomSceneTo(null, 1);
+        }
+        await this.walkFennimalToX(homeX, 680);
+    }
+
+    // Scale and the on-screen anchor move together, so the zoom stays on a
+    // straight line instead of arcing through a blended transform.
+    async zoomSceneTo(focusEl, scale) {
+        let layers = [this.basics.BackgroundLayer, this.basics.ItemLayers && this.basics.ItemLayers.Layer].filter(Boolean);
+        let ms = 1100;
+        let toScale = (!focusEl || scale === 1) ? 1 : scale;
+        let focus = (focusEl && getSVGInternalCenter(focusEl)) || this._sceneZoomFocus;
+        if (!focus || !layers.length) {
+            layers.forEach((layer) => {
+                layer.style.transition = "none";
+                layer.style.transform = "";
+            });
+            this._sceneZoom = 1;
+            return;
+        }
+        let fromScale = this._sceneZoom || 1;
+        let anchor = { x: this.basics.W * 0.5, y: this.basics.H * 0.5 };
+        let fromP = fromScale === 1 ? { x: focus.x, y: focus.y } : (this._sceneZoomAnchor || anchor);
+        let toP = toScale === 1 ? { x: focus.x, y: focus.y } : anchor;
+        layers.forEach((layer) => {
+            layer.style.transition = "none";
+            layer.style.transformBox = "view-box";
+            layer.style.transformOrigin = "0px 0px";
+        });
+        await new Promise((resolve) => {
+            let t0 = performance.now();
+            const frame = (now) => {
+                let t = Math.min(1, (now - t0) / ms);
+                let e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+                let s = fromScale + (toScale - fromScale) * e;
+                let px = fromP.x + (toP.x - fromP.x) * e;
+                let py = fromP.y + (toP.y - fromP.y) * e;
+                let transform = "";
+                if (Math.abs(s - 1) > 0.004 || Math.abs(px - focus.x) > 0.6 || Math.abs(py - focus.y) > 0.6) {
+                    transform = "translate(" + px + "px, " + py + "px) scale(" + s + ") translate(" + (-focus.x) + "px, " + (-focus.y) + "px)";
+                }
+                layers.forEach((layer) => { layer.style.transform = transform; });
+                if (t < 1) requestAnimationFrame(frame);
+                else resolve();
+            };
+            requestAnimationFrame(frame);
+        });
+        this._sceneZoom = toScale;
+        this._sceneZoomFocus = focus;
+        this._sceneZoomAnchor = toScale === 1 ? null : anchor;
+        if (toScale === 1) layers.forEach((layer) => { layer.style.transform = ""; });
+    }
+
+    // Participant-facing name for the toy being seated. Ids like "bubblewand" get a space.
+    placedToyName() {
+        let id = this.FenObj && this.FenObj.toy;
+        let names = {
+            car: "car",
+            plane: "plane",
+            trumpet: "trumpet",
+            robot: "robot",
+            globe: "globe",
+            bubblewand: "bubble wand",
+            jack: "Jack-in-the-Box"
+        };
+        if (names[id]) return names[id];
+        if (!id) return "toy";
+        return String(id).replace(/_/g, " ");
+    }
+
+    // Between the box back and the front. Three clicks, each a shake that seats it lower.
+    async clickToyIntoPlace(token) {
+        let middle = this.basics.ItemLayers.Plus1;
+        if (middle && token.parentNode !== middle) {
+            let here = this.visualCenterClient(token);
+            this.detachTokenForDrop(token, middle, here, null);
+        }
+        let savedHits = this.muteBoxFrontHits();
+        let toyName = this.placedToyName();
+        let wigglePrompt = "It doesn't quite fit... click on the " + toyName + " to wiggle it in place";
+        let prompts = [wigglePrompt, wigglePrompt, wigglePrompt];
+        let seat = this._wiggleSeat || { dy: 54 };
+        let dyEach = seat.dy / prompts.length;
+        try {
+            this.enableHeldTokenHits(token);
+            token.style.cursor = "pointer";
+            for (let i = 0; i < prompts.length; i++) {
+                Interface.Prompt.show_message(prompts[i]);
+                if (i === 0) AudioCont.play_sound_effect("alert_minor");
+                this.showToyClickGlow(token);
+                await this.waitForToyClick(token);
+                this.clearToyClickGlow(token);
+                if (this.basics && this.basics.Fennimal_jump) {
+                    this.basics.Fennimal_jump(32, { ms: 110, resolveMs: 230 });
+                }
+                await this.shakeAndSettle(token, dyEach);
+            }
+        } finally {
+            this.clearToyClickGlow(token);
+            this.restoreBoxFrontHits(savedHits);
+            this.disableHeldTokenHits(token);
+            if (token) token.style.cursor = "auto";
+        }
+        AudioCont.play_sound_effect("positive");
+        await wait(220);
+        Interface.Prompt.hide();
+    }
+
+    muteBoxFrontHits() {
+        let front = this.box && this.box.BoxTop;
+        if (!front) return [];
+        let saved = [];
+        [front, ...front.querySelectorAll("*")].forEach((el) => {
+            saved.push([el, el.style.pointerEvents]);
+            el.style.pointerEvents = "none";
+        });
+        return saved;
+    }
+
+    restoreBoxFrontHits(saved) {
+        (saved || []).forEach(([el, value]) => {
+            el.style.pointerEvents = value || "";
+        });
+    }
+
+    showToyClickGlow(token) {
+        if (token) token.classList.add("toy_click_glow");
+    }
+
+    clearToyClickGlow(token) {
+        if (token) token.classList.remove("toy_click_glow");
+    }
+
+    waitForToyClick(token) {
+        return new Promise((resolve) => {
+            const onDown = (evt) => {
+                if (evt.button != null && evt.button !== 0) return;
+                token.removeEventListener("pointerdown", onDown);
+                resolve();
+            };
+            token.addEventListener("pointerdown", onDown);
+        });
+    }
+
+    // Offsets stay on the toy's own translate. A screen point saved before the
+    // zoom maps to the wrong place afterwards and throws the toy off screen.
+    // The toy keeps its size so it stays easy to see as it seats lower.
+    async shakeAndSettle(token, dy) {
+        let base = (token.style.transform || "").match(/translate\(\s*([-\d.]+)px,\s*([-\d.]+)px\)/);
+        let x = base ? parseFloat(base[1]) : 0;
+        let y = base ? parseFloat(base[2]) : 0;
+        let ctm = token.parentNode && token.parentNode.getScreenCTM && token.parentNode.getScreenCTM();
+        let sx = ctm && ctm.a ? 1 / ctm.a : 1;
+        let sy = ctm && ctm.d ? 1 / ctm.d : 1;
+        let hops = [
+            [-12 * sx, dy * 0.2 * sy, 90],
+            [11 * sx, dy * 0.5 * sy, 90],
+            [-6 * sx, dy * 0.75 * sy, 90],
+            [0, dy * sy, 170]
+        ];
+        for (let hop of hops) {
+            token.style.transition = "transform " + hop[2] + "ms ease-in-out";
+            token.style.transform = "translate(" + (x + hop[0]) + "px, " + (y + hop[1]) + "px)";
+            await wait(hop[2] + 20);
+        }
+        if (typeof AudioCont !== "undefined" && AudioCont.play_sound_effect) {
+            AudioCont.play_sound_effect("thud");
+        }
+    }
+
     async dropMysteryIntoBox() {
         let token = this.mysteryToken;
         if (!token) return;
@@ -15725,7 +16397,9 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
 
         this.detachTokenForDrop(token, this.basics.ItemLayers.Plus1, hover, null);
         let scaleGroup = token.getElementsByClassName("scale_group")[0];
-        let restScale = 0.5;
+        // The swap trial leaves the toy proud of the rim so it can be wiggled down.
+        let proud = this.wantsWiggleSeat();
+        let restScale = proud ? 0.78 : 0.5;
         let fullHeight = token.getBoundingClientRect().height;
         let landedHeight = fullHeight * restScale;
         if (scaleGroup) {
@@ -15741,20 +16415,29 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
         let front = this.box && this.box.BoxTop && this.box.BoxTop.getElementsByClassName("front")[0];
         if (front && landedHeight > 8) {
             let rim = null;
+            let sole = null;
             for (let el of front.children) {
                 if (el.classList.contains("invisible_element")) continue;
-                let top = el.getBoundingClientRect().top;
-                if (rim == null || top < rim) rim = top;
+                let rect = el.getBoundingClientRect();
+                if (rect.height < 1 && rect.width < 1) continue;
+                if (rim == null || rect.top < rim) rim = rect.top;
+                if (sole == null || rect.bottom > sole) sole = rect.bottom;
             }
             if (rim != null) {
-                let seated = rim + 14 - (fullHeight * 0.42) / 2;
-                if (seated < destY) destY = seated;
+                // Proud toys start high, with the front only crossing the lower edge.
+                // Shared toys rest in the opening, still clear of the bottom.
+                let seated = proud ? rim - landedHeight * 0.18 : rim + landedHeight * 0.22;
+                if (sole != null) {
+                    let limit = sole - 8 - landedHeight * 0.5;
+                    if (seated > limit) seated = limit;
+                }
+                if (proud || seated < destY) destY = seated;
             }
         }
         await this.moveTokenToClient(token, target.x, destY, 340, "ease-in");
-        if (this.placementMove() !== "toy_into_sack") {
-            let shrunkHeight = token.getBoundingClientRect().height;
-            await this.moveTokenToClient(token, target.x, destY + 42 + shrunkHeight / 2, 200, "ease-in");
+        if (proud) {
+            let h = token.getBoundingClientRect().height;
+            this._wiggleSeat = { dy: Math.max(52, h * 0.45) };
         }
         this.commitFennimalPlacement();
         if (token) token.style.pointerEvents = "none";
@@ -15797,6 +16480,15 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
         }, 200);
     }
 
+    // Shared trial: the partner is still in the room, but the participant shuts the box.
+    participantClosesSharedBox() {
+        return !!(this.FenObj
+            && this.FenObj.partner_leaves_during_interaction !== true
+            && this.placementMove() === "toy_into_box"
+            && this.partner
+            && this.partner.is_present);
+    }
+
     async close_box_for_reveal() {
         let originalClose = this.box.close_box.bind(this.box);
         this.box.close_box = () => {
@@ -15804,7 +16496,16 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
             this.hidePlacedMystery();
         };
         try {
-            await super.close_box_for_reveal();
+            if (this.participantClosesSharedBox()) {
+                this.box.set_pointer_events_enabled(true);
+                await new Promise((resolve) => {
+                    this.box.wait_for_user_click("close", () => resolve());
+                });
+                await wait(150);
+                this.box.set_pointer_events_enabled(false);
+            } else {
+                await super.close_box_for_reveal();
+            }
         } finally {
             this.box.close_box = originalClose;
         }
@@ -15922,9 +16623,8 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
     }
 
     async leave_and_ask() {
-        // Hold after the box shuts, before they walk off.
+        // Hold after the box shuts. They stay on screen for the name question.
         if (this.announcesArrivalOnScene()) await wait(750);
-        await this.walk_off_left();
         let asked = await this.run_fennimal_quiz();
         if (!asked) return;
         await this.run_object_quiz();
@@ -15944,7 +16644,28 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
         if (this.FenObj.partner_leaves_during_interaction) {
             await this.stow_box_and_close_backpack();
         }
+        await this.waitForEndContinue();
         this.finish_trial();
+    }
+
+    // Both warehouse trials used to advance on their own. Wait here instead.
+    waitForEndContinue() {
+        let layer = this.basics && this.basics.ItemLayers && this.basics.ItemLayers.Questions;
+        if (!layer) return Promise.resolve();
+        if (typeof Interface !== "undefined" && Interface.Prompt) Interface.Prompt.hide();
+        let button = create_SVG_buttonElement(0.5 * this.basics.W, 0.9 * this.basics.H, 400, 75, "Continue", 40);
+        button.style.cursor = "pointer";
+        layer.appendChild(button);
+        return new Promise((resolve) => {
+            button.onpointerdown = () => {
+                button.onpointerdown = null;
+                if (typeof AudioCont !== "undefined" && AudioCont.play_sound_effect) {
+                    AudioCont.play_sound_effect("close_menu");
+                }
+                if (button.parentNode) button.remove();
+                resolve();
+            };
+        });
     }
 
     // Trial 2, once the old toy is on the table and the new one is still in hand.
@@ -16116,9 +16837,36 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
     }
 
     fennimalQuizPrompt() {
-        if (this.placementMove() === "sack_into_box") return "Whose sack did you just put in the box?";
-        if (this.placementMove() === "toy_into_sack") return "Whose toy did you just put in the sack?";
-        return "Whose toy did you just put in the box?";
+        return "What is the name of this Fennimal?";
+    }
+
+    // Same bar metrics as the toy question. The standing Fennimal takes the
+    // left side, so the row starts to their right and the squares shrink to fit.
+    nameQuizBarOptions(fens) {
+        let opts = this.quizBarOptions(fens.length);
+        let body = this.basics && (this.basics.FennimalBody || this.basics.Fennimal);
+        let fenRight = null;
+        if (body) {
+            let rect = body.getBoundingClientRect();
+            let svg = body.ownerSVGElement || document.getElementById("Scannimals_Task_SVG");
+            let ctm = svg && svg.getScreenCTM && svg.getScreenCTM();
+            if (rect && rect.width > 2 && svg && ctm) {
+                let pt = svg.createSVGPoint();
+                pt.x = rect.right;
+                pt.y = rect.top;
+                fenRight = pt.matrixTransform(ctm.inverse()).x;
+            }
+        }
+        if (fenRight != null) {
+            opts.left_margin = Math.max(opts.left_margin || 0, Math.ceil(fenRight + 36));
+        }
+        let count = Math.max(1, fens.length);
+        let spacing = opts.spacing;
+        let spanRight = this.basics.W - opts.right_margin;
+        let maxW = Math.max(240, spanRight - opts.left_margin);
+        let btn = Math.floor((maxW - (count - 1) * spacing) / count);
+        opts.btn_size = Math.max(96, Math.min(170, btn));
+        return opts;
     }
 
     async run_fennimal_quiz() {
@@ -16134,17 +16882,21 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
         }
 
         this.FenObj.placement_errors = [];
-        let barOptions = this.quizBarOptions();
-        let bar = new FennimalChoiceBar(
+        let barOptions = this.nameQuizBarOptions(options);
+        let makeBar = () => new NameChoiceBar(
             this.basics.ItemLayers.Questions,
             this.basics.W,
             this.basics.H,
             barOptions
         );
+        let bar = makeBar();
 
         while (true) {
             Interface.Prompt.show_message(this.fennimalQuizPrompt());
-            let selected = await bar.waitForSelection(shuffleArray([...options]));
+            let selected = await bar.waitForSelection(shuffleArray(options.map((fen) => ({
+                id: fen.id,
+                name: (fen.name && String(fen.name).trim()) || fen.id
+            }))));
 
             if (selected === this.FenObj.id) {
                 AudioCont.play_sound_effect("positive");
@@ -16157,15 +16909,8 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
             this.FenObj.placement_errors.push(selected);
             await bar.hide();
             Interface.Prompt.hide();
-            await this.walkFennimalToX(this.standX, 780);
-            await wait(1000);
-            await this.walk_off_left();
-            bar = new FennimalChoiceBar(
-                this.basics.ItemLayers.Questions,
-                this.basics.W,
-                this.basics.H,
-                barOptions
-            );
+            await wait(350);
+            bar = makeBar();
         }
     }
 }
@@ -16176,6 +16921,7 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
 // or C, the video is required when force_replay_first is set, and any listed
 // distractor toys join the sticker tray. A correct sticker breaks into its
 // parts; once those parts are back on the frame, the toy lands on the postcard.
+// If a part sits unplaced, the partner places one piece, or it snaps home when no partner is here.
 class PostcardFromRecordingTrialController {
     constructor(FenObj, partner_is_present, returnfunc) {
         this.FenObj = FenObj;
@@ -16201,6 +16947,10 @@ class PostcardFromRecordingTrialController {
         this._drag = null;
         this.stickers = [];
         this.polaroids = [];
+        this._assemblyHelpTimer = null;
+        this._assemblyHelpToken = 0;
+        this._assemblyHelpBusy = false;
+        this._assemblyReady = false;
     }
 
     async start_sequence() {
@@ -17950,6 +18700,7 @@ class PostcardFromRecordingTrialController {
     }
 
     async runToyAssembly(sticker) {
+        this._assemblyReady = false;
         let from = null;
         if (sticker) from = this.elementCenter(sticker.lastElementChild || sticker);
         let built = this.buildAssembly();
@@ -17966,9 +18717,13 @@ class PostcardFromRecordingTrialController {
         if (this._finished) return;
         await this.scatterAssemblyPieces(built);
         if (this._finished) return;
-        this.showAssemblyPrompt();
-        await new Promise((resolve) => { this._resolveAssembly = resolve; });
-        this._resolveAssembly = null;
+        this._assemblyReady = true;
+        if (!this._finished && !this.assemblyIsComplete()) {
+            this.showAssemblyPrompt();
+            await new Promise((resolve) => { this._resolveAssembly = resolve; });
+            this._resolveAssembly = null;
+        }
+        this.clearAssemblyHelp();
         if (this._finished) return;
         this.hidePointingNote();
         await this.flyAssemblyToSlot(built);
@@ -18164,6 +18919,7 @@ class PostcardFromRecordingTrialController {
                 dx: 0,
                 dy: 0,
                 placed: false,
+                locked: false,
                 snap: Math.max(span * 0.28, 12)
             };
             this.bindAssemblyPiece(piece);
@@ -18187,7 +18943,7 @@ class PostcardFromRecordingTrialController {
 
     bindAssemblyPiece(piece) {
         piece.wrap.addEventListener("pointerdown", (event) => {
-            if (piece.placed || this._finished || this._assemblyDrag) return;
+            if (piece.placed || piece.locked || this._finished || this._assemblyDrag) return;
             event.preventDefault();
             event.stopPropagation();
             this.hidePointingNote();
@@ -18218,9 +18974,10 @@ class PostcardFromRecordingTrialController {
     }
 
     dropAssemblyPiece(piece) {
-        if (piece.placed || this._finished) return;
+        if (piece.placed || piece.locked || this._finished) return;
         if (Math.hypot(piece.dx, piece.dy) <= piece.snap) {
             piece.placed = true;
+            piece.locked = true;
             piece.dx = 0;
             piece.dy = 0;
             piece.wrap.style.pointerEvents = "none";
@@ -18230,18 +18987,235 @@ class PostcardFromRecordingTrialController {
             if (typeof AudioCont !== "undefined" && AudioCont.play_sound_effect) {
                 AudioCont.play_sound_effect("positive");
             }
-            let pieces = this._assemblyPieces || [];
-            if (pieces.length && pieces.every((item) => item.placed) && this._resolveAssembly) {
-                let done = this._resolveAssembly;
-                this._resolveAssembly = null;
-                done();
-            }
+            this.onAssemblyPiecePlaced();
             return;
         }
         piece.dx = piece.scatterX || 0;
         piece.dy = piece.scatterY || 0;
         piece.wrap.style.transition = "transform 280ms ease-in-out";
         piece.wrap.style.transform = "translate(" + piece.dx + "px, " + piece.dy + "px)";
+    }
+
+    assemblyIsComplete() {
+        let pieces = this._assemblyPieces || [];
+        return pieces.length > 0 && pieces.every((piece) => piece.placed);
+    }
+
+    // The "Got it" bubble covers the pieces. The idle clock starts once it is gone.
+    assemblyPromptBlocksInput() {
+        if (this._assemblyPromptDismissed || !this.showsInstructionBubbles()) return false;
+        return typeof Interface !== "undefined"
+            && typeof Interface.showPartnerSpeechBubble === "function";
+    }
+
+    // Same idle help as the broken-toy workshop: one piece, then the clock starts over.
+    // Partner help stays slow so a participant who is placing pieces is not overtaken.
+    assemblyHelpDelayMs() {
+        let copy = (typeof GenParam !== "undefined" && GenParam.PostcardTask) || {};
+        if (this.partner && this.partner.is_present) {
+            let base = copy.assemblyHelpPartnerMs != null ? copy.assemblyHelpPartnerMs : 25000;
+            let jitter = copy.assemblyHelpPartnerJitterMs != null ? copy.assemblyHelpPartnerJitterMs : 15000;
+            return base + Math.random() * Math.max(0, jitter);
+        }
+        if (copy.assemblyHelpSoloMs != null) return copy.assemblyHelpSoloMs;
+        return 10000;
+    }
+
+    clearAssemblyHelpTimer() {
+        if (this._assemblyHelpTimer) {
+            clearTimeout(this._assemblyHelpTimer);
+            this._assemblyHelpTimer = null;
+        }
+    }
+
+    clearAssemblyHelp() {
+        this._assemblyHelpToken += 1;
+        this.clearAssemblyHelpTimer();
+        this._assemblyHelpBusy = false;
+    }
+
+    scheduleAssemblyHelp() {
+        if (this._finished || this._postcardSolved || !this._assembling || !this._assemblyReady) return;
+        if (!this.assemblyStage || this._assemblyHelpBusy || this.assemblyPromptBlocksInput()) return;
+        if (this.assemblyIsComplete()) return;
+        this.clearAssemblyHelpTimer();
+        let token = this._assemblyHelpToken;
+        this._assemblyHelpTimer = setTimeout(() => {
+            this.runAssemblyHelp(token);
+        }, this.assemblyHelpDelayMs());
+    }
+
+    randomOpenAssemblyPiece() {
+        let open = (this._assemblyPieces || []).filter((piece) => {
+            return !piece.placed && piece !== this._assemblyDrag;
+        });
+        if (!open.length) return null;
+        return open[Math.floor(Math.random() * open.length)];
+    }
+
+    assemblyHelpStopped(token) {
+        return this._finished || token !== this._assemblyHelpToken || !this._assembling || !this.assemblyStage;
+    }
+
+    async runAssemblyHelp(token) {
+        if (this.assemblyHelpStopped(token) || this._assemblyHelpBusy) return;
+        let piece = this.randomOpenAssemblyPiece();
+        if (!piece) {
+            if (this.assemblyHelpStopped(token) || this.assemblyIsComplete()) return;
+            if (!(this._assemblyPieces || []).some((item) => !item.placed)) return;
+            this._assemblyHelpTimer = setTimeout(() => this.runAssemblyHelp(token), 1500);
+            return;
+        }
+        this._assemblyHelpBusy = true;
+        try {
+            await this.helpPlaceAssemblyPiece(piece, token);
+        } catch (err) {
+            console.error("postcard assembly help", err);
+            if (piece && !piece.placed && !this._finished) this.releaseAssemblyPieceLock(piece);
+        } finally {
+            this._assemblyHelpBusy = false;
+        }
+        if (this.assemblyHelpStopped(token) || this.assemblyIsComplete()) return;
+        this.scheduleAssemblyHelp();
+    }
+
+    async helpPlaceAssemblyPiece(piece, token) {
+        piece.locked = true;
+        if (piece.wrap) {
+            piece.wrap.style.pointerEvents = "none";
+            piece.wrap.style.cursor = "default";
+        }
+        let byPartner = !!(this.partner && this.partner.is_present);
+        let landed = false;
+        try {
+            if (byPartner && !this.assemblyHelpStopped(token) && !piece.placed) {
+                await this.stepPartnerTowardAssemblyPiece(piece);
+            }
+            if (!this.assemblyHelpStopped(token) && !piece.placed) {
+                await this.slideAssemblyPieceHome(piece, byPartner ? 600 : 260);
+                if (!this.assemblyHelpStopped(token) && !piece.placed) {
+                    landed = true;
+                    if (typeof AudioCont !== "undefined" && AudioCont.play_sound_effect) {
+                        AudioCont.play_sound_effect("positive");
+                    }
+                }
+            }
+        } finally {
+            if (byPartner) {
+                try { await this.returnPartnerFromAssemblyHelp(); }
+                catch (err) { /* partner already left the scene */ }
+            }
+        }
+        // Mark only after the partner is home, so finishing the sticker cannot
+        // remove the puzzle while they are still standing on it.
+        if (!landed || piece.placed || this.assemblyHelpStopped(token)) {
+            if (!piece.placed && !this._finished) this.releaseAssemblyPieceLock(piece);
+            return;
+        }
+        this.markAssemblyPiecePlaced(piece, false);
+        this.onAssemblyPiecePlaced();
+    }
+
+    releaseAssemblyPieceLock(piece) {
+        if (!piece || piece.placed) return;
+        piece.locked = false;
+        piece.dx = piece.scatterX || 0;
+        piece.dy = piece.scatterY || 0;
+        if (!piece.wrap) return;
+        piece.wrap.style.pointerEvents = "auto";
+        piece.wrap.style.cursor = "pointer";
+        piece.wrap.style.transition = "transform 280ms ease-in-out";
+        piece.wrap.style.transform = "translate(" + piece.dx + "px, " + piece.dy + "px)";
+    }
+
+    slideAssemblyPieceHome(piece, ms) {
+        if (!piece || !piece.wrap) return wait(ms);
+        piece.wrap.style.transition = "none";
+        piece.wrap.style.transform = "translate(" + (piece.dx || 0) + "px, " + (piece.dy || 0) + "px)";
+        void piece.wrap.getBoundingClientRect();
+        piece.dx = 0;
+        piece.dy = 0;
+        piece.wrap.style.transition = "transform " + ms + "ms ease-in-out";
+        piece.wrap.style.transform = "translate(0px, 0px)";
+        return wait(ms);
+    }
+
+    markAssemblyPiecePlaced(piece, playSound) {
+        piece.placed = true;
+        piece.locked = true;
+        piece.dx = 0;
+        piece.dy = 0;
+        if (piece.wrap) {
+            piece.wrap.style.pointerEvents = "none";
+            piece.wrap.style.cursor = "default";
+            piece.wrap.style.transform = "translate(0px, 0px)";
+        }
+        if (playSound !== false && typeof AudioCont !== "undefined" && AudioCont.play_sound_effect) {
+            AudioCont.play_sound_effect("positive");
+        }
+    }
+
+    onAssemblyPiecePlaced() {
+        if (this.assemblyIsComplete()) {
+            this.clearAssemblyHelpTimer();
+            if (this._resolveAssembly) {
+                let done = this._resolveAssembly;
+                this._resolveAssembly = null;
+                done();
+            }
+            return;
+        }
+        if (!this._assemblyHelpBusy) this.scheduleAssemblyHelp();
+    }
+
+    async stepPartnerTowardAssemblyPiece(piece) {
+        let partner = this.partner;
+        if (!partner || !partner.is_present || !partner.PartnerBaseGroup || !partner.PartnerBaseGroup.isConnected) return;
+        if (!this._partnerHelpHomeLayer && partner.PartnerBaseGroup.parentNode) {
+            this._partnerHelpHomeLayer = partner.PartnerBaseGroup.parentNode;
+        }
+        if (this.assemblyStage && partner.PartnerBaseGroup.parentNode !== this.assemblyStage) {
+            this.assemblyStage.appendChild(partner.PartnerBaseGroup);
+        }
+        partner.PartnerBaseGroup.style.pointerEvents = "none";
+
+        let face = "left";
+        let x = -160;
+        let y = -140;
+        try {
+            let spot = this.elementCenter(piece.part || piece.wrap);
+            let base = getSVGInternalCenter(partner.PartnerTranslateGroup);
+            if (spot && base) {
+                let dx = spot.x - base.x;
+                let dy = spot.y - base.y;
+                let dist = Math.hypot(dx, dy);
+                if (dist > 30) {
+                    let travel = Math.min(220, dist * 0.35);
+                    x = partner._offsetX + (dx / dist) * travel;
+                    y = partner._offsetY + (dy / dist) * travel;
+                    face = dx >= 0 ? "right" : "left";
+                }
+            }
+        } catch (err) { /* a short step toward the puzzle still reads as help */ }
+        x = Math.max(-520, Math.min(80, x));
+        y = Math.max(-320, Math.min(40, y));
+        partner.set_direction(face);
+        let home = partner._homeScale || 40;
+        await partner.animate_pose({ x: x, y: y, scale: home * 0.9, ms: 480 });
+    }
+
+    async returnPartnerFromAssemblyHelp() {
+        let partner = this.partner;
+        let home = this._partnerHelpHomeLayer;
+        this._partnerHelpHomeLayer = null;
+        if (!partner || !partner.is_present || !partner.PartnerBaseGroup || !partner.PartnerBaseGroup.isConnected) return;
+        try {
+            await partner.animate_home({ ms: 500, direction: "back" });
+        } catch (err) { /* scene already torn down */ }
+        let node = partner.PartnerBaseGroup;
+        if (!node || !node.isConnected) return;
+        node.style.pointerEvents = "";
+        if (home && home.isConnected && node.parentNode !== home) home.appendChild(node);
     }
 
     parkAssembly(built, from) {
@@ -18379,6 +19353,8 @@ class PostcardFromRecordingTrialController {
     showAssemblyPrompt() {
         if (this._finished || this._postcardSolved || this._assemblyPromptDismissed || !this.assemblyStage) return;
         let copy = (typeof GenParam !== "undefined" && GenParam.PostcardTask) || {};
+        let blocks = this.assemblyPromptBlocksInput();
+        if (blocks) this.clearAssemblyHelpTimer();
         this.showPointingNote(
             this.assemblyAnchor || this.assemblyStage,
             copy.assemblyPrompt || "Oops, the sticker broke! Please put the sticker back together",
@@ -18388,9 +19364,13 @@ class PostcardFromRecordingTrialController {
                 hideButton: false,
                 buttonLabel: "Got it",
                 rememberDismiss: false,
-                onDismiss: () => { this._assemblyPromptDismissed = true; }
+                onDismiss: () => {
+                    this._assemblyPromptDismissed = true;
+                    this.scheduleAssemblyHelp();
+                }
             }
         );
+        if (!blocks) this.scheduleAssemblyHelp();
     }
 
     elementCenter(el) {
@@ -18644,6 +19624,7 @@ class PostcardFromRecordingTrialController {
     finish() {
         if (this._finished) return;
         this._finished = true;
+        this.clearAssemblyHelp();
         this._playToken += 1;
         this._playing = false;
         this._drag = null;
@@ -18693,6 +19674,7 @@ class PostcardFromRecordingTrialController {
 
     clean_up() {
         this._finished = true;
+        this.clearAssemblyHelp();
         this._playToken += 1;
         this._playing = false;
         this._drag = null;

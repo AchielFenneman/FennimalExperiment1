@@ -275,6 +275,13 @@ GENERALPARAM = function () {
                 "This experiment will consist of %NUMBERDAYS% days. At the start of each day you will receive further instructions on how to interact with the Fennimals on the island. ",
             bonus: "<tspan style='color: darkgoldenrod'> <b>Bonus stars.</b></tspan> During some days you be able to earn Bonus Stars. You will earn a bonus of %CURRENCYSYMBOL%%AMOUNTPERSTAR% per star that you earn during the experiment. " +
                 "You can earn up to %MAXNUMBERSTARS% bonus stars during the experiment (for a maximum bonus of %CURRENCYSYMBOL%%MAXBONUSAMOUNT%)"
+        },
+        // mentalizing_exp1_retro only. The partner leads, so the map-search boxes are omitted.
+        OverviewGuided: {
+            story: "<b>Your task in this experiment. </b>In this experiment you will travel to an island called Fenneland. This remote island has a unique wildlife, and is filled with many smart animals called <u>Fennimals</u>. " +
+                "These Fennimals are unique to Fenneland and are unlike any other creatures. <br>" +
+                "<br>" +
+                "This experiment will consist of %NUMBERDAYS% days. At the start of each day you will receive further instructions. "
         }
 
     }
@@ -959,7 +966,12 @@ GENERALPARAM = function () {
         studyPrompt: "Watch the recordings. You'll need them for the postcards.",
         watchAgainPrompt: "Play the video again before adding {name}'s favorite toy.",
         watchFirstPrompt: "Play the video before adding {name}'s favorite toy.",
-        assemblyPrompt: "Oops, the sticker broke! Please put the sticker back together"
+        assemblyPrompt: "Oops, the sticker broke! Please put the sticker back together",
+        // Quiet stretch before one broken-sticker piece is placed for the participant.
+        // Partner help matches the workshop toy: long enough that a quick try still lands first.
+        assemblyHelpSoloMs: 10000,
+        assemblyHelpPartnerMs: 25000,
+        assemblyHelpPartnerJitterMs: 15000
     }
 
     // Feed Fennimal trial

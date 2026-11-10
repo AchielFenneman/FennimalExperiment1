@@ -272,6 +272,7 @@ class InstructionsController {
                 }
                 break;
             case "auto_travel":
+            case "guided_tour":
                 Interface.Prompt.show_message("No additional instructions right now.", 2500);
                 break;
             default:
@@ -504,13 +505,22 @@ class InstructionsController {
     showOverviewPage() {
         let starsCanBeEarned = this.stimuli.get_maximum_number_of_bonus_stars() > 0;
         let storyTextOffset = starsCanBeEarned ? 0 : 0.175 * GenParam.SVG_height;
-        this.overviewPageRemainingSteps = starsCanBeEarned ? ["stars", "movement", "search", "lookout", "instructions"] : ["movement", "search", "lookout", "instructions"];
+        this.overviewIsGuided = this.stimuli.get_experiment_code() === "mentalizing_exp1_retro";
+        this.overviewPageRemainingSteps = this.overviewIsGuided
+            ? (starsCanBeEarned ? ["stars", "movement", "partner"] : ["movement", "partner"])
+            : (starsCanBeEarned ? ["stars", "movement", "search", "lookout", "instructions"] : ["movement", "search", "lookout", "instructions"]);
 
         this.showEmptyPage(true);
         document.getElementById("Instructions_Title").innerHTML = "Overview";
 
-        GenParam.GeneralInstructions.Overview.story = GenParam.GeneralInstructions.Overview.story.replace("%NUMBERDAYS%", this.stimuli.get_number_of_days_in_experiment());
-        let storyTextElem = create_SVG_text_in_foreign_element(GenParam.GeneralInstructions.Overview.story, 2 * this.boundarySize, 110 + storyTextOffset, 0.45 * GenParam.SVG_width, 0.4 * GenParam.SVG_height, "instructions_element_text");
+        let storySource = this.overviewIsGuided
+            ? GenParam.GeneralInstructions.OverviewGuided.story
+            : GenParam.GeneralInstructions.Overview.story;
+        let storyText = storySource.replace("%NUMBERDAYS%", this.stimuli.get_number_of_days_in_experiment());
+        if (!this.overviewIsGuided) {
+            GenParam.GeneralInstructions.Overview.story = storyText;
+        }
+        let storyTextElem = create_SVG_text_in_foreign_element(storyText, 2 * this.boundarySize, 110 + storyTextOffset, 0.45 * GenParam.SVG_width, 0.4 * GenParam.SVG_height, "instructions_element_text");
         this.overviewPagePreviousTextElem.push(storyTextElem);
         storyTextElem.childNodes[0].style.textAlign = "justify";
         this.currentInstructionsSVG.appendChild(storyTextElem);
@@ -529,6 +539,14 @@ class InstructionsController {
             let boxHeight = 0.175 * GenParam.SVG_height, boxOffsetTop = 150;
             let spacingBoxes = 0.01 * GenParam.SVG_height;
             let nextStep = this.overviewPageRemainingSteps.shift();
+            const centerBoxLabel = (foreignElem) => {
+                let label = foreignElem.childNodes[0];
+                label.style.display = "flex";
+                label.style.alignItems = "center";
+                label.style.margin = "0";
+                label.style.height = "100%";
+                label.style.lineHeight = "normal";
+            };
 
             this.overviewPageContinueButton.style.display = "inherit";
             if (this.overviewPageSearchButton) {
@@ -565,9 +583,39 @@ class InstructionsController {
                     this.currentInstructionsSVG.appendChild(playerIconContainer);
                     playerIconContainer.style.transform = `translate(${0.55 * GenParam.SVG_width}px, ${boxOffsetTop + 0.5 * boxHeight}px)`;
 
-                    let movementText = create_SVG_text_in_foreign_element("This icon represents you. You can move this icon across the map by pressing down with your mouse. ",
+                    let movementCopy = this.overviewIsGuided
+                        ? "This icon represents you."
+                        : "This icon represents you. You can move this icon across the map by pressing down with your mouse. ";
+                    let movementText = create_SVG_text_in_foreign_element(movementCopy,
                         0.58 * GenParam.SVG_width, boxOffsetTop, 0.375 * GenParam.SVG_width, boxHeight, "instructions_element_text");
+                    if (this.overviewIsGuided) centerBoxLabel(movementText);
                     this.currentInstructionsSVG.appendChild(movementText);
+                    break;
+                case "partner":
+                    let partnerBoxTop = boxOffsetTop + boxHeight + spacingBoxes;
+                    let backgroundRectPartner = create_SVG_rect(0.51 * GenParam.SVG_width, partnerBoxTop, 0.45 * GenParam.SVG_width, boxHeight, undefined, undefined);
+                    backgroundRectPartner.style.fill = backgroundColor;
+                    backgroundRectPartner.setAttribute("rx", 30);
+                    this.currentInstructionsSVG.appendChild(backgroundRectPartner);
+
+                    let partnerIcon = this.worldState.get_person_icon("partner", "front");
+                    partnerIcon.style.transform = "scale(5)";
+                    let partnerIconContainer = create_SVG_group(0, 0, 0, 0, undefined, undefined);
+                    partnerIconContainer.appendChild(partnerIcon);
+                    this.currentInstructionsSVG.appendChild(partnerIconContainer);
+                    partnerIconContainer.style.transform = `translate(${0.55 * GenParam.SVG_width}px, ${partnerBoxTop + 0.5 * boxHeight}px)`;
+
+                    let partnerName = "your partner";
+                    if (this.worldState && typeof this.worldState.get_partner_icon_settings === "function") {
+                        let partnerSettings = this.worldState.get_partner_icon_settings();
+                        if (partnerSettings && partnerSettings.name) partnerName = partnerSettings.name;
+                    }
+                    let partnerText = create_SVG_text_in_foreign_element(
+                        "This icon represents " + partnerName + ".",
+                        0.58 * GenParam.SVG_width, partnerBoxTop, 0.375 * GenParam.SVG_width, boxHeight, "instructions_element_text"
+                    );
+                    centerBoxLabel(partnerText);
+                    this.currentInstructionsSVG.appendChild(partnerText);
                     break;
                 case "search":
                     let backgroundRectSearch = create_SVG_rect(0.51 * GenParam.SVG_width, boxOffsetTop + boxHeight + spacingBoxes, 0.45 * GenParam.SVG_width, boxHeight, undefined, undefined);
@@ -1857,6 +1905,48 @@ class InstructionsController {
         let instructionText = customBody || (
             "You'll visit each Fennimal in turn — the route is arranged for you.<br><br>" +
             "You do not need to navigate the map yourself. After each visit, you will travel automatically to the next Fennimal."
+        );
+
+        this.textElemMainInstructions = create_SVG_text_in_foreign_element(
+            instructionText,
+            0.12 * GenParam.SVG_width, 180,
+            0.76 * GenParam.SVG_width,
+            520,
+            "instruction_element_text"
+        );
+        this.textElemMainInstructions.classList.add("instruction_element_nonbackground");
+        this.textElemMainInstructions.getElementsByClassName("instruction_element_text")[0].style.fontSize = "36px";
+        this.currentInstructionsSVG.appendChild(this.textElemMainInstructions);
+
+        this.addClosingButtonToParent("bottom-center", false, undefined, 500);
+    }
+
+    initializeGuidedTourInstructions(currentBlockNum, phaseData) {
+        this.currentInstructionType = "guided_tour";
+
+        this.clearInstructions();
+        this.currentInstructionsSVG = this.createBasicInstructionElements();
+        this.parentElem.appendChild(this.currentInstructionsSVG);
+        this.parentElem.style.display = "inherit";
+
+        let partnerName = "your partner";
+        if (this.worldState && typeof this.worldState.get_partner_icon_settings === "function") {
+            let settings = this.worldState.get_partner_icon_settings();
+            if (settings && settings.name) partnerName = settings.name;
+        }
+
+        let customTitle = phaseData && phaseData.day_title;
+        let customBody = phaseData && phaseData.day_body;
+        document.getElementById("Instructions_Title").innerHTML = customTitle
+            ? `Day ${currentBlockNum}: ${customTitle}`
+            : `Day ${currentBlockNum}: a guided tour`;
+        this.updateProgressNewDay(currentBlockNum);
+        this.updateProgressWithinDay(false);
+
+        let instructionText = customBody || (
+            `${partnerName} will first show you around the island. ` +
+            `Follow ${partnerName} to visit all the Fennimals on the island. ` +
+            `Your task is to make a photo of all the Fennimals.`
         );
 
         this.textElemMainInstructions = create_SVG_text_in_foreign_element(

@@ -3398,6 +3398,152 @@ class ToyChoiceBar {
     }
 }
 
+// Same gold bar as ToyChoiceBar. Each cell is a name instead of a toy.
+class NameChoiceBar {
+    constructor(parentLayer, W, H, options = {}) {
+        this.parentLayer = parentLayer;
+        this.W = W;
+        this.H = H;
+        this.panel_y_ratio = options.panel_y_ratio != null ? options.panel_y_ratio : 0.76;
+        this.btn_size = options.btn_size || 170;
+        this.spacing = options.spacing || 25;
+        this.left_margin = options.left_margin || 0;
+        this.right_margin = options.right_margin || 0;
+        this.UIGroup = null;
+        this._selectionHandler = null;
+        this._disabled = false;
+    }
+
+    destroy() {
+        this._disabled = true;
+        this._selectionHandler = null;
+        if (this.UIGroup && this.UIGroup.parentNode) this.UIGroup.remove();
+        this.UIGroup = null;
+    }
+
+    async hide(fade_ms = 200) {
+        this._disabled = true;
+        this._selectionHandler = null;
+        if (!this.UIGroup) return;
+        this.UIGroup.style.transition = `all ${fade_ms}ms ease-in`;
+        this.UIGroup.style.opacity = 0;
+        this.UIGroup.style.transform = "scale(0.8)";
+        await wait(fade_ms);
+        this.destroy();
+    }
+
+    // items: { id, name } in display order. Resolves with the chosen id.
+    waitForSelection(items) {
+        return new Promise(resolve => {
+            this.show(items, (id) => resolve(id));
+        });
+    }
+
+    show(items, onSelect) {
+        this.destroy();
+        this._disabled = false;
+        this._selectionHandler = onSelect;
+
+        this.UIGroup = create_SVG_group(0, 0);
+        this.parentLayer.appendChild(this.UIGroup);
+
+        const btn_size = this.btn_size;
+        const spacing = this.spacing;
+        const total_width = (items.length * btn_size) + ((items.length - 1) * spacing);
+        const available = this.W - this.left_margin - this.right_margin;
+        const start_x = this.left_margin + Math.max(0, (available - total_width) / 2);
+        const panel_y = this.panel_y_ratio * this.H;
+
+        let panel = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        panel.setAttribute("x", start_x - 30);
+        panel.setAttribute("y", panel_y - 20);
+        panel.setAttribute("width", total_width + 60);
+        panel.setAttribute("height", btn_size + 40);
+        panel.setAttribute("rx", 20);
+        panel.setAttribute("fill", "rgba(255, 215, 0, 0.45)");
+        panel.setAttribute("stroke", "#d4af37");
+        panel.setAttribute("stroke-width", "4");
+        this.UIGroup.appendChild(panel);
+
+        items.forEach((item, index) => {
+            let btn_x = start_x + (index * (btn_size + spacing));
+            let btn_y = panel_y;
+            let name = (item && item.name) || "";
+            let itemId = item && item.id;
+
+            let BtnGroup = create_SVG_group(0, 0);
+            this.UIGroup.appendChild(BtnGroup);
+            if (itemId != null) BtnGroup.dataset.fenId = itemId;
+
+            let btn_bg = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            btn_bg.setAttribute("x", btn_x);
+            btn_bg.setAttribute("y", btn_y);
+            btn_bg.setAttribute("width", btn_size);
+            btn_bg.setAttribute("height", btn_size);
+            btn_bg.setAttribute("rx", 15);
+            btn_bg.setAttribute("fill", "#d8c381");
+            btn_bg.setAttribute("stroke", "#b89f5d");
+            btn_bg.setAttribute("stroke-width", "3");
+            btn_bg.style.transition = "all 150ms ease";
+            BtnGroup.appendChild(btn_bg);
+
+            let label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            label.setAttribute("x", btn_x + btn_size / 2);
+            label.setAttribute("y", btn_y + btn_size / 2);
+            label.setAttribute("text-anchor", "middle");
+            label.setAttribute("dominant-baseline", "central");
+            label.setAttribute("font-family", "Arial, sans-serif");
+            label.setAttribute("font-weight", "bold");
+            label.setAttribute("fill", "navy");
+            label.setAttribute("font-size", String(Math.max(22, Math.floor(btn_size * 0.24))));
+            label.style.pointerEvents = "none";
+            label.textContent = name;
+            BtnGroup.appendChild(label);
+            let textBox = label.getBBox();
+            let maxW = btn_size * 0.82;
+            if (textBox.width > maxW) {
+                let size = parseFloat(label.getAttribute("font-size"));
+                label.setAttribute("font-size", String(Math.max(16, Math.floor(size * maxW / textBox.width))));
+            }
+
+            let click_catcher = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            click_catcher.setAttribute("x", btn_x);
+            click_catcher.setAttribute("y", btn_y);
+            click_catcher.setAttribute("width", btn_size);
+            click_catcher.setAttribute("height", btn_size);
+            click_catcher.setAttribute("fill", "transparent");
+            click_catcher.style.cursor = "pointer";
+            BtnGroup.appendChild(click_catcher);
+
+            click_catcher.onpointerenter = () => {
+                if (this._disabled) return;
+                btn_bg.setAttribute("fill", "#ebd89b");
+                btn_bg.setAttribute("stroke", "gold");
+            };
+            click_catcher.onpointerleave = () => {
+                btn_bg.setAttribute("fill", "#d8c381");
+                btn_bg.setAttribute("stroke", "#b89f5d");
+            };
+            click_catcher.onpointerdown = () => {
+                if (this._disabled) return;
+                this._disabled = true;
+                AudioCont.play_sound_effect("button_click");
+                let handler = this._selectionHandler;
+                this._selectionHandler = null;
+                if (handler) handler(itemId);
+            };
+        });
+
+        this.UIGroup.style.transformOrigin = `${this.W / 2}px ${panel_y + (btn_size / 2)}px`;
+        this.UIGroup.style.transform = "scale(0.8)";
+        this.UIGroup.style.opacity = 0;
+        this.UIGroup.style.transition = "all 300ms cubic-bezier(0.34, 1.56, 0.64, 1)";
+        window.getComputedStyle(this.UIGroup).opacity;
+        this.UIGroup.style.transform = "scale(1)";
+        this.UIGroup.style.opacity = 1;
+    }
+}
+
 /**
  * Box-choice panel mirroring ToyChoiceBar (clones #toybox_* templates).
  */

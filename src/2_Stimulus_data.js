@@ -16,7 +16,8 @@ let StimulusSettings = function () {
     //   baseline | enhanced_mentalizing | enhanced_inference_error | enhanced_retrieval_error
     //   ?EXP=mentalizing_exp1&SKIP_TO_INTERACTION=warehouse_cleanup&CONDITION=baseline
     //   &FENNIMAL=A|B picks that Fennimal's cleanup. &PARTNER_LEAVES=1 picks the swap.
-    // mentalizing_exp1_retro: 3 Fennimals. Block 1 photos hide toys. Blocks 2 and 4
+    // mentalizing_exp1_retro: 3 Fennimals. Block 1 is a guided tour from the island
+    // center (partner leads; photos hide toys). Blocks 2 and 4
     // are warehouse_task (no map travel). Each block opens on that task's instructions. Block 2 is Fennimal A
     // (partner stays) then Fennimal B (partner leaves). Arms, equal weight:
     // direct-direct | indirect-direct | indirect-indirect. Direct shows the toy.
@@ -122,7 +123,8 @@ let StimulusSettings = function () {
         mentalizing_between_subjects: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
         mentalizing_exp2: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
         mentalizing_exp1: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
-        mentalizing_exp1_retro: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "overview", "partner_introduction"],
+        // Partner introduction before the overview, so the overview can name the partner.
+        mentalizing_exp1_retro: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "partner_introduction", "overview"],
     };
 
     // ----------------------------------------------------
@@ -334,17 +336,36 @@ let StimulusSettings = function () {
         // One arm per participant, equal weight. Fennimal C does not touch the box.
         mentalizing_exp1_retro: [
 
-            // BLOCK 1: explore and photograph A, B, and C. Partner is present.
+            // BLOCK 1: photograph A, B, and C. Start at the island center.
+            // The partner leads; the participant follows. Visit order is shuffled.
             // The held toy is omitted from the scene and from the polaroid.
             {
-                type: "free_exploration",
+                type: "guided_tour",
                 interaction_type: ["photo_Fennimal"],
                 Fennimals_encountered: ["A", "B", "C"],
                 partner_behavior: "active",
-                include_Fennefinder: true,
-                force_climbing_tower_first: true,
+                include_Fennefinder: false,
                 hide_held_toy: true
             },
+
+             // BLOCK 4: workshop repair of toys X, Y, and Z. Same memory foil as mentalizing_exp1.
+            // The trial ends when the pieces match the picture. No charging step.
+            // No map travel. The block opens with the workshop instructions, then the first toy.
+            {
+                type: "warehouse_task",
+                partner_behavior: "active",
+                ask_Fennimal: true,
+                ask_toy: true,
+                ask_box: false,
+                trial_subblocks: [
+                    {
+                        interaction_type: "broken_toy_workshop",
+                        toys: ["X", "Y", "Z"],
+                        include_charging_action: false
+                    }
+                ]
+            },
+
 
             // BLOCK 2: belief formation. Same warehouse sequence as mentalizing_exp1
             // (partner stays; then partner leaves, backpack, box, prior contents, placement).
@@ -416,7 +437,7 @@ let StimulusSettings = function () {
                         optional_distractor_toys: ["X", "Y", "Z"],
                         repair_toy_sticker: false,
                         show_instructions_bubble: false
-                    },
+                    }, /*
                     {
                         Fennimals: ["A", "B", "C"],
                         force_replay_first: false,
@@ -424,28 +445,11 @@ let StimulusSettings = function () {
                         optional_distractor_toys: ["X", "Y", "Z"],
                         repair_toy_sticker: false,
                         show_instructions_bubble: false
-                    }
+                    } */
                 ]
             },
 
-            // BLOCK 4: workshop repair of toys X, Y, and Z. Same memory foil as mentalizing_exp1.
-            // The trial ends when the pieces match the picture. No charging step.
-            // No map travel. The block opens with the workshop instructions, then the first toy.
-            {
-                type: "warehouse_task",
-                partner_behavior: "active",
-                ask_Fennimal: true,
-                ask_toy: true,
-                ask_box: false,
-                trial_subblocks: [
-                    {
-                        interaction_type: "broken_toy_workshop",
-                        toys: ["X", "Y", "Z"],
-                        include_charging_action: false
-                    }
-                ]
-            },
-
+           
             // BLOCK 5: radial belief block. Practice, belief, partner knowledge, reality.
             // Memory questions moved to the written page in block 6.
             {
