@@ -220,9 +220,37 @@
         return "fennimals_session_v1_" + pid;
     }
 
+    // Refresh restore and the completion block both expire after this.
+    // A claim with no timestamp is treated as already expired.
+    const SESSION_CLAIM_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+
+    function sessionClaimIsCurrent(claim) {
+        if (!claim) return false;
+        let stamped = Date.parse(claim.updatedAt || "");
+        if (!isFinite(stamped)) {
+            console.log(
+                "%c Session claim has no timestamp; not restoring or blocking",
+                "color:purple; font-weight:bold"
+            );
+            return false;
+        }
+        let ageMs = Date.now() - stamped;
+        if (ageMs > SESSION_CLAIM_MAX_AGE_MS) {
+            let days = Math.max(1, Math.round(ageMs / 86400000));
+            console.log(
+                "%c Session claim is " + days + " days old; starting a new session",
+                "color:purple; font-weight:bold"
+            );
+            return false;
+        }
+        return true;
+    }
+
     /**
      * Soft-lock / session continuity (Layer 1).
      * Looks up fennimals_claims/{pid} before stimuli are built.
+     * A claim older than SESSION_CLAIM_MAX_AGE_MS is ignored, so a later study
+     * is neither blocked nor pulled back onto the previous experiment code.
      * Modes: anonymous | new | continue_assignment | blocked_completed
      */
     window.resolveParticipantSessionClaim = async function() {
@@ -250,10 +278,15 @@
                         attemptDocId: pid + "__" + local.sessionId,
                         experimentCompleted: local.experimentCompleted === true,
                         localAssignment: local.assignment || null,
-                        localRestartCount: local.sessionRestartCount || 0
+                        localRestartCount: local.sessionRestartCount || 0,
+                        updatedAt: local.updatedAt || null
                     };
                 }
             } catch (e) { /* ignore */ }
+        }
+
+        if (claim && !forceNew && !sessionClaimIsCurrent(claim)) {
+            claim = null;
         }
 
         if (!forceNew && claim && claim.experimentCompleted === true) {
@@ -298,6 +331,7 @@
                     expCode: claim.expCode,
                     sessionId: claim.activeSessionId,
                     experimentCompleted: false,
+                    updatedAt: claim.updatedAt || new Date().toISOString(),
                     assignment: assignment,
                     sessionRestartCount: priorRestartCount
                 }));
@@ -344,7 +378,7 @@
 <script type="text/javascript" src="src/4_AttentionCheckController.js"></script>
 <script type="text/javascript" src="src/3_Interface.js?v=retro-polish-1"></script>
 <script type="text/javascript" src="src/4_WrittenMemoryPage.js?v=retro-live-1"></script>
-<script type="text/javascript" src="src/2_Top_controller.js?v=guided-tour-1"></script>
+<script type="text/javascript" src="src/2_Top_controller.js?v=session-age-1"></script>
 <script type="text/javascript" src="src/ItemCollections.js"></script>
 
 </html>

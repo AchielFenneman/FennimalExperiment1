@@ -257,7 +257,11 @@ class DataController {
             try {
                 localStorage.setItem(
                     "fennimals_session_v1_" + pid,
-                    JSON.stringify({ expCode: folder, sessionId: earlySession.sessionId })
+                    JSON.stringify({
+                        expCode: folder,
+                        sessionId: earlySession.sessionId,
+                        updatedAt: new Date().toISOString()
+                    })
                 );
             } catch (e) { /* ignore */ }
         }
@@ -299,6 +303,7 @@ class DataController {
                     expCode: payload.expCode,
                     sessionId: payload.activeSessionId,
                     experimentCompleted: payload.experimentCompleted,
+                    updatedAt: payload.updatedAt,
                     sessionRestartCount: this.experimentData.sessionRestartCount || 0,
                     assignment: {
                         fennimals: this.experimentData.fennimals,
