@@ -71,6 +71,9 @@ class TrialController {
         this.resolved = false;
         this.phase = "walk";
         this.keys = new Set();
+        this.keyboardKeys = new Set();
+        this.pointerKeys = new Set();
+        this.pointerIds = new Map();
         this.dragging = false;
         this.snapped = false;
         this.dragOffset = 0;
@@ -86,7 +89,13 @@ class TrialController {
 
         this.onKeyDown = (event) => this.keyDown(event);
         this.onKeyUp = (event) => this.keyUp(event);
-        this.onBlur = () => this.keys.clear();
+        this.onBlur = () => {
+            this.keyboardKeys.clear();
+            this.pointerKeys.clear();
+            this.pointerIds.clear();
+            this.keys.clear();
+            this.dragging = false;
+        };
 
         this.build();
     }
@@ -297,6 +306,9 @@ class TrialController {
             space: this.addKey(this.hintMove, "SPACE", 1021, cy, 148, keyH),
             w: this.addKey(this.hintClimb, "W", 860, cy, letterW, keyH)
         };
+        this.bindPointerKey(this.keyCaps.a, "a");
+        this.bindPointerKey(this.keyCaps.d, "d");
+        this.bindPointerKey(this.keyCaps.space, "space");
         this.hintMove.appendChild(centerText("move", 848, cy, 28, "key-hint-caption"));
         this.hintMove.appendChild(centerText("drag ladder", 1188, cy, 28, "key-hint-caption"));
         this.hintClimb.appendChild(centerText("climb ladder", 1002, cy, 28, "key-hint-caption"));
@@ -312,6 +324,51 @@ class TrialController {
         const key = makeKeyCap(label, cx, cy, width, height);
         parent.appendChild(key);
         return key;
+    }
+
+    bindPointerKey(cap, name) {
+        cap.classList.add("key-cap-button");
+        cap.setAttribute("role", "button");
+        cap.setAttribute("aria-label", name === "space" ? "Space" : name.toUpperCase());
+
+        const press = (event) => {
+            if (!this.t0 || !this.alive || this.resolved) return;
+            if (event.pointerType === "mouse" && event.button !== 0) return;
+            event.preventDefault();
+            event.stopPropagation();
+            try { cap.setPointerCapture(event.pointerId); } catch (err) { /* capture can fail if the pointer already ended */ }
+            this.pointerIds.set(event.pointerId, name);
+            this.pointerKeys.add(name);
+            this.refreshInputKeys();
+        };
+
+        const release = (event) => {
+            if (this.pointerIds.get(event.pointerId) !== name) return;
+            this.pointerIds.delete(event.pointerId);
+            let stillHeld = false;
+            this.pointerIds.forEach((heldName) => {
+                if (heldName === name) stillHeld = true;
+            });
+            if (!stillHeld) this.pointerKeys.delete(name);
+            this.refreshInputKeys();
+            if (name === "space" && !this.keys.has("space")) this.dragging = false;
+        };
+
+        cap.addEventListener("pointerdown", press);
+        cap.addEventListener("pointerup", release);
+        cap.addEventListener("pointercancel", release);
+        cap.addEventListener("lostpointercapture", release);
+        cap.addEventListener("pointerleave", (event) => {
+            if (typeof cap.hasPointerCapture === "function" && cap.hasPointerCapture(event.pointerId)) return;
+            release(event);
+        });
+        cap.addEventListener("contextmenu", (event) => event.preventDefault());
+    }
+
+    refreshInputKeys() {
+        this.keys.clear();
+        this.keyboardKeys.forEach((name) => this.keys.add(name));
+        this.pointerKeys.forEach((name) => this.keys.add(name));
     }
 
     showHint(mode) {
@@ -513,15 +570,17 @@ class TrialController {
         const name = key === " " ? "space" : key;
         if (["arrowleft", "arrowright", "arrowup", "a", "d", "w", "space"].indexOf(name) === -1) return;
         event.preventDefault();
-        this.keys.add(name);
+        this.keyboardKeys.add(name);
+        this.refreshInputKeys();
         if ((name === "w" || name === "arrowup") && this.phase === "ready-to-climb") this.beginClimb();
     }
 
     keyUp(event) {
         const key = event.key.toLowerCase();
         const name = key === " " ? "space" : key;
-        this.keys.delete(name);
-        if (name === "space") this.dragging = false;
+        this.keyboardKeys.delete(name);
+        this.refreshInputKeys();
+        if (name === "space" && !this.keys.has("space")) this.dragging = false;
     }
 
     tick(now) {

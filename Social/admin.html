@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Secure Data Exporter</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 40px; background: #f4f4f9; }
+        .container { max-width: 500px; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        input, button { padding: 10px; margin-top: 10px; width: 100%; box-sizing: border-box; font-size: 16px;}
+        button { background: #007AFF; color: white; border: none; cursor: pointer; border-radius: 5px; font-weight: bold;}
+        button:hover { background: #005bb5; }
+        #status { margin-top: 15px; font-weight: bold; color: #333; }
+        .auth-section { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 2px solid #eee; }
+        .hint { color: #666; font-size: 14px; margin: 8px 0 0; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Secure Data Exporter</h2>
+
+    <div class="auth-section">
+        <p><strong>Step 1: Admin Login</strong></p>
+        <input type="email" id="adminEmail" placeholder="Admin Email" value="admin@fenneland.com">
+        <input type="password" id="adminPassword" placeholder="Password">
+    </div>
+
+    <div>
+        <p><strong>Step 2: Download Data</strong></p>
+        <input type="text" id="collectionName" value="social_dm" placeholder="Enter experiment code">
+        <p class="hint">Also downloads last-resort dumps from the matching <span id="dumpName">social_dm_save_dumps</span> collection.</p>
+        <button id="downloadBtn">Authenticate & Download JSON</button>
+    </div>
+
+    <div id="status"></div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyBLYsCJDNs9JO3bNi3RSCBZFHegtH1OI_I",
+        authDomain: "fennimals.firebaseapp.com",
+        projectId: "fennimals",
+        storageBucket: "fennimals.firebasestorage.app",
+        messagingSenderId: "416848310750",
+        appId: "1:416848310750:web:1fd80297bf7b6389472d4f"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    const collectionInput = document.getElementById("collectionName");
+    const dumpLabel = document.getElementById("dumpName");
+    const refreshDumpLabel = () => {
+        dumpLabel.textContent = (collectionInput.value.trim() || "social_dm") + "_save_dumps";
+    };
+    collectionInput.addEventListener("input", refreshDumpLabel);
+
+    document.getElementById("downloadBtn").addEventListener("click", async () => {
+        const email = document.getElementById("adminEmail").value.trim();
+        const password = document.getElementById("adminPassword").value.trim();
+        const colName = collectionInput.value.trim();
+        const statusEl = document.getElementById("status");
+
+        if (!email || !password || !colName) {
+            return alert("Please fill out the email, password, and collection name.");
+        }
+
+        statusEl.innerText = "Authenticating... Please wait.";
+        statusEl.style.color = "blue";
+
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+            statusEl.innerText = "Login successful! Fetching data...";
+
+            const querySnapshot = await getDocs(collection(db, colName));
+            const dumpName = colName + "_save_dumps";
+            let dumpSnapshot = null;
+            try {
+                dumpSnapshot = await getDocs(collection(db, dumpName));
+            } catch (dumpErr) {
+                console.warn("Could not read " + dumpName, dumpErr);
+            }
+
+            if (querySnapshot.empty && (!dumpSnapshot || dumpSnapshot.empty)) {
+                statusEl.innerText = "No data found in collection: '" + colName + "'";
+                statusEl.style.color = "red";
+                auth.signOut();
+                return;
+            }
+
+            const allParticipants = [];
+            querySnapshot.forEach((docSnap) => {
+                const rawData = docSnap.data();
+                rawData.Document_ID = docSnap.id;
+                allParticipants.push(rawData);
+            });
+
+            const saveDumps = [];
+            if (dumpSnapshot && !dumpSnapshot.empty) {
+                dumpSnapshot.forEach((docSnap) => {
+                    const rawData = docSnap.data();
+                    rawData.Document_ID = docSnap.id;
+                    const exp = rawData.expCode || rawData.originalCollection;
+                    if (!exp || exp === colName) saveDumps.push(rawData);
+                });
+            }
+
+            const completedParticipants = allParticipants.filter((participant) =>
+                participant.experimentCompleted === true
+            );
+
+            const downloadJSON = (dataObj, filename) => {
+                const jsonString = JSON.stringify(dataObj, null, 2);
+                const blob = new Blob([jsonString], { type: "application/json" });
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = filename;
+                link.style.display = "none";
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
+            if (allParticipants.length) downloadJSON(allParticipants, colName + "_all_data.json");
+
+            setTimeout(() => {
+                if (completedParticipants.length) {
+                    downloadJSON(completedParticipants, colName + "_completed_data.json");
+                }
+            }, 500);
+
+            setTimeout(() => {
+                if (saveDumps.length) downloadJSON(saveDumps, colName + "_save_dumps.json");
+            }, 1000);
+
+            statusEl.innerText = "Success! Downloaded " + allParticipants.length + " total ("
+                + completedParticipants.length + " completed)"
+                + (saveDumps.length ? ", plus " + saveDumps.length + " last-resort dump docs." : ".");
+            statusEl.style.color = "green";
+            auth.signOut();
+        } catch (error) {
+            console.error(error);
+            statusEl.innerText = "Error: Invalid password or connection issue.";
+            statusEl.style.color = "red";
+            auth.signOut();
+        }
+    });
+</script>
+</body>
+</html>

@@ -2,6 +2,8 @@
 // The instructions call each block a day.
 
 const StimulusSettings = {
+    // Firestore collection for attempt documents. Claims live in {code}_claims.
+    experimentCode: "social_dm",
     trialTimeoutMs: 10000,
     blockCount: 1,
     rewards: [5, 10, 20],
@@ -47,6 +49,9 @@ const StimulusSettings = {
         }
     }
 };
+
+// Classic scripts do not share lexical bindings with the Firebase module.
+window.EXPERIMENT_CODE = StimulusSettings.experimentCode;
 
 function partnerIntroText(name) {
     return name + " will be your partner for this experiment";

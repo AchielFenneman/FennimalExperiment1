@@ -199,6 +199,13 @@ html, body {
     pointer-events: none;
 }
 
+.key-hint .key-cap-button {
+    pointer-events: auto;
+    cursor: pointer;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
 .key-hint-caption {
     font-weight: 600;
     fill: #1c1c1c;

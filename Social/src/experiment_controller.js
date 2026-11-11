@@ -1,38 +1,5 @@
 // Directs the session: character creation, partner introduction, instructions, the offer loop, the point total, and the closing questions.
-
-class DataController {
-    constructor() {
-        this.records = [];
-        this.totalPoints = 0;
-        this.openResponses = {
-            partnerHelpful: "",
-            cooperationDifference: "",
-            instructionsAndTaskClear: "",
-            generalComments: ""
-        };
-    }
-
-    recordTrial(entry) {
-        this.records.push({
-            rewardAmount: entry.rewardAmount,
-            socialCondition: entry.socialCondition,
-            accepted: entry.accepted,
-            completionTimeMs: entry.completionTimeMs,
-            rewardObtained: entry.rewardObtained,
-            practice: !!entry.practice
-        });
-        if (entry.rewardObtained && !entry.practice) this.totalPoints += entry.rewardAmount;
-    }
-
-    recordOpenResponses(responses) {
-        this.openResponses = {
-            partnerHelpful: responses.partnerHelpful || "",
-            cooperationDifference: responses.cooperationDifference || "",
-            instructionsAndTaskClear: responses.instructionsAndTaskClear || "",
-            generalComments: responses.generalComments || ""
-        };
-    }
-}
+// Session records are written by DataController in data_storage.js.
 
 class IconFactory {
     constructor(playerDoc) {
@@ -70,14 +37,37 @@ class ExperimentController {
     async start() {
         try {
             this.showMessage("Loading…");
+            const helpersReady = await waitForFirebaseSessionHelpers();
+            let earlySession = { mode: "anonymous", sessionId: String(Date.now()) };
+            if (helpersReady) {
+                try {
+                    earlySession = await window.resolveParticipantSessionClaim();
+                } catch (error) {
+                    console.warn("Session claim lookup failed; continuing as a new session", error);
+                }
+            }
+            if (earlySession.mode === "blocked_completed") {
+                this.clearStage();
+                showStudyCompletedScreen(earlySession.message);
+                return;
+            }
+            await this.dataController.finalizeSession(earlySession);
             await this.loadAssets();
-            await this.showCharacterCreation();
+            if (this.dataController.hasRestoredCast()) {
+                this.dataController.applyCast(this.cast);
+            } else {
+                await this.showCharacterCreation();
+                await this.dataController.lockCast(this.cast);
+            }
             await this.showPartnerIntro();
             await this.showInstructions();
             const blockCount = StimulusSettings.blockCount || 1;
             for (let block = 0; block < blockCount; block++) await this.runBlock(block);
             await this.showEnd();
-            await this.showOpenQuestions();
+            const saved = await this.showOpenQuestions();
+            this.showMessage(saved
+                ? "Thank you. Your responses have been saved."
+                : "Thank you. The save did not reach the server. Please leave this page open and contact the researcher.");
         } catch (error) {
             console.error(error);
             this.showMessage(error.message || "Something went wrong.");
@@ -257,24 +247,32 @@ class ExperimentController {
     }
 
     async runBlock(blockIndex) {
+        const trials = await this.dataController.getOrCreateTrials(blockIndex);
         if (blockIndex === 0) await this.runPracticeTrial();
-        const trials = buildTrialList();
         for (let i = 0; i < trials.length; i++) {
             this.clearStage();
             this.refreshScore();
             await wait(uniform(GenParam.offerDelayMs[0], GenParam.offerDelayMs[1]));
-            const accepted = await this.showOffer(trials[i]);
-            if (!accepted) {
+            const decision = await this.showOffer(trials[i]);
+            const meta = {
+                blockIndex: blockIndex,
+                trialIndex: i,
+                decisionTimeMs: decision.decisionTimeMs
+            };
+            if (!decision.accepted) {
                 this.dataController.recordTrial({
                     rewardAmount: trials[i].rewardAmount,
                     socialCondition: trials[i].socialCondition,
                     accepted: false,
+                    decisionTimeMs: meta.decisionTimeMs,
                     completionTimeMs: null,
-                    rewardObtained: false
+                    completedInTime: false,
+                    blockIndex: meta.blockIndex,
+                    trialIndex: meta.trialIndex
                 });
                 continue;
             }
-            await this.runTrial(trials[i]);
+            await this.runTrial(trials[i], meta);
         }
     }
 
@@ -313,12 +311,16 @@ class ExperimentController {
             placeByHeight(partner, iconX + 128, cy + 10, 180);
         }
 
+        const shownAt = performance.now();
         return new Promise((resolve) => {
             let chosen = false;
             const choose = (accepted) => {
                 if (chosen) return;
                 chosen = true;
-                resolve(accepted);
+                resolve({
+                    accepted: accepted,
+                    decisionTimeMs: Math.round(performance.now() - shownAt)
+                });
             };
             this.stage.appendChild(makeButton("Accept", cx - 160, cy + boxH / 2 + 90, 240, 74, () => choose(true)));
             this.stage.appendChild(makeButton("Reject", cx + 160, cy + boxH / 2 + 90, 240, 74, () => choose(false)));
@@ -348,7 +350,8 @@ class ExperimentController {
         });
     }
 
-    runTrial(trial) {
+    runTrial(trial, meta) {
+        meta = meta || {};
         return new Promise((resolve) => {
             this.clearStage();
             this.refreshScore();
@@ -363,9 +366,12 @@ class ExperimentController {
                         rewardAmount: trial.rewardAmount,
                         socialCondition: trial.socialCondition,
                         accepted: true,
+                        decisionTimeMs: meta.decisionTimeMs == null ? null : meta.decisionTimeMs,
                         completionTimeMs: result.completionTimeMs,
-                        rewardObtained: result.rewardObtained,
-                        practice: !!trial.practice
+                        completedInTime: result.rewardObtained === true,
+                        practice: !!trial.practice,
+                        blockIndex: meta.blockIndex == null ? null : meta.blockIndex,
+                        trialIndex: meta.trialIndex == null ? null : meta.trialIndex
                     });
                     this.refreshScore();
                 }
@@ -420,7 +426,7 @@ class ExperimentController {
             instructionsAndTaskClear: "",
             generalComments: ""
         };
-        this.dataController.recordOpenResponses(responses);
+        this.dataController.markQuestionsReached();
 
         const columnW = 1480;
         const columnX = (width - columnW) / 2;
@@ -443,7 +449,16 @@ class ExperimentController {
             }, question.text));
         });
 
-        this.stage.appendChild(makeButton("Continue", width / 2, 990, 400, 75, () => {}));
+        let submitted = false;
+        return new Promise((resolve) => {
+            this.stage.appendChild(makeButton("Continue", width / 2, 990, 400, 75, () => {
+                if (submitted) return;
+                submitted = true;
+                this.dataController.recordOpenResponses(responses);
+                this.showMessage("Saving…");
+                this.dataController.complete().then(resolve);
+            }));
+        });
     }
 }
 
