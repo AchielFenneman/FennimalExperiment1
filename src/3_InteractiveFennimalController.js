@@ -10474,7 +10474,8 @@ class JointBoxDecorationTrialController extends JointBoxCleaningTrialController 
 
 /**
  * retrieve_lost_box phase interaction: Fennimal intro → dirty found box + celebration dance →
- * joint cleaning → optional decoration → lost-and-found tag → partner photo → collect prompt.
+ * joint cleaning → optional decoration → optional lost-and-found tag → partner photo → collect prompt.
+ * include_lost_found_tag: false skips the tag. The box stays decorated only.
  * Extends JointBoxDecoration so decoration pile/turns are available when include_decoration is set.
  */
 class RetrieveLostBoxTrialController extends JointBoxDecorationTrialController {
@@ -10544,7 +10545,7 @@ class RetrieveLostBoxTrialController extends JointBoxDecorationTrialController {
             await this.run_optional_decoration_segment();
         }
 
-        await this.run_lost_found_tagging();
+        await this.maybe_run_lost_found_tagging();
 
         await this.run_retrieve_lost_box_end_photo();
 
@@ -10582,7 +10583,7 @@ class RetrieveLostBoxTrialController extends JointBoxDecorationTrialController {
         await this.move_fennimal_beside_box();
 
         await this.run_optional_decoration_segment();
-        await this.run_lost_found_tagging();
+        await this.maybe_run_lost_found_tagging();
         await this.run_retrieve_lost_box_end_photo();
 
         Interface.Prompt.show_message(
@@ -10809,6 +10810,11 @@ class RetrieveLostBoxTrialController extends JointBoxDecorationTrialController {
         this._looseTagWrapper = wrapper;
         this._looseTagStart = { x: startX, y: startY };
         return wrapper;
+    }
+
+    async maybe_run_lost_found_tagging() {
+        if (this.FenObj && this.FenObj.include_lost_found_tag === false) return;
+        await this.run_lost_found_tagging();
     }
 
     async run_lost_found_tagging() {
@@ -13519,6 +13525,9 @@ class ParticipantToyBoxTrialController {
         this.tableElement = null;
         this.surfacePoint = null;
         this.itemScale = 3.4;
+        // Sack artwork is taller than the toys, so the same scale makes the bag
+        // crowd the chest. Boxes and toys stay at itemScale.
+        this.sackScale = 2.4;
     }
 
     placementMove() {
@@ -13633,7 +13642,7 @@ class ParticipantToyBoxTrialController {
                 this.basics.ItemLayers.Plus1,
                 layout.toyX,
                 layout.toyY,
-                this.itemScale,
+                this.sackScale,
                 180
             )
             : this.toy.create_and_appear_toy(
@@ -13651,6 +13660,12 @@ class ParticipantToyBoxTrialController {
         if (loose) loose.style.pointerEvents = "none";
         await itemReady;
         await wait(170);
+
+        // The phone is the start of the departure. Test the toy first, while
+        // the partner is still standing at the table.
+        if (this.FenObj.charge_before_place === true && this.toy && this.toy.ToyElement) {
+            await this.test_toy_before_packing();
+        }
 
         this.prepareSkippedLeaveContents();
         await this.partner_steps_away();
@@ -13736,17 +13751,20 @@ class ParticipantToyBoxTrialController {
 
     layout_on_table() {
         let surface = this.surfacePoint || { x: 0.5 * this.basics.W, y: 0.79 * this.basics.H };
+        let containerIsSack = this.placementMove() === "toy_into_sack";
+        let looseIsSack = this.placementMove() === "sack_into_box";
         let boxSize = this.templateSize(
-            this.placementMove() === "toy_into_sack" ? this.FenObj.sack : ("toybox_" + this.FenObj.toybox)
+            containerIsSack ? this.FenObj.sack : ("toybox_" + this.FenObj.toybox)
         );
         let toySize = this.templateSize(
-            this.placementMove() === "sack_into_box" ? this.FenObj.sack : ("toy_" + this.FenObj.toy)
+            looseIsSack ? this.FenObj.sack : ("toy_" + this.FenObj.toy)
         );
-        let scale = this.itemScale;
-        let boxHalfW = (boxSize.w * scale) / 2;
-        let boxHalfH = (boxSize.h * scale) / 2;
-        let toyHalfW = (toySize.w * scale) / 2;
-        let toyHalfH = (toySize.h * scale) / 2;
+        let containerScale = containerIsSack ? this.sackScale : this.itemScale;
+        let looseScale = looseIsSack ? this.sackScale : this.itemScale;
+        let boxHalfW = (boxSize.w * containerScale) / 2;
+        let boxHalfH = (boxSize.h * containerScale) / 2;
+        let toyHalfW = (toySize.w * looseScale) / 2;
+        let toyHalfH = (toySize.h * looseScale) / 2;
 
         let boxX = surface.x;
         let boxY = surface.y - boxHalfH * 0.82;
@@ -13802,10 +13820,8 @@ class ParticipantToyBoxTrialController {
         });
     }
 
-    // Box artwork often has a corner or open lip lower than the edge that
-    // actually sits on the table. Match the visible bottom at the middle of
-    // each object, not the lowest point in the bounding box, then set that
-    // shared bottom on the front edge of the tabletop.
+    // Every warehouse trial seats the painted bottom on the bottom edge of the
+    // tabletop. The sack and the box share that line.
     tableGraphics() {
         return [
             this.box && this.box.BoxBase,
@@ -13824,59 +13840,44 @@ class ParticipantToyBoxTrialController {
 
     seat_box_with_toy() {
         if (this.placementMove() === "toy_into_sack") {
-            this.seat_named_pieces(
+            this.seat_pair_on_table(
                 this.sack && (this.sack.SackTop || this.sack.SackBase),
                 [this.sack && this.sack.SackBase, this.sack && this.sack.SackTop],
                 this.toy && this.toy.ToyElement
             );
             return;
         }
-        if (this.placementMove() === "sack_into_box" && this.sack && this.sack.SackItem && this.box) {
-            let front = this.box.BoxTop && this.box.BoxTop.querySelector(".front");
-            this.seat_named_pieces(
-                front,
-                [this.box.BoxBase, this.box.BoxTop],
-                this.sack.SackItem
-            );
-            return;
-        }
-        let toyEl = this.toy && this.toy.ToyElement;
-        let front = this.box.BoxTop && this.box.BoxTop.querySelector(".front");
-        if (toyEl && front) {
-            let toyBottom = this.visualBottom(toyEl);
-            let boxBottom = this.visualBottom(front);
-            if (toyBottom != null && boxBottom != null && Math.abs(toyBottom - boxBottom) >= 2) {
-                this.nudge_elements([this.box.BoxBase, this.box.BoxTop], toyBottom - boxBottom);
-            }
-        }
-
-        front = this.box.BoxTop && this.box.BoxTop.querySelector(".front");
-        let lip = this.tableFrontLip();
-        let seatedBottom = front ? this.visualBottom(front) : null;
-        if (lip == null || seatedBottom == null) return;
-        let drop = lip - seatedBottom;
-        if (Math.abs(drop) < 2) return;
-        this.nudge_elements(
-            [this.box.BoxBase, this.box.BoxTop, this.toy && this.toy.ToyElement],
-            drop
+        let front = this.box && this.box.BoxTop && this.box.BoxTop.querySelector(".front");
+        this.seat_pair_on_table(
+            front,
+            [this.box && this.box.BoxBase, this.box && this.box.BoxTop],
+            this.loosePlacedElement()
         );
     }
 
-    // Same seating as the toy-and-box pair: match visible bottoms, then the table lip.
-    seat_named_pieces(containerEl, containerParts, looseEl) {
-        if (looseEl && containerEl) {
-            let looseBottom = this.visualBottom(looseEl);
-            let containerBottom = this.visualBottom(containerEl);
-            if (looseBottom != null && containerBottom != null && Math.abs(looseBottom - containerBottom) >= 2) {
-                this.nudge_elements(containerParts, looseBottom - containerBottom);
-            }
-        }
+    // Box and loose item each land on the table lip. The loose item is not
+    // dragged along with the box, so a sloping box can come down onto the
+    // line the toy or sack already uses.
+    seat_pair_on_table(containerEl, containerParts, looseEl) {
         let lip = this.tableFrontLip();
-        let seatedBottom = containerEl ? this.visualBottom(containerEl) : null;
-        if (lip == null || seatedBottom == null) return;
-        let drop = lip - seatedBottom;
-        if (Math.abs(drop) < 2) return;
-        this.nudge_elements(containerParts.concat([looseEl]), drop);
+        if (lip == null) return;
+        let parts = (containerParts || []).filter(Boolean);
+        let containerBottom = null;
+        if (containerEl) {
+            let slopingBox = containerEl.classList && containerEl.classList.contains("front");
+            containerBottom = slopingBox
+                ? this.frontSittingEdge(containerEl)
+                : this.visualBottom(containerEl);
+        }
+        let looseBottom = looseEl ? this.visualBottom(looseEl) : null;
+        if (containerBottom != null && parts.length) {
+            let drop = lip - containerBottom;
+            if (Math.abs(drop) >= 2) this.nudge_elements(parts, drop);
+        }
+        if (looseBottom != null) {
+            let drop = lip - looseBottom;
+            if (Math.abs(drop) >= 2) this.nudge_elements([looseEl], drop);
+        }
     }
 
     seat_toy_on_table() {
@@ -13897,76 +13898,50 @@ class ParticipantToyBoxTrialController {
         });
     }
 
-    // Front lip of the tabletop, ignoring the legs. Measured while the box
-    // and toy are still invisible so they do not cover the planks.
+    // Bottom edge of the tabletop plank. The legs are the narrow paths below
+    // it; a hit test stops on the top edge and leaves the objects in the wall.
     tableFrontLip() {
         let table = this.tableElement;
         if (!table) return null;
-        let saved = [];
-        let node = table;
-        while (node && node !== document.documentElement) {
-            saved.push([node, node.style.pointerEvents]);
-            if (node.style.pointerEvents === "none") node.style.pointerEvents = "auto";
-            node = node.parentNode;
+        let tableBox = table.getBoundingClientRect();
+        if (tableBox.width < 2) return null;
+        let bottom = null;
+        let paths = table.querySelectorAll("path");
+        for (let i = 0; i < paths.length; i++) {
+            let b = paths[i].getBoundingClientRect();
+            if (b.width < tableBox.width * 0.5 || b.height < 1) continue;
+            if (bottom == null || b.bottom > bottom) bottom = b.bottom;
         }
+        return bottom;
+    }
 
-        let box = table.getBoundingClientRect();
-        let lips = [];
-        [0.3, 0.42, 0.58, 0.7].forEach((portion) => {
-            let x = box.left + box.width * portion;
-            let runEnd = null;
-            let inRun = false;
-            for (let y = box.top; y < box.bottom; y += 3) {
-                let hit = document.elementFromPoint(x, y);
-                if (hit && table.contains(hit)) {
-                    inRun = true;
-                    runEnd = y;
-                } else if (inRun) {
-                    break;
-                }
-            }
-            if (runEnd != null) lips.push(runEnd);
-        });
-
-        saved.forEach((entry) => {
-            entry[0].style.pointerEvents = entry[1];
-        });
-        if (!lips.length) return null;
-        lips.sort((a, b) => a - b);
-        return lips[Math.floor((lips.length - 1) / 2)];
+    // Lowest painted edge. Invisible alignment rectangles and outline paths
+    // that hang under the artwork are not the edge that should meet the table.
+    paintedBottom(root, colorOnly) {
+        if (!root || !root.querySelectorAll) return null;
+        let nodes = colorOnly
+            ? root.querySelectorAll(".box_color_dark, .box_color_light, .box_color_accent")
+            : root.querySelectorAll("path, polygon, rect, circle, ellipse");
+        let bottom = null;
+        for (let i = 0; i < nodes.length; i++) {
+            let el = nodes[i];
+            if (el.closest(".invisible_element") || el.closest(".alignment_field") || el.closest(".box_decoration")) continue;
+            let b = el.getBoundingClientRect();
+            if (b.width < 1.5 || b.height < 1.5) continue;
+            if (bottom == null || b.bottom > bottom) bottom = b.bottom;
+        }
+        return bottom;
     }
 
     visualBottom(root) {
-        if (!root) return null;
-        let saved = [];
-        let node = root;
-        while (node && node !== document.documentElement) {
-            saved.push([node, node.style.pointerEvents]);
-            if (node.style.pointerEvents === "none") node.style.pointerEvents = "auto";
-            node = node.parentNode;
-        }
-        let prevOpacity = root.style.opacity;
-        if (prevOpacity === "0" || prevOpacity === "0.0") root.style.opacity = "0.02";
+        return this.paintedBottom(root, false);
+    }
 
-        let box = root.getBoundingClientRect();
-        let bottoms = [];
-        [0.32, 0.5, 0.68].forEach((portion) => {
-            let x = box.left + box.width * portion;
-            let last = null;
-            for (let y = box.top; y < box.bottom; y += 3) {
-                let hit = document.elementFromPoint(x, y);
-                if (hit && root.contains(hit)) last = y;
-            }
-            if (last != null) bottoms.push(last);
-        });
-
-        root.style.opacity = prevOpacity;
-        saved.forEach((entry) => {
-            entry[0].style.pointerEvents = entry[1];
-        });
-        if (!bottoms.length) return null;
-        bottoms.sort((a, b) => a - b);
-        return bottoms[Math.floor((bottoms.length - 1) / 2)];
+    // Lowest edge of the colored body. A flat chest meets the table on that
+    // line. A sloping container meets it at the near corner, the same line
+    // the sack uses.
+    frontSittingEdge(root) {
+        return this.paintedBottom(root, true) || this.visualBottom(root);
     }
 
     screenDeltaToSvgY(dyScreen) {
@@ -14031,7 +14006,7 @@ class ParticipantToyBoxTrialController {
             this.basics.ItemLayers.Plus2,
             layout.boxX,
             layout.boxY,
-            this.itemScale,
+            this.sackScale,
             180
         );
         let toyReady = this.toy.create_and_appear_toy(
@@ -14049,12 +14024,46 @@ class ParticipantToyBoxTrialController {
         this.sack.set_pointer_events_enabled(false);
         await Promise.all([sackReady, toyReady]);
         await wait(170);
+        if (this.FenObj.charge_before_place === true) await this.test_toy_before_packing();
         if (partnerLeavesFirst) await this.partner_steps_away({ leaveBackpack: false });
         await this.open_the_sack();
         this.sack.set_pointer_events_enabled(false);
         await this.place_existing_sack_contents_on_table();
         await this.prompt_to_place();
         this.enable_drag();
+    }
+
+    // These trials have no Fennimal to present the toy, so the participant
+    // runs that toy's charge action while it is still on the table. On the
+    // switch trial this finishes before the partner picks up the phone.
+    async test_toy_before_packing() {
+        let line = "Before we pack it away, let's make sure it still works.";
+        if (this.partner && this.partner.is_present && typeof Interface.showPartnerSpeechBubble === "function") {
+            this.partner.set_direction("front");
+            await wait(180);
+            await Interface.showPartnerSpeechBubble({
+                target: this.partner.PartnerBaseGroup,
+                context: "location",
+                text: line,
+                buttonLabel: "Okay",
+                preferredSide: "left"
+            });
+            this.partner.set_direction("back");
+        } else if (typeof Interface !== "undefined" && Interface.Prompt) {
+            Interface.Prompt.show_message(line);
+            await wait(1200);
+        }
+        if (!this.toy || !this.toy.ToyElement || typeof this.toy.charge_toy !== "function") return;
+        this.toy.ToyElement.style.pointerEvents = "auto";
+        this.toy.parentScale = this.itemScale;
+        await this.toy.charge_toy(
+            this.basics.ItemLayers.Plus2,
+            0.38 * this.basics.W,
+            0.32 * this.basics.H,
+            null
+        );
+        if (this.toy.ToyElement) this.toy.ToyElement.style.pointerEvents = "none";
+        if (typeof Interface !== "undefined" && Interface.Prompt) Interface.Prompt.hide();
     }
 
     async play_sack_into_box(layout) {
@@ -14070,7 +14079,7 @@ class ParticipantToyBoxTrialController {
             this.basics.ItemLayers.Plus1,
             layout.toyX,
             layout.toyY,
-            this.itemScale,
+            this.sackScale,
             180
         );
         this.prepare_table_items_for_fade();
@@ -14080,6 +14089,9 @@ class ParticipantToyBoxTrialController {
         this.box.set_pointer_events_enabled(false);
         await Promise.all([boxReady, sackReady]);
         await wait(170);
+        // The first seat runs while the box is still invisible. Measure again
+        // once it is on screen, so it lands on the same line as the sack.
+        this.seat_box_with_toy();
         await this.open_the_box();
         this.box.set_pointer_events_enabled(false);
         await this.place_existing_contents_on_table();
@@ -14145,7 +14157,7 @@ class ParticipantToyBoxTrialController {
                     this.partner,
                     this.FenObj,
                     () => this.after_toy_placed(),
-                    dropOptions
+                    Object.assign({}, dropOptions, this.wiggleCloseOptions())
                 );
             }
         );
@@ -14175,7 +14187,7 @@ class ParticipantToyBoxTrialController {
                     this.partner,
                     this.FenObj,
                     () => this.after_toy_placed(),
-                    { shrinkFactor: 0.82 }
+                    Object.assign({ shrinkFactor: 0.82 }, this.wiggleCloseOptions())
                 );
             }
         );
@@ -14662,7 +14674,7 @@ class ParticipantToyBoxTrialController {
                 this.basics.ItemLayers.Plus1,
                 inside.x,
                 inside.y,
-                2.2,
+                this.sackScale * 0.65,
                 0
             );
             dragEl = this.clearedSack.SackItem;
@@ -15105,7 +15117,8 @@ class ParticipantToyBoxTrialController {
         let match = (scaleGroup.style.transform || "").match(/scale\(([^)]+)\)/);
         let from = match ? parseFloat(match[1]) : 1;
         if (!isFinite(from) || from <= 0) from = 1;
-        let to = this.itemScale || from;
+        let isSack = this.clearedSack && el === this.clearedSack.SackItem;
+        let to = (isSack ? this.sackScale : this.itemScale) || from;
         if (to <= from + 0.05) return null;
         scaleGroup.style.transition = "none";
         scaleGroup.style.transform = "scale(" + to + ")";
@@ -15426,10 +15439,10 @@ class ParticipantToyBoxTrialController {
         await this.open_box_for_reveal();
         let boxTargetEl = this.box.BoxTop.getElementsByClassName("box_target_centerpoint")[0];
         let boxTarget = getSVGInternalCenter(boxTargetEl);
-        set_nested_scale(sackEl, this.itemScale, 450);
+        set_nested_scale(sackEl, this.sackScale, 450);
         await this.animateToyToPoint(sackEl, boxTarget.x, Math.max(boxTarget.y - 280, 160), 450);
         await wait(1000);
-        set_nested_scale(sackEl, this.itemScale * 0.65, 450);
+        set_nested_scale(sackEl, this.sackScale * 0.65, 450);
         await this.animateToyToPoint(sackEl, boxTarget.x, boxTarget.y, 450);
         await this.close_box_for_reveal();
     }
@@ -15478,6 +15491,206 @@ class ParticipantToyBoxTrialController {
             placed.style.opacity = 0;
             await wait(250);
         }
+    }
+
+    // Opt-in on a participant placement. The Fennimal swap has its own wiggle.
+    wantsParticipantWiggle() {
+        return !!(this.FenObj && this.FenObj.wiggle_into_place === true && this.FenObj.placed_by_fennimal !== true);
+    }
+
+    wiggleCloseOptions() {
+        if (!this.wantsParticipantWiggle()) return {};
+        return { beforeClose: (token) => this.seatParticipantToy(token) };
+    }
+
+    // After the drop, zoom onto the container and seat the toy with three clicks.
+    // The toy starts proud of the opening and each click wiggles it further in.
+    async seatParticipantToy(token) {
+        if (!token) return;
+        let focus = this.placementMove() === "toy_into_sack"
+            ? (this.sack && (this.sack.SackBase || this.sack.SackTop))
+            : (this.box && this.box.BoxBase);
+        if (!focus) return;
+        let screenH = token.getBoundingClientRect().height;
+        let dy = Math.max(52, screenH * 0.45);
+        this._wiggleSeat = { dy: dy };
+        // Lift before the zoom by the amount that becomes `dy` screen pixels at 1.75x,
+        // so the toy is already proud when the close-up arrives and the shakes seat it fully.
+        let zoom = 1.75;
+        this.liftToyForWiggle(token, dy / zoom);
+        await this.participantZoomSceneTo(focus, zoom);
+        try {
+            await this.participantClickToyIntoPlace(token);
+        } finally {
+            this.clearParticipantToyGlow(token);
+            token.style.pointerEvents = "none";
+            token.style.cursor = "auto";
+            await this.participantZoomSceneTo(null, 1);
+        }
+    }
+
+    liftToyForWiggle(token, screenDy) {
+        let base = (token.style.transform || "").match(/translate\(\s*([-\d.]+)px,\s*([-\d.]+)px\)/);
+        let x = base ? parseFloat(base[1]) : 0;
+        let y = base ? parseFloat(base[2]) : 0;
+        let dy = (typeof screenDy === "number") ? screenDy : ((this._wiggleSeat && this._wiggleSeat.dy) || 54);
+        let ctm = token.parentNode && token.parentNode.getScreenCTM && token.parentNode.getScreenCTM();
+        let sy = ctm && ctm.d ? 1 / ctm.d : 1;
+        token.style.transition = "none";
+        token.style.transform = "translate(" + x + "px, " + (y - dy * sy) + "px)";
+    }
+
+    async participantClickToyIntoPlace(token) {
+        let savedHits = this.muteParticipantContainerHits();
+        let toyName = this.participantPlacedToyName();
+        let prompt = "It doesn't quite fit... click on the " + toyName + " to wiggle it in place";
+        let seat = this._wiggleSeat || { dy: 54 };
+        let dyEach = seat.dy / 3;
+        try {
+            token.style.pointerEvents = "auto";
+            token.style.cursor = "pointer";
+            token.querySelectorAll("*").forEach((el) => { el.style.pointerEvents = "auto"; });
+            for (let i = 0; i < 3; i++) {
+                Interface.Prompt.show_message(prompt);
+                if (i === 0 && typeof AudioCont !== "undefined") AudioCont.play_sound_effect("alert_minor");
+                this.showParticipantToyGlow(token);
+                await this.waitForParticipantToyClick(token);
+                this.clearParticipantToyGlow(token);
+                await this.participantShakeAndSettle(token, dyEach);
+            }
+        } finally {
+            this.clearParticipantToyGlow(token);
+            this.restoreParticipantContainerHits(savedHits);
+            token.style.pointerEvents = "none";
+            token.querySelectorAll("*").forEach((el) => { el.style.pointerEvents = "none"; });
+            token.style.cursor = "auto";
+        }
+        if (typeof AudioCont !== "undefined") AudioCont.play_sound_effect("positive");
+        await wait(220);
+        Interface.Prompt.hide();
+    }
+
+    participantPlacedToyName() {
+        let id = this.FenObj && this.FenObj.toy;
+        let names = {
+            car: "car",
+            plane: "plane",
+            trumpet: "trumpet",
+            robot: "robot",
+            globe: "globe",
+            bubblewand: "bubble wand",
+            jack: "Jack-in-the-Box"
+        };
+        if (names[id]) return names[id];
+        if (!id) return "toy";
+        return String(id).replace(/_/g, " ");
+    }
+
+    muteParticipantContainerHits() {
+        let front = this.placementMove() === "toy_into_sack"
+            ? (this.sack && this.sack.SackTop)
+            : (this.box && this.box.BoxTop);
+        if (!front) return [];
+        let saved = [];
+        [front, ...front.querySelectorAll("*")].forEach((el) => {
+            saved.push([el, el.style.pointerEvents]);
+            el.style.pointerEvents = "none";
+        });
+        return saved;
+    }
+
+    restoreParticipantContainerHits(saved) {
+        (saved || []).forEach(([el, value]) => {
+            if (el) el.style.pointerEvents = value || "";
+        });
+    }
+
+    showParticipantToyGlow(token) {
+        if (token) token.classList.add("toy_click_glow");
+    }
+
+    clearParticipantToyGlow(token) {
+        if (token) token.classList.remove("toy_click_glow");
+    }
+
+    waitForParticipantToyClick(token) {
+        return new Promise((resolve) => {
+            const onDown = (evt) => {
+                if (evt.button != null && evt.button !== 0) return;
+                token.removeEventListener("pointerdown", onDown);
+                resolve();
+            };
+            token.addEventListener("pointerdown", onDown);
+        });
+    }
+
+    async participantShakeAndSettle(token, dy) {
+        let base = (token.style.transform || "").match(/translate\(\s*([-\d.]+)px,\s*([-\d.]+)px\)/);
+        let x = base ? parseFloat(base[1]) : 0;
+        let y = base ? parseFloat(base[2]) : 0;
+        let ctm = token.parentNode && token.parentNode.getScreenCTM && token.parentNode.getScreenCTM();
+        let sx = ctm && ctm.a ? 1 / ctm.a : 1;
+        let sy = ctm && ctm.d ? 1 / ctm.d : 1;
+        let hops = [
+            [-12 * sx, dy * 0.2 * sy, 90],
+            [11 * sx, dy * 0.5 * sy, 90],
+            [-6 * sx, dy * 0.75 * sy, 90],
+            [0, dy * sy, 170]
+        ];
+        for (let hop of hops) {
+            token.style.transition = "transform " + hop[2] + "ms ease-in-out";
+            token.style.transform = "translate(" + (x + hop[0]) + "px, " + (y + hop[1]) + "px)";
+            await wait(hop[2] + 20);
+        }
+        if (typeof AudioCont !== "undefined" && AudioCont.play_sound_effect) {
+            AudioCont.play_sound_effect("thud");
+        }
+    }
+
+    async participantZoomSceneTo(focusEl, scale) {
+        let layers = [this.basics.BackgroundLayer, this.basics.ItemLayers && this.basics.ItemLayers.Layer].filter(Boolean);
+        let ms = 1100;
+        let toScale = (!focusEl || scale === 1) ? 1 : scale;
+        let focus = (focusEl && getSVGInternalCenter(focusEl)) || this._sceneZoomFocus;
+        if (!focus || !layers.length) {
+            layers.forEach((layer) => {
+                layer.style.transition = "none";
+                layer.style.transform = "";
+            });
+            this._sceneZoom = 1;
+            return;
+        }
+        let fromScale = this._sceneZoom || 1;
+        let anchor = { x: this.basics.W * 0.5, y: this.basics.H * 0.5 };
+        let fromP = fromScale === 1 ? { x: focus.x, y: focus.y } : (this._sceneZoomAnchor || anchor);
+        let toP = toScale === 1 ? { x: focus.x, y: focus.y } : anchor;
+        layers.forEach((layer) => {
+            layer.style.transition = "none";
+            layer.style.transformBox = "view-box";
+            layer.style.transformOrigin = "0px 0px";
+        });
+        await new Promise((resolve) => {
+            let t0 = performance.now();
+            const frame = (now) => {
+                let t = Math.min(1, (now - t0) / ms);
+                let e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+                let s = fromScale + (toScale - fromScale) * e;
+                let px = fromP.x + (toP.x - fromP.x) * e;
+                let py = fromP.y + (toP.y - fromP.y) * e;
+                let transform = "";
+                if (Math.abs(s - 1) > 0.004 || Math.abs(px - focus.x) > 0.6 || Math.abs(py - focus.y) > 0.6) {
+                    transform = "translate(" + px + "px, " + py + "px) scale(" + s + ") translate(" + (-focus.x) + "px, " + (-focus.y) + "px)";
+                }
+                layers.forEach((layer) => { layer.style.transform = transform; });
+                if (t < 1) requestAnimationFrame(frame);
+                else resolve();
+            };
+            requestAnimationFrame(frame);
+        });
+        this._sceneZoom = toScale;
+        this._sceneZoomFocus = focus;
+        this._sceneZoomAnchor = toScale === 1 ? null : anchor;
+        if (toScale === 1) layers.forEach((layer) => { layer.style.transform = ""; });
     }
 
     finish_trial() {

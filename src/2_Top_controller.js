@@ -375,6 +375,8 @@ class DataController {
             fennimal_id: fennimalId,
             fennimal_name: placedByFennimal ? (row.name || null) : null,
             partner_leaves_during_interaction: row.partner_leaves_during_interaction === true,
+            wiggle_into_place: row.wiggle_into_place === true,
+            charge_before_place: row.charge_before_place === true,
             placement_move: row.placement_move || null,
             box_code: boxCode,
             toybox: row.toybox || null,
@@ -1775,6 +1777,30 @@ class TrialGenerator {
                 errors.push(`${label} sets n_trials_to_sample, which is only allowed on retrieve_lost_box.`);
             }
 
+            if (phase.type === "written_memory_page" && phase.memory_questions !== undefined) {
+                let knownMemoryQuestions = new Set([
+                    "placement_object", "sack_toy", "box_decorator", "favorite_toys"
+                ]);
+                if (!Array.isArray(phase.memory_questions) || phase.memory_questions.length === 0) {
+                    errors.push(`${label} memory_questions must be a non-empty array when it is set.`);
+                } else {
+                    phase.memory_questions.forEach((spec, specIndex) => {
+                        if (!spec || !knownMemoryQuestions.has(spec.kind)) {
+                            errors.push(
+                                `${label} memory_questions[${specIndex}] has unknown kind ` +
+                                `"${spec && spec.kind}".`
+                            );
+                            return;
+                        }
+                        if (spec.kind === "placement_object" && spec.place !== "first" && spec.place !== "second") {
+                            errors.push(
+                                `${label} memory_questions[${specIndex}] needs place "first" or "second".`
+                            );
+                        }
+                    });
+                }
+            }
+
             if (phase.type === "hat_binding_task") {
                 let hasHub = !!phase.hub;
                 let hasArms = Array.isArray(phase.arms);
@@ -2809,7 +2835,9 @@ class TrialGenerator {
             sack_code: subblock.sack,
             placement_quiz_options: options,
             skip_phone_room_autotravel: true,
-            partner_leaves_during_interaction: subblock.partner_leaves_during_interaction === true
+            partner_leaves_during_interaction: subblock.partner_leaves_during_interaction === true,
+            wiggle_into_place: subblock.wiggle_into_place === true,
+            charge_before_place: subblock.charge_before_place === true
         };
     }
 
@@ -3276,6 +3304,9 @@ class TrialGenerator {
         if (!trials || trials.length === 0) return trials;
         if (phaseData.include_decoration === true) {
             trials = set_property_to_all_elem_in_arr("include_decoration", true, trials);
+        }
+        if (phaseData.include_lost_found_tag === false) {
+            trials = set_property_to_all_elem_in_arr("include_lost_found_tag", false, trials);
         }
         return trials;
     }
@@ -4319,7 +4350,7 @@ class ExperimentController {
                 this.instrCont.initializeWrittenMemoryPageInstructions(
                     this.currentDayNum,
                     WrittenMemoryPageController.bonusFromPhase(this.currentPhaseData),
-                    WrittenMemoryPageController.questionCountFromStimuli(this.stimuli)
+                    WrittenMemoryPageController.questionCountForPhase(this.currentPhaseData, this.stimuli)
                 );
                 break;
             case "free_exploration":
@@ -5259,7 +5290,7 @@ class ExperimentController {
             this.instrCont.initializeBrokenToyWorkshopInstructions(this.currentDayNum, charges);
             return;
         }
-        this.instrCont.initializeWarehouseCleanupInstructions(this.currentDayNum);
+        this.instrCont.initializeWarehouseCleanupInstructions(this.currentDayNum, this.currentPhaseData);
     }
 
     // The phase card already explained this workshop run.

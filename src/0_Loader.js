@@ -373,4 +373,4 @@ loadMainElements()
 
 
 //Adapt head sorting task to two rows if more than 4 regions selected
-console.log("Ready new! RC")
+console.log("E2 Ready new!")

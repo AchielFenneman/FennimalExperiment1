@@ -13,6 +13,9 @@
  * bonus_stars_per_correct / bonus_stars_per_dont_remember /
  * bonus_stars_per_incorrect. Defaults are 1, 0.5, and 0.
  * The page total is the sum, so five questions pay at most 5 stars.
+ *
+ * A phase may set memory_questions. Without that list, the page stays the
+ * Fennimal placement order plus one favorite-toy question per Fennimal.
  */
 class WrittenMemoryPageController {
     constructor(parentLayer, phaseData, returnfunc, expCont) {
@@ -65,6 +68,21 @@ class WrittenMemoryPageController {
             : [];
         let n = (list || []).filter((fen) => fen && fen.id).length;
         return 2 + n;
+    }
+
+    // memory_questions replaces the default set. favorite_toys is one question per Fennimal.
+    static questionCountForPhase(phase, stimuli) {
+        let specs = phase && Array.isArray(phase.memory_questions) ? phase.memory_questions : null;
+        if (!specs) return WrittenMemoryPageController.questionCountFromStimuli(stimuli);
+        let list = (stimuli && stimuli.get_all_Fennimals_objects_in_array)
+            ? stimuli.get_all_Fennimals_objects_in_array()
+            : [];
+        let n = (list || []).filter((fen) => fen && fen.id).length;
+        return specs.reduce((sum, spec) => {
+            if (!spec || !spec.kind) return sum;
+            if (spec.kind === "favorite_toys") return sum + n;
+            return sum + 1;
+        }, 0);
     }
 
     static maximumStars(bonus, questionCount) {
@@ -156,6 +174,9 @@ class WrittenMemoryPageController {
     }
 
     _buildPages() {
+        let declared = this.phaseData && this.phaseData.memory_questions;
+        if (Array.isArray(declared) && declared.length > 0) return this._buildDeclaredPages(declared);
+
         let boxCode = (this.phaseData && this.phaseData.target_box) || "X";
         let boxAssetId = this._mappedId("toybox", boxCode);
         let boxName = boxAssetId && GenParam.get_box_printed_name
@@ -184,6 +205,269 @@ class WrittenMemoryPageController {
             questions: toyFens.map((fen) => this._toyQuestion(fen))
         };
         return [orderPage, toyPage];
+    }
+
+    _buildDeclaredPages(specs) {
+        let boxCode = (this.phaseData && this.phaseData.target_box) || "X";
+        let boxAssetId = this._mappedId("toybox", boxCode);
+        let boxName = boxAssetId && GenParam.get_box_printed_name
+            ? GenParam.get_box_printed_name(boxAssetId)
+            : "box";
+        let boxPhrase = "the " + this._escape(boxName);
+        let placed = this._participantPlacedObjects(boxCode, boxAssetId);
+        let pages = [];
+
+        specs.forEach((spec) => {
+            if (!spec || !spec.kind) return;
+            if (spec.kind === "placement_object") {
+                let word = spec.place === "second" ? "second" : "first";
+                let index = word === "second" ? 1 : 0;
+                this._pushQuestion(pages, "placement_order", this._objectOrderQuestion(
+                    word,
+                    placed[index] || null,
+                    boxPhrase,
+                    boxAssetId
+                ));
+                return;
+            }
+            if (spec.kind === "sack_toy") {
+                this._pushQuestion(pages, "sack_toy", this._sackToyQuestion(spec));
+                return;
+            }
+            if (spec.kind === "box_decorator") {
+                this._pushQuestion(pages, "box_decorator", this._decoratorQuestion(boxPhrase, boxAssetId));
+                return;
+            }
+            if (spec.kind === "favorite_toys") {
+                let toyFens = shuffleArray(this.fennimals.map((fen) => fen));
+                toyFens.forEach((fen) => this._pushQuestion(pages, "favorite_toys", this._toyQuestion(fen)));
+                return;
+            }
+            console.error("WrittenMemoryPage: unknown memory question kind \"" + spec.kind + "\".");
+        });
+        return pages;
+    }
+
+    _pushQuestion(pages, pageId, question) {
+        let last = pages[pages.length - 1];
+        if (!last || last.id !== pageId) {
+            last = { id: pageId, questions: [] };
+            pages.push(last);
+        }
+        last.questions.push(question);
+    }
+
+    _objectOrderQuestion(placeWord, placed, boxPhrase, boxAssetId) {
+        if (!placed) {
+            console.error("WrittenMemoryPage: missing the " + placeWord + " object placed in the box.");
+        }
+        return {
+            question_id: "placement_" + placeWord,
+            page_id: "placement_order",
+            kind: "placement_object",
+            place: placeWord,
+            promptHtml: "Which object did you place in " + boxPhrase + " <b>" + placeWord + "</b>?",
+            cue: { kind: "box", boxAssetId: boxAssetId },
+            correct_option_id: placed ? (placed.kind + ":" + placed.id) : null,
+            options: this._objectOptions(placed),
+            selectedId: null
+        };
+    }
+
+    _sackToyQuestion(spec) {
+        let sackCode = (spec && spec.sack) || this._sackCodeFromStimulus() || "A";
+        let sackId = this._mappedId("sack", sackCode);
+        let toyId = this._toyPlacedInSack(sackId, sackCode);
+        let sackName = sackId && GenParam.get_sack_printed_name
+            ? GenParam.get_sack_printed_name(sackId)
+            : "sack";
+        if (!toyId) {
+            console.error("WrittenMemoryPage: could not find the toy placed in sack \"" + sackCode + "\".");
+        }
+        return {
+            question_id: "sack_toy_" + sackCode,
+            page_id: "sack_toy",
+            kind: "sack_toy",
+            promptHtml: "Which toy did you place in the " + this._escape(sackName) + "?",
+            cue: { kind: "sack", sackId: sackId },
+            correct_option_id: toyId,
+            options: this._toyOptions(toyId),
+            selectedId: null
+        };
+    }
+
+    _decoratorQuestion(boxPhrase, boxAssetId) {
+        let correctId = this._decoratorId(boxAssetId);
+        if (!correctId) {
+            console.error("WrittenMemoryPage: no Fennimal is recorded as decorating the box.");
+        }
+        return {
+            question_id: "box_decorator",
+            page_id: "box_decorator",
+            kind: "box_decorator",
+            promptHtml: "Which Fennimal helped decorate " + boxPhrase + "?",
+            cue: { kind: "box", boxAssetId: boxAssetId },
+            correct_option_id: correctId,
+            options: this._headOptions(correctId),
+            selectedId: null
+        };
+    }
+
+    _objectOptions(correct) {
+        let options = [];
+        this.toyIds.forEach((id) => {
+            options.push({
+                id: "toy:" + id,
+                kind: "toy",
+                toyId: id,
+                role: correct && correct.kind === "toy" && correct.id === id ? "correct" : "foil"
+            });
+        });
+        this._sackAssetIds().forEach((id) => {
+            options.push({
+                id: "sack:" + id,
+                kind: "sack",
+                sackId: id,
+                role: correct && correct.kind === "sack" && correct.id === id ? "correct" : "foil"
+            });
+        });
+        let correctKey = correct ? (correct.kind + ":" + correct.id) : null;
+        if (correctKey && !options.some((opt) => opt.id === correctKey)) {
+            options.push(correct.kind === "sack"
+                ? { id: correctKey, kind: "sack", sackId: correct.id, role: "correct" }
+                : { id: correctKey, kind: "toy", toyId: correct.id, role: "correct" });
+        }
+        options = shuffleArray(options);
+        options.push(this._dontRememberOption());
+        return options;
+    }
+
+    _sackAssetIds() {
+        let stimuli = this.expCont && this.expCont.stimuli;
+        let ids = [];
+        const add = (id) => {
+            if (id && !ids.includes(id)) ids.push(id);
+        };
+        if (stimuli && stimuli.get_mapped_asset_ids) {
+            (stimuli.get_mapped_asset_ids("sack") || []).forEach(add);
+        }
+        if (stimuli && stimuli.get_all_software_options_of_type) {
+            (stimuli.get_all_software_options_of_type("sack") || []).forEach(add);
+        }
+        return ids;
+    }
+
+    _participantPlacedObjects(boxCode, boxAssetId) {
+        let fromHistory = this._placedObjectsFromHistory(boxAssetId);
+        if (fromHistory.length >= 2) return fromHistory;
+        return this._placedObjectsFromStimulus(boxCode);
+    }
+
+    _placedObjectsFromHistory(boxAssetId) {
+        if (!boxAssetId || typeof WorldState === "undefined" || !WorldState.get_toybox_contents_history) {
+            return [];
+        }
+        let history = WorldState.get_toybox_contents_history(boxAssetId) || [];
+        let placed = [];
+        history.forEach((entry) => {
+            if (!entry || (entry.toy == null && !entry.sack)) return;
+            let object = entry.sack
+                ? { kind: "sack", id: entry.sack }
+                : (entry.toy ? { kind: "toy", id: entry.toy } : null);
+            if (!object) return;
+            let previous = placed[placed.length - 1];
+            if (previous && previous.kind === object.kind && previous.id === object.id) return;
+            placed.push(object);
+        });
+        return placed;
+    }
+
+    _placedObjectsFromStimulus(boxCode) {
+        let placed = [];
+        this._eachWarehouseCleanup((block) => {
+            if (!block || block.Fennimal || block.box !== boxCode) return;
+            if (block.sack) {
+                let id = this._mappedId("sack", block.sack);
+                if (id) placed.push({ kind: "sack", id: id });
+                return;
+            }
+            if (block.toy) {
+                let id = this._mappedId("toy", block.toy);
+                if (id) placed.push({ kind: "toy", id: id });
+            }
+        });
+        return placed;
+    }
+
+    _toyPlacedInSack(sackId, sackCode) {
+        if (sackId && typeof WorldState !== "undefined" && WorldState.get_sack_contents) {
+            let current = WorldState.get_sack_contents(sackId);
+            if (current) return current;
+            if (WorldState.get_sack_contents_history) {
+                let history = WorldState.get_sack_contents_history(sackId) || [];
+                for (let i = history.length - 1; i >= 0; i--) {
+                    if (history[i] && history[i].toy) return history[i].toy;
+                }
+            }
+        }
+        let toyCode = null;
+        this._eachWarehouseCleanup((block) => {
+            if (toyCode || !block || block.Fennimal) return;
+            if (block.sack === sackCode && block.toy) toyCode = block.toy;
+        });
+        return toyCode ? this._mappedId("toy", toyCode) : null;
+    }
+
+    _sackCodeFromStimulus() {
+        let code = null;
+        this._eachWarehouseCleanup((block) => {
+            if (code || !block || block.Fennimal) return;
+            if (block.sack && block.toy && !block.box) code = block.sack;
+        });
+        return code;
+    }
+
+    _decoratorId(boxAssetId) {
+        if (boxAssetId && typeof WorldState !== "undefined" && WorldState.get_toybox_decorator) {
+            let recorded = WorldState.get_toybox_decorator(boxAssetId);
+            if (recorded) return String(recorded);
+        }
+        let phase = this._experimentStructure().find((item) => item && item.type === "retrieve_lost_box");
+        if (!phase || !Array.isArray(phase.box_locations)) return null;
+        let label = this._storedConditionLabel(phase.randomization_id || "lost_box_manipulation");
+        if (!label && typeof getUrlSearchParam === "function") {
+            label = getUrlSearchParam("CONDITION") || getUrlSearchParam("condition");
+            if (label) label = String(label).trim();
+        }
+        let row = phase.box_locations.find((item) => item && String(item.label) === String(label));
+        return row && row.Fennimal_finding_box ? String(row.Fennimal_finding_box) : null;
+    }
+
+    _storedConditionLabel(key) {
+        let stored = this.expCont && this.expCont.dataCont && this.expCont.dataCont.experimentData
+            && this.expCont.dataCont.experimentData.phaseRandomizations;
+        if (!key || !stored || !stored[key] || !stored[key].label) return null;
+        return stored[key].label;
+    }
+
+    _experimentStructure() {
+        return (this.expCont && this.expCont.stimulusSettings
+            && this.expCont.stimulusSettings.Experiment_Structure) || [];
+    }
+
+    _eachWarehouseCleanup(visit) {
+        this._experimentStructure().forEach((phase) => {
+            if (!phase || phase.type !== "warehouse_task") return;
+            let blocks = phase.trial_subblocks;
+            if (!Array.isArray(blocks) && Array.isArray(phase.conditions)) {
+                let label = this._storedConditionLabel(phase.randomization_id);
+                let condition = phase.conditions.find((item) => item && item.label === label) || phase.conditions[0];
+                blocks = condition && condition.trial_subblocks;
+            }
+            (blocks || []).forEach((block) => {
+                if (block && block.interaction_type === "warehouse_cleanup") visit(block);
+            });
+        });
     }
 
     _orderQuestion(questionId, placeWord, correctId, boxPhrase, cue) {
@@ -432,12 +716,29 @@ class WrittenMemoryPageController {
         return height;
     }
 
-    _trayHeight(question) {
+    _trayMetrics(question) {
         let icons = question.options.filter((opt) => opt.kind !== "dont_remember");
-        let cols = question.kind === "favorite_toy" ? Math.min(3, icons.length) : Math.max(1, icons.length);
-        let rows = Math.max(1, Math.ceil(icons.length / cols));
-        let rowH = question.kind === "favorite_toy" ? this.icon : this.icon + this.nameH;
-        return rows * rowH + Math.max(0, rows - 1) * 16 + 20 + this.idrH;
+        if (question.kind === "placement_object") {
+            let cols = Math.min(5, Math.max(1, icons.length));
+            let icon = 146;
+            return { icons, cols, icon, rowH: icon, rowGap: 16, gap: 16, cellW: icon + 8 };
+        }
+        let compact = question.kind === "favorite_toy" || question.kind === "sack_toy";
+        return {
+            icons,
+            cols: compact ? Math.min(3, icons.length) : Math.max(1, icons.length),
+            icon: this.icon,
+            rowH: compact ? this.icon : this.icon + this.nameH,
+            rowGap: 16,
+            gap: 22,
+            cellW: this.icon + 24
+        };
+    }
+
+    _trayHeight(question) {
+        let metrics = this._trayMetrics(question);
+        let rows = Math.max(1, Math.ceil(metrics.icons.length / metrics.cols));
+        return rows * metrics.rowH + Math.max(0, rows - 1) * metrics.rowGap + 20 + this.idrH;
     }
 
     _drawCard(question, x, y, width, height) {
@@ -499,6 +800,7 @@ class WrittenMemoryPageController {
     _drawCue(question, cx, cy, size) {
         if (!question.cue) return;
         if (question.cue.kind === "box") this._drawBox(question.cue.boxAssetId, cx, cy, size);
+        if (question.cue.kind === "sack") this._drawSack(question.cue.sackId, cx, cy, size);
         if (question.cue.kind === "fennimal") this._drawHead(question.cue.fennimal, cx, cy, size);
     }
 
@@ -558,6 +860,10 @@ class WrittenMemoryPageController {
             this._drawToy(selected.toyId, x + size / 2, y + size / 2, size * 0.72);
             return;
         }
+        if (selected.kind === "sack") {
+            this._drawSack(selected.sackId, x + size / 2, y + size / 2, size * 0.72);
+            return;
+        }
         let remembered = create_SVG_foreignElement(x + 14, y + 20, size - 28, size - 40, undefined, undefined);
         let words = document.createElement("div");
         words.textContent = "I don't remember";
@@ -590,11 +896,12 @@ class WrittenMemoryPageController {
     }
 
     _drawTray(question, x, y, width) {
-        let icons = question.options.filter((opt) => opt.kind !== "dont_remember");
-        let cols = question.kind === "favorite_toy" ? Math.min(3, icons.length) : Math.max(1, icons.length);
-        let rowH = question.kind === "favorite_toy" ? this.icon : this.icon + this.nameH;
-        let gap = 22;
-        let cellW = this.icon + 24;
+        let metrics = this._trayMetrics(question);
+        let icons = metrics.icons;
+        let cols = metrics.cols;
+        let rowH = metrics.rowH;
+        let gap = metrics.gap;
+        let cellW = metrics.cellW;
         icons.forEach((opt, index) => {
             let col = index % cols;
             let row = Math.floor(index / cols);
@@ -602,8 +909,8 @@ class WrittenMemoryPageController {
             let rowWidth = rowCount * cellW + (rowCount - 1) * gap;
             let rowX = x + (width - rowWidth) / 2;
             let cx = rowX + col * (cellW + gap) + cellW / 2;
-            let top = y + row * (rowH + 16);
-            this._drawIconOption(question, opt, cx, top, cellW, rowH);
+            let top = y + row * (rowH + metrics.rowGap);
+            this._drawIconOption(question, opt, cx, top, cellW, rowH, metrics.icon);
         });
 
         let idr = question.options.find((opt) => opt.kind === "dont_remember");
@@ -614,7 +921,7 @@ class WrittenMemoryPageController {
         this._drawWordOption(question, idr, idrX, idrY, idrW, this.idrH);
     }
 
-    _drawIconOption(question, opt, cx, top, cellW, rowH) {
+    _drawIconOption(question, opt, cx, top, cellW, rowH, iconSize) {
         let selected = question.selectedId === opt.id;
         let rect = create_SVG_rect(cx - cellW / 2, top, cellW, rowH, undefined, undefined);
         rect.setAttribute("rx", 16);
@@ -632,9 +939,10 @@ class WrittenMemoryPageController {
         });
         this.root.appendChild(rect);
 
+        let icon = iconSize || this.icon;
         if (opt.kind === "fennimal") {
-            this._drawHead(opt.fennimal, cx, top + this.icon * 0.42, this.icon - 52);
-            let name = create_SVG_text_elem(cx, top + this.icon + 8, opt.fennimal.name || opt.fennimal.id, undefined, undefined);
+            this._drawHead(opt.fennimal, cx, top + icon * 0.42, icon - 52);
+            let name = create_SVG_text_elem(cx, top + icon + 8, opt.fennimal.name || opt.fennimal.id, undefined, undefined);
             name.style.textAnchor = "middle";
             name.style.fontSize = "30px";
             name.style.fontWeight = "700";
@@ -642,8 +950,10 @@ class WrittenMemoryPageController {
             name.style.fontFamily = "Myriad Pro, Source Sans 3, Segoe UI, sans-serif";
             name.style.pointerEvents = "none";
             this.root.appendChild(name);
+        } else if (opt.kind === "sack") {
+            this._drawSack(opt.sackId, cx, top + rowH / 2, icon - 32);
         } else {
-            this._drawToy(opt.toyId, cx, top + rowH / 2, this.icon - 32);
+            this._drawToy(opt.toyId, cx, top + rowH / 2, icon - 32);
         }
     }
 
@@ -725,6 +1035,26 @@ class WrittenMemoryPageController {
         this._placeGraphic(node, cx, cy, size);
     }
 
+    _drawSack(sackId, cx, cy, size) {
+        if (!sackId) return;
+        let template = document.getElementById(sackId);
+        if (!template) {
+            console.error("WrittenMemoryPage: missing sack " + sackId);
+            return;
+        }
+        let node = template.cloneNode(true);
+        node.removeAttribute("id");
+        node.style.display = "inherit";
+        let openGroup = node.querySelector(".sack_open");
+        if (openGroup) openGroup.remove();
+        let closedGroup = node.querySelector(".sack_closed");
+        if (closedGroup) closedGroup.style.display = "inline";
+        Array.from(node.getElementsByClassName("prep_element_hidden")).forEach((el) => {
+            el.style.display = "none";
+        });
+        this._placeGraphic(node, cx, cy, size);
+    }
+
     _drawBox(boxAssetId, cx, cy, size) {
         if (!boxAssetId || typeof get_toybox_template !== "function") return;
         let template = get_toybox_template(boxAssetId);
@@ -802,6 +1132,10 @@ class WrittenMemoryPageController {
             stored.toy_id = opt.toyId;
             stored.toy_code = this._codeForAsset("toy", opt.toyId);
         }
+        if (opt.kind === "sack") {
+            stored.sack_id = opt.sackId;
+            stored.sack_code = this._codeForAsset("sack", opt.sackId);
+        }
         return stored;
     }
 
@@ -835,6 +1169,33 @@ class WrittenMemoryPageController {
             }
         }
         if (question.kind === "placement_order") {
+            record.correct_fennimal = question.correct_option_id || null;
+            if (selected && selected.kind === "fennimal") record.selected_fennimal = selected.id;
+        }
+        if (question.kind === "placement_object") {
+            let correctParts = question.correct_option_id ? String(question.correct_option_id).split(":") : [];
+            record.correct_object_kind = correctParts[0] || null;
+            record.correct_object_id = correctParts.length > 1 ? correctParts.slice(1).join(":") : null;
+            if (selected && selected.kind === "toy") {
+                record.selected_object_kind = "toy";
+                record.selected_object_id = selected.toyId;
+                record.selected_toy_code = this._codeForAsset("toy", selected.toyId);
+            }
+            if (selected && selected.kind === "sack") {
+                record.selected_object_kind = "sack";
+                record.selected_object_id = selected.sackId;
+                record.selected_sack_code = this._codeForAsset("sack", selected.sackId);
+            }
+        }
+        if (question.kind === "sack_toy") {
+            record.correct_toy_code = this._codeForAsset("toy", question.correct_option_id);
+            record.target_sack = question.cue && question.cue.sackId;
+            record.target_sack_code = this._codeForAsset("sack", record.target_sack);
+            if (selected && selected.kind === "toy") {
+                record.selected_toy_code = this._codeForAsset("toy", selected.toyId);
+            }
+        }
+        if (question.kind === "box_decorator") {
             record.correct_fennimal = question.correct_option_id || null;
             if (selected && selected.kind === "fennimal") record.selected_fennimal = selected.id;
         }

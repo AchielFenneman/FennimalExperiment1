@@ -253,9 +253,20 @@ class InstructionsController {
             case "broken_toy_workshop":
                 Interface.Prompt.show_message("Put the pieces together so the toy matches the picture.", 2500);
                 break;
-            case "warehouse_task":
-                Interface.Prompt.show_message("Help each Fennimal store a favorite toy.", 2500);
+            case "warehouse_task": {
+                let phase = this.expCont && this.expCont.currentPhaseData;
+                let participantPlaces = !!(phase && Array.isArray(phase.trial_subblocks)
+                    && phase.trial_subblocks.some((block) =>
+                        block && block.interaction_type === "warehouse_cleanup" && !block.Fennimal
+                    ));
+                Interface.Prompt.show_message(
+                    participantPlaces
+                        ? "Pack the toy into the sack, then store that sack in the box."
+                        : "Help each Fennimal store a favorite toy.",
+                    2500
+                );
                 break;
+            }
             case "postcard_task":
                 Interface.Prompt.show_message("No additional instructions right now.", 2500);
                 break;
@@ -505,7 +516,9 @@ class InstructionsController {
     showOverviewPage() {
         let starsCanBeEarned = this.stimuli.get_maximum_number_of_bonus_stars() > 0;
         let storyTextOffset = starsCanBeEarned ? 0 : 0.175 * GenParam.SVG_height;
-        this.overviewIsGuided = this.stimuli.get_experiment_code() === "mentalizing_exp1_retro";
+        let overviewCode = this.stimuli.get_experiment_code();
+        this.overviewIsGuided = overviewCode === "mentalizing_exp1_retro"
+            || overviewCode === "mentalizing_exp2_retro";
         this.overviewPageRemainingSteps = this.overviewIsGuided
             ? (starsCanBeEarned ? ["stars", "movement", "partner"] : ["movement", "partner"])
             : (starsCanBeEarned ? ["stars", "movement", "search", "lookout", "instructions"] : ["movement", "search", "lookout", "instructions"]);
@@ -1177,7 +1190,9 @@ class InstructionsController {
         }
         document.getElementById("Instructions_Title").innerHTML = "Well done!";
         this.setRetrieveLostBoxInstructionText(completionText);
-        this.buildRetrieveLostBoxVisuals(this.fennimalsInPhase, { showTags: true });
+        let phase = this.expCont && this.expCont.currentPhaseData;
+        let showTags = !(phase && phase.include_lost_found_tag === false);
+        this.buildRetrieveLostBoxVisuals(this.fennimalsInPhase, { showTags: showTags });
 
         Array.from(this.parentElem.getElementsByClassName("instruction_element_nonbackground")).forEach((el) => {
             el.style.display = "inherit";
@@ -1856,7 +1871,7 @@ class InstructionsController {
         this.addClosingButtonToParent("bottom-center", false, undefined, 400);
     }
 
-    initializeWarehouseCleanupInstructions(currentBlockNum) {
+    initializeWarehouseCleanupInstructions(currentBlockNum, phaseData) {
         this.currentInstructionType = "warehouse_task";
         this.clearInstructions();
         this.currentInstructionsSVG = this.createBasicInstructionElements();
@@ -1864,12 +1879,12 @@ class InstructionsController {
         this.parentElem.style.display = "inherit";
 
         let copy = (typeof GenParam !== "undefined" && GenParam.WarehouseTask) || {};
-        let title = copy.cleanupTitle || "the warehouse";
+        let title = (phaseData && phaseData.day_title) || copy.cleanupTitle || "the warehouse";
         document.getElementById("Instructions_Title").innerHTML = `Day ${currentBlockNum}: ${title}`;
         this.updateProgressNewDay(currentBlockNum);
         this.updateProgressWithinDay(false);
 
-        let instructionText = copy.cleanupBody ||
+        let instructionText = (phaseData && phaseData.day_body) || copy.cleanupBody ||
             "Please tidy the warehouse.<br><br>A Fennimal will come to put a toy away. Help them when you are asked.";
 
         this.textElemMainInstructions = create_SVG_text_in_foreign_element(
@@ -2166,10 +2181,14 @@ class InstructionsController {
         if (maximum > 0) {
             document.getElementsByClassName("instructions_element_background")[0].style.fill =
                 GenParam.background_fill_for_instructions_where_stars_can_be_earned;
-            let starCount = Math.min(5, Math.round(maximum));
+            let starCount = Math.max(0, Math.round(maximum));
             continueButtonTime += starCount * 250;
             let center = 0.5 * GenParam.SVG_width;
             let spacing = 188;
+            if (starCount > 1) {
+                let maxSpan = 0.72 * GenParam.SVG_width;
+                spacing = Math.min(spacing, maxSpan / (starCount - 1));
+            }
             let startX = center - 0.5 * (starCount - 1) * spacing;
             let starY = 0.64 * GenParam.SVG_height;
             for (let i = 0; i < starCount; i++) {
@@ -2177,13 +2196,6 @@ class InstructionsController {
                     showBonusStarOnScreen(this.parentElem, startX + i * spacing, starY, true, "deletable_bonus_star", 0.9, undefined);
                 }, (i + 1) * 220);
             }
-            let caption = create_SVG_text_elem(center, starY + 118, "(if every answer is right)", undefined, undefined);
-            caption.style.textAnchor = "middle";
-            caption.style.fontSize = "28px";
-            caption.style.fontWeight = "700";
-            caption.style.fill = "navy";
-            caption.classList.add("instruction_element_nonbackground");
-            this.currentInstructionsSVG.appendChild(caption);
         }
 
         this.textElemMainInstructions = create_SVG_text_in_foreign_element(

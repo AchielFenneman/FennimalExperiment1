@@ -276,7 +276,7 @@ GENERALPARAM = function () {
             bonus: "<tspan style='color: darkgoldenrod'> <b>Bonus stars.</b></tspan> During some days you be able to earn Bonus Stars. You will earn a bonus of %CURRENCYSYMBOL%%AMOUNTPERSTAR% per star that you earn during the experiment. " +
                 "You can earn up to %MAXNUMBERSTARS% bonus stars during the experiment (for a maximum bonus of %CURRENCYSYMBOL%%MAXBONUSAMOUNT%)"
         },
-        // mentalizing_exp1_retro only. The partner leads, so the map-search boxes are omitted.
+        // Guided-tour experiments. The partner leads, so the map-search boxes are omitted.
         OverviewGuided: {
             story: "<b>Your task in this experiment. </b>In this experiment you will travel to an island called Fenneland. This remote island has a unique wildlife, and is filled with many smart animals called <u>Fennimals</u>. " +
                 "These Fennimals are unique to Fenneland and are unlike any other creatures. <br>" +

@@ -10,7 +10,7 @@
 //   ?SEED=slides01          same world on every reload
 //   ?PROLIFIC_PID=...       seed is that id (first 10 characters)
 //   neither                 unseeded Math.random; a new draw each load
-//      ?EXP=mentalizing_exp1               (live default is also this code in 2_Stimulus_data.js)
+//      ?EXP=mentalizing_exp1               (still selectable; live default is mentalizing_exp2_retro)
 //      ?EXP=mentalizing_between_subjects   (previous live code; still selectable)
 //      ?EXP=mentalizing_exp2               (3 Fennimals; warehouse sack + box X; lost-box boost|neutral|cost)
 //      ?EXP=mentalizing_exp2&CONDITION=neutral
@@ -25,6 +25,10 @@
 //          (3 Fennimals; photos hide toys; belief arms direct-direct | indirect-direct | indirect-indirect)
 //      ?EXP=mentalizing_exp1_retro&SKIP_INTRO=1&SKIP_TO_INTERACTION=warehouse_cleanup&CONDITION=indirect-direct
 //      ?EXP=mentalizing_exp1_retro&SKIP_INTRO=1&SKIP_TO_PHASE=warehouse_task&CONDITION=indirect-direct
+//      ?EXP=mentalizing_exp2_retro
+//          (live default; participant packs toy A, stores the sack, then swaps in toy B)
+//      ?EXP=mentalizing_exp2_retro&CONDITION=boost|neutral|cost
+//      ?EXP=mentalizing_exp2_retro&SKIP_INTRO=1&SKIP_TO_PHASE=retrieve_lost_box&CONDITION=neutral
 //      ?SKIP_TO_DECORATION=1       (seeded figure capture: skip intro, open the lost-box decoration sequence)
 //      ?CONDITION=...  (force a between-subjects arm; still consumes its one random draw)
 //          lost-box: boost | neutral | cost
@@ -2941,6 +2945,10 @@ async function shared_toy_drop_sequence(DroppedToyElement, BoxMod, BasicsMod, Pa
         WorldState.change_partner_belief_in_box_contents(FenObj.toybox, FenObj.toy);
     }
 
+    if (typeof options.beforeClose === "function") {
+        await options.beforeClose(DroppedToyElement);
+    }
+
     // Restore box hit-testing so the participant can click to close (toy_to_box clears this while open).
     if (BoxMod && typeof BoxMod.set_pointer_events_enabled === "function") {
         BoxMod.set_pointer_events_enabled(true);
@@ -3030,6 +3038,10 @@ async function shared_toy_to_sack_drop_sequence(DroppedToyElement, SackMod, Basi
 
     if (SackMod && typeof SackMod.set_pointer_events_enabled === "function") {
         SackMod.set_pointer_events_enabled(true);
+    }
+
+    if (typeof options.beforeClose === "function") {
+        await options.beforeClose(DroppedToyElement);
     }
 
     const fade_toy_into_sack = async () => {
