@@ -536,8 +536,8 @@ class ExperimentController {
         });
     }
 
-    // One block is one day. The sun advances only after an accepted harvest finished in time.
-    // Rejections and timed-out harvests leave it where it is. Practice does not spend a step.
+    // One block is one day. The sun advances after every accepted harvest, including one that runs out of time.
+    // A rejected offer leaves it where it is. Practice does not spend a step.
     async runBlock(blockIndex) {
         const trials = await this.dataController.getOrCreateTrials(blockIndex);
         const budget = trials.length;
@@ -567,17 +567,15 @@ class ExperimentController {
                 });
                 continue;
             }
-            const result = await this.runTrial(trials[i], meta);
-            if (result && result.rewardObtained) {
-                completed += 1;
-                advance = true;
-            }
+            await this.runTrial(trials[i], meta);
+            completed += 1;
+            advance = true;
         }
         await this.showDayInterval(completed, budget, false, advance);
     }
 
-    // Between offers the sun shows how many harvests have been completed.
-    // It animates one step only when the previous harvest was accepted and finished in time.
+    // Between offers the sun shows how many accepted harvests have been played.
+    // It animates one step after an accepted harvest, whether or not the apples were picked in time.
     async showDayInterval(completed, budget, searching, advance) {
         this.clearStage();
         this.refreshScore();
