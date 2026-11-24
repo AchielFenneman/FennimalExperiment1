@@ -1,7 +1,8 @@
 let StimulusSettings = function () {
 
-    this.Experiment_Code = ["mentalizing_exp2_retro"];
-    // Live default: mentalizing_exp2_retro. Open the page with no query.
+    this.Experiment_Code = ["mentalizing_exp2_retro_v2"];
+    // Live default: mentalizing_exp2_retro_v2. Open the page with no query.
+    // The previous live design stays available: ?EXP=mentalizing_exp2_retro
     // mentalizing_exp1_retro stays available: ?EXP=mentalizing_exp1_retro
     // Other codes: mentalizing_exp1 | mentalizing_exp2 | mentalizing_between_subjects | test | semantic_learning_star | semantic_learning_kit.
     // mentalizing_exp2: 3 Fennimals. Day 2 is broken toy, workshop X/Y/Z, then play.
@@ -45,6 +46,14 @@ let StimulusSettings = function () {
     //   &PARTNER_LEAVES=1 picks the swap. The first warehouse_task is still the workshop.
     //   ?EXP=mentalizing_exp2_retro&SKIP_INTRO=1&SKIP_TO_PHASE=retrieve_lost_box&CONDITION=boost
     //   ?EXP=mentalizing_exp2_retro&SKIP_INTRO=1&SKIP_TO_PHASE=written_memory_page&CONDITION=neutral
+    // mentalizing_exp2_retro_v2: same days as mentalizing_exp2_retro. The warehouse
+    // is the indirect-indirect pair: Fennimal A, then Fennimal B, each with a covered
+    // favorite toy. B's trial is the swap after the partner leaves. No sack.
+    // Memory questions are who placed first, who placed second, who decorated, then favorite toys.
+    //   ?EXP=mentalizing_exp2_retro_v2
+    //   ?EXP=mentalizing_exp2_retro_v2&SKIP_INTRO=1&SKIP_TO_INTERACTION=warehouse_cleanup
+    //   &PARTNER_LEAVES=1 picks B's swap. The first warehouse_task is still the workshop.
+    //   ?EXP=mentalizing_exp2_retro_v2&SKIP_INTRO=1&SKIP_TO_PHASE=written_memory_page&CONDITION=neutral
     // One warehouse call is one move. toy+box is the participant placing that toy.
     // Measurement preview (encoding seeded, not played). Set false, or open ?FULL=1, for the full session.
     // Lost-box arm: ?CONDITION=boost | neutral | cost (also on a full or decoration run).
@@ -140,6 +149,7 @@ let StimulusSettings = function () {
         // Partner introduction before the overview, so the overview can name the partner.
         mentalizing_exp1_retro: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "partner_introduction", "overview"],
         mentalizing_exp2_retro: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "partner_introduction", "overview"],
+        mentalizing_exp2_retro_v2: ["browser_check_and_full_screen_prompt", "consent", "single_sitting", "character_creation", "partner_introduction", "overview"],
     };
 
     // ----------------------------------------------------
@@ -187,6 +197,13 @@ let StimulusSettings = function () {
         // Same three Fennimals. Sack A is the warehouse sack, not a home sack.
         mentalizing_exp2_retro: {
             "A": { head: "A", region: "A", toy: "A", sack: "A" },
+            "B": { head: "B", region: "B", toy: "B" },
+            "C": { head: "C", region: "C", toy: "C" },
+        },
+
+        // Same three Fennimals, with no sack. Warehouse toys stay covered.
+        mentalizing_exp2_retro_v2: {
+            "A": { head: "A", region: "A", toy: "A" },
             "B": { head: "B", region: "B", toy: "B" },
             "C": { head: "C", region: "C", toy: "C" },
         },
@@ -624,6 +641,118 @@ let StimulusSettings = function () {
                     { kind: "placement_object", place: "first" },
                     { kind: "placement_object", place: "second" },
                     { kind: "sack_toy", sack: "A" },
+                    { kind: "box_decorator" },
+                    { kind: "favorite_toys" }
+                ]
+            },
+
+        ],
+
+        // Same days as mentalizing_exp2_retro. The warehouse is two covered
+        // placements: Fennimal A while the partner stays, then Fennimal B.
+        // The partner sees B arrive, then leaves, and the participant swaps
+        // the box. The partner's belief stays A's toy. There is no sack.
+        // The lost-box arm is still boost A | neutral C | cost B.
+        mentalizing_exp2_retro_v2: [
+
+            {
+                type: "guided_tour",
+                interaction_type: ["photo_Fennimal"],
+                Fennimals_encountered: ["A", "B", "C"],
+                partner_behavior: "active",
+                include_Fennefinder: false,
+                hide_held_toy: true
+            },
+
+            {
+                type: "warehouse_task",
+                partner_behavior: "active",
+                ask_Fennimal: true,
+                ask_toy: true,
+                ask_box: false,
+                trial_subblocks: [
+                    {
+                        interaction_type: "broken_toy_workshop",
+                        toys: ["X", "Y", "Z"],
+                        include_charging_action: false
+                    }
+                ]
+            },
+
+            // Indirect-indirect. The day card is the shared Fennimal cleaning-day card.
+            // Each "?" is that Fennimal's favorite toy. The partner can see it.
+            {
+                type: "warehouse_task",
+                partner_behavior: "active",
+                trial_subblocks: [
+                    { interaction_type: "warehouse_cleanup", Fennimal: "A", box: "X", mystery_note: RETRO_FAVORITE_TOY_NOTE },
+                    { interaction_type: "warehouse_cleanup", Fennimal: "B", box: "X", mystery_note: RETRO_FAVORITE_TOY_NOTE, partner_leaves_during_interaction: true }
+                ]
+            },
+
+            {
+                type: "retrieve_lost_box",
+                n_trials_to_sample: 1,
+                randomization_id: "lost_box_manipulation",
+                include_decoration: true,
+                include_lost_found_tag: false,
+                box_locations: [
+                    { label: "boost", Fennimal_finding_box: "A", target_box: "X" },
+                    { label: "neutral", Fennimal_finding_box: "C", target_box: "X" },
+                    { label: "cost", Fennimal_finding_box: "B", target_box: "X" }
+                ],
+                partner_behavior: "active"
+            },
+
+            {
+                type: "postcard_task",
+                partner_behavior: "active",
+                skip_instructions: false,
+                include_full_sequence_at_start: false,
+                blocks: [
+                    {
+                        Fennimals: ["A", "B", "C"],
+                        force_replay_first: true,
+                        postcard_type: "A",
+                        optional_distractor_toys: ["X", "Y", "Z"],
+                        repair_toy_sticker: true,
+                        show_instructions_bubble: true
+                    },
+                    {
+                        Fennimals: ["A", "B", "C"],
+                        force_replay_first: true,
+                        postcard_type: "B",
+                        optional_distractor_toys: ["X", "Y", "Z"],
+                        repair_toy_sticker: false,
+                        show_instructions_bubble: false
+                    }
+                ]
+            },
+
+            {
+                type: "partner_belief_individual_boxes",
+                include_practice_trial: true,
+                include_partner_knowledge_trial: true,
+                num_belief_blocks: 1,
+                include_reality_block_at_end: true,
+                include_empty_box_choice_alternative: true,
+                bonus_stars_per_correct_answer: 1,
+                questions: [
+                    { question_id: "belief_X", target_box: "X" }
+                ]
+            },
+
+            // Who placed a favorite toy first, who placed second, who decorated,
+            // then each Fennimal's favorite toy. Six questions, at most 6 stars.
+            {
+                type: "written_memory_page",
+                target_box: "X",
+                bonus_stars_per_correct: 1,
+                bonus_stars_per_dont_remember: 0.5,
+                bonus_stars_per_incorrect: 0,
+                memory_questions: [
+                    { kind: "placement_order", place: "first" },
+                    { kind: "placement_order", place: "second" },
                     { kind: "box_decorator" },
                     { kind: "favorite_toys" }
                 ]
@@ -1224,6 +1353,7 @@ let StimulusSettings = function () {
         mentalizing_exp1: ["demographics_questionnaire"],
         mentalizing_exp1_retro: ["demographics_questionnaire"],
         mentalizing_exp2_retro: ["demographics_questionnaire"],
+        mentalizing_exp2_retro_v2: ["demographics_questionnaire"],
     };
 
     const All_Allowed_Head_Lists = {};
@@ -1246,6 +1376,7 @@ let StimulusSettings = function () {
         mentalizing_exp1: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
         mentalizing_exp1_retro: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
         mentalizing_exp2_retro: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
+        mentalizing_exp2_retro_v2: ["astro", "cupcake", "tube", "tv", "jackolantern", "elephant", "blockhead", "parrot"],
     };
 
     const All_Allowed_Head_Groups_List = {};
@@ -1271,7 +1402,7 @@ let StimulusSettings = function () {
     if (!this.Experiment_Structure || !this.Fennimal_Dictionary) {
         throw new Error(
             'Unknown experiment code "' + this.Experiment_Code + '". ' +
-            'Live codes: test, semantic_learning_star, semantic_learning_kit, mentalizing_between_subjects, mentalizing_exp1, mentalizing_exp1_retro, mentalizing_exp2, mentalizing_exp2_retro. ' +
+            'Live codes: test, semantic_learning_star, semantic_learning_kit, mentalizing_between_subjects, mentalizing_exp1, mentalizing_exp1_retro, mentalizing_exp2, mentalizing_exp2_retro, mentalizing_exp2_retro_v2. ' +
             'Archived recipes are in archive/ (see archive/MANIFEST.md).'
         );
     }

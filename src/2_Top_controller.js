@@ -1779,7 +1779,7 @@ class TrialGenerator {
 
             if (phase.type === "written_memory_page" && phase.memory_questions !== undefined) {
                 let knownMemoryQuestions = new Set([
-                    "placement_object", "sack_toy", "box_decorator", "favorite_toys"
+                    "placement_object", "placement_order", "sack_toy", "box_decorator", "favorite_toys"
                 ]);
                 if (!Array.isArray(phase.memory_questions) || phase.memory_questions.length === 0) {
                     errors.push(`${label} memory_questions must be a non-empty array when it is set.`);
@@ -1792,7 +1792,8 @@ class TrialGenerator {
                             );
                             return;
                         }
-                        if (spec.kind === "placement_object" && spec.place !== "first" && spec.place !== "second") {
+                        if ((spec.kind === "placement_object" || spec.kind === "placement_order")
+                            && spec.place !== "first" && spec.place !== "second") {
                             errors.push(
                                 `${label} memory_questions[${specIndex}] needs place "first" or "second".`
                             );
@@ -2912,63 +2913,17 @@ class TrialGenerator {
 
     /**
      * retrieve_lost_box alternative: one trial per (possibly sampled) box_locations entry.
-     * Travel to a non-home location in Fennimal_finding_box's native region;
-     * interaction uses target_box (overrides FenObj.toybox).
+     * The box stays at Fennimal_finding_box's own location in their region.
+     * Interaction uses target_box (overrides FenObj.toybox).
      */
     generateRetrieveLostBoxTrialsFromBoxLocations(phaseData) {
         let locs = this.applyRetrieveLostBoxSampling(phaseData);
-        let occupied = new Set();
-        // Prefer spare map spots: exclude every Fennimal's assigned home in this experiment.
-        let allFens = this.stimuli.get_all_Fennimals_objects_in_array() || [];
-        allFens.forEach((fen) => {
-            if (fen && fen.location) occupied.add(fen.location);
-        });
-
-        return locs.map((entry, index) => {
-            let trial = this.buildRetrieveLostBoxTrialFromBoxLocation(
-                entry,
-                phaseData,
-                index,
-                occupied
-            );
-            occupied.add(trial.location);
-            return trial;
-        });
-    }
-
-    /**
-     * Pick a location in the Fennimal's region that is not their home (and not already taken).
-     * Prefer unused region spots; fall back to any non-home location in the region.
-     */
-    pickAlternateLocationInRegion(homeLocation, region, occupiedSet, contextLabel) {
-        let regionData = typeof GenParam !== "undefined" ? GenParam.RegionData[region] : null;
-        let locations = regionData && Array.isArray(regionData.Locations)
-            ? regionData.Locations.slice()
-            : [];
-
-        if (locations.length === 0) {
-            throw new Error(
-                `TrialGenerator: ${contextLabel} region "${region}" has no Locations in GenParam.RegionData ` +
-                `(MapController must have initialized markers first).`
-            );
-        }
-
-        let candidates = locations.filter(
-            (loc) => loc !== homeLocation && !occupiedSet.has(loc)
+        return locs.map((entry, index) =>
+            this.buildRetrieveLostBoxTrialFromBoxLocation(entry, phaseData, index)
         );
-        if (candidates.length === 0) {
-            candidates = locations.filter((loc) => loc !== homeLocation);
-        }
-        if (candidates.length === 0) {
-            throw new Error(
-                `TrialGenerator: ${contextLabel} cannot place encounter away from home location ` +
-                `"${homeLocation}" — region "${region}" has no other location markers.`
-            );
-        }
-        return shuffleArray(candidates)[0];
     }
 
-    buildRetrieveLostBoxTrialFromBoxLocation(entry, phaseData, index, occupiedSet) {
+    buildRetrieveLostBoxTrialFromBoxLocation(entry, phaseData, index) {
         let fenId = entry.Fennimal_finding_box;
         let fenArr = this.stimuli.get_Fennimals_in_array([fenId]);
         if (!fenArr || fenArr.length === 0) {
@@ -3004,13 +2959,8 @@ class TrialGenerator {
             trial.weight_proportion = entry.weight_proportion;
         }
 
+        // The map marker and the location you enter are this Fennimal's own spot.
         trial.home_location = trial.location;
-        trial.location = this.pickAlternateLocationInRegion(
-            trial.home_location,
-            trial.region,
-            occupiedSet || new Set(),
-            `retrieve_lost_box box_locations[${index}] (Fennimal "${fenId}")`
-        );
 
         return trial;
     }
@@ -4366,11 +4316,12 @@ class ExperimentController {
                 this.currentPhaseData.include_Fennefinder = true;
                 this.setupTrialBasedPhase();
                 this.flagExplorationPhaseCompleted = false;
-                // box_locations trials may sit at non-home spots — preload those backgrounds.
+                // Preload the location scene for the spot where the box sits.
                 this.ensureLocationImagesLoaded(
                     (this.currentPhaseData.Fennimals_in_phase || []).map((t) => [t.location, t.region])
                 );
-                WorldState.populate_map_with_array_of_Fennimals(this.currentPhaseData.Fennimals_in_phase, true);
+                // Already "found": close enough shows the enter button, with no search hold.
+                WorldState.populate_map_with_array_of_Fennimals(this.currentPhaseData.Fennimals_in_phase, false);
                 this.mapCont.add_lost_box_icons_on_map(this.currentPhaseData.Fennimals_in_phase);
                 if (window.__SKIP_TO_DECORATION__) {
                     this.instrCont.clearInstructions();

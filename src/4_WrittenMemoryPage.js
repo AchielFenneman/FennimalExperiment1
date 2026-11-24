@@ -16,6 +16,7 @@
  *
  * A phase may set memory_questions. Without that list, the page stays the
  * Fennimal placement order plus one favorite-toy question per Fennimal.
+ * placement_order asks which Fennimal's favorite toy went in first or second.
  */
 class WrittenMemoryPageController {
     constructor(parentLayer, phaseData, returnfunc, expCont) {
@@ -227,6 +228,22 @@ class WrittenMemoryPageController {
                     placed[index] || null,
                     boxPhrase,
                     boxAssetId
+                ));
+                return;
+            }
+            if (spec.kind === "placement_order") {
+                let word = spec.place === "second" ? "second" : "first";
+                let index = word === "second" ? 1 : 0;
+                let order = this._placementFennimalIds(boxCode, boxAssetId);
+                if (!order[index]) {
+                    console.error("WrittenMemoryPage: missing the " + word + " Fennimal who placed a toy in the box.");
+                }
+                this._pushQuestion(pages, "placement_order", this._orderQuestion(
+                    "placement_" + word,
+                    word,
+                    order[index] || null,
+                    boxPhrase,
+                    { kind: "box", boxAssetId: boxAssetId }
                 ));
                 return;
             }
@@ -549,23 +566,29 @@ class WrittenMemoryPageController {
     }
 
     _placementsFromStimulus(boxCode) {
-        let structure = (this.expCont && this.expCont.stimulusSettings
-            && this.expCont.stimulusSettings.Experiment_Structure) || [];
+        let structure = this._experimentStructure();
         let phase = structure.find((item) =>
             item && item.type === "warehouse_task" && item.randomization_id === "belief_formation"
         );
-        if (!phase) return [];
+        if (phase) return this._fennimalPlacementIds(phase, boxCode, "belief_formation");
 
-        let conditions = Array.isArray(phase.conditions) ? phase.conditions : [];
-        let label = null;
-        let stored = this.expCont && this.expCont.dataCont && this.expCont.dataCont.experimentData
-            && this.expCont.dataCont.experimentData.phaseRandomizations;
-        if (stored && stored.belief_formation && stored.belief_formation.label) {
-            label = stored.belief_formation.label;
+        let ids = [];
+        structure.forEach((item) => {
+            if (!item || item.type !== "warehouse_task") return;
+            this._fennimalPlacementIds(item, boxCode, item.randomization_id).forEach((id) => ids.push(id));
+        });
+        return ids;
+    }
+
+    // belief_formation keeps its drawn arm. A fixed warehouse list uses trial_subblocks.
+    _fennimalPlacementIds(phase, boxCode, randomizationKey) {
+        let blocks = phase.trial_subblocks || [];
+        if (Array.isArray(phase.conditions) && phase.conditions.length > 0) {
+            let label = randomizationKey ? this._storedConditionLabel(randomizationKey) : null;
+            let condition = phase.conditions.find((item) => item && item.label === label) || phase.conditions[0];
+            blocks = (condition && condition.trial_subblocks) || [];
         }
-        let condition = conditions.find((item) => item && item.label === label) || conditions[0];
-        let blocks = (condition && condition.trial_subblocks) || phase.trial_subblocks || [];
-        return blocks
+        return (blocks || [])
             .filter((block) => block && block.interaction_type === "warehouse_cleanup" && block.box === boxCode && block.Fennimal)
             .map((block) => block.Fennimal);
     }

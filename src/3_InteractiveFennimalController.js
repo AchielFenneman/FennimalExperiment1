@@ -16498,8 +16498,10 @@ class FennimalToyBoxTrialController extends ParticipantToyBoxTrialController {
             this.detachTokenForDrop(token, middle, here, null);
         }
         let savedHits = this.muteBoxFrontHits();
-        let toyName = this.placedToyName();
-        let wigglePrompt = "It doesn't quite fit... click on the " + toyName + " to wiggle it in place";
+        // A covered toy stays unnamed. Direct trials still name the toy on screen.
+        let wigglePrompt = this.FenObj.reveal_toy === true
+            ? "It doesn't quite fit... click on the " + this.placedToyName() + " to wiggle it in place"
+            : "It doesn't quite fit... Click the toy to wiggle it in place";
         let prompts = [wigglePrompt, wigglePrompt, wigglePrompt];
         let seat = this._wiggleSeat || { dy: 54 };
         let dyEach = seat.dy / prompts.length;

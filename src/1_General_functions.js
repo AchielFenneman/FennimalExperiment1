@@ -10,7 +10,7 @@
 //   ?SEED=slides01          same world on every reload
 //   ?PROLIFIC_PID=...       seed is that id (first 10 characters)
 //   neither                 unseeded Math.random; a new draw each load
-//      ?EXP=mentalizing_exp1               (still selectable; live default is mentalizing_exp2_retro)
+//      ?EXP=mentalizing_exp1               (still selectable; live default is mentalizing_exp2_retro_v2)
 //      ?EXP=mentalizing_between_subjects   (previous live code; still selectable)
 //      ?EXP=mentalizing_exp2               (3 Fennimals; warehouse sack + box X; lost-box boost|neutral|cost)
 //      ?EXP=mentalizing_exp2&CONDITION=neutral
@@ -26,9 +26,14 @@
 //      ?EXP=mentalizing_exp1_retro&SKIP_INTRO=1&SKIP_TO_INTERACTION=warehouse_cleanup&CONDITION=indirect-direct
 //      ?EXP=mentalizing_exp1_retro&SKIP_INTRO=1&SKIP_TO_PHASE=warehouse_task&CONDITION=indirect-direct
 //      ?EXP=mentalizing_exp2_retro
-//          (live default; participant packs toy A, stores the sack, then swaps in toy B)
+//          (previous live design; participant packs toy A, stores the sack, then swaps in toy B)
 //      ?EXP=mentalizing_exp2_retro&CONDITION=boost|neutral|cost
 //      ?EXP=mentalizing_exp2_retro&SKIP_INTRO=1&SKIP_TO_PHASE=retrieve_lost_box&CONDITION=neutral
+//      ?EXP=mentalizing_exp2_retro_v2
+//          (live default; warehouse is indirect-indirect: A then B place covered favorite toys)
+//      ?EXP=mentalizing_exp2_retro_v2&SKIP_INTRO=1&SKIP_TO_INTERACTION=warehouse_cleanup
+//          &PARTNER_LEAVES=1 picks B's swap. &FENNIMAL=A|B picks that arrival.
+//      ?EXP=mentalizing_exp2_retro_v2&SKIP_INTRO=1&SKIP_TO_PHASE=written_memory_page&CONDITION=neutral
 //      ?SKIP_TO_DECORATION=1       (seeded figure capture: skip intro, open the lost-box decoration sequence)
 //      ?CONDITION=...  (force a between-subjects arm; still consumes its one random draw)
 //          lost-box: boost | neutral | cost

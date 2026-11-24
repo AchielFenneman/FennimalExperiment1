@@ -518,7 +518,8 @@ class InstructionsController {
         let storyTextOffset = starsCanBeEarned ? 0 : 0.175 * GenParam.SVG_height;
         let overviewCode = this.stimuli.get_experiment_code();
         this.overviewIsGuided = overviewCode === "mentalizing_exp1_retro"
-            || overviewCode === "mentalizing_exp2_retro";
+            || overviewCode === "mentalizing_exp2_retro"
+            || overviewCode === "mentalizing_exp2_retro_v2";
         this.overviewPageRemainingSteps = this.overviewIsGuided
             ? (starsCanBeEarned ? ["stars", "movement", "partner"] : ["movement", "partner"])
             : (starsCanBeEarned ? ["stars", "movement", "search", "lookout", "instructions"] : ["movement", "search", "lookout", "instructions"]);

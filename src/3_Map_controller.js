@@ -464,7 +464,15 @@ class MapController {
                     }
                     break;
                 case "enter_location_with_unvisited_Fennimal":
-                    Interface.Prompt.show_message("There is a Fennimal present at this location!", false);
+                    if (this.ExpCont.currentPhaseType === "retrieve_lost_box") {
+                        let foundFen = this.WorldState.get_reference_to_Fennimal_object_at_location(this.current_nearest_location);
+                        let boxName = foundFen && foundFen.toybox
+                            ? GenParam.get_box_printed_name(foundFen.toybox)
+                            : "box";
+                        Interface.Prompt.show_message("The " + boxName + " is here!", false);
+                    } else {
+                        Interface.Prompt.show_message("There is a Fennimal present at this location!", false);
+                    }
                     AudioCont.play_sound_effect("success");
                     this.show_action_button("enter_location_" + this.current_nearest_location, this.Current_Action_Focal_Target, ["Enter"], false);
                     break;
@@ -2019,10 +2027,9 @@ class MapController {
     };
 
     /**
-     * Tiny closed toybox marker for retrieve_lost_box: sits on the map location
-     * where that lost box currently is.
-     * Placement mirrors FennimalIconOnMap (simple translate + scale) — not
-     * copy_scale_and_move — so CTM/centering quirks after phone-room cannot hide it.
+     * Tiny closed toybox marker for retrieve_lost_box.
+     * Centered on the location marker (the same point proximity and the enter
+     * button use). Portrait offsets from FennimalIconOnMap are not applied.
      */
     LostBoxIconOnMap = class {
         constructor(trial, MapLayer) {
@@ -2032,24 +2039,7 @@ class MapController {
             this.toybox = trial.toybox;
             this.targetSize = 52;
             this.max_opacity = 1;
-            this.offset_x = 18;
-            this.offset_y = -28;
             this.IconGroup = null;
-
-            switch (this.location) {
-                case "Lake": this.offset_x = -20; this.offset_y = 8; break;
-                case "Statue": this.offset_x = 28; break;
-                case "Fountain": this.offset_x = -22; this.offset_y = -10; break;
-                case "Farm": this.offset_x = 28; this.offset_y = -8; break;
-                case "Dam": this.offset_x = 18; this.offset_y = -48; break;
-                case "Waterfall": this.offset_x = -18; break;
-                case "Cliff": this.offset_x = 28; this.offset_y = 20; break;
-                case "Rainforest": this.offset_x = -18; break;
-                case "Bush": this.offset_x = -18; this.offset_y = -8; break;
-                case "Iceberg": this.offset_x = -18; this.offset_y = -12; break;
-                case "Igloo": this.offset_x = -18; this.offset_y = -8; break;
-                case "Pineforest": this.offset_y = -14; break;
-            }
 
             let marker = document.getElementById("location_marker_" + this.location);
             if (!marker) {
@@ -2068,14 +2058,12 @@ class MapController {
             let mapY = 0;
             try {
                 let bbox = marker.getBBox();
-                mapX = bbox.x + this.offset_x;
-                mapY = bbox.y + this.offset_y;
+                mapX = bbox.x + 0.5 * bbox.width;
+                mapY = bbox.y + 0.5 * bbox.height;
             } catch (err) {
                 // Fallback: use cx/cy attributes on circle markers.
-                let cx = parseFloat(marker.getAttribute("cx") || "0");
-                let cy = parseFloat(marker.getAttribute("cy") || "0");
-                mapX = cx + this.offset_x;
-                mapY = cy + this.offset_y;
+                mapX = parseFloat(marker.getAttribute("cx") || "0");
+                mapY = parseFloat(marker.getAttribute("cy") || "0");
                 console.warn("LostBoxIconOnMap: getBBox failed for marker; used cx/cy", this.location, err);
             }
 
