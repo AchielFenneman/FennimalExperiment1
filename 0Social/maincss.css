@@ -103,6 +103,32 @@ html, body {
     border-color: #b8860b;
 }
 
+#Experiment_Task_SVG .completion-code-frame {
+    overflow: visible;
+    pointer-events: auto;
+}
+
+#Experiment_Task_SVG .completion-code {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid #d0d0d0;
+    border-radius: 16px;
+    background: #ffffff;
+    color: #1c1c1c;
+    font-family: "Source Sans 3", "Segoe UI", sans-serif;
+    font-size: 54px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    user-select: all;
+    -webkit-user-select: all;
+    touch-action: auto;
+    cursor: text;
+}
+
 .partner-name {
     font-weight: 700;
     pointer-events: none;
@@ -142,6 +168,41 @@ html, body {
 
 .score-label {
     font-weight: 600;
+}
+
+.score-label.score-gain {
+    animation: score-flash-gain 0.9s linear;
+}
+
+.score-label.score-fail {
+    animation: score-flash-fail 2.1s linear;
+}
+
+.fail-caption {
+    font-weight: 600;
+    fill: #1c1c1c;
+}
+
+@keyframes score-flash-gain {
+    0%, 22% {
+        fill: #0e9a38;
+        filter: drop-shadow(0 0 8px rgba(14, 154, 56, 0.95));
+    }
+    100% { fill: #1c1c1c; filter: none; }
+}
+
+@keyframes score-flash-fail {
+    0% { fill: #1c1c1c; filter: none; }
+    14%, 40% {
+        fill: #d10c0c;
+        filter: drop-shadow(0 0 8px rgba(209, 12, 12, 0.95));
+    }
+    54% { fill: #1c1c1c; filter: none; }
+    68%, 90% {
+        fill: #d10c0c;
+        filter: drop-shadow(0 0 8px rgba(209, 12, 12, 0.95));
+    }
+    100% { fill: #1c1c1c; filter: none; }
 }
 
 .countdown-track {
@@ -257,6 +318,18 @@ html, body {
     100% {
         filter: none;
     }
+}
+
+.hourglass {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: hourglass-turn 1.875s ease-in-out infinite;
+}
+
+@keyframes hourglass-turn {
+    0%, 16% { transform: rotate(0deg); }
+    42%, 66% { transform: rotate(180deg); }
+    92%, 100% { transform: rotate(360deg); }
 }
 
 @keyframes ladder-pulse {

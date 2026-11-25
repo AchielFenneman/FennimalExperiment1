@@ -68,6 +68,7 @@ class DataController {
             trials: this.trials,
             openQuestions: this.openQuestions,
             totalPoints: 0,
+            paymentData: null,
             timeStamps: [],
             totalDuration: 0,
             experimentCompleted: false,
@@ -172,32 +173,6 @@ class DataController {
         await this.storeAllData(false);
     }
 
-    async getOrCreateTrials(blockIndex) {
-        const key = String(blockIndex);
-        if (!this.experimentData.trialsByBlock || typeof this.experimentData.trialsByBlock !== "object") {
-            this.experimentData.trialsByBlock = {};
-        }
-        const existing = this.experimentData.trialsByBlock[key];
-        if (Array.isArray(existing) && existing.length) {
-            return existing.map((trial) => ({
-                rewardAmount: trial.rewardAmount,
-                socialCondition: trial.socialCondition
-            }));
-        }
-        const trials = buildTrialList().map((trial) => ({
-            rewardAmount: trial.rewardAmount,
-            socialCondition: trial.socialCondition
-        }));
-        this.experimentData.trialsByBlock[key] = trials;
-        this.recordTimestamp("trial_order_set");
-        await this.writeSessionClaim(false);
-        await this.storeAllData(false);
-        return trials.map((trial) => ({
-            rewardAmount: trial.rewardAmount,
-            socialCondition: trial.socialCondition
-        }));
-    }
-
     recordTrial(entry) {
         const accepted = entry.accepted === true;
         this.trials.push({
@@ -211,7 +186,7 @@ class DataController {
             completedInTime: accepted && entry.completedInTime === true,
             practice: !!entry.practice
         });
-        if (entry.completedInTime && !entry.practice) this.totalPoints += entry.rewardAmount;
+        if (entry.completedInTime) this.totalPoints += entry.rewardAmount;
         this.storeAllData(false);
     }
 
@@ -230,6 +205,34 @@ class DataController {
         this.questionsMarked = true;
         this.recordTimestamp("questions_reached");
         this.storeAllData(false);
+    }
+
+    // Called once, after the final questions. The code suffix is the bonus in cents.
+    preparePayment() {
+        if (this.experimentData.paymentData && this.experimentData.paymentData.completionCode) {
+            return copyValue(this.experimentData.paymentData);
+        }
+        const rate = GenParam.bonusExchange;
+        const points = this.totalPoints;
+        const cents = Math.round(points * (rate.dollars / rate.points) * 100);
+        const words = StimulusSettings.completionCodeWords;
+        const word1 = shuffle(words.first)[0];
+        const word2 = shuffle(words.second)[0];
+        this.experimentData.paymentData = {
+            totalPoints: points,
+            bonusDollars: cents / 100,
+            bonusCents: cents,
+            completionWords: [word1, word2],
+            completionCode: word1 + word2 + cents
+        };
+        this.recordTimestamp("payment_ready");
+        this.storeAllData(false);
+        return copyValue(this.experimentData.paymentData);
+    }
+
+    prolificReturnUrl() {
+        const code = this.experimentData.paymentData.completionCode;
+        return "https://app.prolific.com/submissions/complete?cc=" + encodeURIComponent(code);
     }
 
     complete() {

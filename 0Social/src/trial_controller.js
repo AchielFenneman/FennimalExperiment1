@@ -29,6 +29,8 @@ class Actor {
         this.makeGraphic = makeGraphic;
         this.height = height;
         this.pose = null;
+        this.lean = 0;
+        this.poseTransform = "";
         this.x = 0;
         this.y = 0;
         this.root = el("g");
@@ -48,24 +50,36 @@ class Actor {
         const scale = this.height / box.height;
         const feetX = box.x + box.width / 2;
         const feetY = box.y + box.height;
-        this.inner.setAttribute("transform", "translate(" + (-feetX * scale) + " " + (-feetY * scale) + ") scale(" + scale + ")");
+        this.poseTransform = "translate(" + (-feetX * scale) + " " + (-feetY * scale) + ") scale(" + scale + ")";
+        this.applyInner();
     }
 
-    setFeet(x, y) {
+    applyInner() {
+        const tilt = this.lean ? "rotate(" + this.lean + ") " : "";
+        this.inner.setAttribute("transform", tilt + this.poseTransform);
+    }
+
+    setFeet(x, y, lean) {
         this.x = x;
         this.y = y;
         this.root.setAttribute("transform", "translate(" + x + " " + y + ")");
+        const tilt = lean || 0;
+        if (tilt !== this.lean) {
+            this.lean = tilt;
+            this.applyInner();
+        }
     }
 }
 
 class TrialController {
-    constructor({ stage, trialDoc, trial, createIcon, partnerName, onOutcome }) {
+    constructor({ stage, trialDoc, trial, createIcon, partnerName, onOutcome, onRewardLanded }) {
         this.stage = stage;
         this.trialDoc = trialDoc;
         this.trial = trial;
         this.createIcon = createIcon;
         this.partnerName = partnerName;
         this.onOutcome = onOutcome;
+        this.onRewardLanded = onRewardLanded || null;
 
         this.alive = true;
         this.resolved = false;
@@ -162,6 +176,7 @@ class TrialController {
 
         this.playerLadder.placeBase(playerLadderStart.x, playerLadderStart.y);
         this.partnerLadder.placeBase(partnerLadderStart.x, partnerLadderStart.y);
+        this.partnerLadderHome = { x: partnerLadderStart.x, y: partnerLadderStart.y };
         this.ladderGroundY = playerLadderStart.y;
 
         const iconHeight = GenParam.iconHeightPx / this.scale;
@@ -227,21 +242,32 @@ class TrialController {
 
     makeClock(cx, cy) {
         const radius = 51;
+        this.clockRadius = radius;
         this.clockLength = 2 * Math.PI * radius;
         const group = el("g", { class: "countdown" });
-        group.appendChild(el("circle", {
-            cx: cx, cy: cy, r: radius,
+        this.clockTrack = el("circle", {
+            cx: 0, cy: 0, r: radius,
             class: "countdown-track"
-        }));
+        });
+        group.appendChild(this.clockTrack);
         this.ring = el("circle", {
-            cx: cx, cy: cy, r: radius,
+            cx: 0, cy: 0, r: radius,
             class: "countdown-ring"
         });
         this.ring.setAttribute("stroke-dasharray", this.clockLength);
         this.ring.setAttribute("stroke-dashoffset", "0");
-        this.ring.setAttribute("transform", "rotate(-90 " + cx + " " + cy + ")");
+        this.ring.setAttribute("transform", "rotate(-90)");
         group.appendChild(this.ring);
+        this.clock = group;
+        this.placeClock(cx, cy, 1);
         return group;
+    }
+
+    placeClock(x, y, scale) {
+        this.clockX = x;
+        this.clockY = y;
+        this.clockScale = scale;
+        this.clock.setAttribute("transform", "translate(" + x + " " + y + ") scale(" + scale + ")");
     }
 
     mountMedal() {
@@ -412,7 +438,50 @@ class TrialController {
             gust._paths.forEach((path) => path.setAttribute("d", d));
             gust.style.opacity = String(Math.sin(u * Math.PI) * 0.8 * strength);
         });
+        this.updateBlownLeaves(now, strength);
         this.setBranchPose(Math.sin(now / 260) * 2.4 * strength, 0);
+    }
+
+    updateBlownLeaves(now, strength) {
+        if (!this.wind || !this.leafTemplates || !this.leafTemplates.length) return;
+        if (!this.blownLeaves) this.blownLeaves = [];
+        if (!this.nextLeafAt) this.nextLeafAt = now + uniform(450, 1100);
+        if (strength > 0.45 && now >= this.nextLeafAt && this.blownLeaves.length < 2) {
+            this.spawnBlownLeaf(now);
+            this.nextLeafAt = now + uniform(1400, 2300);
+        }
+        const keep = [];
+        this.blownLeaves.forEach((leaf) => {
+            const u = (now - leaf._born) / leaf._duration;
+            if (u >= 1) {
+                leaf.remove();
+                return;
+            }
+            const x = lerp(leaf._x0, leaf._x1, u);
+            const y = leaf._y + Math.sin(u * Math.PI * 2) * leaf._bob;
+            const spin = leaf._spin0 + (now - leaf._born) / 1000 * leaf._spinRate;
+            leaf.setAttribute("transform", "translate(" + x + " " + y + ") rotate(" + spin + ") scale(" + leaf._scale + ")");
+            const edge = Math.min(u / 0.1, (1 - u) / 0.1, 1);
+            leaf.style.opacity = String(edge * strength);
+            keep.push(leaf);
+        });
+        this.blownLeaves = keep;
+    }
+
+    spawnBlownLeaf(now) {
+        const template = this.leafTemplates[Math.floor(Math.random() * this.leafTemplates.length)];
+        const leaf = template.cloneNode(true);
+        leaf._born = now;
+        leaf._duration = uniform(2400, 3200);
+        leaf._x0 = 524;
+        leaf._x1 = -36;
+        leaf._y = uniform(42, 168);
+        leaf._bob = uniform(5, 12);
+        leaf._scale = uniform(0.34, 0.48);
+        leaf._spin0 = uniform(-40, 40);
+        leaf._spinRate = uniform(70, 150) * (Math.random() < 0.5 ? -1 : 1);
+        this.wind.appendChild(leaf);
+        this.blownLeaves.push(leaf);
     }
 
     startWind() {
@@ -446,6 +515,8 @@ class TrialController {
         this.wind.remove();
         this.wind = null;
         this.gusts = null;
+        this.blownLeaves = null;
+        this.nextLeafAt = 0;
         this.setBranchPose(0, 0);
     }
 
@@ -513,6 +584,11 @@ class TrialController {
             if (!this.alive) return;
             await bubble.show({ target: this.medalSpin, text: lines.reward, preferredSide: "down" });
             if (!this.alive) return;
+            const score = this.stage.ownerSVGElement.querySelector(".score-label");
+            if (score) {
+                await bubble.show({ target: score, text: lines.total, preferredSide: "down" });
+                if (!this.alive) return;
+            }
             await bubble.show({ target: this.partner.root, text: lines.partner, preferredSide: "up" });
         } finally {
             window.removeEventListener("keydown", blockKeys);
@@ -684,11 +760,21 @@ class TrialController {
         this.enableApplesIfReady();
     }
 
+    applyPartnerPacing() {
+        const spec = GenParam.partnerControl;
+        const extra = Math.random() < spec.mistakeChance ? spec.mistakeMs : 0;
+        this.partnerMistake = extra ? (Math.random() < 0.5 ? "walk" : "ladder") : null;
+        this.partnerScale = (GenParam.partnerSequenceMs - extra) / this.cooperationAnimationMs();
+    }
+
     async runPartner() {
+        this.applyPartnerPacing();
         this.partner.inner.classList.add("partner-active");
         this.showPartnerName();
         const foot = this.partnerLadder.basePoint();
-        await this.walkTo(this.partner, foot.x, foot.y, this.speed / this.partnerScale);
+        const partnerSpeed = this.speed / this.partnerScale;
+        if (this.partnerMistake === "walk") await this.walkWithStop(foot, partnerSpeed);
+        else await this.walkTo(this.partner, foot.x, foot.y, partnerSpeed);
         if (!this.alive || this.resolved) return;
 
         this.partnerLadder.group.classList.add("partner-held");
@@ -699,10 +785,16 @@ class TrialController {
         const partnerY = this.partner.y;
         if (Math.abs(dx) > 1) this.partner.setPose(dx < 0 ? "left" : "right");
         const ms = this.partnerMs(Math.hypot(dx, dy) / this.speed * 1000);
+        const dragPlan = this.buildControlPlan("drag");
         await tween(ms, (t) => {
-            this.partnerLadder.placeBase(from.x + dx * t, from.y + dy * t);
-            this.partner.setFeet(partnerX + dx * t, partnerY + dy * t);
+            const base = this.controlPoint(from.x, from.y, from.x + dx, from.y + dy, t, dragPlan);
+            this.partnerLadder.placeBase(base.x, base.y);
+            const step = this.controlPoint(partnerX, partnerY, partnerX + dx, partnerY + dy, t, dragPlan);
+            this.faceHorizontal(this.partner, step.x);
+            this.partner.setFeet(step.x, step.y);
         }, () => this.alive && !this.resolved);
+        if (!this.alive || this.resolved) return;
+        if (this.partnerMistake === "ladder") await this.fumbleLadderDrop();
         if (!this.alive || this.resolved) return;
         this.partnerLadder.placeBase(this.partnerTreeBase.x, this.partnerTreeBase.y);
         this.partner.setFeet(this.partnerTreeBase.x, this.partnerTreeBase.y);
@@ -855,8 +947,16 @@ class TrialController {
     prepareAloneProps() {
         const broom = this.scene.querySelector("#broom");
         const leafSet = this.scene.querySelector("#fallen_leaves");
+        this.leafTemplates = [];
+        if (leafSet) {
+            leafSet.querySelectorAll(".fallen_leaf").forEach((leaf) => {
+                const copy = leaf.cloneNode(true);
+                copy.removeAttribute("id");
+                this.leafTemplates.push(copy);
+            });
+            leafSet.remove();
+        }
         if (broom) broom.remove();
-        if (leafSet) leafSet.remove();
         if (this.trial.socialCondition !== "alone") return;
         this.partnerLadder.group.style.display = "none";
         const spot = this.pointIn(this.scene, this.scene.querySelector("#partner_starting_point"));
@@ -877,6 +977,73 @@ class TrialController {
         this.partner.root.setAttribute("transform", "translate(" + this.partner.x + " " + this.partner.y + ") rotate(" + angle + ")");
     }
 
+    async walkWithStop(foot, speed) {
+        const fromX = this.partner.x;
+        const fromY = this.partner.y;
+        const at = uniform(0.42, 0.58);
+        const stopX = lerp(fromX, foot.x, at);
+        const stopY = lerp(fromY, foot.y, at);
+        await this.walkTo(this.partner, stopX, stopY, speed);
+        if (!this.alive || this.resolved) return;
+        await this.hesitatePartner(stopX, stopY, Math.sign(foot.x - fromX) || 1, GenParam.partnerControl.mistakeMs);
+        if (!this.alive || this.resolved) return;
+        await this.walkTo(this.partner, foot.x, foot.y, speed);
+    }
+
+    async hesitatePartner(x, y, dir, ms) {
+        this.partner.setPose(dir < 0 ? "right" : "left");
+        const back = -dir * uniform(8, 16);
+        await tween(ms * 0.34, (t) => {
+            this.partner.setFeet(lerp(x, x + back, t), y);
+        }, () => this.alive && !this.resolved);
+        if (!this.alive || this.resolved) return;
+        await wait(ms * 0.28);
+        if (!this.alive || this.resolved) return;
+        this.partner.setPose(dir < 0 ? "left" : "right");
+        await tween(ms * 0.38, (t) => {
+            this.partner.setFeet(lerp(x + back, x, t), y);
+        }, () => this.alive && !this.resolved);
+    }
+
+    async fumbleLadderDrop() {
+        const ms = GenParam.partnerControl.mistakeMs;
+        const tree = this.partnerTreeBase;
+        const back = Math.sign(this.partnerLadderHome.x - tree.x) || 1;
+        const slip = back * uniform(18, 30);
+        const tilt = back * uniform(14, 22);
+        this.partnerLadder.group.classList.remove("partner-held");
+        const px = this.partner.x;
+        const py = this.partner.y;
+        await tween(ms * 0.4, (t) => {
+            const eased = t * t;
+            this.placeLadderTilt(tree.x + slip * eased, tree.y, tilt * eased);
+            this.partner.setFeet(px + slip * 0.45 * eased, py);
+            this.faceHorizontal(this.partner, this.partner.x + back);
+        }, () => this.alive && !this.resolved);
+        if (!this.alive || this.resolved) return;
+        await wait(ms * 0.18);
+        if (!this.alive || this.resolved) return;
+        this.partnerLadder.group.classList.add("partner-held");
+        const fromX = tree.x + slip;
+        const fromPx = this.partner.x;
+        await tween(ms * 0.42, (t) => {
+            const eased = 1 - (1 - t) * (1 - t);
+            this.placeLadderTilt(lerp(fromX, tree.x, eased), tree.y, lerp(tilt, 0, eased));
+            this.partner.setFeet(lerp(fromPx, tree.x, eased), py);
+            this.faceHorizontal(this.partner, tree.x);
+        }, () => this.alive && !this.resolved);
+        this.placeLadderTilt(tree.x, tree.y, 0);
+    }
+
+    placeLadderTilt(x, y, angle) {
+        const rig = this.partnerLadder;
+        rig.originX = x - rig.base.x;
+        rig.originY = y - rig.base.y;
+        let transform = "translate(" + rig.originX + " " + rig.originY + ")";
+        if (angle) transform += " rotate(" + angle + " " + rig.base.x + " " + rig.base.y + ")";
+        rig.group.setAttribute("transform", transform);
+    }
+
     async walkTo(actor, x, y, speed) {
         if (Math.abs(x - actor.x) > 1) actor.setPose(x < actor.x ? "left" : "right");
         const distance = Math.hypot(x - actor.x, y - actor.y);
@@ -884,13 +1051,86 @@ class TrialController {
             actor.setFeet(x, y);
             return;
         }
-        await this.moveActor(actor, x, y, distance / (speed || this.speed) * 1000);
+        await this.moveActor(actor, x, y, distance / (speed || this.speed) * 1000, actor === this.partner ? "walk" : null);
     }
 
-    moveActor(actor, x, y, ms) {
+    moveActor(actor, x, y, ms, human) {
         const fromX = actor.x;
         const fromY = actor.y;
-        return tween(ms, (t) => actor.setFeet(lerp(fromX, x, t), lerp(fromY, y, t)), () => this.alive && !this.resolved);
+        const plan = human ? this.buildControlPlan(human) : null;
+        return tween(ms, (t) => {
+            if (!plan) {
+                actor.setFeet(lerp(fromX, x, t), lerp(fromY, y, t));
+                return;
+            }
+            const step = this.controlPoint(fromX, fromY, x, y, t, plan);
+            this.faceHorizontal(actor, step.x);
+            actor.setFeet(step.x, step.y);
+        }, () => this.alive && !this.resolved);
+    }
+
+    faceHorizontal(actor, x) {
+        if (Math.abs(x - actor.x) < 0.2) return;
+        actor.setPose(x < actor.x ? "left" : "right");
+    }
+
+    buildControlPlan(kind) {
+        const spec = GenParam.partnerControl;
+        const delay = uniform(spec.startDelay[0], spec.startDelay[1]);
+        const pause = Math.random() < (kind === "drag" ? spec.dragPauseChance : spec.pauseChance);
+        const pauseLen = pause ? uniform(spec.pauseLength[0], spec.pauseLength[1]) : 0;
+        const roll = Math.random();
+        const end = roll < spec.overshootChance ? "over" : roll < spec.overshootChance + spec.undershootChance ? "under" : "clean";
+        const correction = end === "clean" ? 0 : uniform(spec.correctLength[0], spec.correctLength[1]);
+        const travelEnd = 1 - correction;
+        const points = [{ t: 0, u: 0 }, { t: delay, u: 0 }];
+        let t = delay;
+        if (pause && t + pauseLen < travelEnd - 0.08) {
+            const pauseAt = uniform(0.34, 0.66);
+            const moveSpan = travelEnd - t - pauseLen;
+            const tMid = t + moveSpan * pauseAt;
+            points.push({ t: tMid, u: pauseAt });
+            points.push({ t: tMid + pauseLen, u: pauseAt });
+            t = tMid + pauseLen;
+        }
+        if (end === "over") {
+            points.push({ t: Math.max(t + 0.02, travelEnd), u: 1 + uniform(spec.overshoot[0], spec.overshoot[1]) });
+        } else if (end === "under") {
+            points.push({ t: Math.max(t + 0.02, travelEnd), u: 1 - uniform(spec.undershoot[0], spec.undershoot[1]) });
+        }
+        points.push({ t: 1, u: 1 });
+        const cleaned = [points[0]];
+        for (let i = 1; i < points.length; i++) {
+            const prev = cleaned[cleaned.length - 1];
+            const nextT = points[i].t <= prev.t ? Math.min(1, prev.t + 0.001) : points[i].t;
+            cleaned.push({ t: nextT, u: points[i].u });
+        }
+        cleaned[cleaned.length - 1] = { t: 1, u: 1 };
+        return cleaned;
+    }
+
+    samplePlan(plan, t) {
+        if (t <= 0) return plan[0].u;
+        for (let i = 1; i < plan.length; i++) {
+            const next = plan[i];
+            const prev = plan[i - 1];
+            if (t <= next.t) {
+                const span = next.t - prev.t;
+                const k = span <= 0.0001 ? 1 : (t - prev.t) / span;
+                return lerp(prev.u, next.u, k);
+            }
+        }
+        return 1;
+    }
+
+    controlPoint(fromX, fromY, toX, toY, t, plan) {
+        const u = this.samplePlan(plan, t);
+        const along = clamp(u, 0, 1);
+        const over = u > 1 ? u - 1 : 0;
+        return {
+            x: lerp(fromX, toX, along) + (toX - fromX) * over,
+            y: lerp(fromY, toY, along)
+        };
     }
 
     enableApplesIfReady() {
@@ -916,9 +1156,42 @@ class TrialController {
     updateTimer(now) {
         if (this.clockPaused) return;
         const elapsed = now - this.t0;
-        const remaining = 1 - elapsed / StimulusSettings.trialTimeoutMs;
-        this.ring.setAttribute("stroke-dashoffset", String(this.clockLength * (1 - Math.max(0, remaining))));
-        if (elapsed >= StimulusSettings.trialTimeoutMs) this.fail();
+        const timeout = StimulusSettings.trialTimeoutMs;
+        const left = timeout - elapsed;
+        this.updateClockWarning(now, left);
+        const fraction = 1 - elapsed / timeout;
+        this.ring.setAttribute("stroke-dashoffset", String(this.clockLength * (1 - Math.max(0, fraction))));
+        if (elapsed >= timeout) this.fail();
+    }
+
+    updateClockWarning(now, left) {
+        const warn = GenParam.timeoutFlashMs;
+        if (left > warn) {
+            this.warnPhase = 0;
+            this.warnStamp = now;
+            this.setClockWarning(false);
+            return;
+        }
+        if (left <= 0) {
+            this.setClockWarning(true);
+            return;
+        }
+        const urgency = 1 - left / warn;
+        const period = lerp(640, 90, urgency);
+        const step = this.warnStamp ? Math.min(80, now - this.warnStamp) : 16;
+        this.warnStamp = now;
+        this.warnPhase = (this.warnPhase || 0) + step / period;
+        const solid = urgency >= 0.88;
+        this.setClockWarning(solid || (this.warnPhase % 1) < 0.5);
+    }
+
+    setClockWarning(active) {
+        if (this.clockWarning === active) return;
+        this.clockWarning = active;
+        const red = GenParam.colors.failRed;
+        this.ring.style.stroke = active ? red : "";
+        this.clockTrack.style.stroke = active ? red : "";
+        this.clockTrack.style.fill = active ? "#ffd0d0" : "";
     }
 
     succeed() {
@@ -940,7 +1213,7 @@ class TrialController {
         this.resolved = true;
         this.phase = "resolve";
         if (this.bubble) this.bubble.hide(true);
-        this.clock.remove();
+        this.stopWind();
         const result = {
             completionTimeMs: this.elapsedMs(),
             rewardObtained: false
@@ -968,14 +1241,78 @@ class TrialController {
             this.medalSpin.setAttribute("transform", "translate(" + centerX + " " + centerY + ") scale(" + scale + ")");
         }, () => this.alive);
         await wait(GenParam.rewardHoldMs / 2);
+        if (!this.alive) return;
+        const scoreX = GenParam.screen.width / 2;
+        const scoreY = 72;
+        const startScale = this.medalScale || 3;
+        let landedAt = 0;
+        const land = () => {
+            if (landedAt || !this.onRewardLanded) return;
+            landedAt = performance.now();
+            this.onRewardLanded();
+        };
+        await tween(GenParam.rewardAbsorbMs, (t) => {
+            const eased = t * t * (3 - 2 * t);
+            this.placeMedal(
+                lerp(centerX, scoreX, eased),
+                lerp(centerY, scoreY, eased),
+                lerp(startScale, 0.18, eased)
+            );
+            this.medalSpin.style.opacity = String(1 - eased);
+            if (eased >= 0.4) land();
+        }, () => this.alive);
+        if (!this.alive) return;
+        land();
+        const remain = GenParam.rewardFlashMs - (landedAt ? performance.now() - landedAt : 0);
+        if (remain > 0) await wait(remain);
     }
 
     async playFail() {
-        this.medalInner.classList.add("medal-fail");
+        const centerX = GenParam.screen.width / 2;
+        const centerY = GenParam.screen.height / 2 - 70;
+        const fromX = this.clockX;
+        const fromY = this.clockY;
+        const red = GenParam.colors.failRed;
+        this.ring.setAttribute("stroke-dashoffset", "0");
+        this.ring.style.stroke = red;
+        this.clockTrack.style.stroke = red;
+        this.clockTrack.style.fill = "#ffd5d5";
+        this.root.appendChild(this.clock);
+
+        const fade = GenParam.fadeMs / 2;
         await Promise.all([
-            tween(GenParam.failMedalMs, (t) => { this.medalSpin.style.opacity = String(1 - t); }, () => this.alive),
-            tween(GenParam.fadeMs, (t) => { this.mask.style.opacity = String(t); }, () => this.alive)
+            tween(fade, (t) => { this.mask.style.opacity = String(t); }, () => this.alive),
+            tween(fade, (t) => { this.medalSpin.style.opacity = String(1 - t); }, () => this.alive)
         ]);
+        if (!this.alive) return;
+        await tween(fade, (t) => {
+            this.mask.setAttribute("fill", lerpHex(GenParam.colors.mask, "#ffffff", t));
+        }, () => this.alive);
+        if (!this.alive) return;
+
+        const targetScale = GenParam.failClockScale;
+        await tween(GenParam.failMoveMs, (t) => {
+            const eased = t * t * (3 - 2 * t);
+            this.placeClock(
+                lerp(fromX, centerX, eased),
+                lerp(fromY, centerY, eased),
+                lerp(1, targetScale, eased)
+            );
+        }, () => this.alive);
+        if (!this.alive) return;
+
+        const textY = centerY + this.clockRadius * targetScale + 64;
+        const caption = el("g");
+        caption.style.opacity = "0";
+        [
+            "You ran out of time!",
+            "You did not earn any points for this harvest."
+        ].forEach((line, index) => {
+            caption.appendChild(centerText(line, centerX, textY + index * 56, 42, "fail-caption"));
+        });
+        this.root.appendChild(caption);
+        await tween(GenParam.fadeMs, (t) => { caption.style.opacity = String(t); }, () => this.alive);
+        await wait(GenParam.failHoldMs);
     }
 
     close(result) {

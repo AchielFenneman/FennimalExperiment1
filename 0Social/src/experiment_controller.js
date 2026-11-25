@@ -25,6 +25,37 @@ class IconFactory {
 const DAY_ICON_UNIT = 120;
 const DAY_ICON_HORIZON = 82;
 
+function makeHourglass() {
+    const glass = el("g", { class: "hourglass" });
+    const sand = "#e2b15a";
+    const frame = "#6f6458";
+    glass.appendChild(el("path", {
+        d: "M -14 -24 H 14 M -14 24 H 14 M -13 -22 L 13 -22 L 1.4 -1.2 L 13 22 L -13 22 L -1.4 -1.2 Z",
+        fill: "none",
+        stroke: frame,
+        "stroke-width": 3.2,
+        "stroke-linejoin": "round",
+        "stroke-linecap": "round"
+    }));
+    glass.appendChild(el("path", {
+        d: "M -7.2 -20.2 L 7.2 -20.2 L 1.1 -2.4 Z",
+        fill: sand
+    }));
+    glass.appendChild(el("path", {
+        d: "M -11.2 21.2 L 11.2 21.2 L 1.2 3.2 Z",
+        fill: sand
+    }));
+    glass.appendChild(el("rect", {
+        x: -1.1,
+        y: -3.2,
+        width: 2.2,
+        height: 6.4,
+        rx: 1,
+        fill: sand
+    }));
+    return glass;
+}
+
 function rayTriangle(angle, inner, outer, half) {
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
@@ -322,6 +353,7 @@ class ExperimentController {
             player: { gender: "male", colors: {} },
             partner: { gender: "female", colors: {}, name: "" }
         };
+        this.dayClockExplained = false;
     }
 
     async start() {
@@ -351,13 +383,13 @@ class ExperimentController {
             }
             await this.showPartnerIntro();
             await this.showInstructions();
-            const blockCount = StimulusSettings.blockCount || 1;
+            const blockCount = StimulusSettings.blocks.length;
             for (let block = 0; block < blockCount; block++) await this.runBlock(block);
             await this.showEnd();
-            const saved = await this.showOpenQuestions();
-            this.showMessage(saved
-                ? "Thank you. Your responses have been saved."
-                : "Thank you. The save did not reach the server. Please leave this page open and contact the researcher.");
+            await this.showOpenQuestions();
+            const payment = this.dataController.preparePayment();
+            await this.showPaymentReveal(payment);
+            await this.showCompletionCode(payment);
         } catch (error) {
             console.error(error);
             this.showMessage(error.message || "Something went wrong.");
@@ -381,9 +413,12 @@ class ExperimentController {
         this.stage.appendChild(centerText(text, GenParam.screen.width / 2, GenParam.screen.height / 2, 40));
     }
 
-    refreshScore() {
+    refreshScore(flash, shownPoints) {
         if (this.scoreNode) this.scoreNode.remove();
-        this.scoreNode = centerText("Points: " + this.dataController.totalPoints, GenParam.screen.width / 2, 64, 36, "score-label");
+        const points = shownPoints == null ? this.dataController.totalPoints : shownPoints;
+        this.scoreNode = centerText("Points: " + points, GenParam.screen.width / 2, 72, 60, "score-label");
+        if (flash === "gain") this.scoreNode.classList.add("score-gain");
+        if (flash === "fail") this.scoreNode.classList.add("score-fail");
         this.svg.appendChild(this.scoreNode);
     }
 
@@ -423,32 +458,32 @@ class ExperimentController {
         this.clearStage();
         const width = GenParam.screen.width;
         const name = this.cast.partner.name;
-        const blockCount = StimulusSettings.blockCount || 1;
+        const blockCount = StimulusSettings.blocks.length;
         const board = el("g", { id: "instructions" });
         this.stage.appendChild(board);
 
-        board.appendChild(centerText("Instructions", width / 2, 36, 48));
+        board.appendChild(centerText("Instructions", width / 2, 28, 44));
 
-        const textWidth = 1500;
+        const textWidth = 1680;
         const textBottom = drawWrappedParagraphs(
             board,
             instructionsParagraphs(blockCount, this.cast.partner),
             (width - textWidth) / 2,
-            136,
+            92,
             textWidth,
-            30,
-            42,
-            18,
+            28,
+            38,
+            14,
             "instructions-copy"
         );
 
         const margin = 56;
         const gap = 28;
-        const tableTop = textBottom + 36;
-        const tableH = 400;
+        const tableTop = textBottom + 24;
+        const tableH = 352;
         const tableW = (width - margin * 2 - gap * 2) / 3;
         const columns = [
-            StimulusSettings.rewards.slice().sort((a, b) => b - a).map((amount) => ({
+            Object.keys(StimulusSettings.rewardLevels).map((name) => StimulusSettings.rewardLevels[name]).sort((a, b) => b - a).map((amount) => ({
                 icon: cloneSvgById(this.trialDoc, "point_" + amount + "_medal"),
                 text: rewardLegendText(amount)
             })),
@@ -461,14 +496,14 @@ class ExperimentController {
                     icon: this.icons.create(this.cast.partner.gender, "front", this.cast.partner.colors),
                     text: partnerLegendText(name, true)
                 },
-                { icon: null, text: partnerLegendText(name, false) }
+                { icon: makeWindIcon(), text: partnerLegendText(name, false) }
             ]
         ];
         columns.forEach((rows, index) => {
             this.drawLegendTable(board, margin + index * (tableW + gap), tableTop, tableW, tableH, rows);
         });
 
-        const buttonY = tableTop + tableH + 78;
+        const buttonY = tableTop + tableH + 62;
         return new Promise((resolve) => {
             board.appendChild(makeButton("Continue", width / 2, buttonY, 400, 75, resolve));
             const bounds = board.getBBox();
@@ -537,27 +572,32 @@ class ExperimentController {
     }
 
     // One block is one day. The sun advances after every accepted harvest, including one that runs out of time.
-    // A rejected offer leaves it where it is. Practice does not spend a step.
+    // A rejected offer leaves it where it is. The day ends when dayLength harvests have been accepted.
+    // Practice does not spend a step.
     async runBlock(blockIndex) {
-        const trials = await this.dataController.getOrCreateTrials(blockIndex);
-        const budget = trials.length;
+        const block = StimulusSettings.blocks[blockIndex];
+        if (!block) throw new Error("Missing settings for day " + (blockIndex + 1));
+        const dayLength = block.dayLength;
+        if (!(dayLength > 0)) throw new Error("Day length must be at least 1.");
         if (blockIndex === 0) await this.runPracticeTrial();
-        if (!budget) return;
         let completed = 0;
         let advance = false;
-        for (let i = 0; i < budget; i++) {
-            await this.showDayInterval(completed, budget, true, advance);
+        let offerIndex = 0;
+        while (completed < dayLength) {
+            await this.showDayInterval(completed, dayLength, true, advance);
             advance = false;
-            const decision = await this.showOffer(trials[i]);
+            const trial = drawRewardTrial(block);
+            const decision = await this.showOffer(trial);
             const meta = {
                 blockIndex: blockIndex,
-                trialIndex: i,
+                trialIndex: offerIndex,
                 decisionTimeMs: decision.decisionTimeMs
             };
+            offerIndex += 1;
             if (!decision.accepted) {
                 this.dataController.recordTrial({
-                    rewardAmount: trials[i].rewardAmount,
-                    socialCondition: trials[i].socialCondition,
+                    rewardAmount: trial.rewardAmount,
+                    socialCondition: trial.socialCondition,
                     accepted: false,
                     decisionTimeMs: meta.decisionTimeMs,
                     completionTimeMs: null,
@@ -567,11 +607,11 @@ class ExperimentController {
                 });
                 continue;
             }
-            await this.runTrial(trials[i], meta);
+            await this.runTrial(trial, meta);
             completed += 1;
             advance = true;
         }
-        await this.showDayInterval(completed, budget, false, advance);
+        await this.showDayInterval(completed, dayLength, false, advance);
     }
 
     // Between offers the sun shows how many accepted harvests have been played.
@@ -582,6 +622,10 @@ class ExperimentController {
         const clock = new DayClock(this.stage);
         const shown = budget > 0 ? completed / budget : 0;
         clock.setProgress(advance ? (completed - 1) / budget : shown);
+        if (!this.dayClockExplained) {
+            this.dayClockExplained = true;
+            await this.explainDayClock(clock);
+        }
         if (searching) {
             this.stage.appendChild(centerText(
                 StimulusSettings.daySearchText,
@@ -590,11 +634,24 @@ class ExperimentController {
                 GenParam.dayClock.captionSize,
                 "day-search"
             ));
+            const holder = el("g", { class: "hourglass-holder" });
+            holder.setAttribute("transform", "translate(" + (GenParam.screen.width / 2) + " " + (clock.captionY + 72) + ")");
+            holder.appendChild(makeHourglass());
+            this.stage.appendChild(holder);
         }
         if (advance) await clock.animateTo(shown);
         await wait(searching
             ? uniform(GenParam.offerDelayMs[0], GenParam.offerDelayMs[1])
             : GenParam.dayClock.sunsetHoldMs);
+    }
+
+    explainDayClock(clock) {
+        const bubble = new SpeechBubble(this.svg);
+        return bubble.show({
+            target: clock.sun,
+            text: dayClockBubbleText(),
+            preferredSide: "up"
+        });
     }
 
     showOffer(trial) {
@@ -623,13 +680,16 @@ class ExperimentController {
 
         const typeIcon = this.cloneTypeIcon(condition.apples);
         this.stage.appendChild(typeIcon);
-        const withPartner = trial.socialCondition !== "alone";
-        const iconX = withPartner ? cx + 40 : cx + 130;
-        placeByHeight(typeIcon, iconX, cy, 200);
-        if (withPartner) {
+        const treeX = cx + 40;
+        placeByHeight(typeIcon, treeX, cy, 200);
+        if (trial.socialCondition === "alone") {
+            const wind = makeWindIcon();
+            this.stage.appendChild(wind);
+            placeByHeight(wind, treeX + 168, cy, 108);
+        } else {
             const partner = this.icons.create(this.cast.partner.gender, "front", this.cast.partner.colors);
             this.stage.appendChild(partner);
-            placeByHeight(partner, iconX + 128, cy + 10, 180);
+            placeByHeight(partner, treeX + 128, cy + 10, 180);
         }
 
         const shownAt = performance.now();
@@ -682,7 +742,9 @@ class ExperimentController {
                 trial: trial,
                 createIcon: (person, pose) => this.icons.create(this.cast[person].gender, pose, this.cast[person].colors),
                 partnerName: this.cast.partner.name,
+                onRewardLanded: () => this.refreshScore("gain"),
                 onOutcome: (result) => {
+                    const before = this.dataController.totalPoints;
                     this.dataController.recordTrial({
                         rewardAmount: trial.rewardAmount,
                         socialCondition: trial.socialCondition,
@@ -694,7 +756,9 @@ class ExperimentController {
                         blockIndex: meta.blockIndex == null ? null : meta.blockIndex,
                         trialIndex: meta.trialIndex == null ? null : meta.trialIndex
                     });
-                    this.refreshScore();
+                    if (this.dataController.totalPoints > before) this.refreshScore(null, before);
+                    else if (result.rewardObtained !== true) this.refreshScore("fail");
+                    else this.refreshScore();
                 }
             });
             trialController.start().then(resolve);
@@ -776,11 +840,107 @@ class ExperimentController {
                 if (submitted) return;
                 submitted = true;
                 this.dataController.recordOpenResponses(responses);
+                clearTimeout(this.dataController.responseTimer);
                 this.showMessage("Saving…");
-                this.dataController.complete().then(resolve);
+                this.dataController.storeAllData(false).then(() => resolve());
             }));
         });
     }
+
+    showPaymentReveal(payment) {
+        this.clearStage();
+        if (this.scoreNode) {
+            this.scoreNode.remove();
+            this.scoreNode = null;
+        }
+        const cx = GenParam.screen.width / 2;
+        const pointWord = payment.totalPoints === 1 ? "point" : "points";
+        this.stage.appendChild(centerText("Your bonus for this experiment", cx, 250, 52));
+        this.stage.appendChild(centerText("You earned " + payment.totalPoints + " " + pointWord + ".", cx, 390, 40));
+        const amount = centerText("Your bonus is " + bonusMoneyText(payment.bonusDollars) + ".", cx, 490, 64);
+        amount.style.fontWeight = "700";
+        this.stage.appendChild(amount);
+        this.stage.appendChild(centerText("Do not close this page yet.", cx, 680, 40));
+        this.stage.appendChild(centerText("The next page shows your completion code.", cx, 740, 40));
+        return new Promise((resolve) => {
+            this.stage.appendChild(makeButton("Continue", cx, 900, 400, 75, resolve));
+        });
+    }
+
+    showCompletionCode(payment) {
+        this.clearStage();
+        const cx = GenParam.screen.width / 2;
+        const width = 1500;
+        this.stage.appendChild(centerText("Do not close this page yet", cx, 90, 52));
+        let y = this.appendCenteredLines(
+            "Do not close or refresh this window yet. As a safety backup, your completion code is:",
+            cx, 180, width, 34, 46
+        );
+        const codeW = 920;
+        const codeH = 120;
+        const codeY = y + 36;
+        this.stage.appendChild(makeSelectableCode(payment.completionCode, cx - codeW / 2, codeY, codeW, codeH));
+        y = codeY + codeH + 70;
+        y = this.appendCenteredLines(
+            "Pressing the button below should automatically submit your code to Prolific. Please copy this code first.",
+            cx, y, width, 32, 44
+        );
+        y += 56;
+        y = this.appendCenteredLines(
+            "Do not close or refresh this window before clicking the button. We can only approve your work if you submit the code to Prolific by clicking the button below.",
+            cx, y, width, 32, 44
+        );
+        this.appendCenteredLines("Thank you for participating.", cx, y + 70, width, 34, 46);
+
+        return new Promise((resolve) => {
+            let sent = false;
+            this.stage.appendChild(makeButton("Submit your data", cx, 990, 520, 75, () => {
+                if (sent) return;
+                sent = true;
+                this.returnToProlific(payment).then(resolve);
+            }));
+        });
+    }
+
+    appendCenteredLines(text, cx, y, maxWidth, fontSize, leading) {
+        const lines = wrapTextLines(this.stage, text, fontSize, maxWidth);
+        lines.forEach((line, index) => {
+            this.stage.appendChild(centerText(line, cx, y + index * leading, fontSize));
+        });
+        return y + Math.max(lines.length - 1, 0) * leading;
+    }
+
+    async returnToProlific(payment) {
+        const url = this.dataController.prolificReturnUrl();
+        let saved = false;
+        try {
+            saved = await this.dataController.complete();
+        } catch (error) {
+            console.error("Final save failed:", error);
+        }
+        if (!saved) {
+            alert(
+                "Your data is safe, but we had a connection hiccup. Your Prolific completion code is: " +
+                payment.completionCode + ". Click OK to return to Prolific."
+            );
+        }
+        window.location.href = url;
+    }
+}
+
+function makeSelectableCode(text, x, y, width, height) {
+    const frame = el("foreignObject", {
+        x: x,
+        y: y,
+        width: width,
+        height: height,
+        class: "completion-code-frame"
+    });
+    const box = document.createElementNS("http://www.w3.org/1999/xhtml", "div");
+    box.className = "completion-code";
+    box.textContent = text;
+    frame.appendChild(box);
+    return frame;
 }
 
 class CharacterCreation {

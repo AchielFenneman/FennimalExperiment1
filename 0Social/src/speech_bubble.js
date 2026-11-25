@@ -132,6 +132,7 @@ class SpeechBubble {
                     () => this.confirm()
                 );
                 this.root.appendChild(button);
+                this.bindEnter();
             }
 
             parent.appendChild(this.root);
@@ -146,7 +147,24 @@ class SpeechBubble {
         this.hide(false, done);
     }
 
+    bindEnter() {
+        this.unbindEnter();
+        this.onEnterKey = (event) => {
+            if (event.repeat || event.key !== "Enter" || !this.resolveConfirm) return;
+            event.preventDefault();
+            this.confirm();
+        };
+        window.addEventListener("keydown", this.onEnterKey);
+    }
+
+    unbindEnter() {
+        if (!this.onEnterKey) return;
+        window.removeEventListener("keydown", this.onEnterKey);
+        this.onEnterKey = null;
+    }
+
     hide(immediate, onDone) {
+        this.unbindEnter();
         if (this.targetElement) {
             this.targetElement.style.filter = this.targetPrevFilter || "";
             this.targetElement = null;

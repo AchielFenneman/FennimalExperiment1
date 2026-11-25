@@ -3,6 +3,12 @@
 const GenParam = {
     screen: { width: 1920, height: 1080 },
 
+    // Cash bonus for collected points. The instructions quote this rate.
+    bonusExchange: {
+        dollars: 0.01,
+        points: 10
+    },
+
     offerDelayMs: [2000, 2500],
     appleFadeMs: 500,
     ladderSnapPauseMs: 500,
@@ -21,6 +27,21 @@ const GenParam = {
     partnerClimbMs: 620,
     climbDurationMs: 900,
     walkSpeedPxPerSec: 420,
+    // Partner travel still lasts the same time. The irregularity is late presses, brief releases, and a small horizontal overshoot or undershoot.
+    // A rare mistake adds a fixed beat; the rest of that sequence is sped up so the total stays partnerSequenceMs.
+    partnerControl: {
+        startDelay: [0.06, 0.16],
+        pauseChance: 0.6,
+        dragPauseChance: 0.35,
+        pauseLength: [0.06, 0.11],
+        overshootChance: 0.34,
+        undershootChance: 0.28,
+        overshoot: [0.04, 0.08],
+        undershoot: [0.05, 0.12],
+        correctLength: [0.1, 0.16],
+        mistakeChance: 0.18,
+        mistakeMs: 700
+    },
     snapDistancePx: 100,
     grabDistancePx: 100,
     partnerStartOffsetPx: 170,
@@ -33,8 +54,14 @@ const GenParam = {
     medalHeightPx: 150,
     rewardMoveMs: 500,
     rewardHoldMs: 1400,
+    rewardAbsorbMs: 780,
+    // Matches the score-flash-gain duration. The counter turns green during the flight and is back to normal as the screen moves on.
+    rewardFlashMs: 900,
     fadeMs: 400,
-    failMedalMs: 100,
+    failMoveMs: 650,
+    failHoldMs: 1700,
+    failClockScale: 2.5,
+    timeoutFlashMs: 2500,
 
     colors: {
         button: "#f4d36a",
@@ -349,6 +376,26 @@ function setKeyCapPressed(group, pressed) {
     group._lip.setAttribute("y", group._lipY + dy);
     group._glyph.setAttribute("y", group._glyphY + dy);
     group.classList.toggle("is-pressed", pressed);
+}
+
+function makeWindIcon() {
+    const group = el("g", { class: "wind-icon" });
+    const strokes = [
+        { d: "M 8 28 C 26 28 30 4 48 4 C 62 4 68 22 80 22", width: 5.5 },
+        { d: "M 2 54 C 26 54 32 26 54 26 C 72 26 80 48 96 48", width: 6 },
+        { d: "M 14 80 C 34 80 40 56 58 56 C 72 56 78 74 90 74", width: 5.5 }
+    ];
+    strokes.forEach((line) => {
+        group.appendChild(el("path", {
+            d: line.d,
+            fill: "none",
+            stroke: "#767c82",
+            "stroke-width": line.width,
+            "stroke-linecap": "round",
+            "stroke-linejoin": "round"
+        }));
+    });
+    return group;
 }
 
 function spawnSparkles(parent, cx, cy) {
