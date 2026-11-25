@@ -686,23 +686,10 @@ let StimulusSettings = function () {
                 partner_behavior: "active",
                 trial_subblocks: [
                     { interaction_type: "warehouse_cleanup", Fennimal: "A", box: "X", mystery_note: RETRO_FAVORITE_TOY_NOTE },
-                    { interaction_type: "warehouse_cleanup", Fennimal: "B", box: "X", mystery_note: RETRO_FAVORITE_TOY_NOTE, partner_leaves_during_interaction: true }
+                    { interaction_type: "warehouse_cleanup", Fennimal: "B", box: "X",  reveal_toy: true, partner_leaves_during_interaction: true }
                 ]
             },
 
-            {
-                type: "retrieve_lost_box",
-                n_trials_to_sample: 1,
-                randomization_id: "lost_box_manipulation",
-                include_decoration: true,
-                include_lost_found_tag: false,
-                box_locations: [
-                    { label: "boost", Fennimal_finding_box: "A", target_box: "X" },
-                    { label: "neutral", Fennimal_finding_box: "C", target_box: "X" },
-                    { label: "cost", Fennimal_finding_box: "B", target_box: "X" }
-                ],
-                partner_behavior: "active"
-            },
 
             {
                 type: "postcard_task",
@@ -727,6 +714,20 @@ let StimulusSettings = function () {
                         show_instructions_bubble: false
                     }
                 ]
+            },
+
+            {
+                type: "retrieve_lost_box",
+                n_trials_to_sample: 1,
+                randomization_id: "lost_box_manipulation",
+                include_decoration: true,
+                include_lost_found_tag: false,
+                box_locations: [
+                    { label: "boost", Fennimal_finding_box: "A", target_box: "X" },
+                    //{ label: "neutral", Fennimal_finding_box: "C", target_box: "X" },
+                    { label: "cost", Fennimal_finding_box: "B", target_box: "X" }
+                ],
+                partner_behavior: "active"
             },
 
             {
