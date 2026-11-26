@@ -57,6 +57,8 @@ const GenParam = {
     rewardAbsorbMs: 780,
     // Matches the score-flash-gain duration. The counter turns green during the flight and is back to normal as the screen moves on.
     rewardFlashMs: 900,
+    // Matches score-flash-loss. The offer stays up long enough to see the total drop after a rejection.
+    rejectCostFlashMs: 900,
     fadeMs: 400,
     failMoveMs: 650,
     failHoldMs: 1700,
@@ -309,6 +311,63 @@ function makeTextArea(x, y, width, height, onInput, label) {
     field.addEventListener("input", () => onInput(field.value));
     frame.appendChild(field);
     return frame;
+}
+
+// Small point token for the Reject button. Drawn directly so the amount stays readable at button size.
+function makeRejectCostIcon(amount) {
+    const group = el("g", { class: "reject-cost-icon" });
+    group.appendChild(el("circle", {
+        cx: 0,
+        cy: 0,
+        r: 28,
+        fill: "#f3b2a8",
+        stroke: "#8a3028",
+        "stroke-width": 3
+    }));
+    group.appendChild(el("circle", {
+        cx: 0,
+        cy: 0,
+        r: 21,
+        fill: "#d6453c"
+    }));
+    const label = centerText("-" + amount, 0, 1, 28, "reject-cost-label");
+    label.style.pointerEvents = "none";
+    group.appendChild(label);
+    return group;
+}
+
+// Puts an icon on the right side of a button label and keeps the pair centered.
+function placeButtonIcon(button, icon, height, gap) {
+    const label = button.querySelector(".ui-button-label");
+    const face = button.querySelector(".ui-button-face");
+    const width = Number(face.getAttribute("width"));
+    const faceX = Number(face.getAttribute("x"));
+    const faceY = Number(face.getAttribute("y"));
+    const faceH = Number(face.getAttribute("height"));
+    icon.style.pointerEvents = "none";
+    button.appendChild(icon);
+
+    const token = icon.querySelector(".reject-cost-label");
+    const plate = icon.querySelector("path");
+    if (token && plate) {
+        const plateBox = plate.getBBox();
+        token.setAttribute("x", plateBox.x + plateBox.width / 2);
+        token.setAttribute("y", plateBox.y + plateBox.height / 2);
+    }
+
+    const raw = icon.getBBox();
+    let iconH = height;
+    const textW = label.getComputedTextLength();
+    let iconW = raw.height > 0 ? raw.width * (iconH / raw.height) : height;
+    const available = width - 36;
+    if (textW + gap + iconW > available && raw.width > 0) {
+        iconW = Math.max(32, available - gap - textW);
+        iconH = iconW * (raw.height / raw.width);
+    }
+    const total = textW + gap + iconW;
+    const left = faceX + (width - total) / 2;
+    label.setAttribute("x", left + textW / 2);
+    placeByHeight(icon, left + textW + gap + iconW / 2, faceY + faceH / 2, iconH);
 }
 
 function makeButton(label, cx, cy, width, height, onPress) {

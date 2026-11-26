@@ -1,5 +1,5 @@
 // Editable experiment design. One block is one day. The day ends when enough harvests
-// have been accepted. Each offer draws a reward level and a social condition separately.
+// have been accepted. Each day has a fixed offer set, shuffled at the start of the experiment.
 
 const StimulusSettings = {
     // Firestore collection for attempt documents. Claims live in {code}_claims.
@@ -8,7 +8,7 @@ const StimulusSettings = {
     // Waiting screen before an offer is presented.
     daySearchText: "Searching for trees with ripe apples",
 
-    // Medal values. The legend lists these, and each day's reward weights refer to these names.
+    // Medal values. The legend lists these, and each day's reward counts refer to these names.
     rewardLevels: {
         low: 5,
         medium: 10,
@@ -16,26 +16,20 @@ const StimulusSettings = {
     },
 
     // One entry per day. dayLength is how many accepted harvests fill the sun's path.
-    // Each offer draws a reward and a social condition independently, then combines them.
-    // Because the reward roll does not depend on the condition, alone and cooperation-optional
-    // offers have the same mix of 5-, 10-, and 20-point harvests.
-    // Weights are percentages. If a table does not sum to 100 it is rescaled, and the console warns.
+    // rewardCounts is how often each reward appears for every social condition.
+    // The offer set crosses that profile with alone, cooperation-required, and
+    // cooperation-optional, so the three trial types are equally common and share
+    // the same rewards. That set is shuffled once per day at the start of the experiment.
+    // A rejected offer spends a place in the set and does not fill the day. When the
+    // set runs out first, it is shuffled again and presented from the start.
     blocks: [
         {
             dayLength: 15,
-            // High offers are almost always taken and low offers almost always refused,
-            // so most of the day is the medium reward, where the choice still varies.
-            rewardWeights: {
-                low: 15,
-                medium: 70,
-                high: 15
-            },
-            // Alone and cooperation-optional are the matched pair (same apple height).
-            // Cooperation-required stays in the day, at half that rate, because those apples are up high.
-            conditionWeights: {
-                alone: 40,
-                "cooperation-optional": 40,
-                "cooperation-required": 20
+            // One 20, three 10s, and one 5 for each of the three conditions: 15 offers.
+            rewardCounts: {
+                high: 1,
+                medium: 3,
+                low: 1
             }
         }
     ],
@@ -46,6 +40,9 @@ const StimulusSettings = {
         enabled: true,
         rewardAmount: 10
     },
+
+    // Taken off the point total each time an offer is rejected. The first offer points this out.
+    rejectCost: 1,
 
     conditions: {
         alone: { apples: "middle_apple", swatch: "#e23b3b" },
@@ -122,7 +119,7 @@ function instructionsParagraphs(blockCount, partner) {
         "The task lasts " + count + " " + dayWord + ". " + during + " you will harvest apples.",
         "Each harvest has to be completed in " + seconds + " " + secondWord + ": this means you need to drag the ladder and pick the apples before the time runs out. If you take longer than " + seconds + " " + secondWord + ", the harvest fails, and you don't earn a reward.",
         partner.name + " will assist you during the harvest. " + subject + " will happily help you whenever " + pronoun + " is available.",
-        "Before you accept or reject you will get some information for each offer. Specifically, 3 pieces of information: the amount of points earned for the task, where are the apples, and whether your partner participates in this harvest."
+        "Before you accept or reject you will get some information for each offer. Specifically, 3 pieces of information: the amount of points earned for the task, where are the apples, and whether your partner participates in this harvest. " + rejectCostSentence()
     ];
 }
 
@@ -146,6 +143,28 @@ function dayClockBubbleText() {
     return "Accepted harvests take time. Each one you accept moves the day forward, whether you finish it in time or run out of time.";
 }
 
+function rejectCostSentence() {
+    const cost = StimulusSettings.rejectCost;
+    const word = cost === 1 ? "point" : "points";
+    return "Rejecting an offer costs " + cost + " " + word + ".";
+}
+
+function offerBubbleText(partnerName, trial) {
+    const upper = trial.socialCondition === "cooperation-required";
+    const helping = trial.socialCondition !== "alone";
+    return {
+        intro: "This is the offer screen. Accept or reject.",
+        reward: "This medal is the reward for finishing the harvest in time. Those points are added to your total.",
+        apples: upper
+            ? "The apples are up high. " + partnerName + " will pull a branch down so you can reach them."
+            : "The apples are in the middle of the tree. You can reach them by climbing the ladder.",
+        partner: helping
+            ? partnerName + " will take part in this harvest."
+            : "A strong wind is blowing, so " + partnerName + " can't help you. You have to wait a short while for the wind to die down.",
+        reject: rejectCostSentence() + " That cost is taken off your total."
+    };
+}
+
 function practiceBubbleText(partnerName) {
     return {
         time: "Let's try one practice task. This circle shows the time you have left. If it runs out before you finish, you do not earn the reward.",
@@ -157,49 +176,63 @@ function practiceBubbleText(partnerName) {
     };
 }
 
-const weightWarningsShown = {};
+// One copy of the day's offer set, before it is shuffled. Each condition gets
+// the same reward profile, so the set size is the profile length times three.
+function buildDayTrialSet(block, dayNumber) {
+    const dayLabel = dayNumber ? "Day " + dayNumber : "A day";
+    const levels = StimulusSettings.rewardLevels;
+    const counts = block && block.rewardCounts;
+    if (!counts) throw new Error(dayLabel + " is missing reward counts.");
+    const conditions = Object.keys(StimulusSettings.conditions);
+    if (!conditions.length) throw new Error("No social conditions are defined.");
 
-function weightedPick(weights, label, known) {
-    const entries = [];
-    let total = 0;
-    Object.keys(weights || {}).forEach((name) => {
-        if (known && !known[name]) throw new Error(label + " uses an unknown name: " + name);
-        const weight = Number(weights[name]);
-        if (!isFinite(weight) || weight < 0) {
-            throw new Error(label + " for " + name + " must be a number that is zero or above.");
+    const profile = [];
+    Object.keys(counts).forEach((name) => {
+        if (!Object.prototype.hasOwnProperty.call(levels, name)) {
+            throw new Error(dayLabel + " counts an unknown reward: " + name);
         }
-        if (weight === 0) return;
-        entries.push({ name: name, weight: weight });
-        total += weight;
+        const count = Number(counts[name]);
+        if (!isFinite(count) || count < 0 || Math.floor(count) !== count) {
+            throw new Error(dayLabel + " count for " + name + " must be a whole number that is zero or above.");
+        }
+        for (let i = 0; i < count; i++) profile.push(levels[name]);
     });
-    if (!entries.length) throw new Error(label + " has no positive weight.");
-    if (Math.abs(total - 100) > 0.01) {
-        const key = label + "|" + JSON.stringify(weights);
-        if (!weightWarningsShown[key]) {
-            weightWarningsShown[key] = true;
-            console.warn(
-                "\n%c  WARNING  %c " + label + " sum to " + total + ", not 100. " +
-                "Treating these values as relative weights and rescaling them to 100.\n",
-                "background:#b00020;color:#fff;font-size:22px;font-weight:800;padding:8px 14px;",
-                "color:#b00020;font-size:16px;font-weight:700;"
-            );
-            console.warn(weights);
-        }
-    }
-    let roll = Math.random() * total;
-    for (let i = 0; i < entries.length; i++) {
-        roll -= entries[i].weight;
-        if (roll < 0) return entries[i].name;
-    }
-    return entries[entries.length - 1].name;
+    if (!profile.length) throw new Error(dayLabel + " reward counts produce an empty set.");
+
+    const trials = [];
+    conditions.forEach((socialCondition) => {
+        profile.forEach((rewardAmount) => {
+            trials.push({
+                rewardAmount: rewardAmount,
+                socialCondition: socialCondition
+            });
+        });
+    });
+    return trials;
 }
 
-function drawRewardTrial(block) {
-    const levels = StimulusSettings.rewardLevels;
-    const rewardName = weightedPick(block.rewardWeights, "Reward weights", levels);
-    const socialCondition = weightedPick(block.conditionWeights, "Social-condition weights", StimulusSettings.conditions);
-    return {
-        rewardAmount: levels[rewardName],
-        socialCondition: socialCondition
-    };
+function trialKey(trial) {
+    return trial && trial.rewardAmount + "|" + trial.socialCondition;
+}
+
+function sameTrialMultiset(left, right) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
+    const counts = {};
+    left.forEach((trial) => {
+        const key = trialKey(trial);
+        counts[key] = (counts[key] || 0) + 1;
+    });
+    for (let i = 0; i < right.length; i++) {
+        const key = trialKey(right[i]);
+        if (!counts[key]) return false;
+        counts[key] -= 1;
+    }
+    return true;
+}
+
+// True when the saved order is one shuffled copy of each day's current set.
+function trialOrderMatchesSettings(order) {
+    const blocks = StimulusSettings.blocks;
+    if (!Array.isArray(order) || order.length !== blocks.length) return false;
+    return blocks.every((block, index) => sameTrialMultiset(order[index], buildDayTrialSet(block, index + 1)));
 }

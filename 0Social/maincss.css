@@ -178,6 +178,15 @@ html, body {
     animation: score-flash-fail 2.1s linear;
 }
 
+.score-label.score-loss {
+    animation: score-flash-loss 0.9s linear;
+}
+
+.reject-cost-label {
+    font-weight: 700;
+    fill: #fffdf8;
+}
+
 .fail-caption {
     font-weight: 600;
     fill: #1c1c1c;
@@ -187,6 +196,14 @@ html, body {
     0%, 22% {
         fill: #0e9a38;
         filter: drop-shadow(0 0 8px rgba(14, 154, 56, 0.95));
+    }
+    100% { fill: #1c1c1c; filter: none; }
+}
+
+@keyframes score-flash-loss {
+    0%, 35% {
+        fill: #d10c0c;
+        filter: drop-shadow(0 0 8px rgba(209, 12, 12, 0.95));
     }
     100% { fill: #1c1c1c; filter: none; }
 }

@@ -173,8 +173,21 @@ class DataController {
         await this.storeAllData(false);
     }
 
+    // Draws each day's offer order once. A refresh keeps that order and restarts progress.
+    async ensureTrialOrder() {
+        if (trialOrderMatchesSettings(this.experimentData.trialsByBlock)) return;
+        this.experimentData.trialsByBlock = StimulusSettings.blocks.map((block, index) => {
+            return shuffle(buildDayTrialSet(block, index + 1));
+        });
+        await this.writeSessionClaim(false);
+        await this.storeAllData(false);
+    }
+
     recordTrial(entry) {
         const accepted = entry.accepted === true;
+        const pointsAwarded = entry.completedInTime
+            ? entry.rewardAmount
+            : (accepted ? 0 : -StimulusSettings.rejectCost);
         this.trials.push({
             blockNumber: entry.blockIndex == null ? null : entry.blockIndex + 1,
             trialNumber: entry.trialIndex == null ? null : entry.trialIndex + 1,
@@ -184,9 +197,10 @@ class DataController {
             decisionTimeMs: entry.decisionTimeMs == null ? null : entry.decisionTimeMs,
             completionTimeMs: accepted && entry.completionTimeMs != null ? entry.completionTimeMs : null,
             completedInTime: accepted && entry.completedInTime === true,
+            pointsAwarded: pointsAwarded,
             practice: !!entry.practice
         });
-        if (entry.completedInTime) this.totalPoints += entry.rewardAmount;
+        this.totalPoints += pointsAwarded;
         this.storeAllData(false);
     }
 
@@ -214,7 +228,9 @@ class DataController {
         }
         const rate = GenParam.bonusExchange;
         const points = this.totalPoints;
-        const cents = Math.round(points * (rate.dollars / rate.points) * 100);
+        // Rejections can leave the total below zero. The bonus is paid only on points that remain.
+        const payablePoints = Math.max(0, points);
+        const cents = Math.round(payablePoints * (rate.dollars / rate.points) * 100);
         const words = StimulusSettings.completionCodeWords;
         const word1 = shuffle(words.first)[0];
         const word2 = shuffle(words.second)[0];

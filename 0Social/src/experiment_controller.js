@@ -374,6 +374,8 @@ class ExperimentController {
                 return;
             }
             await this.dataController.finalizeSession(earlySession);
+            await this.dataController.ensureTrialOrder();
+            this.prepareOfferQueues();
             await this.loadAssets();
             if (this.dataController.hasRestoredCast()) {
                 this.dataController.applyCast(this.cast);
@@ -419,6 +421,7 @@ class ExperimentController {
         this.scoreNode = centerText("Points: " + points, GenParam.screen.width / 2, 72, 60, "score-label");
         if (flash === "gain") this.scoreNode.classList.add("score-gain");
         if (flash === "fail") this.scoreNode.classList.add("score-fail");
+        if (flash === "loss") this.scoreNode.classList.add("score-loss");
         this.svg.appendChild(this.scoreNode);
     }
 
@@ -572,8 +575,9 @@ class ExperimentController {
     }
 
     // One block is one day. The sun advances after every accepted harvest, including one that runs out of time.
-    // A rejected offer leaves it where it is. The day ends when dayLength harvests have been accepted.
-    // Practice does not spend a step.
+    // A rejected offer costs rejectCost points and leaves the sun where it is. The day ends when dayLength harvests have been accepted.
+    // Offers come from that day's shuffled set. When rejections empty the set first, the same set is shuffled and started again.
+    // Practice does not spend a step. The first offer explains the icons before the choice opens.
     async runBlock(blockIndex) {
         const block = StimulusSettings.blocks[blockIndex];
         if (!block) throw new Error("Missing settings for day " + (blockIndex + 1));
@@ -586,8 +590,8 @@ class ExperimentController {
         while (completed < dayLength) {
             await this.showDayInterval(completed, dayLength, true, advance);
             advance = false;
-            const trial = drawRewardTrial(block);
-            const decision = await this.showOffer(trial);
+            const trial = this.takeOffer(blockIndex);
+            const decision = await this.showOffer(trial, blockIndex === 0 && offerIndex === 0);
             const meta = {
                 blockIndex: blockIndex,
                 trialIndex: offerIndex,
@@ -605,6 +609,10 @@ class ExperimentController {
                     blockIndex: meta.blockIndex,
                     trialIndex: meta.trialIndex
                 });
+                if (StimulusSettings.rejectCost) {
+                    this.refreshScore("loss");
+                    await wait(GenParam.rejectCostFlashMs);
+                }
                 continue;
             }
             await this.runTrial(trial, meta);
@@ -612,6 +620,30 @@ class ExperimentController {
             advance = true;
         }
         await this.showDayInterval(completed, dayLength, false, advance);
+    }
+
+    // The first pass of a day plays the order drawn at the start of the experiment.
+    // A later pass is a new shuffle of the same set.
+    prepareOfferQueues() {
+        const assigned = this.dataController.experimentData.trialsByBlock || [];
+        this.offerQueues = assigned.map((trials) => trials.map((trial) => ({
+            rewardAmount: trial.rewardAmount,
+            socialCondition: trial.socialCondition
+        })));
+    }
+
+    takeOffer(blockIndex) {
+        let queue = this.offerQueues[blockIndex];
+        if (!queue || !queue.length) {
+            const block = StimulusSettings.blocks[blockIndex];
+            queue = shuffle(buildDayTrialSet(block, blockIndex + 1));
+            this.offerQueues[blockIndex] = queue;
+        }
+        const trial = queue.shift();
+        return {
+            rewardAmount: trial.rewardAmount,
+            socialCondition: trial.socialCondition
+        };
     }
 
     // Between offers the sun shows how many accepted harvests have been played.
@@ -654,7 +686,7 @@ class ExperimentController {
         });
     }
 
-    showOffer(trial) {
+    async showOffer(trial, guide) {
         this.clearStage();
         this.refreshScore();
         const condition = StimulusSettings.conditions[trial.socialCondition];
@@ -663,7 +695,9 @@ class ExperimentController {
         const boxW = 600;
         const boxH = 300;
 
-        this.stage.appendChild(el("rect", {
+        const offerCard = el("g", { class: "offer-card" });
+        this.stage.appendChild(offerCard);
+        offerCard.appendChild(el("rect", {
             x: cx - boxW / 2,
             y: cy - boxH / 2,
             width: boxW,
@@ -675,37 +709,81 @@ class ExperimentController {
         }));
 
         const medal = cloneSvgById(this.trialDoc, "point_" + trial.rewardAmount + "_medal");
-        this.stage.appendChild(medal);
+        offerCard.appendChild(medal);
         placeByHeight(medal, cx - 170, cy, GenParam.medalHeightPx);
 
         const typeIcon = this.cloneTypeIcon(condition.apples);
-        this.stage.appendChild(typeIcon);
+        offerCard.appendChild(typeIcon);
         const treeX = cx + 40;
         placeByHeight(typeIcon, treeX, cy, 200);
+        let company;
         if (trial.socialCondition === "alone") {
-            const wind = makeWindIcon();
-            this.stage.appendChild(wind);
-            placeByHeight(wind, treeX + 168, cy, 108);
+            company = makeWindIcon();
+            offerCard.appendChild(company);
+            placeByHeight(company, treeX + 168, cy, 108);
         } else {
-            const partner = this.icons.create(this.cast.partner.gender, "front", this.cast.partner.colors);
-            this.stage.appendChild(partner);
-            placeByHeight(partner, treeX + 128, cy + 10, 180);
+            company = this.icons.create(this.cast.partner.gender, "front", this.cast.partner.colors);
+            offerCard.appendChild(company);
+            placeByHeight(company, treeX + 128, cy + 10, 180);
         }
 
-        const shownAt = performance.now();
-        return new Promise((resolve) => {
+        let shownAt = 0;
+        let acceptButton;
+        let rejectButton;
+        let costIcon;
+        const decision = new Promise((resolve) => {
             let chosen = false;
             const choose = (accepted) => {
                 if (chosen) return;
                 chosen = true;
+                acceptButton.style.pointerEvents = "none";
+                rejectButton.style.pointerEvents = "none";
                 resolve({
                     accepted: accepted,
                     decisionTimeMs: Math.round(performance.now() - shownAt)
                 });
             };
-            this.stage.appendChild(makeButton("Accept", cx - 160, cy + boxH / 2 + 90, 240, 74, () => choose(true)));
-            this.stage.appendChild(makeButton("Reject", cx + 160, cy + boxH / 2 + 90, 240, 74, () => choose(false)));
+            const buttonY = cy + boxH / 2 + 90;
+            acceptButton = makeButton("Accept", cx - 160, buttonY, 240, 74, () => choose(true));
+            rejectButton = makeButton("Reject", cx + 160, buttonY, 240, 74, () => choose(false));
+            offerCard.appendChild(acceptButton);
+            offerCard.appendChild(rejectButton);
+            costIcon = makeRejectCostIcon(StimulusSettings.rejectCost);
+            placeButtonIcon(rejectButton, costIcon, 54, 12);
         });
+
+        acceptButton.style.pointerEvents = "none";
+        rejectButton.style.pointerEvents = "none";
+        try {
+            if (guide) {
+                await this.explainOffer(trial, {
+                    card: offerCard,
+                    medal: medal,
+                    apples: typeIcon,
+                    company: company,
+                    cost: costIcon
+                });
+            }
+        } finally {
+            shownAt = performance.now();
+            acceptButton.style.pointerEvents = "";
+            rejectButton.style.pointerEvents = "";
+        }
+        return decision;
+    }
+
+    // Same continue-to-advance captions as the practice trial. The choice stays locked until the last one closes.
+    async explainOffer(trial, targets) {
+        const lines = offerBubbleText(this.cast.partner.name, trial);
+        const bubble = new SpeechBubble(this.svg);
+        const steps = [
+            { target: targets.card, text: lines.intro, preferredSide: "up" },
+            { target: targets.medal, text: lines.reward, preferredSide: "up" },
+            { target: targets.apples, text: lines.apples, preferredSide: "up" },
+            { target: targets.company, text: lines.partner, preferredSide: "up" },
+            { target: targets.cost, text: lines.reject, preferredSide: "up" }
+        ];
+        for (let i = 0; i < steps.length; i++) await bubble.show(steps[i]);
     }
 
     cloneTypeIcon(appleClass) {
