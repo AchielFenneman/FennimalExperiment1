@@ -724,8 +724,8 @@ let StimulusSettings = function () {
                 include_lost_found_tag: false,
                 box_locations: [
                     { label: "boost", Fennimal_finding_box: "A", target_box: "X" },
-                    //{ label: "neutral", Fennimal_finding_box: "C", target_box: "X" },
-                    { label: "cost", Fennimal_finding_box: "B", target_box: "X" }
+                    { label: "neutral", Fennimal_finding_box: "C", target_box: "X" },
+                    //{ label: "cost", Fennimal_finding_box: "B", target_box: "X" }
                 ],
                 partner_behavior: "active"
             },
